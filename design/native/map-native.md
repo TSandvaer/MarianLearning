@@ -92,3 +92,56 @@ P  portrait (375×667 floor)           L  landscape (667×375 floor)
 - `mapPathScale(pane, model, alsoBadged, landscape)` returns `{ s, virtualW, virtualH, contentH, scrolls }`.
 
 Unit tests pin the sizes table above.
+
+## 3. Emma on the map
+
+- **No App-level Emma on the map.** App does not render `EmmaStage` while `route === 'map'`. Give its outer view `exiting={FadeOut.duration(200)}` (the web map's exit); `map` is the only route where it unmounts. Back on the Hub she remounts with `entrance='fade'` and her shadow, as on a returning launch. Why: on the map Emma is part of the picture. She scrolls with the path in L and sits under the stops, and the hoisted stage draws her full figure, which the map no longer shows.
+- **Emma is the web's "you are here" badge (`EmmaBadge.tsx`), not a standing figure behind the stop.** `team/DECISIONS.md` 2026-10-06 put her behind the stop. Thomas replaced that on 2026-10-07 ("she has no legs so this doesnt work", #522; `emma-character-and-animation.md` § 3b). Port the badge: a clay rim, a cream window with her head and shoulders, and a tail pointing down at the stop. The whole box sits above the stop (`emmaBadge()`).
+- **Draw order in the path layer:** bands, stones, land pills, current glow, badge, gates, stops. The badge never covers a stop or a gate.
+- **Face: drawn, not baked.** The window is a circle with `overflow: 'hidden'`. Inside it, the pose WebP (`emmaAsset('idle' | 'cheering')`) is drawn with side `window × 1024 / 400`, offset by `(−cx, −cy) / 400 × window`. The crop squares are the web's `CROP`: idle (312, 14, 400) and cheering (330, 80, 400). This needs no new files: the pose art is already bundled and EmmaStage has decoded it. Rim, window and gloss: `EmmaBadge.tsx` values in virtual px × s.
+- **Poses:**
+  - `idle` → idle face.
+  - `cheering` → cheering face, plus a scale pop [1, 1.18, 0.95, 1.05, 1] over 600 ms, ease-out.
+  - `attentive-pointing` (a locked-stop tap) → idle face, tilted −9° (spring 300/16) for 1500 ms.
+
+  The face swap is two keyed image layers with a 200 ms cross-fade. The pivot is the tail's tip (`transformOrigin: '50% 100%'`). No breathing (web parity). When the path is complete: the cheering face on the last stop, and no glow.
+
+- **The badge springs only when its stop changes** (the unlock hop, § 4). On a rotation it moves with the path: a spring would trail behind the re-laid-out stops.
+
+## 4. The unlock celebration (moved here from the Hub)
+
+Session End's "All done" already opens the map when `pendingUnlock(progress, world)` is set. App also sets the map's world to the session's world (§ 7). Any map visit with an uncelebrated unlock plays it, as on the web.
+
+**Decision: port the web beat as it is.** Core's `unlockTimeline` starts at mount. The native layout comes from the viewport, so there is no measure frame to wait for.
+
+| ms          | Phase                | What happens                                                                                                                                                                        |
+| ----------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0           | bloom                | `persistUnlockCelebrated(world)` runs first, so leaving mid-beat never replays it. The badge is on the just-mastered stop; that stop's flower badge scales 0 → 1 (300 ms).          |
+| 400         | hop                  | The badge springs (260/22) to the new stop, with two arcs y [0, −28, 0, −18, 0] × s over 700 ms, ease-in-out.                                                                       |
+| 1100        | pop                  | Padlock scale 1 → 1.35 → 0 (400 ms). The locked sticker layer fades 1 → 0 (400 ms). 8 sparkles fly to 0.7 × the stop size (600 ms). `sfx-chime-soft` at 0.85.                       |
+| 1500        | gate (new land only) | The closed arch scales 1 → 1.12 → 1.2 and fades off the open one (600 ms). 12 sparkles fly to 64 × s. The new land's band goes from 0.35 to 1 opacity (600 ms). `sfx-cheer` at 0.7. |
+| 1500 / 2100 | cheer                | The badge turns `cheering`, and the caption and line start (`unlockLine`). At the line's end the badge returns to `idle` (`cheering` if the path is complete).                      |
+
+- **Before `cheer`:** stop and gate taps do nothing, the caption slot stays empty (it is reserved, so nothing moves), and in L the pane doesn't scroll. Home works at any time.
+- **Reduce Motion:** no hop, pop, swing or sparkles. The badge cross-fades from stop to stop, and every change is a 200 ms fade (spec § 7). The audio is the same.
+- **No haptics.** iPads have no haptic engine, and Marian plays on one. A buzz only on phones would make her two devices disagree.
+- **Backgrounding mid-beat:** nothing special. Effects that fire while the app is hidden are dropped (the sfx contract), and the line parks and resumes (the voice channel).
+- **No celebration on the Hub** (hub-native § 4).
+
+## 5. Art: bake versus draw
+
+iOS supports only `brightness` and `opacity` in RN's `filter` (hub-native § 4), so anything that needs `saturate` is baked. Everything else is drawn.
+
+| Piece                                                                     | Web                                                                                        | Native                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Locked stop sticker                                                       | `saturate(.2) brightness(1.12) opacity(.62)` + `drop-shadow(0 4px 3px rgba(60,30,10,.12))` | **Bake** a `-256-locked` copy of the 24 stop images in `export-assets.mjs`, beside the `-muted` copies (sharp `modulate({ saturation: 0.2, brightness: 1.12 })`), with a `pathArtLockedAsset(id)` accessor. The 0.62 opacity and the shadow are drawn. Only 256: a locked sticker is never over 188 device px (0.84 × 112 pt at 2×). |
+| The pop's frost fade                                                      | The same filter on a fading copy                                                           | The locked copy over the full-colour sticker, opacity 1 → 0.                                                                                                                                                                                                                                                                         |
+| Shadows on stickers, arches, flower badge, padlock, open buds, badge tail | `filter: drop-shadow`                                                                      | `imageShadow()` (`screens/hub/clay.ts`, moved to shared): iOS `shadow*` on a background-less wrapper, Android `dropShadow`. Tradeoff: if scrolling in L drops frames on the oldest test phone, set `shouldRasterizeIOS` on the static sticker wrappers before baking anything.                                                       |
+| Emma's face                                                               | CSS crop of the pose SVG                                                                   | Drawn crop (§ 3).                                                                                                                                                                                                                                                                                                                    |
+| Badge tail                                                                | Inline SVG                                                                                 | react-native-svg, same path, 2 pt stroke.                                                                                                                                                                                                                                                                                            |
+| Bands, stones, plinths, bud tray, land pills, Home button, current glow   | Gradients + `box-shadow` (including `inset`)                                               | `experimental_backgroundImage` + `boxShadow` strings, px × s, as on the Hub and Math.                                                                                                                                                                                                                                                |
+| Title                                                                     | `text-shadow` stack                                                                        | Three stacked `Text` layers (the Hub's `ClayTitle` pattern), with the map's colours.                                                                                                                                                                                                                                                 |
+| Caption slab + speaker                                                    | Clay slab, inline SVG                                                                      | Session End's `ClayCaption` + `SpeakerIcon`, moved to `mobile/src/components/` with a `testID` prop.                                                                                                                                                                                                                                 |
+| Sparkles                                                                  | `motion` spans                                                                             | Reanimated dots, 10 × s, pink and gold alternating.                                                                                                                                                                                                                                                                                  |
+
+**New art: the 24 locked stickers.** Everything else is already in the bundle.
