@@ -11,7 +11,9 @@ import { join } from 'path'
 import {
   assetForWebPath,
   emmaAsset,
+  emmaIdleShadowAsset,
   pathArtAsset,
+  pathArtMutedAsset,
   pictureAsset,
   sceneAsset,
 } from './index'
@@ -60,8 +62,25 @@ describe('native asset registry', () => {
     }
   })
 
+  it("has the Hub bakes: idle Emma's shadow and a muted copy of every 256 px path art", () => {
+    expect(emmaIdleShadowAsset()).toBeDefined()
+    for (const id of PATH_ART_IDS) {
+      expect([id, pathArtMutedAsset(id) !== undefined]).toEqual([id, true])
+    }
+  })
+
   it('every registry entry is a web asset that still exists', () => {
-    for (const webPath of Object.keys(WEB_ASSET_MODULES)) {
+    // Native-only bakes (`/native/...`) come from a web asset that exists.
+    const source = (key: string) =>
+      key === '/native/emma/idle-shadow.webp'
+        ? '/assets/emma-idle.svg'
+        : key.replace(
+            /^\/native\/path\/(.+)-muted\.webp$/,
+            '/assets/path/$1.webp',
+          )
+    for (const key of Object.keys(WEB_ASSET_MODULES)) {
+      const webPath = key.startsWith('/native/') ? source(key) : key
+      expect(webPath.startsWith('/assets/')).toBe(true)
       expect([webPath, existsSync(join(WEB_ASSETS, '..', webPath))]).toEqual([
         webPath,
         true,

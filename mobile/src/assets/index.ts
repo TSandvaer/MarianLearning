@@ -54,3 +54,16 @@ export function pathArtAsset(
 ): NativeImage | undefined {
   return assetForWebPath(pathArtSrc(id, size))
 }
+
+/**
+ * Native-only bakes of web CSS filters iOS cannot draw (`export-assets`,
+ * keyed under `/native/`): the Hub's shadow under idle Emma, and the
+ * Hub's muted "next" sticker (web `saturate(.55) brightness(1.04)`).
+ */
+export function emmaIdleShadowAsset(): NativeImage | undefined {
+  return assetForWebPath('/native/emma/idle-shadow.webp')
+}
+
+export function pathArtMutedAsset(id: PathArtId): NativeImage | undefined {
+  return assetForWebPath(`/native/path/${id}-256-muted.webp`)
+}
