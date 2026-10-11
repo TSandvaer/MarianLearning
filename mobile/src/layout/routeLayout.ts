@@ -6,6 +6,7 @@ import {
   type ScreenLayout,
   type Viewport,
 } from './layout'
+import { sessionEndLayout } from './sessionEndLayout'
 
 /**
  * Emma's frame and the content area for a route. Greet centres Emma,
@@ -19,6 +20,8 @@ export function layoutForRoute(route: Route, viewport: Viewport): ScreenLayout {
     case 'math':
     case 'literacy':
       return mathLayout(viewport)
+    case 'session-end':
+      return sessionEndLayout(viewport)
     default:
       return hubLayout(viewport)
   }
