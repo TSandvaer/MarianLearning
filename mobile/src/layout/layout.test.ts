@@ -49,14 +49,16 @@ function overlaps(a: Rect, b: Rect): boolean {
 
 describe.each(Object.entries(VIEWPORTS))('%s', (_name, viewport) => {
   // Greet has its own layout and tests (greetLayout.test.ts): Emma's frame
-  // may overhang the screen there, as on the web.
+  // may overhang the screen there, as on the web. So may the Hub's (web
+  // stage top −6u; landscape column overhang), used by the routes not
+  // ported yet (hubLayout.test.ts).
   it.each(ROUTES.filter((r) => r !== 'splash' && r !== 'greet'))(
     '%s: Emma and the placeholder panel sit in the safe area, apart',
     (route) => {
       const layout = layoutForRoute(route, viewport)
       const safe = safeRect(viewport)
       const panel = panelRect(layout)
-      expect(inside(layout.emma, safe)).toBe(true)
+      if (!('form' in layout)) expect(inside(layout.emma, safe)).toBe(true)
       expect(inside(panel, safe)).toBe(true)
       expect(panel.height).toBeGreaterThan(0)
       expect(overlaps(layout.emma, panel)).toBe(false)
