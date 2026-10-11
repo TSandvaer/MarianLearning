@@ -203,3 +203,9 @@ Distinct from its siblings:
 - **Context:** The native Map (#540, `956405b`) ports Emma's Path to Kyle's spec (#539); the map logic moved into `@marian/core/map/`. Kevin approved with no required changes.
 - **Decided:** (1) Map approved on device with the `add-to-20` debug seed ("works, merge it"). (2) Thomas noticed the top gate (land 4) is open while land 3 is locked. That is the shared rule (a gate opens when its land's first step is not locked) plus the diagnostic baseline (`mult-2-5-10` starts at `intro`, `packages/core/src/progress/defaults.ts:177`), the same on the web; kept as is for the port, since any change would touch the frozen web too. (3) Word Song follows the Map's pattern: Kyle's native spec and Devon's core/audio work in parallel.
 - **Decided by:** Thomas (device check); (2) and (3) follow the web-parity rule and the 2026-10-09 Phase 3 order.
+
+## 2026-10-11 — Native Word Song approved on device; drain complete
+
+- **Context:** The native Word Song (#543, `054928c`) ports the web screen to Kyle's spec (#542); its round rules moved into `@marian/core`. Kevin's one required change (the blend-mark drift check compared byte lengths, and 9 CBR clips share one length) was fixed with a sha256 per entry.
+- **Decided:** (1) Word Song approved on device with the `cvc-words` debug seed ("works, merge it"), including Kyle's native-only calls: right-edge chip column in phone landscape, blend highlight from measured onset marks, dark letter on a rose spotlight. (2) The session drained on Thomas's "drain session": in-flight work finished, nothing new dispatched; ParentSettings starts only on his go.
+- **Decided by:** Thomas (device check, drain).
