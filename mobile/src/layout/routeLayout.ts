@@ -3,6 +3,7 @@ import { greetLayout } from './greetLayout'
 import { hubLayout } from './hubLayout'
 import { mathLayout, type ScreenLayout, type Viewport } from './layout'
 import { sessionEndLayout } from './sessionEndLayout'
+import { wordSongLayout } from './wordSongLayout'
 
 /**
  * Emma's frame and the content area for a route. Greet centres Emma,
@@ -15,8 +16,9 @@ export function layoutForRoute(route: Route, viewport: Viewport): ScreenLayout {
     case 'greet':
       return greetLayout(viewport)
     case 'math':
-    case 'literacy':
       return mathLayout(viewport)
+    case 'literacy':
+      return wordSongLayout(viewport)
     case 'session-end':
       return sessionEndLayout(viewport)
     default:

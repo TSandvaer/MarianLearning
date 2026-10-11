@@ -51,8 +51,11 @@ describe.each(Object.entries(VIEWPORTS))('%s', (_name, viewport) => {
   // Greet has its own layout and tests (greetLayout.test.ts): Emma's frame
   // may overhang the screen there, as on the web. So may the Hub's (web
   // stage top −6u; landscape column overhang), used by the routes not
-  // ported yet (hubLayout.test.ts).
-  it.each(ROUTES.filter((r) => r !== 'splash' && r !== 'greet'))(
+  // ported yet (hubLayout.test.ts). Word Song has its own layout and
+  // tests too (wordSongLayout.test.ts); it never shows the placeholder.
+  it.each(
+    ROUTES.filter((r) => r !== 'splash' && r !== 'greet' && r !== 'literacy'),
+  )(
     '%s: Emma and the placeholder panel sit in the safe area, apart',
     (route) => {
       const layout = layoutForRoute(route, viewport)

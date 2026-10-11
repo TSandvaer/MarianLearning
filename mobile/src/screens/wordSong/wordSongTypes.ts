@@ -29,7 +29,14 @@ export interface PlayWordSongUtteranceOptions {
   onPlay?: () => void
   /** Fires per word; the caption (and the blend's letters) follow it. */
   onWordTick?: (wordIndex: number) => void
+  /** The clip's clock in ms (real audio only; the marks-driven blend). */
+  onTime?: (ms: number) => void
 }
+
+/** A session line's MP3 on disk and its byte length (`fileFor`). */
+export type ClipFileFn = (
+  text: string,
+) => { uri: string; bytes: number } | undefined
 
 /**
  * Plays one Word Song line by its text. Resolves at the line's end; rejects

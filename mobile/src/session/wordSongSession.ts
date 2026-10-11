@@ -32,7 +32,10 @@ import {
   type LoadedSessionAudio,
   type SessionPrefetcher,
 } from '../audio'
-import type { PlayWordSongUtteranceFn } from '../screens/wordSong/wordSongTypes'
+import type {
+  ClipFileFn,
+  PlayWordSongUtteranceFn,
+} from '../screens/wordSong/wordSongTypes'
 import {
   startSessionWithFallback,
   type SessionStartFallbackHandle,
@@ -55,6 +58,8 @@ export interface WordSongSessionSnapshot extends WordSongSessionExtras {
   plan: WordSongSessionPlan | null
   /** The session audio's player; `null` = the silent caption walk. */
   playUtterance: PlayWordSongUtteranceFn | null
+  /** A line's file on disk (tap sounds, blend marks); `null` = none. */
+  clipFor: ClipFileFn | null
   /** The start settled (either way): problem 1 may be read aloud. */
   audioReady: boolean
 }
@@ -98,6 +103,7 @@ interface Loaded {
 const IDLE: WordSongSessionSnapshot = {
   plan: null,
   playUtterance: null,
+  clipFor: null,
   audioReady: false,
   ...NO_EXTRAS,
 }
@@ -205,6 +211,7 @@ export function createWordSongSessionController(
             plan: prepared.plan,
             playUtterance: (text, opts) =>
               prepared.audio.playUtterance(text, opts),
+            clipFor: (text) => prepared.audio.fileFor(text),
             audioReady: true,
           })
         },

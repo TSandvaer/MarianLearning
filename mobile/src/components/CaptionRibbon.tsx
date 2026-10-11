@@ -15,7 +15,13 @@
  * it (Math and the Hub use a clay slab), set the text `color`, add an
  * `exiting` animation and draw children over the slab (the Hub's tail).
  */
-import { useEffect, type ComponentProps, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from 'react'
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
 import Animated, {
   Easing,
@@ -50,6 +56,7 @@ interface WordProps {
   lineHeight: number
   last: boolean
   color: string
+  onY?: (y: number) => void
 }
 
 function Word({
@@ -59,6 +66,7 @@ function Word({
   lineHeight,
   last,
   color,
+  onY,
 }: WordProps) {
   const opacity = useSharedValue(revealed ? 1 : 0)
   useEffect(() => {
@@ -73,6 +81,7 @@ function Word({
   return (
     <Animated.Text
       testID={revealed ? 'caption-word-revealed' : 'caption-word-hidden'}
+      onLayout={onY ? (e) => onY(e.nativeEvent.layout.y) : undefined}
       style={[
         styles.word,
         { fontSize, lineHeight, color, marginRight: last ? 0 : fontSize * 0.4 },
@@ -100,6 +109,13 @@ export interface CaptionRibbonProps {
   exiting?: ComponentProps<typeof Animated.View>['exiting']
   /** Drawn over the slab, under the words (e.g. a speech tail). */
   children?: ReactNode
+  /**
+   * A fixed slot of this many lines (Word Song): the ribbon never grows
+   * past it, and when the newest revealed word sits below the slot the
+   * text slides up a line (200 ms ease-out; Reduce Motion: a jump), so
+   * that word is always on the last line. Default: the ribbon grows.
+   */
+  maxLines?: number
 }
 
 export function CaptionRibbon({
@@ -114,9 +130,11 @@ export function CaptionRibbon({
   color = colors.ink,
   exiting,
   children,
+  maxLines,
 }: CaptionRibbonProps) {
   const reducedMotion = useReducedMotion()
   const words = text.split(/\s+/).filter(Boolean)
+  const scroll = useLineScroll(lineKey, revealedCount, lineHeight, maxLines)
   return (
     <Animated.View
       testID={testID}
@@ -136,21 +154,91 @@ export function CaptionRibbon({
       ]}
     >
       {children}
-      <View style={styles.row}>
-        {words.map((w, i) => (
-          <Word
-            key={`${lineKey}-${i}`}
-            word={w}
-            revealed={i < revealedCount}
-            fontSize={fontSize}
-            lineHeight={lineHeight}
-            last={i === words.length - 1}
-            color={color}
-          />
-        ))}
+      <View
+        style={
+          maxLines !== undefined
+            ? { maxHeight: maxLines * lineHeight, overflow: 'hidden' }
+            : undefined
+        }
+      >
+        <Animated.View
+          testID={
+            maxLines !== undefined
+              ? `caption-lines-up-${scroll.linesUp}`
+              : undefined
+          }
+          style={[styles.row, scroll.style]}
+        >
+          {words.map((w, i) => (
+            <Word
+              key={`${lineKey}-${i}`}
+              word={w}
+              revealed={i < revealedCount}
+              fontSize={fontSize}
+              lineHeight={lineHeight}
+              last={i === words.length - 1}
+              color={color}
+              onY={
+                maxLines !== undefined ? (y) => scroll.onWordY(i, y) : undefined
+              }
+            />
+          ))}
+        </Animated.View>
       </View>
     </Animated.View>
   )
+}
+
+/**
+ * The fixed slot's scroll (see `maxLines`): how many lines the text has
+ * slid up so the newest revealed word sits on the slot's last line, from
+ * each word's laid-out y (state, per line), animated on a shared value.
+ * Inert without `maxLines`.
+ */
+function useLineScroll(
+  lineKey: string,
+  revealedCount: number,
+  lineHeight: number,
+  maxLines: number | undefined,
+) {
+  const reducedMotion = useReducedMotion()
+  const [laid, setLaid] = useState<{ key: string; ys: number[] }>({
+    key: lineKey,
+    ys: [],
+  })
+  const ys = laid.key === lineKey ? laid.ys : []
+  const y = ys[revealedCount - 1]
+  const linesUp =
+    maxLines === undefined || y === undefined
+      ? 0
+      : Math.max(0, Math.round(y / lineHeight) - (maxLines - 1))
+  const offset = useSharedValue(0)
+  useEffect(() => {
+    const target = -linesUp * lineHeight
+    offset.set(
+      reducedMotion || linesUp === 0
+        ? target
+        : withTiming(target, {
+            duration: 200,
+            easing: Easing.out(Easing.ease),
+          }),
+    )
+  }, [linesUp, lineHeight, reducedMotion, offset])
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateY: offset.get() }],
+  }))
+  const onWordY = useCallback(
+    (i: number, wordY: number) =>
+      setLaid((prev) => {
+        const base = prev.key === lineKey ? prev.ys : []
+        if (base[i] === wordY && prev.key === lineKey) return prev
+        const next = base.slice()
+        next[i] = wordY
+        return { key: lineKey, ys: next }
+      }),
+    [lineKey],
+  )
+  return { style, onWordY, linesUp }
 }
 
 const styles = StyleSheet.create({

@@ -20,6 +20,7 @@ import {
   writeSessionHistory,
 } from '@marian/core/sessionEnd/sessionHistory'
 import { WARM_CAP_MS } from '@marian/core/splash/splashTiming'
+import { loadStardust } from '@marian/core/shared/stardust'
 import { ADVANCE_AFTER_CORRECT_MS } from '@marian/core/shared/gameplayConstants'
 import {
   act,
@@ -289,7 +290,17 @@ it('Greet → heart → Math (offline: the static plan, silent captions) → 8 p
   expect(live[0]!.calls).toContain('play')
 })
 
-it('Session End writes once: after All done, Hub → Word Song → Session End is the placeholder and records nothing', async () => {
+/** Word Song, offline (static plan, silent captions): the read ends, the
+ *  right chip, "Yes!", the next problem. */
+async function answerWordRight(): Promise<void> {
+  await settle(2000)
+  const word = screen.getByTestId('word-song-word-picture').props
+    .accessibilityLabel as string
+  await fireEvent.press(screen.getByTestId(`word-song-chip-${word}`))
+  await settle(ADVANCE_AFTER_CORRECT_MS + 400)
+}
+
+it('Session End writes once per session: Math → Session End → Hub → Word Song → Session End (+5), and nothing replays after', async () => {
   boot()
   await greetToMath()
   for (let i = 0; i < 8; i++) await answerRight()
@@ -297,16 +308,98 @@ it('Session End writes once: after All done, Hub → Word Song → Session End i
   await fireEvent.press(screen.getByTestId('session-end-cta'))
   await advance(LEAVE_DELAY_MS)
   expect(screen.getByTestId('hub')).toBeOnTheScreen()
-  expect(readSessionHistory().sessionCount).toBe(1)
   expect(loadProgress()?.history).toHaveLength(1)
+  const stardustBefore = loadStardust().total
 
   await fireEvent.press(screen.getByTestId('hub-card-word-song'))
-  await fireEvent.press(screen.getByTestId('exit-session-end'))
+  await flushAll()
+  expect(screen.getByTestId('word-song')).toBeOnTheScreen()
+  expect(sessionStarts().at(-1)).toMatchObject({
+    payload: { track: 'word-song', level: 1, childName: 'Marian' },
+  })
+  for (let i = 0; i < 8; i++) await answerWordRight()
+
+  // Word Song handed its result over: the one write, the +5 bonus.
+  expect(screen.getByTestId('session-end')).toBeOnTheScreen()
+  expect(readSessionHistory().sessionCount).toBe(2)
+  expect(loadProgress()?.history).toHaveLength(2)
+  // Recorded under the Word Song focus picked at the kick (the diagnostic
+  // baseline's), even though offline the static plan ran.
+  expect(loadProgress()?.history.at(-1)?.skillFocus).toEqual(['letter-sounds'])
+  expect(loadStardust().total).toBe(stardustBefore + 5)
+
+  await sessionEndSettles()
+  await fireEvent.press(screen.getByTestId('session-end-cta'))
+  await advance(LEAVE_DELAY_MS)
   await settle(1000)
-  expect(readSessionHistory().sessionCount).toBe(1)
-  expect(loadProgress()?.history).toHaveLength(1)
-  expect(screen.getByTestId('route-session-end')).toBeOnTheScreen()
+  expect(readSessionHistory().sessionCount).toBe(2)
+  expect(loadProgress()?.history).toHaveLength(2)
+})
+
+it('QA route literacy: Word Song runs at once, and its Session End writes exactly once', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  const env = jest.spyOn(buildEnv, 'readBuildEnv').mockReturnValue({
+    apiBase: undefined,
+    progressApiSecret: undefined,
+    debug: '1',
+    seed: undefined,
+    dayOffset: undefined,
+    mute: undefined,
+    audioCheck: undefined,
+    qaAutoTapMs: undefined,
+    qaRoute: 'literacy',
+  })
+  try {
+    boot({ debug: true, seed: null, dayOffset: null })
+    await render(<App />)
+    await flushAll()
+    expect(screen.getByTestId('word-song')).toBeOnTheScreen()
+    // Mounting wrote nothing; the session start was kicked once.
+    expect(progressWrites).toBe(0)
+    expect(sessionStarts()).toHaveLength(1)
+    for (let i = 0; i < 8; i++) await answerWordRight()
+    expect(screen.getByTestId('session-end')).toBeOnTheScreen()
+    expect(readSessionHistory().sessionCount).toBe(1)
+    expect(loadProgress()?.history).toHaveLength(1)
+    await sessionEndSettles()
+    await fireEvent.press(screen.getByTestId('session-end-cta'))
+    await advance(LEAVE_DELAY_MS)
+    await settle(1000)
+    expect(loadProgress()?.history).toHaveLength(1)
+  } finally {
+    env.mockRestore()
+  }
+})
+
+it('Word Song → back: the Hub at once, no Session End, no write, the request aborted', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  boot({ debug: true, seed: 'cvc-words', dayOffset: null })
+  // Every request hangs until it is aborted.
+  ;(globalThis.fetch as jest.Mock).mockImplementation(
+    (_url: string, init: { signal?: AbortSignal }) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () =>
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+        )
+      }),
+  )
+  await renderPastSplash()
+  const writes = progressWrites
+  await fireEvent.press(screen.getByTestId('hub-card-word-song'))
+  await flushAll()
+  expect(screen.getByTestId('word-song-getting-ready')).toBeOnTheScreen()
+  const calls = (globalThis.fetch as jest.Mock).mock.calls
+  const signal = (calls.at(-1)![1] as { signal: AbortSignal }).signal
+  expect(signal.aborted).toBe(false)
+  await fireEvent.press(screen.getByTestId('word-song-back-to-hub'))
+  await flushAll()
+  expect(screen.getByTestId('hub')).toBeOnTheScreen()
+  expect(signal.aborted).toBe(true)
   expect(screen.queryByTestId('session-end')).toBeNull()
+  expect(progressWrites).toBe(writes)
+  ;(globalThis.fetch as jest.Mock).mockImplementation(() =>
+    Promise.reject(new TypeError('Network request failed (jest is offline)')),
+  )
 })
 
 it('QA route session-end without a session: the placeholder, and nothing is written', async () => {
@@ -497,14 +590,18 @@ it('back to the Hub tears the session down; Math again starts a fresh one', asyn
   jest.spyOn(console, 'log').mockImplementation(() => {})
   boot({ debug: true, seed: 'add-to-20', dayOffset: null })
   await renderPastSplash()
-  // Word Song glows (a tie): no Number Garden prefetch.
-  expect(sessionStarts()).toHaveLength(0)
+  // Word Song glows (a tie): the Hub prefetches Word Song's session.
+  expect(sessionStarts()).toEqual([
+    expect.objectContaining({
+      payload: expect.objectContaining({ track: 'word-song' }),
+    }),
+  ])
   await fireEvent.press(screen.getByTestId('hub-card-number-garden'))
   await flushAll()
   expect(screen.getByTestId('math')).toBeOnTheScreen()
-  expect(sessionStarts()).toHaveLength(1)
+  expect(sessionStarts()).toHaveLength(2)
   // The seeded progress rides along (focus node, first encounters).
-  expect(sessionStarts()[0]).toMatchObject({
+  expect(sessionStarts()[1]).toMatchObject({
     payload: { track: 'math', progress: { focusNode: 'add-to-20' } },
   })
 
@@ -516,10 +613,10 @@ it('back to the Hub tears the session down; Math again starts a fresh one', asyn
   // the tap starts its own).
   await flushAll()
   expect(screen.getByTestId('hub-card-suggested')).toBeOnTheScreen()
-  expect(sessionStarts()).toHaveLength(2)
+  expect(sessionStarts()).toHaveLength(3)
   await fireEvent.press(screen.getByTestId('hub-card-number-garden'))
   await flushAll()
-  expect(sessionStarts()).toHaveLength(3)
+  expect(sessionStarts()).toHaveLength(4)
 })
 
 it('Number Garden glowing: the Hub prefetches its session and the tap adopts it', async () => {
