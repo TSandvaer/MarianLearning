@@ -13,12 +13,15 @@
  * between). Phone (spec § 4): back on its own; streak then stardust
  * right-aligned; the beads on their own row (portrait) or at the left of
  * the pane's HUD row (landscape). Nothing here is a target except back.
+ *
+ * Word Song wears the same HUD (the web's is a local copy of Math's), with
+ * its own test IDs and a 400 ms / 1.3 pop: `world={WORD_SONG_HUD}`.
  */
 import {
   STREAK_BONUS_THRESHOLDS,
   STREAK_FADE_OUT_MS,
 } from '@marian/core/shared/gameplayConstants'
-import { useEffect } from 'react'
+import { createContext, useContext, useEffect } from 'react'
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import Animated, {
   Easing,
@@ -32,10 +35,11 @@ import Animated, {
 import type { HudLayout, HudMetrics } from '../../layout/mathLayout'
 import { colors, fonts } from '../../theme'
 import { BackChevron, SparkleGlyph } from './glyphs'
+import { MATH_HUD, type HudWorld } from './hudWorld'
 
-/** Web `HUD_POP_TWEEN`: 250 ms ease-out. */
-const POP_MS = 250
 const EASE_OUT = Easing.bezier(0, 0, 0.58, 1)
+
+const World = createContext<HudWorld>(MATH_HUD)
 
 const BACK_BG =
   'radial-gradient(circle at 40% 32%, #e7b07a 0%, #c98a55 55%, #a86c3c 100%)'
@@ -45,9 +49,10 @@ const BACK_SHADOW_PRESSED =
   'inset 0 4px 0 rgba(255, 255, 255, 0.3), 0 2px 0 #7d4a26, 0 4px 8px rgba(60, 30, 10, 0.28)'
 
 function BackButton({ size, onPress }: { size: number; onPress: () => void }) {
+  const { idPrefix } = useContext(World)
   return (
     <Pressable
-      testID="math-back-to-hub"
+      testID={`${idPrefix}-back-to-hub`}
       accessibilityRole="button"
       accessibilityLabel="Back"
       onPress={onPress}
@@ -68,15 +73,16 @@ function BackButton({ size, onPress }: { size: number; onPress: () => void }) {
   )
 }
 
-/** A value that pops `[1, 1.25, 1]` when `trigger` changes while `active`. */
+/** A value that pops `[1, peak, 1]` when `trigger` changes while `active`. */
 function usePop(trigger: number, active: boolean) {
   const reducedMotion = useReducedMotion()
+  const { popMs, popScale } = useContext(World)
   const scale = useSharedValue(1)
   useEffect(() => {
     if (!active || reducedMotion) return
-    const half = { duration: POP_MS / 2, easing: EASE_OUT }
-    scale.set(withSequence(withTiming(1.25, half), withTiming(1, half)))
-  }, [trigger, active, reducedMotion, scale])
+    const half = { duration: popMs / 2, easing: EASE_OUT }
+    scale.set(withSequence(withTiming(popScale, half), withTiming(1, half)))
+  }, [trigger, active, reducedMotion, scale, popMs, popScale])
   return useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }))
 }
 
@@ -90,9 +96,10 @@ function StardustPill({
   m: HudMetrics
 }) {
   const pop = usePop(total, celebrating)
+  const { idPrefix } = useContext(World)
   return (
     <View
-      testID="math-stardust"
+      testID={`${idPrefix}-stardust`}
       accessible
       accessibilityLabel={`Stardust: ${total}`}
       style={[
@@ -124,6 +131,7 @@ function StardustPill({
 type BeadState = 'completed' | 'current' | 'upcoming'
 
 function Bead({ state, m }: { state: BeadState; m: HudMetrics }) {
+  const { idPrefix } = useContext(World)
   const size = useSharedValue(m.bead[state])
   useEffect(() => {
     size.set(withTiming(m.bead[state], { duration: 200, easing: EASE_OUT }))
@@ -135,7 +143,7 @@ function Bead({ state, m }: { state: BeadState; m: HudMetrics }) {
   }))
   return (
     <Animated.View
-      testID={`math-problem-dot-${state}`}
+      testID={`${idPrefix}-problem-dot-${state}`}
       style={[BEAD_LOOK[state], style]}
     />
   )
@@ -170,9 +178,10 @@ function Beads({
   index: number
   m: HudMetrics
 }) {
+  const { idPrefix } = useContext(World)
   return (
     <View
-      testID="math-problem-dots"
+      testID={`${idPrefix}-problem-dots`}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={[
@@ -207,6 +216,7 @@ function Streak({
   m: HudMetrics
 }) {
   const reducedMotion = useReducedMotion()
+  const { idPrefix, popMs, popScale } = useContext(World)
   const opacity = useSharedValue(0)
   const scale = useSharedValue(reducedMotion ? 1 : 0.9)
   const bonus = (STREAK_BONUS_THRESHOLDS as readonly number[]).includes(streak)
@@ -218,15 +228,24 @@ function Streak({
       )
       return
     }
-    opacity.set(withTiming(1, { duration: POP_MS, easing: EASE_OUT }))
-    scale.set(withTiming(1, { duration: POP_MS, easing: EASE_OUT }))
-  }, [fadingOut, opacity, scale])
+    opacity.set(withTiming(1, { duration: popMs, easing: EASE_OUT }))
+    scale.set(withTiming(1, { duration: popMs, easing: EASE_OUT }))
+  }, [fadingOut, opacity, scale, popMs])
 
   useEffect(() => {
     if (!celebrating || !bonus || reducedMotion || fadingOut) return
-    const half = { duration: POP_MS / 2, easing: EASE_OUT }
-    scale.set(withSequence(withTiming(1.25, half), withTiming(1, half)))
-  }, [celebrating, bonus, streak, reducedMotion, fadingOut, scale])
+    const half = { duration: popMs / 2, easing: EASE_OUT }
+    scale.set(withSequence(withTiming(popScale, half), withTiming(1, half)))
+  }, [
+    celebrating,
+    bonus,
+    streak,
+    reducedMotion,
+    fadingOut,
+    scale,
+    popMs,
+    popScale,
+  ])
 
   const style = useAnimatedStyle(() => ({
     opacity: opacity.get(),
@@ -237,7 +256,7 @@ function Streak({
     // animation and an animated style both drive the same opacity.
     <Animated.View exiting={FadeOut.duration(150)}>
       <Animated.View
-        testID="math-streak"
+        testID={`${idPrefix}-streak`}
         accessible
         accessibilityLabel={`Streak: ${streak}`}
         style={[styles.streak, style]}
@@ -270,9 +289,19 @@ export interface MathHudProps {
   streakFadingOut: boolean
   celebrating: boolean
   onBack: () => void
+  /** The world's test IDs and pop (default Math's). */
+  world?: HudWorld
 }
 
-export function MathHud({
+export function MathHud({ world = MATH_HUD, ...props }: MathHudProps) {
+  return (
+    <World.Provider value={world}>
+      <HudBody {...props} />
+    </World.Provider>
+  )
+}
+
+function HudBody({
   hud,
   landscape,
   metrics: m,
@@ -284,7 +313,8 @@ export function MathHud({
   streakFadingOut,
   celebrating,
   onBack,
-}: MathHudProps) {
+}: Omit<MathHudProps, 'world'>) {
+  const hudId = `${useContext(World).idPrefix}-hud`
   const streakEl = showStreak ? (
     <Streak
       streak={streak}
@@ -300,7 +330,7 @@ export function MathHud({
     const { rect, padX } = hud
     return (
       <View
-        testID="math-hud"
+        testID={hudId}
         style={[
           styles.row,
           {
@@ -337,7 +367,7 @@ export function MathHud({
         <BackButton size={m.back} onPress={onBack} />
       </View>
       <View
-        testID="math-hud"
+        testID={hudId}
         style={[
           styles.abs,
           styles.beadsRow,

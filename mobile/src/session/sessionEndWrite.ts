@@ -14,12 +14,10 @@
  *      replays. "Play again to get today's flower." is marked as said the
  *      moment it is scheduled.
  *
- * One deliberate gap: the Word Song graduation split needs the planner's
- * novel-probe word list, which lives in the server's `api/` (outside what
- * Metro bundles). The split is computed when the caller passes the list
- * (`novelProbeWords`); without it no split is written, the fallback the
- * web itself takes when a session used no novel words. Word Song is not
- * ported yet, so no Word Song payload reaches native Session End today.
+ * The Word Song graduation split needs the planner's novel-probe word
+ * list. The planner's copy lives in the server's `api/` (outside what
+ * Metro bundles), so the split reads core's `NOVEL_PROBE_WORDS`, pinned to
+ * the planner's by the web suite (`wordRoundParity.test.tsx`).
  */
 import { localDateKey, now as progressNow } from '@marian/core/progress/clock'
 import {
@@ -54,6 +52,7 @@ import {
   WORDSONG_SESSION_END_BONUS,
   grantWordSongCompletionBonus,
 } from '@marian/core/shared/wordSongCompletionBonus'
+import { NOVEL_PROBE_WORDS } from '@marian/core/wordSong/novelProbeWords'
 import type { SessionEndPayload } from './sessionEndPayload'
 
 /** The payload with the web's back-compat defaults (null → a zero math session). */
@@ -80,7 +79,7 @@ export function completionBonus(surface: SessionEndSurface): number {
 export interface SessionEndWriteOptions {
   /** Progress clock (honours the debug day offset). */
   clock?: () => Date
-  /** Word Song's novel-probe words, for the graduation split (see header). */
+  /** Word Song's novel-probe words (default: core's), for the graduation split. */
   novelProbeWords?: readonly string[]
 }
 
@@ -113,7 +112,7 @@ export function writeSessionEnd(
     track,
     focusNode,
     p,
-    opts.novelProbeWords,
+    opts.novelProbeWords ?? NOVEL_PROBE_WORDS,
   )
   const leitnerOutcomes =
     p.surface === 'math' &&
