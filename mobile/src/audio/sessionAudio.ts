@@ -111,6 +111,12 @@ export interface LoadedSessionAudio {
   playUtteranceById(id: string, opts?: LineCallbacks): Promise<void>
   /** Write (if needed) and create a line's player ahead of its first play. */
   prewarm(text: string): void
+  /**
+   * A line's MP3 on disk (written now if needed) and its byte length, for
+   * players outside the voice channel (Word Song's tap sounds) and for
+   * matching a clip to its measured marks. `undefined`: no such line.
+   */
+  fileFor(text: string): { uri: string; bytes: number } | undefined
   readonly textToId: ReadonlyMap<string, string>
   readonly utteranceCount: number
   /** Distinct texts = files this session writes. */
@@ -164,6 +170,7 @@ export function loadSessionAudio(
   /** First id → base64 still to write, in plan order. */
   const pending = new Map<string, string>()
   const uris = new Map<string, string>()
+  const fileBytes = new Map<string, number>()
   for (const u of utterances) {
     texts.set(u.id, u.text)
     if (!textToId.has(u.text)) {
@@ -200,6 +207,7 @@ export function loadSessionAudio(
     try {
       const { uri, bytes } = files.write(sessionId, fileId, base64)
       uris.set(fileId, uri)
+      fileBytes.set(fileId, bytes)
       bytesWritten += bytes
       return uri
     } catch (err) {
@@ -277,6 +285,7 @@ export function loadSessionAudio(
         label: `session:${id}`,
         onPlay: opts.onPlay,
         onWordTick: opts.onWordTick,
+        onTime: opts.onTime,
       },
     )
   }
@@ -301,6 +310,13 @@ export function loadSessionAudio(
       if (unloaded || id === undefined) return
       const uri = writeOne(id)
       if (uri !== undefined) engine.preload(`${keyPrefix}${id}`, { uri })
+    },
+    fileFor(text) {
+      const id = textToId.get(text)
+      if (unloaded || id === undefined) return undefined
+      const uri = writeOne(id)
+      if (uri === undefined) return undefined
+      return { uri, bytes: fileBytes.get(id) ?? 0 }
     },
     textToId,
     utteranceCount: utterances.length,

@@ -31,6 +31,12 @@ export interface LineCallbacks {
   onPlay?: () => void
   /** Word i of the line should now be visible. Fires 0..n-1, in order. */
   onWordTick?: (wordIndex: number) => void
+  /**
+   * The clip's clock: ms into the clip, on every status update once it
+   * plays (50 ms cadence), and its duration once it ends. Word Song's
+   * blend highlight follows its measured marks with it.
+   */
+  onTime?: (ms: number) => void
 }
 
 export interface StartLineOptions extends LineCallbacks {
@@ -140,6 +146,7 @@ export function startLine(
         // A very short clip can finish between two status updates.
         if (!started) markStarted()
         tickUpTo(wordCount - 1)
+        opts.onTime?.(Math.max(status.currentTime, status.duration) * 1000)
         settle(null)
         return
       }
@@ -148,6 +155,7 @@ export function startLine(
         else return
       }
       tickUpTo(wordIndexAt(status.currentTime, status.duration, wordCount))
+      opts.onTime?.(status.currentTime * 1000)
     },
   )
 

@@ -63,6 +63,16 @@ export {
   samePrefetchKey,
 } from './sessionPrefetch'
 export type { PrefetchKey, SessionPrefetcher } from './sessionPrefetch'
+export { createTapClipPlayer } from './tapClip'
+export type { TapClipPlayer } from './tapClip'
+export {
+  blendMarksFor,
+  blendRevealAt,
+  letterWindow,
+  litAt,
+  wordWindow,
+} from './blendMarks'
+export type { Segment } from './blendMarks'
 export { useAudioEngine, configureAudioSession, AUDIO_MODE } from './lifecycle'
 export { isAudioMuted } from './mute'
 export { readAudioLog, recordAudio } from './audioLog'

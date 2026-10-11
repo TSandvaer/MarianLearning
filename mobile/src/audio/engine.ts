@@ -123,6 +123,7 @@ export function createAudioEngine(
               label: speakOpts.label,
               onPlay: speakOpts.onPlay,
               onWordTick: speakOpts.onWordTick,
+              onTime: speakOpts.onTime,
               now: opts.now,
               onLatency: (ms, label) =>
                 recordAudio({ kind: 'onplay', label, ms }),
