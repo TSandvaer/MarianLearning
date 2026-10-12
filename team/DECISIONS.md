@@ -215,3 +215,9 @@ Distinct from its siblings:
 - **Context:** The session had drained after Word Song (#543). Thomas answered "continue" and, asked in a popup whether that meant ParentSettings, picked "Start ParentSettings".
 - **Decided:** (1) ParentSettings follows the Word Song pattern: Kyle writes `design/native/parent-settings-native.md` (#545, docs-only), while Devon moves the screen's pure logic into `@marian/core` and builds the native screen to that spec; Kevin reviews once, then Thomas device-checks. (2) Kyle's named native departures: Share… replaces the web's JSON textarea, Restore confirms once in a system alert, and native corrects the defaults footnote, the "in-a-row" wording and the Copied timer; the web copy stays frozen. (3) The missing launch-time cloud reconcile on native is parked, not added to this PR.
 - **Decided by:** Thomas (popup); (1) follows the 2026-10-09 Phase 3 order.
+
+## 2026-10-12 — Native Parent Settings approved on device; Phase 3 complete
+
+- **Context:** #547 (`af5afbe`) ports Parent Settings to Kyle's spec (#545); its logic moved into `@marian/core/parentSettings` and the web screen imports it. Kevin approved in one round. In Expo Go, Push now showed "Couldn't reach the server.": production `/api/progress` answers 502 `kv-failed` because the project's Upstash store is uninstalled (`vercel integration list`), so the web's cloud sync fails the same way.
+- **Decided:** (1) Merge #547 now. Thomas tests Restore between two devices and the restore field in iPhone landscape later. The merge includes Devon's read-first Restore: native reads the other device's progress, then adopts its ID; the web adopts the ID first. (2) The orchestrator diagnoses the store outage read-only; any change to the Vercel or Upstash accounts is Thomas's.
+- **Decided by:** Thomas (device check, popups).
