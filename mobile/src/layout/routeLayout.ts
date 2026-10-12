@@ -8,8 +8,8 @@ import { wordSongLayout } from './wordSongLayout'
 /**
  * Emma's frame and the content area for a route. Greet centres Emma,
  * the two play screens perch her upper-left, Session End has its own;
- * the Hub and every route not ported yet (map, parent settings) use the
- * Hub's frames, so Emma stays put when a placeholder opens from the Hub.
+ * the Hub and every other route use the Hub's frames (the map and Parent
+ * Settings don't show this Emma; the `reward` placeholder keeps her put).
  */
 export function layoutForRoute(route: Route, viewport: Viewport): ScreenLayout {
   switch (route) {
