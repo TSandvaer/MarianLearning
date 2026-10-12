@@ -108,7 +108,7 @@ The biggest pieces are Math (4,562 `.tsx` lines) and WordSong (3,350).
 - TestFlight internal testing on her iPad and phone. Internal testers don't go through App Review.
 - Android through Play internal testing or an APK.
 - The native app gets a new `deviceId`, which means fresh progress. That's acceptable while Marian isn't using the app yet.
-- Then decide: retire the PWA, or keep the web build.
+- Retire the PWA once Marian is on the native app (decided 2026-10-12, `team/DECISIONS.md`). The Vercel backend (`/api/claude`, `/api/progress` and its Upstash store) stays as the app's API server.
 
 ### Phase 6 (later, separate decision): Public store release
 
@@ -148,7 +148,7 @@ Agents can write the code in parallel. Your eye and ear gates can't be paralleli
 - Freeze web UI features during the migration? (Recommended)
 - Which phone(s) are the targets (iPhone, which Android model), and which iPadOS version is Marian's iPad on?
 - Are the Apple Developer and Google Play accounts set up?
-- Long term: keep a web build (through `react-native-web`) or retire the PWA?
+- Long term: keep a web build (through `react-native-web`) or retire the PWA? Decided 2026-10-12: retire the PWA (Phase 5).
 
 ## Sources
 

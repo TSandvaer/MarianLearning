@@ -221,3 +221,9 @@ Distinct from its siblings:
 - **Context:** #547 (`af5afbe`) ports Parent Settings to Kyle's spec (#545); its logic moved into `@marian/core/parentSettings` and the web screen imports it. Kevin approved in one round. In Expo Go, Push now showed "Couldn't reach the server.": production `/api/progress` answers 502 `kv-failed` because the project's Upstash store is uninstalled (`vercel integration list`), so the web's cloud sync fails the same way.
 - **Decided:** (1) Merge #547 now. Thomas tests Restore between two devices and the restore field in iPhone landscape later. The merge includes Devon's read-first Restore: native reads the other device's progress, then adopts its ID; the web adopts the ID first. (2) The orchestrator diagnoses the store outage read-only; any change to the Vercel or Upstash accounts is Thomas's.
 - **Decided by:** Thomas (device check, popups).
+
+## 2026-10-12 — Native-only: the PWA retires at Phase 5
+
+- **Context:** Thomas asked what dropping the PWA would mean. The native app still depends on the Vercel backend: `/api/claude` plans each session and carries Emma's audio, and `/api/progress` is the cloud backup on the Upstash store. The plan left the call open ("Then decide: retire the PWA, or keep the web build").
+- **Decided:** Go native-only. The web front end (screens, Vite/PWA build, the web Playwright suite) is deleted once Marian is on the native app through TestFlight, not before, because until Apple enrollment clears the PWA is the only installable build. Vercel stays as the app's API server. Phase 4 still sorts the Playwright specs, porting the product invariants to Maestro or core tests; the web specs are not maintained beyond that.
+- **Decided by:** Thomas (popup).
