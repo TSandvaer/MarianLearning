@@ -23,6 +23,7 @@ import {
   mergeSessionHistories,
   pushProgressToCloud,
   reconcileWithCloud,
+  setCloudSyncSuccessListener,
   type FetchResult,
   type ReconcileOutcome,
 } from './cloudSync'
@@ -1079,4 +1080,185 @@ describe('mergeSessionHistories', () => {
     expect(merged[0]!.novelPoolSuccessRate).toBe(0.8)
     expect(merged[0]!.latencyMs).toEqual([1200, 900, 1500])
   })
+})
+
+// ---------------------------------------------------------------------------
+// Sync-success listener (native "Last synced"): told only when this device
+// and its cloud copy agree after a cloud call.
+// ---------------------------------------------------------------------------
+
+describe('setCloudSyncSuccessListener', () => {
+  const T1 = '2026-10-13T08:00:00.000Z'
+  const T2 = '2026-10-13T09:00:00.000Z'
+
+  function played(iso: string): Progress {
+    const p = defaultProgress()
+    return { ...p, profile: { ...p.profile, lastPlayedISO: iso } }
+  }
+
+  type Reply = 'found-T1' | 'found-T2' | 'found-bad-blob' | 'malformed' | number
+
+  /** GET answers `get`, POST answers `post`. */
+  function routedFetch(get: Reply, post: number) {
+    const reply = (r: Reply): Response => {
+      if (r === 'found-T1' || r === 'found-T2') {
+        const iso = r === 'found-T1' ? T1 : T2
+        return new Response(
+          JSON.stringify({ ok: true, blob: played(iso), lastModifiedISO: iso }),
+          { status: 200 },
+        )
+      }
+      if (r === 'found-bad-blob') {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            blob: { nonsense: 1 },
+            lastModifiedISO: T2,
+          }),
+          { status: 200 },
+        )
+      }
+      if (r === 'malformed') {
+        return new Response('{"ok":false}', { status: 200 })
+      }
+      return new Response('', { status: r })
+    }
+    return vi.fn(async (_url: string, init?: RequestInit) =>
+      reply(init?.method === 'POST' ? post : get),
+    )
+  }
+
+  const listener = vi.fn<() => void>()
+
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    listener.mockReset()
+    setCloudSyncSuccessListener(listener)
+  })
+
+  afterEach(() => {
+    setCloudSyncSuccessListener(null)
+  })
+
+  it.each<
+    [
+      string,
+      number | 'throw' | 'no-secret',
+      'sent' | 'failed' | 'skipped',
+      number,
+    ]
+  >([
+    ['the server accepts it', 200, 'sent', 1],
+    ['a 5xx', 502, 'failed', 0],
+    ['a network error', 'throw', 'failed', 0],
+    ['no secret', 'no-secret', 'skipped', 0],
+  ])('push, %s: told %i time(s)', async (_label, server, result, told) => {
+    const fetchImpl = vi.fn(async () => {
+      if (server === 'throw') throw new Error('offline')
+      return new Response('', {
+        status: server === 'no-secret' ? 200 : server,
+      })
+    })
+    await expect(
+      pushProgressToCloud(VALID_UUID, defaultProgress(), {
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        authSecret: server === 'no-secret' ? null : SECRET,
+      }),
+    ).resolves.toBe(result)
+    expect(listener).toHaveBeenCalledTimes(told)
+  })
+
+  it('is told before the push resolves', async () => {
+    const order: string[] = []
+    listener.mockImplementation(() => {
+      order.push('told')
+    })
+    await pushProgressToCloud(VALID_UUID, defaultProgress(), {
+      fetchImpl: routedFetch(404, 200) as unknown as typeof fetch,
+      authSecret: SECRET,
+    }).then(() => order.push('resolved'))
+    expect(order).toEqual(['told', 'resolved'])
+  })
+
+  it('a throwing listener never breaks the push', async () => {
+    listener.mockImplementation(() => {
+      throw new Error('db closed')
+    })
+    await expect(
+      pushProgressToCloud(VALID_UUID, defaultProgress(), {
+        fetchImpl: routedFetch(404, 200) as unknown as typeof fetch,
+        authSecret: SECRET,
+      }),
+    ).resolves.toBe('sent')
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  // label, GET reply, POST status, local, outcome, requests, told
+  it.each<
+    [
+      string,
+      Reply,
+      number,
+      Progress | null,
+      ReconcileOutcome['kind'],
+      number,
+      number,
+    ]
+  >([
+    [
+      'cloud newer: installed',
+      'found-T2',
+      200,
+      played(T1),
+      'installed-from-cloud',
+      1,
+      1,
+    ],
+    ['equal: nothing to change', 'found-T1', 200, played(T1), 'noop', 1, 1],
+    [
+      'local newer, push accepted',
+      'found-T1',
+      200,
+      played(T2),
+      'pushed-to-cloud',
+      2,
+      1,
+    ],
+    [
+      'local newer, push failed',
+      'found-T1',
+      503,
+      played(T2),
+      'pushed-to-cloud',
+      2,
+      0,
+    ],
+    ['404, push accepted', 404, 200, played(T1), 'pushed-to-cloud', 2, 1],
+    ['404, push failed', 404, 500, played(T1), 'pushed-to-cloud', 2, 0],
+    ['404, no local blob', 404, 200, null, 'noop', 1, 0],
+    ['read 5xx', 503, 200, played(T1), 'cloud-error', 1, 0],
+    ['malformed copy', 'malformed', 200, played(T1), 'cloud-error', 1, 0],
+    [
+      'blob rejected',
+      'found-bad-blob',
+      200,
+      played(T1),
+      'cloud-blob-rejected',
+      1,
+      0,
+    ],
+  ])(
+    'reconcile, %s: told %i time(s)',
+    async (_label, get, post, local, kind, requests, told) => {
+      const fetchImpl = routedFetch(get, post)
+      const outcome = await reconcileWithCloud(VALID_UUID, local, {
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        authSecret: SECRET,
+        installLocally: () => {},
+      })
+      expect(outcome.kind).toBe(kind)
+      expect(fetchImpl).toHaveBeenCalledTimes(requests)
+      expect(listener).toHaveBeenCalledTimes(told)
+    },
+  )
 })

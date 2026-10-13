@@ -124,6 +124,11 @@ export {
   pushProgressToCloud,
   reconcileWithCloud,
 } from './cloudSync'
+export {
+  LAST_SYNC_STORAGE_KEY,
+  readLastSyncISO,
+  recordLastSync,
+} from './lastSync'
 export { reconcileAtLaunch } from './launchReconcile'
 export type {
   LaunchReconcileDeps,

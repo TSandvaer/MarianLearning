@@ -127,6 +127,48 @@ function authHeaders(): Record<string, string> {
 }
 
 // ---------------------------------------------------------------------------
+// Sync-success listener
+// ---------------------------------------------------------------------------
+
+/**
+ * Told each time this device and its cloud copy agree after a cloud call:
+ *
+ *   - a push the server accepted (`pushProgressToCloud` → `'sent'`), from
+ *     any caller: Push now, the session-end push, the map's unlock push,
+ *     and a reconcile's own push (404 or local newer);
+ *   - a reconcile read that installed the cloud blob, or found it equal.
+ *
+ * Never told on `'failed'` / `'skipped'`, a read error (5xx, timeout,
+ * malformed copy), a rejected blob, or a 404 with no local blob to push.
+ * Called synchronously before the helper resolves, so a caller awaiting
+ * the push or reconcile sees the listener's write afterwards.
+ *
+ * The native host installs one to record "Last synced"
+ * (`./lastSync.ts`). The web installs none: its row shows
+ * `profile.lastPlayedISO` (frozen).
+ */
+export type CloudSyncSuccessListener = () => void
+
+let syncSuccessListener: CloudSyncSuccessListener | null = null
+
+/** Install the host's listener. `null` uninstalls it (tests). */
+export function setCloudSyncSuccessListener(
+  listener: CloudSyncSuccessListener | null,
+): void {
+  syncSuccessListener = listener
+}
+
+function notifySynced(): void {
+  try {
+    syncSuccessListener?.()
+  } catch (err) {
+    // The helpers never throw; a listener that does is logged and dropped.
+    const message = err instanceof Error ? err.message : String(err)
+    console.warn(`[cloudSync] sync listener threw — ${message}`)
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Error reasons surfaced to the caller for observability. None are
 // currently rendered as UI; the caller logs to console.warn.
 // ---------------------------------------------------------------------------
@@ -202,7 +244,10 @@ export async function pushProgressToCloud(
       },
       body: JSON.stringify(body),
     })
-    if (res.ok) return 'sent'
+    if (res.ok) {
+      notifySynced()
+      return 'sent'
+    }
     console.warn(
       `[cloudSync] push failed status=${res.status} — local progress unchanged`,
     )
@@ -434,6 +479,7 @@ export async function reconcileWithCloud(
       return { kind: 'cloud-blob-rejected' }
     }
     installLocally(validated)
+    notifySynced()
     return { kind: 'installed-from-cloud', progress: validated }
   }
 
@@ -450,6 +496,7 @@ export async function reconcileWithCloud(
 
   // Equal (or local is null + cloud time === -Infinity which is impossible
   // because cloudTimeMs is a number; only equality remains).
+  notifySynced()
   return { kind: 'noop', reason: 'equal' }
 }
 

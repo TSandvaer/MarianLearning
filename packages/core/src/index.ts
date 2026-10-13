@@ -10,6 +10,8 @@
  *   - `setApiBase`: origin of the /api functions (web: none, relative)
  *   - `setDayOffsetSource`: QA day offset (web: ?debug=1&dayOffset=N)
  *   - `setCloudSyncAuthSecretSource`: the progress-API secret
+ *   - `setCloudSyncSuccessListener`: told after each successful cloud
+ *     sync (native: records "Last synced"; web: none)
  *
  * The web host is `src/platform/web.ts`.
  */
@@ -22,5 +24,7 @@ export { apiUrl, setApiBase } from './platform/apiUrl'
 export { setDayOffsetSource, type DayOffsetSource } from './progress/clock'
 export {
   setCloudSyncAuthSecretSource,
+  setCloudSyncSuccessListener,
   type CloudSyncAuthSecretSource,
+  type CloudSyncSuccessListener,
 } from './progress/cloudSync'
