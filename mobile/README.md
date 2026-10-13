@@ -35,6 +35,8 @@ npx expo start --go --ios    # installs Expo Go on the booted simulator
 
 On a physical iPhone / iPad, Expo Go needs `npx expo login` and the same Expo account signed in inside the app (Expo changelog, 2026-09-03). Simulators and development builds don't.
 
+**TestFlight (store build)**: `eas build --profile production`, run by Thomas. The step-by-step runbook is [`docs/testflight.md`](docs/testflight.md).
+
 **Physical iPhone / iPad without the paid Apple Developer account**: see the PR for the free "Personal Team" status. The app declares no capabilities (its entitlements file is empty), which is what a free team can provision.
 
 ## Styling
@@ -58,7 +60,7 @@ Seeds are `@marian/core/debug/seeds` (the same table the web uses). Launch argum
 
 ```bash
 # launch arguments, on an installed dev build
-xcrun simctl launch booted com.marianlearning.tutor -debug 1 -seed cvc-words
+xcrun simctl launch booted dk.sandvaer.emmaspath -debug 1 -seed cvc-words
 
 # env flags (restart Metro with --clear after changing one)
 EXPO_PUBLIC_DEBUG=1 EXPO_PUBLIC_SEED=cvc-words npx expo start --clear

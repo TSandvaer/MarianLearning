@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Marian Tutor",
+    "name": "Emma's Path",
     "slug": "marian-tutor",
     "scheme": "mariantutor",
     "version": "0.1.0",
@@ -9,11 +9,14 @@
     "userInterfaceStyle": "light",
     "backgroundColor": "#FFF5F0",
     "ios": {
-      "bundleIdentifier": "com.marianlearning.tutor",
-      "supportsTablet": true
+      "bundleIdentifier": "dk.sandvaer.emmaspath",
+      "supportsTablet": true,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
-      "package": "com.marianlearning.tutor"
+      "package": "dk.sandvaer.emmaspath"
     },
     "plugins": [
       "expo-dev-client",
@@ -39,6 +42,12 @@
           "enableBackgroundPlayback": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "3ed1920d-bab2-4fef-ab11-6413a74d5e62"
+      }
+    },
+    "owner": "sandvaer"
   }
 }
