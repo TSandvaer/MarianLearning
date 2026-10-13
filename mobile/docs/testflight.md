@@ -60,7 +60,7 @@ The steps to get **Emma's Path** (bundle ID `dk.sandvaer.emmaspath`, version `0.
    - SKU: any internal string of your choice, for example `emmas-path`.
    - User access: Full Access.
 
-   Click **Create** and check for messages [11]. "You can use an app name for one app per localization" [11]. If it's taken, the planned fallback "Emma's Path – Learn Math & Reading" is **34 characters, over the 30 limit** [12], so Apple won't accept it as written. Ask the orchestrator for a fallback of 30 characters or fewer.
+   Click **Create** and check for messages [11]. "You can use an app name for one app per localization" [11]. If it's taken, use the fallback **Emma's Path – Kids Learning** (27 characters). Apple: "The name must be at least two characters and no more than 30 characters" [12].
 
 7. **Put the app's Apple ID into `eas.json`** (through a PR). In App Store Connect: your app > **App Store** tab > **General** > **App Information**. The number listed as **Apple ID** is the `ascAppId` [13]. It isn't secret: Apple uses it in the app's App Store URL [12]. Send it to the orchestrator. A one-line PR replaces `REPLACE_WITH_ASC_APP_ID__see_mobile_docs_testflight_md` in `mobile/eas.json` (`submit.production.ios.ascAppId`). Your Apple ID email stays out of the repo, which is public: EAS asks for it at submit time [13]. After that PR merges, run step 1 again.
 

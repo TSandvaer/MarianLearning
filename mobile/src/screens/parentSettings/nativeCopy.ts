@@ -19,7 +19,7 @@ export const NATIVE_COPY = {
   copyFailedUseShare: "Couldn't copy — use Share instead.",
   shareFailed: "Couldn't share.",
   /** Share sheet title (Android) and mail subject (iOS). */
-  shareTitle: 'Marian Tutor backup',
+  shareTitle: "Emma's Path backup",
   ownDeviceId: "That's this device's own ID.",
   restoreAlertTitle: 'Restore from that device?',
   restoreAlertMessage:
