@@ -91,7 +91,12 @@ export function fakeDeps(
   }
 }
 
-export async function mount(fake: FakeDeps = fakeDeps(), layout = PHONE) {
+export async function mount(
+  fake: FakeDeps = fakeDeps(),
+  layout = PHONE,
+  /** Debug only: App passes it when the debug launch flag is on. */
+  onQaJump?: () => void,
+) {
   const onExit = jest.fn()
   const releaseAudio = jest.fn()
   const utils = await render(
@@ -100,6 +105,7 @@ export async function mount(fake: FakeDeps = fakeDeps(), layout = PHONE) {
       onExit={onExit}
       deps={fake.deps}
       releaseAudio={releaseAudio}
+      onQaJump={onQaJump}
     />,
   )
   return { ...fake, onExit, releaseAudio, ...utils }

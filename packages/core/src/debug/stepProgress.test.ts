@@ -17,7 +17,9 @@ import {
   isProgressV1,
   loadProgress,
   pickFocusNode,
+  reconcileWithCloud,
   type MasteryTrack,
+  type Progress,
   type SkillNode,
   type WordSongNode,
 } from '../progress'
@@ -272,5 +274,31 @@ describe('the jump write', () => {
     expect(applyQaStep('sight-words')).toBe(true)
     expect(currentStepOf(loadProgress()!, 'word-song')).toBe('sight-words')
     expect(warn).toHaveBeenCalledTimes(1)
+  })
+
+  it('with cloud sync on, the next reconcile pushes the jump over an older cloud blob (the stamp)', async () => {
+    const deviceId = getOrCreateDeviceId()
+    const cloudBlob = progressAtStep('add-to-20')
+    const older = '2026-10-12T20:00:00.000Z'
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true, blob: cloudBlob, lastModifiedISO: older }),
+    })) as unknown as typeof fetch
+    const pushImpl = vi.fn(async () => 'sent' as const)
+    const install = vi.fn()
+
+    jumpToStep('mult-6-9')
+    const outcome = await reconcileWithCloud(deviceId, loadProgress(), {
+      fetchImpl,
+      authSecret: 's3cret',
+      pushImpl,
+      installLocally: install,
+    })
+    expect(outcome).toEqual({ kind: 'pushed-to-cloud' })
+    expect(install).not.toHaveBeenCalled()
+    expect(pushImpl).toHaveBeenCalledTimes(1)
+    const [, pushed] = pushImpl.mock.calls[0]! as unknown as [string, Progress]
+    expect(currentStepOf(pushed, 'math')).toBe('mult-6-9')
   })
 })

@@ -22,6 +22,7 @@ import { now as progressNow } from '@marian/core/progress/clock'
 import {
   isoDate,
   readSessionHistory,
+  recordTreeTouched,
   SESSION_HISTORY_KEY,
   writeSessionHistory,
 } from '@marian/core/sessionEnd/sessionHistory'
@@ -36,6 +37,7 @@ import {
   within,
 } from '@testing-library/react-native'
 import { setIsAudioActiveAsync } from 'expo-audio'
+import { Alert, type AlertButton } from 'react-native'
 import {
   fakePlayers,
   flush,
@@ -907,6 +909,140 @@ it('QA route parent-settings: the real screen at once, nothing written on mount,
   } finally {
     env.mockRestore()
   }
+})
+
+// ── QA: jump to a step (debug only) ────────────────────────────────────
+
+/** Parent Settings → the QA row → `node` → Jump (the system alert). */
+async function qaJump(node: string, button = 'Jump'): Promise<void> {
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {})
+  await openParentSettings()
+  await fireEvent.press(screen.getByTestId('parent-settings-qa-step-row'))
+  await fireEvent.press(screen.getByTestId(node))
+  expect(alert).toHaveBeenCalledTimes(1)
+  const buttons = alert.mock.calls[0]![2] as AlertButton[]
+  await act(async () => {
+    buttons.find((b) => b.text === button)!.onPress!()
+  })
+  alert.mockRestore()
+  await flushAll()
+}
+
+/** The session-start payloads App sent for one world. */
+function payloadsFor(track: 'math' | 'word-song'): { progress?: unknown }[] {
+  return sessionStarts()
+    .map(
+      (s) => (s as { payload: { track: string; progress?: unknown } }).payload,
+    )
+    .filter((p) => p.track === track)
+}
+
+it('release safety: without the debug flag, Parent Settings has no QA step row', async () => {
+  boot()
+  writeSessionHistory({ ...readSessionHistory(), sessionCount: 3 })
+  await renderPastSplash()
+  expect(screen.getByTestId('hub')).toBeOnTheScreen()
+  await settle(2000)
+  await openParentSettings()
+  expect(screen.getByTestId('parent-settings-cloud-wrap')).toBeOnTheScreen()
+  expect(screen.queryByTestId('parent-settings-qa-step-row')).toBeNull()
+  expect(screen.queryByTestId('qa-step-picker')).toBeNull()
+})
+
+it('QA jump to mult-6-9: one progress write, today cleared, the device ID kept, the Hub on it, and Number Garden asks for it', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  boot({ debug: true, seed: 'letter-sounds', qaStep: null, dayOffset: null })
+  await renderPastSplash()
+  await settle(2000)
+  recordTreeTouched('number-garden', progressNow())
+  await openParentSettings()
+  const id = String(
+    screen.getByTestId('parent-settings-cloud-device-id').props.children,
+  )
+  await fireEvent.press(screen.getByTestId('parent-settings-done'))
+  const progressBefore = progressWrites
+  const historyBefore = keyWrites.get(SESSION_HISTORY_KEY) ?? 0
+
+  await qaJump('qa-step-mult-6-9')
+  expect(screen.getByTestId('hub')).toBeOnTheScreen()
+  expect(screen.getByTestId('hub-card-current-mult-6-9')).toBeOnTheScreen()
+  expect(screen.getByTestId('hub-card-current-letter-sounds')).toBeOnTheScreen()
+  expect(progressWrites).toBe(progressBefore + 1)
+  expect(keyWrites.get(SESSION_HISTORY_KEY)).toBe(historyBefore + 1)
+  expect(readSessionHistory().todayTreesTouched.trees).toEqual([])
+  expect(readStoredDeviceId()).toBe(id)
+  expect(keyWrites.get(DEVICE_ID_STORAGE_KEY)).toBe(1)
+
+  await fireEvent.press(screen.getByTestId('hub-card-number-garden'))
+  await flushAll()
+  expect(screen.getByTestId('math')).toBeOnTheScreen()
+  const math = payloadsFor('math')
+  // The fresh Hub prefetches Word Song (a tie), so the tap starts one.
+  expect(math).toHaveLength(1)
+  expect(math[0]).toMatchObject({ progress: { focusNode: 'mult-6-9' } })
+})
+
+it('QA jump mounts the screens afresh: Math’s fallback plan is the new step’s (add-to-20: sums past ten)', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  // Math's default step (add-to-10): the sums-to-10 fallback, at mount.
+  boot({ debug: true, seed: 'letter-sounds', qaStep: null, dayOffset: null })
+  await renderPastSplash()
+  await settle(2000)
+  await qaJump('qa-step-add-to-20')
+  expect(screen.getByTestId('hub-card-current-add-to-20')).toBeOnTheScreen()
+  await fireEvent.press(screen.getByTestId('hub-card-number-garden'))
+  await flushAll()
+  // Offline: the static fallback plan, chosen at the fresh mount.
+  await advance(1000)
+  const { a, b } = problemOnScreen()
+  expect(a + b).toBeGreaterThan(10)
+})
+
+it('QA jump to simple-sentences: the Hub on it (Number Garden at its default), and Word Song asks for it', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  boot({ debug: true, seed: 'add-to-20', qaStep: null, dayOffset: null })
+  await renderPastSplash()
+  await settle(2000)
+  await qaJump('qa-step-simple-sentences')
+  expect(screen.getByTestId('hub')).toBeOnTheScreen()
+  expect(
+    screen.getByTestId('hub-card-current-simple-sentences'),
+  ).toBeOnTheScreen()
+  // The jump starts from Marian's defaults: the seed's add-to-20 is gone.
+  expect(screen.getByTestId('hub-card-current-add-to-10')).toBeOnTheScreen()
+
+  await fireEvent.press(screen.getByTestId('hub-card-word-song'))
+  await flushAll()
+  expect(screen.getByTestId('word-song')).toBeOnTheScreen()
+  const wordSong = payloadsFor('word-song')
+  // The Hub's Word Song prefetch before the jump, the fresh Hub's after
+  // it, and the tap's own (offline, the prefetch failed).
+  expect(
+    wordSong.map((p) => (p.progress as { focusNode?: string }).focusNode),
+  ).toEqual(['letter-sounds', 'simple-sentences', 'simple-sentences'])
+})
+
+it("QA: Back to Marian's real start writes her defaults and opens the Hub on them", async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  boot({ debug: true, seed: 'add-to-20', qaStep: null, dayOffset: null })
+  await renderPastSplash()
+  await settle(2000)
+  const progressBefore = progressWrites
+  await qaJump('qa-step-real-start', 'Reset')
+  expect(progressWrites).toBe(progressBefore + 1)
+  expect(loadProgress()!.skillLevels).toEqual(defaultProgress().skillLevels)
+  expect(screen.getByTestId('hub')).toBeOnTheScreen()
+  expect(screen.getByTestId('hub-card-current-add-to-10')).toBeOnTheScreen()
+  expect(screen.getByTestId('hub-card-current-letter-sounds')).toBeOnTheScreen()
+})
+
+it('-qaStep at launch: Splash → Hub on that step', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  boot({ debug: true, seed: null, qaStep: 'digraphs-ch', dayOffset: null })
+  await renderPastSplash()
+  expect(screen.getByTestId('hub')).toBeOnTheScreen()
+  expect(screen.getByTestId('hub-card-current-digraphs-ch')).toBeOnTheScreen()
+  expect(screen.getByTestId('hub-card-current-add-to-10')).toBeOnTheScreen()
 })
 
 // ── Launch-time cloud reconcile (web boot effect, src/App.tsx) ─────────

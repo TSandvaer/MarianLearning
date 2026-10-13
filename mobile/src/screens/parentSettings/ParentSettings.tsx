@@ -13,7 +13,13 @@
  * the QA route are safe. On mount the held iOS audio session is released
  * (§ 6). Done and Android back → Hub. The screen handles the keyboard
  * itself (§ 4): bottom padding plus scroll-into-view for the restore field.
+ *
+ * Debug only: with `onQaJump` (App passes it only when the debug launch
+ * flag is on) a "QA: jump to a step" row closes the column and opens the
+ * step picker (`./QaStepPicker.tsx`) over the screen; Android back closes
+ * the picker first.
  */
+import { currentStepOf } from '@marian/core/hub/hubCardModel'
 import { HEADER_COPY } from '@marian/core/parentSettings/copy'
 import {
   applySettingsPatch,
@@ -50,6 +56,7 @@ import {
   type ParentSettingsDeps,
 } from './parentSettingsDeps'
 import { HEADER_FONT_MAX, slate } from './psTheme'
+import { QaStepPicker, QaStepRow } from './QaStepPicker'
 import { SettingsCard } from './SettingsCard'
 import { useLifetime } from './useTransientStatus'
 
@@ -64,6 +71,11 @@ export interface ParentSettingsProps {
   deps?: ParentSettingsDeps
   /** Test seam: releases the held iOS audio session on mount. */
   releaseAudio?: () => void
+  /**
+   * Debug only: shows the QA step picker. Called after a jump (or the
+   * reset to the real start) was written; App restarts on the Hub.
+   */
+  onQaJump?: () => void
 }
 
 export function ParentSettings({
@@ -71,6 +83,7 @@ export function ParentSettings({
   onExit,
   deps = DEFAULT_PARENT_SETTINGS_DEPS,
   releaseAudio = releaseAudioSession,
+  onQaJump,
 }: ParentSettingsProps) {
   const reducedMotion = useReducedMotion()
   // Read once; every control writes through and updates this copy.
@@ -106,6 +119,7 @@ export function ParentSettings({
     releaseAudio()
   }, [releaseAudio])
 
+  const [qaOpen, setQaOpen] = useState(false)
   const leaving = useRef(false)
   const done = useCallback(() => {
     if (leaving.current) return
@@ -113,9 +127,13 @@ export function ParentSettings({
     Keyboard.dismiss()
     onExit()
   }, [onExit])
-  const doneRef = useRef(done)
+  const back = useCallback(() => {
+    if (qaOpen) setQaOpen(false)
+    else done()
+  }, [qaOpen, done])
+  const doneRef = useRef(back)
   useEffect(() => {
-    doneRef.current = done
+    doneRef.current = back
   })
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -269,8 +287,29 @@ export function ParentSettings({
               }}
             />
           </View>
+          {onQaJump && (
+            <View style={styles.section}>
+              <QaStepRow
+                onPress={() => {
+                  Keyboard.dismiss()
+                  setQaOpen(true)
+                }}
+              />
+            </View>
+          )}
         </View>
       </ScrollView>
+      {onQaJump && qaOpen && (
+        <QaStepPicker
+          layout={layout}
+          current={{
+            math: currentStepOf(progress, 'math'),
+            'word-song': currentStepOf(progress, 'word-song'),
+          }}
+          onClose={() => setQaOpen(false)}
+          onJumped={onQaJump}
+        />
+      )}
     </Animated.View>
   )
 }
