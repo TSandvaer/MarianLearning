@@ -24,6 +24,14 @@
  * - **Result**: first-tap correctness / value / latency and the offered
  *   distractor class per problem, the scaffold flags, stardust and streak
  *   (`MathSessionResult`), handed to App after problem 8.
+ *
+ * Native-only, Number Garden 1 and 8–11 (core's extended kinds; spec
+ * `design/native/math-skip-counting-multiplication-native.md`): a number-
+ * recognition problem shows `NumberStrip`, a skip-count problem `SkipTrack`,
+ * both in place of the equation; a multiplication problem shows
+ * `A × B = ?` over `GroupsRow`. Their chips come from
+ * `buildExtendedChipOrder`, their hint lines set `hintStep` (arithmetic keeps
+ * `hintBeat`), and the subitising scaffolds never run for them.
  * - Background: an advance due while the app is hidden waits for its
  *   return; the dot card's timers pause.
  *
@@ -43,6 +51,11 @@ import {
   subMinuendFromProblem,
 } from '@marian/core/math/dotCard'
 import { chipMaxAnswerForCorrects } from '@marian/core/math/distractors'
+import { multiplyChipCeiling } from '@marian/core/math/extendedDistractors'
+import type {
+  ExtendedMathProblem,
+  ExtendedMathSessionPlan,
+} from '@marian/core/math/extendedProblems'
 import {
   pickStaticSessionPlan,
   type MathProblem,
@@ -87,7 +100,15 @@ import {
   type Sfx,
 } from '../../audio'
 import { CaptionRibbon } from '../../components/CaptionRibbon'
-import { countingMetrics, type MathLayout } from '../../layout/mathLayout'
+import {
+  countingMetrics,
+  groupsAreDrawn,
+  groupsMetrics,
+  numberStripMetrics,
+  skipTrackMetrics,
+  type ExtendedMathLayout,
+  type MathLayout,
+} from '../../layout/mathLayout'
 import {
   appVisibility,
   useIsAppHidden,
@@ -95,17 +116,25 @@ import {
 } from '../../lifecycle/appVisibility'
 import { colors, FILL, fonts } from '../../theme'
 import { AnswerChip } from './AnswerChip'
-import { buildChipOrder, type OfferedDistractorClass } from './chipOrder'
+import { buildChipOrder } from './chipOrder'
 import { CountingRow } from './CountingRow'
+import {
+  buildExtendedChipOrder,
+  type MathOfferedClass,
+} from './extendedChipOrder'
 import { GettingReady } from './GettingReady'
+import { countSpokenFactor } from './extendedHints'
+import { GroupsRow } from './GroupsRow'
 import { MathHud } from './MathHud'
 import type {
   MathSessionResult,
   PlayMathUtteranceFn,
   PlayMathUtteranceOptions,
 } from './mathTypes'
+import { NumberStrip } from './NumberStrip'
 import { ScaffoldFlash } from './ScaffoldFlash'
 import { createSilentMathPlayer, type SilentMathPlayer } from './silentPlayer'
+import { SkipTrack } from './SkipTrack'
 
 /** Web: the chime lands 320 ms after sparkle + plink (#133 follow-up). */
 export const STREAK_CHIME_STAGGER_MS = 320
@@ -117,6 +146,8 @@ export const LATENCY_CEILING_MS = 60_000
 export const CHIP_GATE_FALLBACK_MS = 2000
 /** Math fades out over 250 ms (web `exit`). */
 export const MATH_EXIT_MS = 250
+/** Multiplication's sign (U+00D7; Fredoka has the glyph). Spec § 3. */
+export const TIMES_GLYPH = '×'
 
 /** The four effects, with the web's volumes. Test seam. */
 export interface MathSfx {
@@ -143,9 +174,12 @@ function cancelSessionLine(): void {
 }
 
 export interface MathProps {
-  layout: MathLayout
+  /** Math's frames; for the extended kinds, `extendedMathLayout` (the chip
+   *  column and the ribbon cap). */
+  layout: MathLayout &
+    Partial<Pick<ExtendedMathLayout, 'chipsAxis' | 'ribbonLines'>>
   /** The session plan: the server's once it settled, else the static one. */
-  plan?: MathSessionPlan
+  plan?: MathSessionPlan | ExtendedMathSessionPlan
   /** The session audio's player; without it the captions walk silently. */
   playUtterance?: PlayMathUtteranceFn
   /**
@@ -155,6 +189,12 @@ export interface MathProps {
    */
   audioReady?: boolean
   focusNode?: SkillNode
+  /**
+   * The focus node the server plan was made for (the session focus). On
+   * `mult-3-4` the plates' tags and "+" wait for hint 2; every other
+   * multiplication step shows them from the reveal (spec § 3).
+   */
+  planFocusNode?: SkillNode
   subitisingScaffoldActive?: boolean
   subitisingSubScaffoldActive?: boolean
   onSessionComplete?: (result: MathSessionResult) => void
@@ -207,6 +247,22 @@ function resolveHintTriple(
   return null
 }
 
+/** Every problem with its `kind`: a plain (static, arithmetic) plan's
+ *  problems get `'arithmetic'`. */
+function withKinds(
+  plan: MathSessionPlan | ExtendedMathSessionPlan,
+): ExtendedMathSessionPlan {
+  const problems: readonly (MathProblem | ExtendedMathProblem)[] = plan.problems
+  return {
+    id: plan.id,
+    label: plan.label,
+    problems: problems.map(
+      (p): ExtendedMathProblem =>
+        'kind' in p ? p : { ...p, kind: 'arithmetic' },
+    ),
+  }
+}
+
 /**
  * Monotonic ms for the latency capture (web: `performance.now()`). React
  * Native provides `performance` at runtime; its typings do not declare it.
@@ -226,6 +282,7 @@ export function MathScreen({
   playUtterance,
   audioReady,
   focusNode,
+  planFocusNode,
   subitisingScaffoldActive,
   subitisingSubScaffoldActive,
   onSessionComplete,
@@ -243,8 +300,8 @@ export function MathScreen({
 
   // Same as the web: the plan follows `planProp` (the server plan swaps in
   // for the static one while the problem area still shows "getting ready").
-  const plan = useMemo<MathSessionPlan>(
-    () => planProp ?? pickStaticSessionPlan(now),
+  const plan = useMemo<ExtendedMathSessionPlan>(
+    () => withKinds(planProp ?? pickStaticSessionPlan(now)),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- web parity: `now` only seeds the fallback
     [planProp],
   )
@@ -298,9 +355,9 @@ export function MathScreen({
   const perProblemAnswerValueRef = useRef<(number | null)[]>(
     plan.problems.map(() => null),
   )
-  const perProblemDistractorClassRef = useRef<
-    (OfferedDistractorClass | null)[]
-  >(plan.problems.map(() => null))
+  const perProblemDistractorClassRef = useRef<(MathOfferedClass | null)[]>(
+    plan.problems.map(() => null),
+  )
   const latencyMsByProblemRef = useRef<number[]>(plan.problems.map(() => -1))
   const chipReadyAtRef = useRef<number | null>(null)
   const firstTapRecordedRef = useRef(false)
@@ -333,6 +390,11 @@ export function MathScreen({
 
   const [pose, setPose] = useState<EmmaPose>('idle')
   const [hintBeat, setHintBeat] = useState<'group-a' | 'group-b' | null>(null)
+  /** The extended kinds' hint line (1 / 2 / 3), kept until the problem ends
+   *  (their hint visuals stay); `null` before hint 1. */
+  const [hintStep, setHintStep] = useState<1 | 2 | 3 | null>(null)
+  /** Hint 2 has ended: every plate not lit by a word yet lights. */
+  const [hint2Done, setHint2Done] = useState(false)
   const [shakingChip, setShakingChip] = useState<number | null>(null)
   const [captionText, setCaptionText] = useState('')
   const [captionRevealed, setCaptionRevealed] = useState(0)
@@ -343,13 +405,32 @@ export function MathScreen({
   const [guidedActive, setGuidedActive] = useState(false)
 
   const planMaxAnswer = useMemo(
-    () => chipMaxAnswerForCorrects(plan.problems.map((p) => p.correct)),
+    () =>
+      chipMaxAnswerForCorrects(
+        plan.problems
+          .filter((p) => p.kind === 'arithmetic')
+          .map((p) => p.correct),
+      ),
     [plan],
   )
-  const chipOrderWithClass = useMemo(
-    () => buildChipOrder(plan.problems[problemIndex], planMaxAnswer, focusNode),
-    [plan, problemIndex, planMaxAnswer, focusNode],
+  const multiplyCeiling = useMemo(
+    () =>
+      multiplyChipCeiling(
+        plan.problems
+          .filter((p) => p.kind === 'multiply')
+          .map((p) => p.correct),
+      ),
+    [plan],
   )
+  const chipOrderWithClass = useMemo<{
+    values: readonly number[]
+    offeredClass: MathOfferedClass | null
+  }>(() => {
+    const p = plan.problems[problemIndex]
+    return p.kind === 'arithmetic'
+      ? buildChipOrder(p, planMaxAnswer, focusNode)
+      : buildExtendedChipOrder(p, multiplyCeiling)
+  }, [plan, problemIndex, planMaxAnswer, multiplyCeiling, focusNode])
   useEffect(() => {
     perProblemDistractorClassRef.current[problemIndex] =
       chipOrderWithClass.offeredClass
@@ -490,11 +571,10 @@ export function MathScreen({
       perProblemAnswerValueRef.current,
       null,
     )
-    perProblemDistractorClassRef.current =
-      resize<OfferedDistractorClass | null>(
-        perProblemDistractorClassRef.current,
-        null,
-      )
+    perProblemDistractorClassRef.current = resize<MathOfferedClass | null>(
+      perProblemDistractorClassRef.current,
+      null,
+    )
   }, [planLength])
 
   useEffect(() => {
@@ -543,6 +623,8 @@ export function MathScreen({
       setProblemIndex((i) => i + 1)
       setProblemState(FRESH_PROBLEM_STATE)
       setHintBeat(null)
+      setHintStep(null)
+      setHint2Done(false)
       if (hintTimerRef.current !== null) {
         clearTimeout(hintTimerRef.current)
         hintTimerRef.current = null
@@ -629,7 +711,7 @@ export function MathScreen({
   // ── The hint ─────────────────────────────────────────────────────────
 
   const runHintSequence = useCallback(
-    async (problem: MathProblem) => {
+    async (problem: ExtendedMathProblem) => {
       const myIndex = problemIndex
       // Native-only: a third wrong answer (the guided answer) ends the
       // hint. On the web the remaining hint beats go on and cancel "This
@@ -648,19 +730,30 @@ export function MathScreen({
       }
       if (!stillLive()) return
       setPose('attentive-pointing')
+      // The extended kinds' visuals follow `hintStep`; arithmetic's flower
+      // groups follow `hintBeat` (web W12-02).
+      const extended = problem.kind !== 'arithmetic'
       const triple = resolveHintTriple(problem.utterances)
       if (triple === null) {
         const legacy = problem.utterances.hint
+        if (extended) setHintStep(1)
         if (typeof legacy === 'string') await speak(legacy)
         returnToIdle()
         return
       }
-      setHintBeat('group-a')
+      if (extended) setHintStep(1)
+      else setHintBeat('group-a')
       await speak(triple.hint1)
       if (!stillLive()) return
+      if (extended) setHintStep(2)
       await speak(triple.hint2)
       if (!stillLive()) return
-      setHintBeat('group-b')
+      if (extended) {
+        setHint2Done(true)
+        setHintStep(3)
+      } else {
+        setHintBeat('group-b')
+      }
       await speak(triple.hint3)
       returnToIdle()
     },
@@ -670,7 +763,7 @@ export function MathScreen({
   // ── Taps ─────────────────────────────────────────────────────────────
 
   const handleWrongTap = useCallback(
-    (chipValue: number, problem: MathProblem) => {
+    (chipValue: number, problem: ExtendedMathProblem) => {
       sfx.poof.play()
       setShakingChip(chipValue)
       if (shakeTimerRef.current !== null) clearTimeout(shakeTimerRef.current)
@@ -741,7 +834,7 @@ export function MathScreen({
   )
 
   const handleCorrectTap = useCallback(
-    (problem: MathProblem) => {
+    (problem: ExtendedMathProblem) => {
       sfx.sparkle.play()
       sfx.plink.play()
       setPose('celebration')
@@ -912,18 +1005,20 @@ export function MathScreen({
   // ── Scaffolds (core's gates, as on the web) ──────────────────────────
 
   const currentProblem = plan.problems[problemIndex]
+  // The arithmetic problem on screen; `null` for the extended kinds, which
+  // never run the subitising scaffolds (spec § 1).
+  const arith = currentProblem.kind === 'arithmetic' ? currentProblem : null
   const showStreak = streak >= 2 || streakFadingOut
 
   const useScaffoldGate =
     focusNode !== undefined && subitisingScaffoldActive !== undefined
-  const dotCardInScope = useScaffoldGate
-    ? shouldShowSubitisingScaffold(
-        focusNode,
-        currentProblem,
-        subitisingScaffoldActive,
-      )
-    : shouldShowDotCard(currentProblem)
-  const dotCardPips = dotCardInScope ? pipsFromProblem(currentProblem) : null
+  const dotCardInScope =
+    arith !== null &&
+    (useScaffoldGate
+      ? shouldShowSubitisingScaffold(focusNode, arith, subitisingScaffoldActive)
+      : shouldShowDotCard(arith))
+  const dotCardPips =
+    dotCardInScope && arith !== null ? pipsFromProblem(arith) : null
   const dotCardDismissed =
     !dotCardInScope || activeDismissForIndex === problemIndex
   const showDotCardOverlay =
@@ -938,16 +1033,16 @@ export function MathScreen({
 
   const useSubScaffoldGate =
     focusNode !== undefined && subitisingSubScaffoldActive !== undefined
-  const subMinuendInScope = useSubScaffoldGate
-    ? shouldShowSubitisingSubScaffold(
-        focusNode,
-        currentProblem,
-        subitisingSubScaffoldActive,
-      )
-    : false
-  const subMinuendValue = subMinuendInScope
-    ? subMinuendFromProblem(currentProblem)
-    : null
+  const subMinuendInScope =
+    arith !== null && useSubScaffoldGate
+      ? shouldShowSubitisingSubScaffold(
+          focusNode,
+          arith,
+          subitisingSubScaffoldActive,
+        )
+      : false
+  const subMinuendValue =
+    subMinuendInScope && arith !== null ? subMinuendFromProblem(arith) : null
   const subMinuendDismissed =
     !subMinuendInScope || subMinuendDismissForIndex === problemIndex
   const showSubMinuendOverlay =
@@ -963,13 +1058,8 @@ export function MathScreen({
 
   const { problem: area, chips, ribbon, ribbonPadding } = layout
   const counting =
-    currentProblem.op === '+'
-      ? countingMetrics(
-          layout,
-          currentProblem.addendA,
-          currentProblem.addendB,
-          area.width,
-        )
+    arith !== null && arith.op === '+'
+      ? countingMetrics(layout, arith.addendA, arith.addendB, area.width)
       : null
   // Phone: the counting slot is always reserved, so the equation never
   // moves between problems (mixed-op and two-digit tiers included).
@@ -982,7 +1072,61 @@ export function MathScreen({
         ? layout.dotCard.cell
         : 0)
   const showVisualRow =
-    layout.visualSlot !== null || counting !== null || subMinuendInScope
+    arith !== null &&
+    (layout.visualSlot !== null || counting !== null || subMinuendInScope)
+
+  // The extended kinds' visuals, sized once per plan (spec decision 10).
+  const skipMetrics = useMemo(
+    () =>
+      skipTrackMetrics(
+        layout,
+        plan.problems.flatMap((p) => (p.kind === 'skip-count' ? [p] : [])),
+      ),
+    [layout, plan],
+  )
+  const groups = useMemo(
+    () =>
+      groupsMetrics(
+        layout,
+        plan.problems.flatMap((p) => (p.kind === 'multiply' ? [p] : [])),
+      ),
+    [layout, plan],
+  )
+  const strip = numberStripMetrics(layout)
+  const multiply = currentProblem.kind === 'multiply' ? currentProblem : null
+  const groupsDrawn =
+    multiply !== null && groupsAreDrawn(multiply.factorA, multiply.factorB)
+  const litCount =
+    multiply === null || hintStep === null || hintStep < 2
+      ? 0
+      : hint2Done
+        ? multiply.factorB
+        : captionText === multiply.utterances.hint2
+          ? countSpokenFactor(
+              captionText,
+              captionRevealed,
+              multiply.factorA,
+              multiply.factorB,
+            )
+          : 0
+  useEffect(() => {
+    if (multiply === null || groupsDrawn) return
+    recordAudio({
+      kind: 'note',
+      label: 'math',
+      detail: `no groups for ${multiply.factorA} × ${multiply.factorB} (drawn for 1–10 × 1–5)`,
+    })
+  }, [multiply, groupsDrawn])
+  const equation =
+    multiply !== null
+      ? [String(multiply.factorA), TIMES_GLYPH, String(multiply.factorB)]
+      : arith !== null
+        ? [
+            String(arith.addendA),
+            arith.op === '-' ? '−' : '+',
+            String(arith.addendB),
+          ]
+        : null
 
   return (
     <>
@@ -1019,6 +1163,7 @@ export function MathScreen({
             fontSize={layout.captionFontSize}
             lineHeight={layout.captionLineHeight}
             padding={ribbonPadding}
+            maxLines={layout.ribbonLines}
             style={[
               styles.clayRibbon,
               { left: ribbon.x, top: ribbon.y, width: ribbon.width },
@@ -1056,41 +1201,76 @@ export function MathScreen({
                 },
               ]}
             >
-              <View
-                testID="math-symbolic"
-                accessible
-                accessibilityLabel={currentProblem.utterances.read}
-                style={[styles.equation, { gap: layout.equationGap }]}
-              >
-                {[
-                  String(currentProblem.addendA),
-                  currentProblem.op === '-' ? '−' : '+',
-                  String(currentProblem.addendB),
-                  '=',
-                  '?',
-                ].map((token, i) => (
-                  <Text
-                    key={i}
-                    allowFontScaling={false}
-                    style={[
-                      styles.equationText,
-                      {
-                        fontSize: layout.equationFont,
-                        lineHeight: layout.equationLineHeight,
-                      },
-                    ]}
-                  >
-                    {token}
-                  </Text>
-                ))}
-              </View>
+              {currentProblem.kind === 'recognize' && (
+                <NumberStrip
+                  key={`strip-${problemIndex}`}
+                  target={currentProblem.correct}
+                  metrics={strip}
+                  label={currentProblem.utterances.read}
+                  hintStep={hintStep}
+                  guided={guidedActive}
+                  answered={problemState.resolved}
+                />
+              )}
+              {currentProblem.kind === 'skip-count' && (
+                <SkipTrack
+                  key={`skip-${problemIndex}`}
+                  problem={currentProblem}
+                  metrics={skipMetrics}
+                  hintStep={hintStep}
+                  guided={guidedActive}
+                  answered={problemState.resolved}
+                />
+              )}
+              {equation !== null && (
+                <View
+                  testID="math-symbolic"
+                  accessible
+                  accessibilityLabel={currentProblem.utterances.read}
+                  style={[styles.equation, { gap: layout.equationGap }]}
+                >
+                  {[...equation, '=', '?'].map((token, i) => (
+                    <Text
+                      key={i}
+                      allowFontScaling={false}
+                      style={[
+                        styles.equationText,
+                        {
+                          fontSize: layout.equationFont,
+                          lineHeight: layout.equationLineHeight,
+                        },
+                      ]}
+                    >
+                      {token}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {multiply !== null && groups.slot > 0 && (
+                <View style={[styles.visual, { height: groups.slot }]}>
+                  {groupsDrawn && (
+                    <GroupsRow
+                      key={`groups-${problemIndex}`}
+                      factorA={multiply.factorA}
+                      factorB={multiply.factorB}
+                      metrics={groups}
+                      width={area.width}
+                      tagsFromReveal={planFocusNode !== 'mult-3-4'}
+                      hintStep={hintStep}
+                      litCount={litCount}
+                      guided={guidedActive}
+                    />
+                  )}
+                </View>
+              )}
 
               {showVisualRow && (
                 <View style={[styles.visual, { height: visualHeight }]}>
-                  {counting !== null && (
+                  {counting !== null && arith !== null && (
                     <CountingRow
-                      addendA={currentProblem.addendA}
-                      addendB={currentProblem.addendB}
+                      addendA={arith.addendA}
+                      addendB={arith.addendB}
                       metrics={counting}
                       visible={flowersVisible}
                       hintBeat={hintBeat}
@@ -1141,6 +1321,8 @@ export function MathScreen({
                   width: chips.rect.width,
                   height: chips.rect.height,
                   gap: chips.gap,
+                  flexDirection:
+                    layout.chipsAxis === 'column' ? 'column' : 'row',
                 },
               ]}
             >

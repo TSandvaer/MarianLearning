@@ -85,7 +85,9 @@ export function buildChipOrder(
   return { values, offeredClass }
 }
 
-function lcg(seed: number): () => number {
+// Exported for `extendedChipOrder.ts` (the same shuffle); the body stays
+// the web's.
+export function lcg(seed: number): () => number {
   let s = seed >>> 0
   return () => {
     s = (s * 1664525 + 1013904223) >>> 0

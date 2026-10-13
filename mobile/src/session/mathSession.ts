@@ -35,7 +35,7 @@
  * function. App subscribes with `useSyncExternalStore`.
  */
 import { mathSessionPlanFromServer } from '@marian/core/math/planFromServer'
-import type { MathSessionPlan } from '@marian/core/math/sessionPlans'
+import type { ExtendedMathSessionPlan } from '@marian/core/math/extendedProblems'
 import {
   createSubitisingRng,
   easyBandLeitnerMeanBox,
@@ -194,8 +194,10 @@ export function mathScaffoldDecisions(sessionStartISO: string): {
 }
 
 export interface MathSessionSnapshot {
-  /** The server plan; `null` until resolved, and on any failure. */
-  plan: MathSessionPlan | null
+  /** The server plan; `null` until resolved, and on any failure. Read with
+   *  core's extended kinds (number recognition, skip counting,
+   *  multiplication), which only the native app opts in to. */
+  plan: ExtendedMathSessionPlan | null
   /** The session audio's player; `null` = Math's silent caption walk. */
   playUtterance: PlayMathUtteranceFn | null
   /** The start settled (either way): Math may read problem 1 aloud. */
@@ -225,7 +227,7 @@ export interface MathSessionController {
 }
 
 interface Loaded {
-  plan: MathSessionPlan
+  plan: ExtendedMathSessionPlan
   audio: LoadedSessionAudio
 }
 
@@ -320,7 +322,9 @@ export function createMathSessionController(
           }))
         try {
           return {
-            plan: mathSessionPlanFromServer(prepared.plan),
+            plan: mathSessionPlanFromServer(prepared.plan, {
+              extendedKinds: true,
+            }),
             audio: prepared.audio,
           }
         } catch (err) {

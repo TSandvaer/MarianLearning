@@ -102,7 +102,7 @@ import { useAppFonts } from './fonts'
 import type { Viewport } from './layout/layout'
 import { greetLayout } from './layout/greetLayout'
 import { hubLayout } from './layout/hubLayout'
-import { mathLayout } from './layout/mathLayout'
+import { extendedMathLayout } from './layout/mathLayout'
 import { mapScreenLayout } from './layout/mapScreenLayout'
 import { parentSettingsLayout } from './layout/parentSettingsLayout'
 import { wordSongLayout } from './layout/wordSongLayout'
@@ -440,7 +440,10 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
   )
 
   const greet = route === 'greet' ? greetLayout(viewport) : null
-  const math = route === 'math' ? mathLayout(viewport) : null
+  // The server plan's kind picks the frame (number recognition, skip
+  // counting and multiplication; all 8 problems of a session share it).
+  const mathKind = mathState.plan?.problems[0]?.kind ?? 'arithmetic'
+  const math = route === 'math' ? extendedMathLayout(viewport, mathKind) : null
   const wordSong = route === 'literacy' ? wordSongLayout(viewport) : null
   // Session End needs a finished session; without one (the QA route, or
   // a later arrival after it consumed its payload) the placeholder renders
@@ -486,6 +489,11 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               playUtterance={mathState.playUtterance ?? undefined}
               audioReady={mathState.audioReady}
               focusNode={mathDefaults.focusNode}
+              planFocusNode={
+                mathState.plan !== null
+                  ? mathSession.sessionFocus?.node
+                  : undefined
+              }
               subitisingScaffoldActive={mathDefaults.scaffold.add}
               subitisingSubScaffoldActive={mathDefaults.scaffold.sub}
               onSessionComplete={onMathComplete}
