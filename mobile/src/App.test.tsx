@@ -16,8 +16,11 @@ import {
   type Progress,
 } from '@marian/core/progress'
 import { seedUnlocksCelebrated } from '@marian/core/progress/pathBeats'
+import { now as progressNow } from '@marian/core/progress/clock'
 import {
+  isoDate,
   readSessionHistory,
+  SESSION_HISTORY_KEY,
   writeSessionHistory,
 } from '@marian/core/sessionEnd/sessionHistory'
 import { WARM_CAP_MS } from '@marian/core/splash/splashTiming'
@@ -669,6 +672,78 @@ it('the Hub prefetch survives a map visit: Number Garden glowing → map → Hom
   await flushAll()
   expect(screen.getByTestId('math')).toBeOnTheScreen()
   expect(sessionStarts()).toHaveLength(1)
+})
+
+/** Writes to the session-history key since the last `boot()`. */
+const historyWrites = () => keyWrites.get(SESSION_HISTORY_KEY) ?? 0
+
+it('a Hub pick records the world as played today (web handleHubPickTree): once per new world, nothing more for a repeat', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  boot({ debug: true, seed: 'add-to-20', dayOffset: null })
+  await renderPastSplash()
+  await flushAll()
+  const today = isoDate(progressNow())
+  expect(readSessionHistory().todayTreesTouched.trees).toEqual([])
+
+  // Number Garden: the Hub's suggestion write, then App's.
+  let before = historyWrites()
+  await fireEvent.press(screen.getByTestId('hub-card-number-garden'))
+  await flushAll()
+  expect(screen.getByTestId('math')).toBeOnTheScreen()
+  expect(historyWrites() - before).toBe(2)
+  expect(readSessionHistory().todayTreesTouched).toEqual({
+    date: today,
+    trees: ['number-garden'],
+  })
+
+  // Word Song joins the list.
+  await fireEvent.press(screen.getByTestId('math-back-to-hub'))
+  await flushAll()
+  before = historyWrites()
+  await fireEvent.press(screen.getByTestId('hub-card-word-song'))
+  await flushAll()
+  expect(screen.getByTestId('word-song')).toBeOnTheScreen()
+  expect(historyWrites() - before).toBe(2)
+  expect(readSessionHistory().todayTreesTouched).toEqual({
+    date: today,
+    trees: ['number-garden', 'word-song'],
+  })
+
+  // Number Garden again: only the Hub's write; the list is unchanged.
+  await fireEvent.press(screen.getByTestId('word-song-back-to-hub'))
+  await flushAll()
+  before = historyWrites()
+  await fireEvent.press(screen.getByTestId('hub-card-number-garden'))
+  await flushAll()
+  expect(screen.getByTestId('math')).toBeOnTheScreen()
+  expect(historyWrites() - before).toBe(1)
+  expect(readSessionHistory().todayTreesTouched).toEqual({
+    date: today,
+    trees: ['number-garden', 'word-song'],
+  })
+})
+
+it('a Hub pick on a stepped day (EXPO_PUBLIC_DAY_OFFSET) starts that day’s list fresh', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  boot({ debug: true, seed: 'add-to-20', dayOffset: '1' })
+  const realToday = isoDate(new Date())
+  writeSessionHistory({
+    ...readSessionHistory(),
+    todayTreesTouched: {
+      date: realToday,
+      trees: ['number-garden', 'word-song'],
+    },
+  })
+  await renderPastSplash()
+  await flushAll()
+  await fireEvent.press(screen.getByTestId('hub-card-word-song'))
+  await flushAll()
+  const stepped = isoDate(progressNow())
+  expect(stepped).not.toBe(realToday)
+  expect(readSessionHistory().todayTreesTouched).toEqual({
+    date: stepped,
+    trees: ['word-song'],
+  })
 })
 
 it("Hub: the map button opens that world's map, Home returns to a quiet Hub, a 3 s press on Emma opens Parent Settings", async () => {

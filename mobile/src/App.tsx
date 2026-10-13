@@ -66,6 +66,7 @@ import { pendingUnlock } from '@marian/core/progress/pathBeats'
 import { nextAfterSplash } from '@marian/core/router/nextAfterSplash'
 import {
   readSessionHistoryForToday,
+  recordTreeTouched,
   type SkillTreeId,
 } from '@marian/core/sessionEnd/sessionHistory'
 import * as SplashScreen from 'expo-splash-screen'
@@ -382,16 +383,15 @@ function Shell() {
     if (prefetchTrackFor(suggestion) === 'math') mathSession.prefetch()
     else wordSongSession.prefetch()
   }, [route, mathSession, wordSongSession])
-  // Web `handleHubPickTree`. The kick takes the prefetch in the tap.
+  // Web `handleHubPickTree`. The kick takes the prefetch in the tap; then,
+  // as on the web, the world is recorded as played today (after the Hub's
+  // own suggestion write, before the route flips).
   const onHubPick = useCallback(
     (tree: SkillTreeId) => {
-      if (tree === 'number-garden') {
-        mathSession.kick()
-        navigate('math')
-      } else {
-        wordSongSession.kick()
-        navigate('literacy')
-      }
+      if (tree === 'number-garden') mathSession.kick()
+      else wordSongSession.kick()
+      recordTreeTouched(tree, progressNow())
+      navigate(tree === 'number-garden' ? 'math' : 'literacy')
     },
     [mathSession, wordSongSession, navigate],
   )

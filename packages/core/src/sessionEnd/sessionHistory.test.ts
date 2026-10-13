@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'vitest'
+import { describe, expect, it, beforeEach, vi } from 'vitest'
 import type { StorageAdapter } from '../math/stardust'
 import { STARDUST_STORAGE_KEY, STARDUST_SCHEMA_VERSION } from '../math/stardust'
 import {
@@ -12,11 +12,16 @@ import {
   isoDate,
   markTreeTouched,
   readSessionHistoryForToday,
+  recordTreeTouched,
   SESSION_HISTORY_KEY,
   SESSION_HISTORY_SCHEMA_VERSION,
   _resetSessionHistoryWarn,
 } from './sessionHistory'
-import type { SessionHistoryV1, SessionHistoryV2 } from './sessionHistory'
+import type {
+  SessionHistoryV1,
+  SessionHistoryV2,
+  SkillTreeId,
+} from './sessionHistory'
 
 /** Minimal in-memory storage adapter for tests. */
 function createMemoryStorage(): StorageAdapter & {
@@ -395,6 +400,138 @@ describe('sessionHistory', () => {
         date: '2026-04-29',
         trees: ['word-song'],
       })
+    })
+  })
+
+  describe('recordTreeTouched (the Hub pick write)', () => {
+    /** Memory storage that counts writes to the session-history key. */
+    function countingStorage() {
+      const base = createMemoryStorage()
+      let writes = 0
+      return {
+        store: base.store,
+        writes: () => writes,
+        getItem: base.getItem,
+        setItem: (k: string, v: string) => {
+          if (k === SESSION_HISTORY_KEY) writes += 1
+          base.setItem(k, v)
+        },
+      }
+    }
+
+    /**
+     * The web's write, copied from `handleHubPickTree` (`src/App.tsx`,
+     * frozen): the reference `recordTreeTouched` must match.
+     */
+    function webPickWrite(
+      tree: SkillTreeId,
+      now: Date,
+      adapter: StorageAdapter,
+    ): void {
+      try {
+        const prev = readSessionHistory(adapter)
+        const next = markTreeTouched(prev, tree, now)
+        if (next !== prev) writeSessionHistory(next, adapter)
+      } catch {
+        // Storage failures are non-fatal (web).
+      }
+    }
+
+    const DAY1 = new Date(2026, 9, 13, 9, 0)
+    const DAY1_LATER = new Date(2026, 9, 13, 18, 30)
+    const DAY2 = new Date(2026, 9, 14, 8, 0)
+
+    it('writes once per new tree in a day, never for a repeat pick', () => {
+      const adapter = countingStorage()
+      recordTreeTouched('number-garden', DAY1, adapter)
+      expect(adapter.writes()).toBe(1)
+      expect(readSessionHistory(adapter).todayTreesTouched).toEqual({
+        date: '2026-10-13',
+        trees: ['number-garden'],
+      })
+
+      recordTreeTouched('number-garden', DAY1_LATER, adapter)
+      expect(adapter.writes()).toBe(1)
+
+      recordTreeTouched('word-song', DAY1_LATER, adapter)
+      expect(adapter.writes()).toBe(2)
+      expect(readSessionHistory(adapter).todayTreesTouched).toEqual({
+        date: '2026-10-13',
+        trees: ['number-garden', 'word-song'],
+      })
+    })
+
+    it('the next day starts a fresh list with the picked tree', () => {
+      const adapter = countingStorage()
+      recordTreeTouched('number-garden', DAY1, adapter)
+      recordTreeTouched('word-song', DAY1, adapter)
+      recordTreeTouched('word-song', DAY2, adapter)
+      expect(adapter.writes()).toBe(3)
+      expect(readSessionHistory(adapter).todayTreesTouched).toEqual({
+        date: '2026-10-14',
+        trees: ['word-song'],
+      })
+    })
+
+    it("keeps the Hub's suggestion write and every other field", () => {
+      const adapter = countingStorage()
+      const before: SessionHistoryV2 = {
+        ...emptySessionHistory(),
+        sessionCount: 4,
+        dayStreak: 2,
+        lastSuggestion: 'word-song',
+      }
+      writeSessionHistory(before, adapter)
+      recordTreeTouched('number-garden', DAY1, adapter)
+      expect(readSessionHistory(adapter)).toEqual({
+        ...before,
+        todayTreesTouched: { date: '2026-10-13', trees: ['number-garden'] },
+      })
+    })
+
+    it('never throws when storage does', () => {
+      const throwing: StorageAdapter = {
+        getItem: () => {
+          throw new Error('read failed')
+        },
+        setItem: () => {
+          throw new Error('quota')
+        },
+      }
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      expect(() => recordTreeTouched('word-song', DAY1, throwing)).not.toThrow()
+      const writeOnly: StorageAdapter = {
+        getItem: () => null,
+        setItem: () => {
+          throw new Error('quota')
+        },
+      }
+      expect(() =>
+        recordTreeTouched('word-song', DAY1, writeOnly),
+      ).not.toThrow()
+      warn.mockRestore()
+    })
+
+    it('web parity: the same picks land the same bytes with the same writes', () => {
+      const picks: [SkillTreeId, Date][] = [
+        ['number-garden', DAY1],
+        ['number-garden', DAY1_LATER],
+        ['word-song', DAY1_LATER],
+        ['word-song', DAY2],
+        ['number-garden', DAY2],
+        ['number-garden', DAY2],
+      ]
+      const web = countingStorage()
+      const native = countingStorage()
+      for (const [tree, now] of picks) {
+        webPickWrite(tree, now, web)
+        recordTreeTouched(tree, now, native)
+        expect(native.store.get(SESSION_HISTORY_KEY)).toBe(
+          web.store.get(SESSION_HISTORY_KEY),
+        )
+      }
+      expect(web.writes()).toBe(4)
+      expect(native.writes()).toBe(4)
     })
   })
 
