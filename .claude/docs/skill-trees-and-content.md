@@ -497,7 +497,7 @@ Read-line templates accepted ([`planFromServer.ts:171`](MarianLearning/packages/
 
 ### `plannerRoundTrip` test
 
-[`src/screens/WordSong/plannerRoundTrip.test.ts`](MarianLearning/src/screens/WordSong/plannerRoundTrip.test.ts). End-to-end planner ↔ parser pin. The Anthropic SDK is mocked; for each test we hand-craft a wire-shape response that mirrors what the new prompt instructs Haiku to emit, feed it through `generateSessionPlan`, then through `wordSongSessionPlanFromServer`, and assert the per-problem `contentType` matches the requested focus node.
+[`api/_plannerRoundTrip.test.ts`](MarianLearning/api/_plannerRoundTrip.test.ts). End-to-end planner ↔ parser pin. The Anthropic SDK is mocked; for each test we hand-craft a wire-shape response that mirrors what the new prompt instructs Haiku to emit, feed it through `generateSessionPlan`, then through `wordSongSessionPlanFromServer`, and assert the per-problem `contentType` matches the requested focus node.
 
 Suites:
 
@@ -747,7 +747,7 @@ Dave's phonics research docs list words in **psycholinguistic / difficulty order
 
 - Curriculum graph: see [`progress-and-persistence.md`](progress-and-persistence.md) for `Progress` shape, `SkillNode`, `SkillLevel`, mastery rule, focus-node picker.
 - Source files: [`MarianLearning/src/screens/Math/`](MarianLearning/src/screens/Math/), [`MarianLearning/src/screens/WordSong/`](MarianLearning/src/screens/WordSong/), [`MarianLearning/packages/core/src/hub/stages.ts`](MarianLearning/packages/core/src/hub/stages.ts).
-- Tests: [`distractors.test.ts`](MarianLearning/packages/core/src/math/distractors.test.ts), [`sessionPlans.test.ts`](MarianLearning/packages/core/src/math/sessionPlans.test.ts), [`planFromServer.test.ts`](MarianLearning/packages/core/src/math/planFromServer.test.ts), [`wordDistractors.test.ts`](MarianLearning/packages/core/src/wordSong/wordDistractors.test.ts), [`wordPictures.test.tsx`](MarianLearning/src/screens/WordSong/wordPictures.test.tsx), [`plannerRoundTrip.test.ts`](MarianLearning/src/screens/WordSong/plannerRoundTrip.test.ts).
+- Tests: [`distractors.test.ts`](MarianLearning/packages/core/src/math/distractors.test.ts), [`sessionPlans.test.ts`](MarianLearning/packages/core/src/math/sessionPlans.test.ts), [`planFromServer.test.ts`](MarianLearning/packages/core/src/math/planFromServer.test.ts), [`wordDistractors.test.ts`](MarianLearning/packages/core/src/wordSong/wordDistractors.test.ts), [`wordPictures.test.tsx`](MarianLearning/src/screens/WordSong/wordPictures.test.tsx), [`_plannerRoundTrip.test.ts`](MarianLearning/api/_plannerRoundTrip.test.ts).
 - Design docs: [`short-o-pool-expansion.md`](MarianLearning/design/word-song/short-o-pool-expansion.md), [`short-o-picture-pack-prompts.md`](MarianLearning/design/word-song/short-o-picture-pack-prompts.md), [`word-song-picture-pack.md`](MarianLearning/design/word-song-picture-pack.md), `design/screen-3-math.md`, `design/screen-4-word-song.md`, `design/screen-hub.md`.
 - Marian's diagnostic baseline: `project_diagnostic_results` auto-memory + `CLAUDE.md` `## Marian's current levels`.
 - Sibling-node naming rationale: `design/word-song/short-o-pool-expansion.md` §2 (Q3 locked 2026-05-04).

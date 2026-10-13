@@ -19,25 +19,25 @@
  * then through the parser, and assert the per-problem contentType
  * matches the requested focus node.
  *
- * Why here (src/) and not in api/_planner.test.ts
+ * Why here (api/) and not in api/_planner.test.ts
  * -----------------------------------------------
- * api/ runs under a server-only tsconfig that doesn't drag in the
- * frontend module graph (see api/_plannerWordList.ts header comment).
- * The parser lives under src/. This file lives on the src/ side so the
- * cross-module import is one-directional (src → api), matching every
- * other src/ test that pulls api/_types or api/_planner directly.
+ * This file used to live at src/screens/WordSong/plannerRoundTrip.test.ts,
+ * from when the parser lived under src/. The parser and word pack now
+ * live in `@marian/core`, so the file only imports api/ and core. It
+ * moved here in React Native Phase 4 because the web front end (src/)
+ * is deleted once Marian is on the native app (team/DECISIONS.md
+ * 2026-10-12), and this file is the only cover for the same-vowel
+ * distractor rule. It stays separate from api/_planner.test.ts because
+ * it pins the planner → parser round trip, not the planner alone.
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
-import {
-  generateSessionPlan,
-  type PlannerAnthropicClient,
-} from '../../../api/_planner'
+import { generateSessionPlan, type PlannerAnthropicClient } from './_planner.js'
 import {
   WORD_SONG_NOVEL_PROBE_WORDS,
   WORD_SONG_SIMPLE_SENTENCES,
-} from '../../../api/_plannerWordList'
+} from './_plannerWordList.js'
 import { wordSongSessionPlanFromServer } from '@marian/core/wordSong/planFromServer'
 import { pickDistractors } from '@marian/core/wordSong/wordDistractors'
 import {
@@ -1074,13 +1074,22 @@ describe('planner → parser round-trip — untuned tier stub fallback (step 2 t
  * trios), and the post-record promotion gate via `pickFocusNode`
  * + `applyMasteryRule` (executed inside `recordProgressOnSessionEnd`).
  */
+// tsconfig.api.json has no DOM lib, so `window` is not typed here. The
+// root Vitest still runs this file in jsdom (vite.config.ts `test`), so
+// the window and its storage are there at run time.
+function clearWindowStorage(): void {
+  ;(
+    globalThis as unknown as { window: { localStorage: { clear(): void } } }
+  ).window.localStorage.clear()
+}
+
 describe('graduation-session round-trip — cvc-words generalization check (ticket 86c9m3aec)', () => {
   beforeEach(() => {
-    window.localStorage.clear()
+    clearWindowStorage()
   })
 
   afterEach(() => {
-    window.localStorage.clear()
+    clearWindowStorage()
   })
 
   /**

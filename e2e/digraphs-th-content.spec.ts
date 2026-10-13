@@ -2,6 +2,11 @@
  * E2E spec — digraphs-th (voiceless /θ/) CONTENT presence + hybridMode
  * partial gate + intro→practicing transition.
  *
+ * React Native Phase 4: Test 2 moved to
+ * `scripts/canonDigraphsTh.test.ts`. It reads the canon from disk and
+ * needs no browser, so it runs in Vitest, which outlives the web
+ * front end. Test numbers below are the original ones.
+ *
  * Ticket: PR 3 of the 3-PR digraphs-th content build wave. Paired with
  *         Kevin's planner PR (`feat/digraphs-th-planner`) and Devon's
  *         wordPack PR (`feat/digraphs-th-wordpack`), both in flight in
@@ -243,39 +248,6 @@ const TH_TIER_WORDS: ReadonlySet<string> = new Set([
 ])
 
 /**
- * The 2 `hybridMode: true` th words. Source:
- * `digraphs-th-word-list.md` §6.2 + §8 AC13 (Dave's th-addendum §3e):
- *   - `thick` — double-digraph (`th` target digraph + `ck`, a separate
- *     not-yet-taught digraph) → recognition-only.
- *   - `cloth` — `/kl/` onset blend exceeds CVC scope → recognition-only.
- * The planner must NEVER emit a `segmentation` / `spelling` /
- * `decode_from_phoneme` prompt for these two.
- *
- * th diverges from ch here: ch shipped ZERO hybridMode words (total
- * gate); th ships TWO (partial gate). It resembles the sh tier (3
- * hybrid words), though for a structurally-different reason — sh's
- * hybrids were long-vowel-after-digraph; th's are onset-blend +
- * double-digraph (Dave Non-obvious finding 5).
- */
-const HYBRID_TH_WORDS: ReadonlySet<string> = new Set(['thick', 'cloth'])
-
-/**
- * The 5 fully-decodable th words (`hybridMode: false`). NOT gated — the
- * planner MAY emit any prompt type for these. Listed here for the
- * explicit "non-hybrid words are un-gated" assertion in test 2, so a
- * future OVER-BROAD gate (one that accidentally gates ALL th words like
- * ch's total gate) is caught. This is the load-bearing partial-gate
- * distinction between th and ch.
- */
-const NON_HYBRID_TH_WORDS: ReadonlySet<string> = new Set([
-  'thin',
-  'bath',
-  'math',
-  'path',
-  'moth',
-])
-
-/**
  * The th/t-contrast distractor-only entries the th tier ships. Source:
  * `digraphs-th-word-list.md` §2 + §8 AC2:
  *   - `tin` (`vowel: 'i'`, `isTarget: false`) — NEW distractor-only
@@ -316,22 +288,6 @@ const ALLOWED_CHIP_WORDS: ReadonlySet<string> = new Set([
   ...TH_TIER_WORDS,
   ...TH_DISTRACTOR_ONLY_WORDS,
 ])
-
-/**
- * Decode-style prompt-type slots that the th tier must NEVER emit for a
- * `hybridMode: true` word. The canon's per-problem utterance ids follow
- * the `word.p<N>.<slot>` template (verified against the shipped
- * digraphs-ch / digraphs-sh canons: slots today are `read | correct |
- * reprompt | hint | giveAnswer`). AC13 forbids these three NEW
- * decode-style slots from ever appearing for a `thick` or `cloth`
- * problem — but ALLOWS them for the 5 non-hybrid words (the partial
- * gate, unlike ch's total gate).
- */
-const FORBIDDEN_DECODE_SLOTS: ReadonlyArray<string> = [
-  'segmentation',
-  'spelling',
-  'decode_from_phoneme',
-]
 
 /** Minimal shape of the on-disk session canon this spec inspects. */
 interface CanonUtterance {
@@ -393,27 +349,6 @@ function targetWordsByProblem(canon: CanonShape): Map<number, string> {
       )
     }
     byProblem.set(problemNum, wordMatch[1]!.toLowerCase())
-  }
-  return byProblem
-}
-
-/**
- * Build the per-problem slot inventory from the canon's
- * `plan.utterances` array. Key = problem number, value = the set of
- * slot names emitted for that problem. `session.end.*` and other
- * out-of-namespace ids are skipped.
- */
-function slotsByProblem(canon: CanonShape): Map<number, Set<string>> {
-  const byProblem = new Map<number, Set<string>>()
-  for (const u of canon.plan.utterances) {
-    const m = u.id.match(/^word\.p(\d+)\.(\w+)$/)
-    if (m === null) continue // session.end.* etc — not per-problem
-    const problemNum = Number(m[1])
-    const slot = m[2]!
-    if (!byProblem.has(problemNum)) {
-      byProblem.set(problemNum, new Set())
-    }
-    byProblem.get(problemNum)!.add(slot)
   }
   return byProblem
 }
@@ -673,100 +608,6 @@ test.describe('digraphs-th content + hybridMode partial gate + intro→practicin
     const targetWords = [...byProblem.values()]
     const offPoolWords = targetWords.filter((w) => !TH_TIER_WORDS.has(w))
     expect(offPoolWords).toEqual([])
-  })
-
-  /**
-   * AC13 — the th tier ships TWO `hybridMode: true` words (`thick`,
-   * `cloth`) → NO problem whose target is `thick` or `cloth` may carry
-   * a decode-style prompt slot. The gate is PARTIAL — unlike ch's
-   * total gate.
-   *
-   * Pure payload assertion — runs on BOTH chromium + webkit. This is
-   * the th-specific divergence from `digraphs-ch-content.spec.ts` test
-   * 2: ch had ZERO hybridMode words, so its gate was TOTAL (no decode
-   * slot on ANY ch problem). th has TWO hybridMode words, so its gate
-   * is PARTIAL — modelled on `digraphs-sh-content.spec.ts` test 2.
-   *
-   * Two assertions, both load-bearing:
-   *   (a) UNDER-GATE guard — NO problem whose target is `thick` or
-   *       `cloth` carries a `segmentation` / `spelling` /
-   *       `decode_from_phoneme` slot. A planner that misapplies a
-   *       decode prompt to a hybrid word is caught.
-   *   (b) OVER-BROAD-GATE guard — the test does NOT assert the absence
-   *       of decode slots for the 5 non-hybrid words; instead it
-   *       asserts every problem's target is a known th word and that
-   *       BOTH hybrid words AND at least some non-hybrid words appear
-   *       in the canon, so the partial-gate distinction is actually
-   *       exercised. A future planner that gates ALL th words (copying
-   *       ch's total-gate logic by mistake) would still pass (a) but
-   *       the design intent — th is a PARTIAL gate — is documented and
-   *       pinned by `NON_HYBRID_TH_WORDS` being a live, asserted-on
-   *       constant.
-   *
-   * On pre-merge main this fails at `readDigraphsThCanon()` → explicit
-   * ENOENT throw.
-   */
-  test('2. AC13: thick + cloth (hybridMode) carry no segmentation/spelling/decode-from-phoneme slot; the 5 non-hybrid th words are un-gated (partial gate, unlike ch)', async () => {
-    const { parsed: canon } = readDigraphsThCanon()
-    const byProblem = targetWordsByProblem(canon)
-    expect(byProblem.size).toBe(8)
-
-    const slots = slotsByProblem(canon)
-
-    // (a) UNDER-GATE guard — collect every (problem, hybrid-word,
-    // forbidden-slot) violation, then assert the violation list is
-    // empty. The list-then-assert-empty shape gives a failure message
-    // that names exactly which hybrid word got which forbidden
-    // decode-style slot.
-    const hybridDecodeViolations: Array<{
-      problem: number
-      word: string
-      slot: string
-    }> = []
-    for (const [problemNum, word] of byProblem) {
-      if (!HYBRID_TH_WORDS.has(word)) continue
-      const problemSlots = slots.get(problemNum) ?? new Set<string>()
-      for (const forbidden of FORBIDDEN_DECODE_SLOTS) {
-        if (problemSlots.has(forbidden)) {
-          hybridDecodeViolations.push({
-            problem: problemNum,
-            word,
-            slot: forbidden,
-          })
-        }
-      }
-    }
-    // thick + cloth never receive a decode-style prompt — the
-    // recognition-only contract (Dave §3e, §6.2, AC13).
-    expect(hybridDecodeViolations).toEqual([])
-
-    // (b) OVER-BROAD-GATE guard / partial-gate exercise — the canon
-    // must actually contain BOTH hybrid words AND non-hybrid words, so
-    // the partial-gate distinction is meaningfully exercised (not a
-    // vacuous pass on a canon that happens to omit thick/cloth, or one
-    // that is all-hybrid). With a 7-word pool spread over 8 problems
-    // (sub-8-pool: each word ≥1×, one repeat), both classes are present
-    // by construction once the pool ships correctly.
-    const targetWords = [...byProblem.values()]
-    const hybridTargetsPresent = targetWords.filter((w) =>
-      HYBRID_TH_WORDS.has(w),
-    )
-    const nonHybridTargetsPresent = targetWords.filter((w) =>
-      NON_HYBRID_TH_WORDS.has(w),
-    )
-    // Both hybrid words appear (the 7-word pool, each ≥1× across 8
-    // problems, guarantees thick + cloth both surface).
-    expect(new Set(hybridTargetsPresent)).toEqual(HYBRID_TH_WORDS)
-    // Non-hybrid th words also appear — the gate is PARTIAL, the canon
-    // is not all-hybrid. (Count-based: at least the 5 non-hybrid pool
-    // words must each surface ≥1× in a correctly-shaped 7-word/8-problem
-    // canon.)
-    expect(new Set(nonHybridTargetsPresent)).toEqual(NON_HYBRID_TH_WORDS)
-
-    // Sanity: every problem's target word is a th-pool word (guards
-    // against a vacuous pass on a blending-cv stub-fallback canon).
-    const offPoolTargets = targetWords.filter((w) => !TH_TIER_WORDS.has(w))
-    expect(offPoolTargets).toEqual([])
   })
 
   /**
