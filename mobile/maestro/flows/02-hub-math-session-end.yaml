@@ -1,0 +1,31 @@
+# Critical path 2: a returning child.
+# Splash → Hub → Math (Number Garden card) → Session End → Hub.
+appId: host.exp.Exponent
+name: Hub to Math to Session End
+tags:
+  - critical-path
+---
+# Any skip-Greet seed makes a returning child (sessionCount 1). The
+# `cvc-words` seed only touches Word Song, so Math stays on the diagnostic
+# baseline, the same step as a first launch.
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: cvc-words
+- runFlow: ../subflows/open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 120000
+- tapOn:
+    id: hub-card-number-garden
+- runFlow: ../subflows/math-session.yaml
+- assertVisible:
+    id: session-end-count
+    text: 1 of 3
+- tapOn:
+    id: session-end-cta
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 30000

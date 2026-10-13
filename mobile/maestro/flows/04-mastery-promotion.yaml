@@ -1,0 +1,81 @@
+# Critical path 4: mastery promotion.
+#
+# The `cvc-words-short-o` debug seed puts a returning child on the short-o
+# step (`practicing`), with short-u still `locked`. A step is mastered on
+# its 3rd good day (7 of 8 or better, any order; core `applyMasteryRule`),
+# so the flow plays three Word Song days, moving the progress clock one
+# day per launch with the `dayOffset` launch argument (debug only). The
+# third Session End promotes short-o, opens short-u, and its "All done"
+# takes the child to the Word Song map, which plays the unlock beat.
+#
+# The seed goes in on day 1 only: re-applying it later would be harmless
+# (its patch is a no-op on a `practicing` step), but day 2 and 3 should
+# run on the state the app wrote.
+appId: host.exp.Exponent
+name: Mastery promotion
+tags:
+  - critical-path
+---
+# Day 1 (today).
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: cvc-words-short-o
+- runFlow: ../subflows/open-app.yaml
+- runFlow:
+    file: ../subflows/word-song-day.yaml
+    env:
+      COUNT: 1 of 3
+- tapOn:
+    id: session-end-cta
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 30000
+
+# Day 2.
+- launchApp:
+    stopApp: true
+    arguments:
+      dayOffset: 1
+- runFlow: ../subflows/open-app.yaml
+- runFlow:
+    file: ../subflows/word-song-day.yaml
+    env:
+      COUNT: 2 of 3
+- tapOn:
+    id: session-end-cta
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 30000
+
+# Day 3: the promotion.
+- launchApp:
+    stopApp: true
+    arguments:
+      dayOffset: 2
+- runFlow: ../subflows/open-app.yaml
+- runFlow:
+    file: ../subflows/word-song-day.yaml
+    env:
+      COUNT: 3 of 3!
+- assertVisible:
+    id: session-end-slot-grown
+    index: 2
+- tapOn:
+    id: session-end-cta
+# An unlock is waiting, so "All done" opens the map (not the Hub), on the
+# unlock beat, with short-u on the path.
+- extendedWaitUntil:
+    visible:
+      id: map-word-song-beat-unlock
+    timeout: 30000
+- assertVisible:
+    id: map-stop-cvc-words-short-u
+- tapOn:
+    id: map-home
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 30000

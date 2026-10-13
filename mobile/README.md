@@ -129,6 +129,8 @@ npx expo-doctor
 
 The repo root's `yarn lint` lints `mobile/**/*.ts{,x}` with the web's ESLint + Prettier rules; the root Vitest run excludes `mobile/`.
 
+The critical paths (first launch, Hub → Math → Session End, Word Song, mastery promotion) are Maestro flows on the iOS Simulator with Expo Go: see [`maestro/README.md`](maestro/README.md). They are local only (no CI job).
+
 ## Assets
 
 `npm run export-assets` (after the root `yarn install`; it borrows the web's `sharp` and `prettier`) re-exports the web images: Emma poses, pictures and scenes from PNG-in-SVG to WebP, the four novel-probe pictures the web draws inline (rendered through the root `tsx`), the Emma's Path WebPs as-is, the app icon and the splash logo, and measures the baked blend clips into `src/audio/blendMarks.generated.ts` (needs `ffmpeg` on the PATH; `blendMarks.test.ts` fails when a re-bake changes a clip). It regenerates `src/assets/registry.ts`, keyed by the web URL path, so `pathArtSrc()` / `sceneSrc()` from core look up native images directly. `src/assets/assets.test.ts` fails when a pose, picture, scene or path-art piece has no native export.

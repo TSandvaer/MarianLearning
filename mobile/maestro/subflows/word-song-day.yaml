@@ -1,0 +1,14 @@
+# A returning child's Word Song day: Hub → Word Song → Session End, which
+# must show `${COUNT}` (the good days on this step, e.g. "2 of 3").
+appId: host.exp.Exponent
+---
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 120000
+- tapOn:
+    id: hub-card-word-song
+- runFlow: word-song-session.yaml
+- assertVisible:
+    id: session-end-count
+    text: ${COUNT}

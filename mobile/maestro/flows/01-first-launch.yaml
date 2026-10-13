@@ -1,0 +1,35 @@
+# Critical path 1: first launch.
+# Splash → Greet → Math → Session End → Hub, on empty storage.
+appId: host.exp.Exponent
+name: First launch
+tags:
+  - critical-path
+---
+- launchApp:
+    stopApp: true
+- runFlow: ../subflows/open-app.yaml
+# Splash (1.75 s, too short to catch reliably) routes a fresh install to
+# Greet: sessionCount is 0.
+- extendedWaitUntil:
+    visible:
+      id: greet
+    timeout: 120000
+# The QA autotap wakes Emma (Maestro does not race it for the wake tap);
+# her four lines play muted, and the heart shows after line 3.
+- extendedWaitUntil:
+    visible:
+      id: greet-heart
+    timeout: 60000
+- tapOn:
+    id: greet-heart
+- runFlow: ../subflows/math-session.yaml
+# Session End's one write: today's first good day on the step.
+- assertVisible:
+    id: session-end-count
+    text: 1 of 3
+- tapOn:
+    id: session-end-cta
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 30000
