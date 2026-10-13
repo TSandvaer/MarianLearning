@@ -14,14 +14,14 @@
 2. **Skip counting shows a track of stepping stones**: every term she hears, then a "?" stone. There is no equation and no counters. _Why:_ the numbers are the content of a counting sequence. Counters for 40–70 would be impossible to count on a phone and would break the 20 pt dot floor (§ 2).
 3. **Multiplication shows the equation `A × B = ?` above B plates of A flowers.** _Why:_ this is the add/sub layout (equation over counters), with groups as the counters (§ 3).
 4. **The × sign appears at all three tiers** (× rather than ·, Thomas confirmed 2026-10-13). _Why:_ Emma says "times" in all 24 read lines, and the ribbon shows the word. The equation is where her word becomes a sign, as "plus" becomes "+". The groups next to it always carry the meaning, so the sign never has to stand alone. The diagnostic's "no x symbol" describes where she is now. It is not a ban, and 3rd grade will need the sign.
-5. **Repeated addition (a number tag on each plate with "+" between the plates) is shown from the start in `mult-2-5-10`. In `mult-3-4` and `mult-6-9` it appears at hint 2.** _Why:_ this is concrete → visual → abstract across the tiers. The first tier translates × into "2 + 2 + 2", which she can already read. Later tiers ask her to see it herself first.
+5. **Repeated addition (a number tag on each plate with "+" between the plates) is shown from the start in `mult-2-5-10` and `mult-6-9`. In `mult-3-4` it appears at hint 2** (Dave, 2026-10-13). _Why:_ in the first tier it translates × into "2 + 2 + 2", which she can already read. Groups of 3–4 are within subitising range, so `mult-3-4` can ask her to see the groups herself first. Groups of 6–9 are not; without tags she would count up to 27 flowers one by one.
 6. **The groups never fade in v1.** _Why:_ `mult-6-9` is still at the conceptual stage (products 12–27, `design/research/w12-generic-tier-hint-templates.md` § Tier 5). Hiding the groups would leave her with no support until two wrong answers.
 7. **Every hint line has its own picture beat** (§ 5). On hint 2 of a multiplication problem, each plate lights up as Emma names it. _Why:_ she should hear one spoken "two" for each plate she sees.
 8. **"This one is …" (the guided answer) is the explanation moment.** All the support shows at once: every hop, every tag (§ 5).
 9. **Phone landscape uses Word Song's L frame (the chip column).** Multiplication's ribbon is 1 line there (§ 6). _Why:_ under Math's bottom row of chips, the 5-tall groups and the 56 pt equation don't fit a 375 pt-tall screen.
 10. **Sizes are computed once per plan** from its largest problem. _Why:_ stones and plates keep one size for the whole session, and the equation never moves.
 11. **No new lines, art or sounds.** _Why:_ the canon already has every line, and its audio is baked. Flowers, stones, plates and the strip are drawn in code.
-12. **Number recognition shows a 1–10 number strip in one row, and the chips carry the answer** (§ 10). _Why:_ every hint-2 line is a fact about where the number sits on that line ("Five is in the middle.", "Nine is close to ten."), and in one row those facts are literally true on screen.
+12. **Number recognition shows a 1–10 number strip in one row, with its numerals hidden until hint 1, and the chips carry the answer** (§ 10). _Why:_ every hint-2 line is a fact about where the number sits on that line ("Five is in the middle.", "Nine is close to ten."), and in one row those facts are literally true on screen.
 13. **Number recognition keeps Math's own frames and chips** (`pickDistractors` unchanged). _Why:_ a 48 pt strip fits Math's problem rect on every form, and adjacent numbers are the near-miss that has already been reviewed for add-to-10.
 
 ## 1. Data notes for Devon
@@ -50,11 +50,11 @@ New file `mobile/src/screens/math/SkipTrack.tsx` (`testID="math-skip-track"`, `a
 - **"+":** Fredoka 600 `colors.ink`, 16 pt (tablet 20), centred in each gap between plates at the plates' mid-height. The gap is `G = clamp(12, fit, 24)` (tablet `clamp(16, fit, 32)`).
 - **Slot:** half a tag plus the plan's tallest plate, reserved for the whole session. The plates hang from its top, one `problemGap` below the equation (P 24, L 8, tablet 24).
 
-| Tier          | Plates + flowers | Tags + "+"                                   |
-| ------------- | ---------------- | -------------------------------------------- |
-| `mult-2-5-10` | always           | always (repeated addition shown from reveal) |
-| `mult-3-4`    | always           | hidden; they appear one by one on hint 2     |
-| `mult-6-9`    | always           | hidden; they appear one by one on hint 2     |
+| Tier          | Plates + flowers | Tags + "+"                                       |
+| ------------- | ---------------- | ------------------------------------------------ |
+| `mult-2-5-10` | always           | always (repeated addition shown from reveal)     |
+| `mult-3-4`    | always           | hidden; they appear one by one on hint 2         |
+| `mult-6-9`    | always           | always (groups of 6–9 can't be seen at a glance) |
 
 A hidden tag still takes its space, so nothing moves when it appears. After hint 2 the tags stay for the rest of the problem.
 
@@ -62,35 +62,36 @@ A hidden tag still takes its space, so nothing moves when it appears. After hint
 
 3 chips: the answer + 2 wrong values. `AnswerChip` is unchanged: dim, guided glow, shake and burst all behave as today. The values come from a **new pure function beside `pickDistractors`** (Devon's seam). A new `buildExtendedChipOrder` in `mobile/src/screens/math/extendedChipOrder.ts` shuffles them with the same LCG and seed as `buildChipOrder`. `buildChipOrder` stays a verbatim web copy and keeps serving arithmetic; `chipOrder.test.ts` must not change.
 
-| Kind       | P1–P3 (gentle)                                         | P4–P8                                                                                                                                           | Offered class (P4–P8) |
-| ---------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| skip-count | the first term; `correct + step`                       | `last + 1` (counted on by one); `correct + step` (skipped a term)                                                                               | `'count-by-one'`      |
-| multiply   | `pickDistractors(correct, index, M)` (its gentle tier) | `wrongOpDistractors(correct, factorA, factorB, M, 1)`: `A + B` (read × as +) and ±1; if it returns `null`, `pickDistractors(correct, index, M)` | `'wrong-op'`          |
+| Kind       | P1–P3 (gentle)                                         | P4–P8                                                                                                                                                              | Offered class (P4–P8) |
+| ---------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------- |
+| skip-count | the first term; `correct + step`                       | `last + 1` (counted on by one); `correct + step` (skipped a term)                                                                                                  | `'count-by-one'`      |
+| multiply   | `pickDistractors(correct, index, M)` (its gentle tier) | `A + B` (read × as +) and `correct + sign` (a counting slip, sign below); if `A + B` equals the answer or leaves 1–M (2 × 2), `pickDistractors(correct, index, M)` | `'wrong-op'`          |
 
 - **Skip repair:** a value equal to the answer or the other value, or outside 1–100, becomes the last term, or failing that the first term.
-- **M** (multiply ceiling) = 20 when every answer in the plan is ≤ 20, else `10 × ceil(max / 10)` (`mult-6-9` → 30). _Why:_ `chipMaxAnswerForCorrects` gives 99, which would put a "99" chip beside "Six times two".
+- **M** (multiply ceiling) = `10 × ceil((max answer + 1) / 10)`: `mult-2-5-10` → 30, `mult-3-4` → 20, `mult-6-9` → 30. _Why:_ the +1 chip always fits, and `chipMaxAnswerForCorrects` (99) would put a "99" chip beside "Six times two".
+- **The ±1 sign** (Dave, 2026-10-13) alternates by position: **+1 on P4, P6 and P8; −1 on P5 and P7**. If that value collides with `A + B`, use the other sign, then ±2. _Why:_ `A + B` is always below `A × B`, so a −1 chip every time makes the answer the biggest chip (14 of 15 canon problems before this change), and "tap the biggest" would pass as mastery. Now the answer is the biggest in 6 of 15 and the middle in 9. It is never the smallest, which is a weak 2-in-3 cue. Don't take the sign from the shuffle LCG's first draw: for these small seeds it is always below 0.5, so the sign would always come out −1.
 - **Why these traps:** counting on by ones is the classic sign that the step hasn't been seen. × and + are the same shape turned 45°, and she knows +, so `A + B` catches exactly the confusion that the new sign invites.
 
-Canon values (checked by running core's functions on the 24 multiply problems; unit-test all 32):
+Canon values (multiply checked by running core's functions with the rules above; unit-test all 32):
 
 - skip: 10 [2, 12] · 20 [5, 25] · 50 [10, 60] · 8 [7, 10] · 30 [26, 35] · 70 [61, 80] · 16 [15, 18] · 45 [41, 50]
-- mult-2-5-10: 4 [1, 20] · 5 [1, 20] · 10 [1, 20] · 6 [5, 7] · 10 [7, 9] · 10 [7, 9] · 20 [12, 19] · 20 [9, 19]
-- mult-3-4: 6 [1, 20] · 6 [1, 20] · 9 [1, 20] · 8 [6, 7] · 8 [6, 7] · 12 [7, 11] · 12 [7, 11] · 16 [8, 15]
-- mult-6-9: 12 [1, 30] · 14 [1, 30] · 16 [1, 30] · 18 [9, 17] · 21 [10, 20] · 18 [11, 17] · 24 [11, 23] · 27 [12, 26]
+- mult-2-5-10: 4 [1, 30] · 5 [1, 30] · 10 [1, 30] · 6 [5, 7] · 10 [7, 9] · 10 [7, 11] · 20 [12, 19] · 20 [9, 21]
+- mult-3-4: 6 [1, 20] · 6 [1, 20] · 9 [1, 20] · 8 [6, 9] · 8 [6, 7] · 12 [7, 13] · 12 [7, 11] · 16 [8, 17]
+- mult-6-9: 12 [1, 30] · 14 [1, 30] · 16 [1, 30] · 18 [9, 19] · 21 [10, 20] · 18 [11, 19] · 24 [11, 23] · 27 [12, 28]
 
 ## 5. Emma's lines on screen
 
 The slots fire exactly as today: read on reveal, reprompt on wrongs 1–2, the three hints 600 ms after the 2nd wrong's reprompt, the guided answer on wrong 3. For the new kinds, `runHintSequence` sets a new `hintStep` (1 / 2 / 3) before each hint line, where arithmetic sets `hintBeat`.
 
-| Slot (canon example: skip / multiply)                                       | Skip screen                                                                  | Multiply screen                                                                                |
-| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| read: "Two, four, six, eight. What is next?" / "Two times three. How many?" | stones + "?", no hops                                                        | equation + plates (tags per § 3)                                                               |
-| correct: "Yes! Ten!" / "Yes! Six!"                                          | "?" becomes the answer; the last hop turns solid                             | as today (chip burst, sparkle)                                                                 |
-| reprompt: "Hmm... try again?"                                               | no change                                                                    | no change                                                                                      |
-| hint1: "Look at the numbers." / "Look at the groups."                       | the stones ripple left to right                                              | the plates ripple left to right                                                                |
-| hint2: "We add two each time." / "Two, then two, then two."                 | the hops between the given stones fade in one by one, each "+2"              | the k-th spoken "two" lights plate k (a pulse; on T2/T3 its tag and the "+" before it fade in) |
-| hint3: "Eight and two more is what?" / "How many?"                          | the last stone and "?" pulse together; the dashed last hop draws in          | all plates pulse together once                                                                 |
-| giveAnswer: "This one is ten." / "This one is six."                         | every hop shows; "?" gets a 4 pt `colors.myRose` ring, like the glowing chip | every tag and "+" shows; the plates pulse once                                                 |
+| Slot (canon example: skip / multiply)                                       | Skip screen                                                                  | Multiply screen                                                                                     |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| read: "Two, four, six, eight. What is next?" / "Two times three. How many?" | stones + "?", no hops                                                        | equation + plates (tags per § 3)                                                                    |
+| correct: "Yes! Ten!" / "Yes! Six!"                                          | "?" becomes the answer; the last hop turns solid                             | as today (chip burst, sparkle)                                                                      |
+| reprompt: "Hmm... try again?"                                               | no change                                                                    | no change                                                                                           |
+| hint1: "Look at the numbers." / "Look at the groups."                       | the stones ripple left to right                                              | the plates ripple left to right                                                                     |
+| hint2: "We add two each time." / "Two, then two, then two."                 | the hops between the given stones fade in one by one, each "+2"              | the k-th spoken "two" lights plate k (a pulse; on `mult-3-4` its tag and the "+" before it fade in) |
+| hint3: "Eight and two more is what?" / "How many?"                          | the last stone and "?" pulse together; the dashed last hop draws in          | all plates pulse together once                                                                      |
+| giveAnswer: "This one is ten." / "This one is six."                         | every hop shows; "?" gets a 4 pt `colors.myRose` ring, like the glowing chip | every tag and "+" shows; the plates pulse once                                                      |
 
 - **Hint-2 word match:** read the hint-2 line's word ticks (the same `onWordTick` / `captionRevealed` that drives the ribbon, so the silent player works too). The k-th token (lower-cased, punctuation stripped) for which `wordToNumber(token) === factorA` lights plate k, for k ≤ `factorB`. "One group of five." lights its one plate at "five". When the line ends, any plate not yet lit lights at once.
 - Emma's poses are as today (`listening`, `celebration`, `puzzled-tilt`, `attentive-pointing`). A guided answer can cut a hint short, so decision 8 doesn't rely on the hint having played.
@@ -121,7 +122,7 @@ P skip (375×667)               P multiply ("Two times three")
 | [ 41 ]   [ 45 ]   [ 50 ]   | | [ 5 ]    [ 6 ]    [ 7 ]    |
 +----------------------------+ +----------------------------+
 
-L multiply (667×375, "Nine times three"; mult-6-9, so the tags show from hint 2)
+L multiply (667×375, "Nine times three"; mult-6-9, tags shown from reveal)
 +------------------------------------------------------+
 | [<]   | ● ● ◉ ○ ○ ○ ○ ○        ✦3 (★ 12) | [ 12 ] |
 |       | +--------------------------------+ |  104   |
@@ -182,20 +183,21 @@ L multiply (667×375, "Nine times three"; mult-6-9, so the tags show from hint 2
 9. Session end: `op: '*'` facts for multiply; no facts for skip-count or number recognition.
 10. Number recognition: `NumberStrip` instead of `math-symbolic`, plus its hint/correct/guided beats (§ 10). Frames, ribbon and chip picker are Math's own.
 
-**New:** `SkipTrack`, `GroupsRow`, `NumberStrip`, `extendedMathLayout`, `buildExtendedChipOrder`, the core chip picker, `TIMES_GLYPH`. **Reused:** `AnswerChip`, `MathHud`, `CaptionRibbon` (`maxLines`), `GettingReady`, `FlowerGlyph`, `wordToNumber`, `pickDistractors`, `wrongOpDistractors`, every sound effect and pose.
+**New:** `SkipTrack`, `GroupsRow`, `NumberStrip`, `extendedMathLayout`, `buildExtendedChipOrder`, the core chip picker, `TIMES_GLYPH`. **Reused:** `AnswerChip`, `MathHud`, `CaptionRibbon` (`maxLines`), `GettingReady`, `FlowerGlyph`, `wordToNumber`, `pickDistractors`, every sound effect and pose.
 
 ## 10. Step 1, number recognition: `NumberStrip`
 
 Canon (`number-recog.json`, targets 1, 3, 5, 2, 7, 4, 9, 6): read "Tap the seven.", correct "Yes! Seven!", reprompt "Hmm... try again?", hint1 "Look at the numbers.", hint2 a fact from Dave's 10-entry table (here "Seven is bigger than five."), hint3 "Which one is seven?", giveAnswer "This one is seven.".
 
-- **What shows:** no equation. New `mobile/src/screens/math/NumberStrip.tsx` (`testID="math-number-strip"`, `accessibilityLabel` = the read line) takes the place of `math-symbolic`, centred in the problem rect, from reveal. It is a ruler-like strip of 10 touching cells, 1 to 10 left to right: one white rounded rect (radius 12) with a 2 pt `colors.myPink` border and 1 pt `colors.myPink` dividers. The numerals are Fredoka 700 `colors.ink`, 22 pt (tablet 32). Cell width = `min(⌊area width / 10⌋, 48)` (tablet 72), height 48 (tablet 64). The strip is flat with `pointerEvents: 'none'`, so it doesn't read as chips. _Why visible from reveal:_ "Look at the numbers." needs numbers to look at, and an empty stage reads as broken.
+- **What shows:** no equation. New `mobile/src/screens/math/NumberStrip.tsx` (`testID="math-number-strip"`, `accessibilityLabel` = the read line) takes the place of `math-symbolic`, centred in the problem rect. It is a ruler-like strip of 10 touching cells, 1 to 10 left to right: one white rounded rect (radius 12) with a 2 pt `colors.myPink` border and 1 pt `colors.myPink` dividers. The numerals are Fredoka 700 `colors.ink`, 22 pt (tablet 32). Cell width = `min(⌊area width / 10⌋, 48)` (tablet 72), height 48 (tablet 64). The strip is flat with `pointerEvents: 'none'`, so it doesn't read as chips.
+- **Numerals from hint 1** (Dave, 2026-10-13): at reveal each cell holds a 6 pt `colors.myPink` dot instead of its numeral, so the stage is a path of ten empty places. _Why:_ she has to match "seven" to the 7 on a chip, not count along the strip and copy the glyph. The dots keep the frame and its ten positions, so the stage reads as a path waiting for numbers rather than an empty screen. The numerals appear at hint 1, at the guided answer (whichever comes first), or, for the target cell alone, on a correct tap.
 - **Chips:** 3, from `pickDistractors(correct, index, 10)` unchanged: gentle on P1–P3, off-by-one on P4–P8, offered class `'off-by-one'` on P4–P8. Canon: 1 [3, 10] · 3 [1, 10] · 5 [1, 10] · 2 [1, 3] · 7 [6, 8] · 4 [3, 5] · 9 [8, 10] · 6 [5, 7].
 - **Hints and moments:**
-  - hint1 "Look at the numbers.": the numerals ripple 1 → 10 (§ 7 ripple, scale 1.2).
+  - hint1 "Look at the numbers.": the numerals ripple in 1 → 10. Each dot fades out as its numeral scales 0.6 → 1, 150 ms after the previous cell (§ 7 timing) [fade only]. They stay for the rest of the problem.
   - hint2: the **landmark** cell the fact names fills `colors.myPink` (200 ms fade), and its numeral pulses once; it stays lit. Landmarks: 1 → 1, 2 → 1, 3 → 2, 4 → 3, 5 → 5, 6 → 5, 7 → 5, 8 → 7, 9 → 10, 10 → 10. Each is the number the fact mentions ("Two comes right after one." → 1); for 1, 5 and 10 it is the target itself.
   - hint3 "Which one is seven?": no strip change; the question is about the chips.
-  - giveAnswer "This one is seven.": the target's cell gets the 4 pt `colors.myRose` ring, and the correct chip glows (as today).
-  - correct "Yes! Seven!": the target's cell fills `colors.myPink`, and its numeral springs 1 → 1.25 → 1 (stiffness 260, damping 20) [200 ms fade].
+  - giveAnswer "This one is seven.": any numerals not yet shown appear at once (200 ms fade), the target's cell gets the 4 pt `colors.myRose` ring, and the correct chip glows (as today).
+  - correct "Yes! Seven!": the target's cell fills `colors.myPink`, and its numeral (in place of the dot, if hint 1 hasn't played) springs 0.6 → 1.25 → 1 (stiffness 260, damping 20) [200 ms fade].
 - **Layouts:** Math's frames on every form (P, L with its chip row, tablet), with no ribbon change: the longest line, "Two comes right after one.", is 2 lines in P (228.7 pt) and 1 in L. Strip: P floor 340 × 48 (cells 34), L 667×375 480 × 48 (Math's 491 pt pane), tablet 710 × 64 (portrait) / 720 × 64 (landscape). "10" measures 20.8 pt wide at 22 pt.
 - **Session end:** no fact (no Leitner outcome, no `mathFacts`). It counts only through `perProblemCorrect`, `latencyMs` and `perProblemAnswerValue`, as skip-count does. _Why:_ recognising a numeral is not an a/b arithmetic fact.
 
@@ -205,17 +207,19 @@ Canon (`number-recog.json`, targets 1, 3, 5, 2, 7, 4, 9, 6): read "Tap the seven
 - [ ] Skip: every term she hears is on a stone. 4–5 cells take one row, 6–9 take two balanced rows with row 2 indented. All 8 problems use one stone size. Tapping a stone does nothing.
 - [ ] Skip hints, after 2 wrong taps: hint 1 ripples the stones in order; hint 2 shows "+step" hops between the given stones; hint 3 pulses the last stone and "?" and draws the dashed last hop. The hops stay until the problem ends. On a correct tap, "?" becomes the answer.
 - [ ] Multiply: B plates of A flowers in columns of 5 (`mult-6-9` P5 `7 × 3`: 3 plates, each a column of 5 + a column of 2).
-- [ ] `mult-2-5-10`: tags + "+" show from reveal. `mult-3-4` / `mult-6-9`: hidden at reveal; on hint 2 each plate lights and shows its tag as Emma says its number. All are shown by the end of hint 2, with audio and with silent captions. Nothing moves when a tag appears.
+- [ ] `mult-2-5-10` and `mult-6-9`: tags + "+" show from reveal. `mult-3-4`: hidden at reveal; on hint 2 each plate lights and shows its tag as Emma says its number. All are shown by the end of hint 2, with audio and with silent captions. Nothing moves when a tag appears.
 - [ ] Guided answer (3rd wrong): every hop / every tag shows, and only the correct chip is tappable and glowing (as today).
-- [ ] Chips: exactly 3. The 32 canon problems produce the § 4 values (unit test), and `perProblemDistractorClass` is `null` for P1–P3 and `'count-by-one'` / `'wrong-op'` for P4–P8.
+- [ ] Chips: exactly 3. The 32 canon problems produce the § 4 values (unit test); across the 15 multiply P4–P8 problems the answer is the biggest chip in 6, and `perProblemDistractorClass` is `null` for P1–P3 and `'count-by-one'` / `'wrong-op'` for P4–P8.
 - [ ] Layout: `extendedMathLayout` unit tests pin § 6's table (D, areas, chip size, plate-row widths) for all 9 viewports. On device, in both orientations, nothing is clipped, nothing overlaps the ribbon, and the § 6 floors hold.
 - [ ] Ribbon: the 8-term skip read ("Five, ten, fifteen, twenty, twenty-five, thirty, thirty-five, forty. What is next?") scrolls inside its slot in L and never covers the stones. Every multiply line is one line in L.
 - [ ] Session end: a multiply session writes 8 `op: '*'` facts (Leitner keys like `2*3`). A skip session writes no facts, changes no Leitner box, and still counts toward mastery and the good day.
 - [ ] Web unchanged: the web's Math for these steps still takes its static fallback (Devon's opt-in parser).
-- [ ] Number recognition (QA step picker → `number-recog`): the 8 canon problems in order, with Emma's voice. P1 "Tap the one." shows the 1–10 strip and the chips 1, 3, 10. Hint 2 lights the landmark per § 10 ("Seven is bigger than five." lights 5). The guided answer rings the target cell, and a correct tap fills it. Tapping the strip does nothing. The session writes no facts.
+- [ ] Number recognition (QA step picker → `number-recog`): the 8 canon problems in order, with Emma's voice. P1 "Tap the one." shows the strip with ten dots and no numerals, and the chips 1, 3, 10. The numerals appear at hint 1 (or at the guided answer); a correct tap before that shows only the target's numeral. Hint 2 lights the landmark per § 10 ("Seven is bigger than five." lights 5). The guided answer rings the target cell, and a correct tap fills it. Tapping the strip does nothing. The session writes no facts.
 - [ ] Parser: a skip read ending "what's next?" parses the same as one ending "What is next?" (unit test).
 - [ ] Reduce Motion: no scaling anywhere in § 7 or § 10; fades only.
 
 ## Open questions
 
-None for Thomas (the × sign is confirmed). The orchestrator is routing these to Dave in parallel, and none of them blocks the build: the two new chip traps (§ 4), the tier fade of the repeated-addition layer (decision 5), and the number strip being visible from reveal (§ 10).
+- **Thomas (does not block):** how does Marian's Danish workbook draw 3 · 4: as 3 groups of 4, or 4 groups of 3? "A times B" stays as B groups of A (matching Emma's lines and hint 2) unless the workbook uses the opposite reading and she stumbles on it.
+
+Dave's consult (2026-10-13, PR #559 comments) is applied: the ±1 sign (§ 4), tags from reveal in `mult-6-9` (decision 5), and numerals from hint 1 on the number strip (§ 10). The × sign is confirmed.
