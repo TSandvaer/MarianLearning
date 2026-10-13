@@ -146,6 +146,10 @@ function Hop({
     >
       <Svg width={width} height={height} style={styles.fill}>
         <Path
+          // Remounted when it turns solid: react-native-svg keeps the native
+          // dash pattern when `strokeDasharray` goes back to undefined (the
+          // last hop stayed dashed after a correct tap on the iOS simulator).
+          key={dashed ? 'dashed' : 'solid'}
           d={arc}
           stroke={colors.myRose}
           strokeWidth={hopStroke}
