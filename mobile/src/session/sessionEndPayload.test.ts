@@ -1,4 +1,8 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { mathSessionPlanFromServer } from '@marian/core/math/planFromServer'
 import { STATIC_SESSION_PLANS } from '@marian/core/math/sessionPlans'
+import { REPO_ROOT } from '../../test/webSource'
 import type { MathSessionResult } from '../screens/math/mathTypes'
 import { mathSessionEndPayload } from './sessionEndPayload'
 
@@ -59,4 +63,56 @@ it('carries the scaffold flags only when true, and no focus without one', () => 
   expect(payload).not.toHaveProperty('subitisingScaffoldSubRendered')
   expect(payload).not.toHaveProperty('mathFacts')
   expect(payload).not.toHaveProperty('sessionFocus')
+})
+
+describe('Number Garden 1 and 8–11 (native spec § 8 and § 10)', () => {
+  function canon(node: string) {
+    const json = JSON.parse(
+      readFileSync(
+        resolve(
+          REPO_ROOT,
+          'public',
+          'canon',
+          'math',
+          'level-1',
+          `${node}.json`,
+        ),
+        'utf8',
+      ),
+    ) as { plan: unknown }
+    return mathSessionPlanFromServer(json.plan, { extendedKinds: true })
+  }
+
+  it('multiplication: 8 op "*" facts, factors in read order', () => {
+    const payload = mathSessionEndPayload(RESULT, canon('mult-3-4'), null)
+    expect(payload.mathFacts).toEqual([
+      { a: 2, b: 3, op: '*' },
+      { a: 3, b: 2, op: '*' },
+      { a: 3, b: 3, op: '*' },
+      { a: 4, b: 2, op: '*' },
+      { a: 2, b: 4, op: '*' },
+      { a: 3, b: 4, op: '*' },
+      { a: 4, b: 3, op: '*' },
+      { a: 4, b: 4, op: '*' },
+    ])
+  })
+
+  it.each(['skip-counting', 'number-recog'])(
+    '%s: no facts (no Leitner outcome), the rest as usual',
+    (node) => {
+      const payload = mathSessionEndPayload(RESULT, canon(node), null)
+      expect(payload).not.toHaveProperty('mathFacts')
+      expect(payload.perProblemCorrect).toEqual(RESULT.perProblemCorrect)
+      expect(payload.latencyMs).toEqual(RESULT.latencyMs)
+      expect(payload.perProblemAnswerValue).toEqual(
+        RESULT.perProblemAnswerValue,
+      )
+    },
+  )
+
+  it('an arithmetic plan read with the extended kinds keeps its facts', () => {
+    const payload = mathSessionEndPayload(RESULT, canon('add-to-10'), null)
+    expect(payload.mathFacts).toHaveLength(8)
+    expect(payload.mathFacts?.every((f) => f.op === '+')).toBe(true)
+  })
 })
