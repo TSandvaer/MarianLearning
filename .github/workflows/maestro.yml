@@ -138,6 +138,9 @@ jobs:
           path: |
             ${{ runner.temp }}/maestro-out
             ${{ runner.temp }}/maestro-run.log
-            ~/.maestro/tests
+          # Maestro writes each flow's logs and screenshots under
+          # <flow>/.maestro/tests/<timestamp>/, which upload-artifact skips
+          # unless hidden files are included.
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14

@@ -122,6 +122,23 @@ done
 [[ "$(curl -s --max-time 2 "http://127.0.0.1:$PORT/status" || true)" == "packager-status:running" ]] ||
   fail "Metro did not start in 120 s, see $OUT/metro.log"
 
+# Build the iOS bundle once before any flow, from the URL the manifest
+# gives Expo Go, so Expo Go's own request is served warm. A cold build takes
+# ~10 s on an M5 Mac but ~140 s on a hosted CI runner, longer than the first
+# flow's 120 s wait for its first screen.
+BUNDLE_URL="$(
+  curl -s --max-time 60 \
+    -H 'expo-platform: ios' -H 'accept: application/expo+json,application/json' \
+    "http://127.0.0.1:$PORT/" |
+    node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(JSON.parse(s).launchAsset.url)}catch{}})' ||
+    true
+)"
+[[ -n "$BUNDLE_URL" ]] || fail "Metro served no iOS manifest, see $OUT/metro.log"
+warm_start=$SECONDS
+curl -sf --max-time 600 -o /dev/null "$BUNDLE_URL" ||
+  fail "the iOS bundle did not build, see $OUT/metro.log"
+echo "iOS bundle built in $((SECONDS - warm_start)) s"
+
 # ── Flows ────────────────────────────────────────────────────────────────
 reset_app_storage() {
   xcrun simctl terminate "$UDID" "$EXPO_GO" >/dev/null 2>&1 || true

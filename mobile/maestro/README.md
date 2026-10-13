@@ -48,8 +48,9 @@ One flow: `maestro/run.sh maestro/flows/03-word-song.yaml`. With exactly one boo
 
    `--clear` matters: Metro caches inlined `EXPO_PUBLIC_*` values across restarts.
 
-2. Per flow: quits Expo Go, empties the app's key-value store (`ExponentExperienceData/*/marian-tutor*/SQLite/ExpoSQLiteStorage`), runs the flow.
-3. Prints a PASS/FAIL line per flow with its duration, stops Metro, exits non-zero if any flow failed.
+2. Builds the iOS bundle once, from the URL Metro's manifest gives Expo Go, so no flow pays the cold build inside its first wait (about 10 s on an M5 Mac, about 140 s on a CI runner).
+3. Per flow: quits Expo Go, empties the app's key-value store (`ExponentExperienceData/*/marian-tutor*/SQLite/ExpoSQLiteStorage`), runs the flow.
+4. Prints a PASS/FAIL line per flow with its duration, stops Metro, exits non-zero if any flow failed.
 
 Per-flow state goes in as **iOS launch arguments** in the flow's `launchApp: arguments:` (`seed`, `dayOffset`; `src/platform/launchFlags.ts` reads them before the env flags). That is what lets one Metro serve all four flows, and lets flow 4 move the clock a day per relaunch.
 
