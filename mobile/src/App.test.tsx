@@ -87,6 +87,7 @@ function boot(
       progressApiSecret,
       debug: undefined,
       seed: undefined,
+      qaStep: undefined,
       dayOffset: undefined,
       mute: undefined,
       audioCheck: undefined,
@@ -247,7 +248,7 @@ it('first launch (sessionCount 0): Splash → Greet, and Splash is silent', asyn
 
 it('returning (sessionCount ≥ 1, via a debug seed): Splash → Hub, and Emma speaks with no tap', async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {})
-  boot({ debug: true, seed: 'add-to-20', dayOffset: null })
+  boot({ debug: true, seed: 'add-to-20', qaStep: null, dayOffset: null })
   await renderPastSplash()
   expect(screen.getByTestId('hub')).toBeOnTheScreen()
   expect(screen.queryByTestId('greet')).toBeNull()
@@ -360,6 +361,7 @@ it('QA route literacy: Word Song runs at once, and its Session End writes exactl
     progressApiSecret: undefined,
     debug: '1',
     seed: undefined,
+    qaStep: undefined,
     dayOffset: undefined,
     mute: undefined,
     audioCheck: undefined,
@@ -367,7 +369,7 @@ it('QA route literacy: Word Song runs at once, and its Session End writes exactl
     qaRoute: 'literacy',
   })
   try {
-    boot({ debug: true, seed: null, dayOffset: null })
+    boot({ debug: true, seed: null, qaStep: null, dayOffset: null })
     await render(<App />)
     await flushAll()
     expect(screen.getByTestId('word-song')).toBeOnTheScreen()
@@ -390,7 +392,7 @@ it('QA route literacy: Word Song runs at once, and its Session End writes exactl
 
 it('Word Song → back: the Hub at once, no Session End, no write, the request aborted', async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {})
-  boot({ debug: true, seed: 'cvc-words', dayOffset: null })
+  boot({ debug: true, seed: 'cvc-words', qaStep: null, dayOffset: null })
   // Every request hangs until it is aborted.
   ;(globalThis.fetch as jest.Mock).mockImplementation(
     (_url: string, init: { signal?: AbortSignal }) =>
@@ -426,6 +428,7 @@ it('QA route session-end without a session: the placeholder, and nothing is writ
     progressApiSecret: undefined,
     debug: '1',
     seed: undefined,
+    qaStep: undefined,
     dayOffset: undefined,
     mute: undefined,
     audioCheck: undefined,
@@ -433,7 +436,7 @@ it('QA route session-end without a session: the placeholder, and nothing is writ
     qaRoute: 'session-end',
   })
   try {
-    boot({ debug: true, seed: null, dayOffset: null })
+    boot({ debug: true, seed: null, qaStep: null, dayOffset: null })
     await render(<App />)
     await settle(1000)
     expect(readSessionHistory().sessionCount).toBe(0)
@@ -512,6 +515,7 @@ it('QA route map without a handoff: the placeholder, no beat, and nothing is wri
     progressApiSecret: undefined,
     debug: '1',
     seed: undefined,
+    qaStep: undefined,
     dayOffset: undefined,
     mute: undefined,
     audioCheck: undefined,
@@ -519,7 +523,7 @@ it('QA route map without a handoff: the placeholder, no beat, and nothing is wri
     qaRoute: 'map',
   })
   try {
-    boot({ debug: true, seed: null, dayOffset: null })
+    boot({ debug: true, seed: null, qaStep: null, dayOffset: null })
     saveProgress(pendingUnlockDoc())
     const before = loadProgress()?.unlocksCelebrated
     const writes = progressWrites
@@ -605,7 +609,7 @@ it('Math drives Emma: listening while reading, puzzled-tilt on a wrong answer, c
 
 it('back to the Hub tears the session down; Math again starts a fresh one', async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {})
-  boot({ debug: true, seed: 'add-to-20', dayOffset: null })
+  boot({ debug: true, seed: 'add-to-20', qaStep: null, dayOffset: null })
   await renderPastSplash()
   // Word Song glows (a tie): the Hub prefetches Word Song's session.
   expect(sessionStarts()).toEqual([
@@ -638,7 +642,7 @@ it('back to the Hub tears the session down; Math again starts a fresh one', asyn
 
 it('Number Garden glowing: the Hub prefetches its session and the tap adopts it', async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {})
-  boot({ debug: true, seed: 'add-to-20', dayOffset: null })
+  boot({ debug: true, seed: 'add-to-20', qaStep: null, dayOffset: null })
   // The tie alternates from Word Song: Number Garden glows.
   writeSessionHistory({ ...readSessionHistory(), lastSuggestion: 'word-song' })
   // The prefetch is still in flight when she taps.
@@ -665,7 +669,7 @@ it('Number Garden glowing: the Hub prefetches its session and the tap adopts it'
 
 it('the Hub prefetch survives a map visit: Number Garden glowing → map → Home → tap adopts it', async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {})
-  boot({ debug: true, seed: 'add-to-20', dayOffset: null })
+  boot({ debug: true, seed: 'add-to-20', qaStep: null, dayOffset: null })
   writeSessionHistory({ ...readSessionHistory(), lastSuggestion: 'word-song' })
   ;(globalThis.fetch as jest.Mock).mockImplementationOnce(
     () => new Promise(() => {}),
@@ -687,7 +691,7 @@ const historyWrites = () => keyWrites.get(SESSION_HISTORY_KEY) ?? 0
 
 it('a Hub pick records the world as played today (web handleHubPickTree): once per new world, nothing more for a repeat', async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {})
-  boot({ debug: true, seed: 'add-to-20', dayOffset: null })
+  boot({ debug: true, seed: 'add-to-20', qaStep: null, dayOffset: null })
   await renderPastSplash()
   await flushAll()
   const today = isoDate(progressNow())
@@ -733,7 +737,7 @@ it('a Hub pick records the world as played today (web handleHubPickTree): once p
 
 it('a Hub pick on a stepped day (EXPO_PUBLIC_DAY_OFFSET) starts that day’s list fresh', async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {})
-  boot({ debug: true, seed: 'add-to-20', dayOffset: '1' })
+  boot({ debug: true, seed: 'add-to-20', qaStep: null, dayOffset: '1' })
   const realToday = isoDate(new Date())
   writeSessionHistory({
     ...readSessionHistory(),
@@ -756,7 +760,7 @@ it('a Hub pick on a stepped day (EXPO_PUBLIC_DAY_OFFSET) starts that day’s lis
 
 it("Hub: the map button opens that world's map, Home returns to a quiet Hub, a 3 s press on Emma opens Parent Settings", async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {})
-  boot({ debug: true, seed: 'add-to-20', dayOffset: null })
+  boot({ debug: true, seed: 'add-to-20', qaStep: null, dayOffset: null })
   await renderPastSplash()
   await flushAll()
   expect(voiceLine()).toMatch(/^hub-guide:/)
@@ -831,7 +835,7 @@ async function openParentSettings(): Promise<void> {
 
 it('Parent Settings: Hub → Parent Settings → Done → Hub → again writes nothing on entry, keeps one device ID, no Emma, and releases the audio session', async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {})
-  boot({ debug: true, seed: 'add-to-20', dayOffset: null })
+  boot({ debug: true, seed: 'add-to-20', qaStep: null, dayOffset: null })
   await renderPastSplash()
   await settle(2000)
   const progressBefore = progressWrites
@@ -879,6 +883,7 @@ it('QA route parent-settings: the real screen at once, nothing written on mount,
     progressApiSecret: undefined,
     debug: '1',
     seed: undefined,
+    qaStep: undefined,
     dayOffset: undefined,
     mute: undefined,
     audioCheck: undefined,
@@ -886,7 +891,7 @@ it('QA route parent-settings: the real screen at once, nothing written on mount,
     qaRoute: 'parent-settings',
   })
   try {
-    boot({ debug: true, seed: null, dayOffset: null })
+    boot({ debug: true, seed: null, qaStep: null, dayOffset: null })
     await render(<App />)
     await settle(1000)
     expect(screen.getByTestId('parent-settings')).toBeOnTheScreen()
@@ -1013,7 +1018,10 @@ it('launch reconcile without the progress secret: off, so no request, no device 
 
 it('launch reconcile, cloud newer: installed once while Splash runs (fields from the cloud, sessions merged so no local one is lost), and App mounting again does not reconcile again', async () => {
   const log = jest.spyOn(console, 'log').mockImplementation(() => {})
-  boot({ debug: true, seed: 'add-to-20', dayOffset: null }, 's3cret')
+  boot(
+    { debug: true, seed: 'add-to-20', qaStep: null, dayOffset: null },
+    's3cret',
+  )
   const { local, cloud } = localAndNewerCloud()
   withCloud(async () => cloudRecord(cloud, CLOUD_PLAYED))
   try {
@@ -1092,7 +1100,10 @@ it.each<[string, CloudAnswer, string, 'pushed' | 'kept']>([
   async (_name, answer, kind, push) => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {})
     jest.spyOn(console, 'warn').mockImplementation(() => {})
-    boot({ debug: true, seed: 'add-to-20', dayOffset: null }, 's3cret')
+    boot(
+      { debug: true, seed: 'add-to-20', qaStep: null, dayOffset: null },
+      's3cret',
+    )
     const { local, cloud } = localAndNewerCloud()
     withCloud(async () => answer(cloud))
     try {
@@ -1120,7 +1131,10 @@ it.each<[string, CloudAnswer, string, 'pushed' | 'kept']>([
 
 it('launch reconcile answering after the Hub is up: Emma plays on (no remount) and the cloud blob is installed', async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {})
-  boot({ debug: true, seed: 'add-to-20', dayOffset: null }, 's3cret')
+  boot(
+    { debug: true, seed: 'add-to-20', qaStep: null, dayOffset: null },
+    's3cret',
+  )
   const { cloud } = localAndNewerCloud()
   let answer: (record: unknown) => void = () => {}
   withCloud(
@@ -1153,7 +1167,10 @@ it('launch reconcile answering after the Hub is up: Emma plays on (no remount) a
 it('launch reconcile that times out keeps local progress: nothing written, and the app runs on', async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {})
   const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
-  boot({ debug: true, seed: 'add-to-20', dayOffset: null }, 's3cret')
+  boot(
+    { debug: true, seed: 'add-to-20', qaStep: null, dayOffset: null },
+    's3cret',
+  )
   localAndNewerCloud()
   const local = loadProgress()
   // The read hangs until core's 3 s timeout aborts it.

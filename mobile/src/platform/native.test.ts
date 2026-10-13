@@ -1,5 +1,7 @@
 import { apiUrl, getKeyValueStore, setApiBase } from '@marian/core'
 import { DEBUG_SEED_NAMES } from '@marian/core/debug/seeds'
+import { QA_STEPS } from '@marian/core/debug/stepProgress'
+import { currentStepOf } from '@marian/core/hub/hubCardModel'
 import {
   LAST_SYNC_STORAGE_KEY,
   loadProgress,
@@ -18,7 +20,21 @@ import {
   readSessionHistory,
 } from '@marian/core/sessionEnd/sessionHistory'
 import type { BuildEnv } from './buildEnv'
-import { NO_LAUNCH_FLAGS, type LaunchFlags } from './launchFlags'
+import {
+  buildMathSessionPayload,
+  readMathProgressHints,
+} from '../session/mathSession'
+import {
+  buildWordSongSessionPayload,
+  readWordSongProgressHints,
+} from '../session/wordSongHints'
+import {
+  NO_LAUNCH_FLAGS,
+  buildEnvSource,
+  resolveLaunchFlags,
+  type LaunchFlags,
+  type LaunchFlagSource,
+} from './launchFlags'
 import {
   DEFAULT_API_BASE,
   bootNative,
@@ -46,6 +62,7 @@ const EMPTY_ENV: BuildEnv = {
   progressApiSecret: undefined,
   debug: undefined,
   seed: undefined,
+  qaStep: undefined,
   dayOffset: undefined,
   mute: undefined,
   audioCheck: undefined,
@@ -53,7 +70,12 @@ const EMPTY_ENV: BuildEnv = {
   qaRoute: undefined,
 }
 
-const DEBUG_FLAGS: LaunchFlags = { debug: true, seed: null, dayOffset: null }
+const DEBUG_FLAGS: LaunchFlags = {
+  debug: true,
+  seed: null,
+  qaStep: null,
+  dayOffset: null,
+}
 
 afterEach(() => {
   setApiBase('')
@@ -332,5 +354,98 @@ describe('bootNative', () => {
       bootNative({ backend, env: EMPTY_ENV, flags: { ...DEBUG_FLAGS, seed } })
       expect(loadProgress()).not.toBeNull()
     }
+  })
+
+  it('-qaStep: progress at that step through the sqlite store, and Splash goes to the Hub', () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {})
+    const backend = memoryBackend()
+    bootNative({
+      backend,
+      env: EMPTY_ENV,
+      flags: { ...DEBUG_FLAGS, qaStep: 'mult-6-9' },
+    })
+    expect(currentStepOf(loadProgress()!, 'math')).toBe('mult-6-9')
+    expect(currentStepOf(loadProgress()!, 'word-song')).toBe('letter-sounds')
+    expect(readSessionHistory().sessionCount).toBe(1)
+    expect(nextAfterSplash()).toBe('hub')
+    expect(log).toHaveBeenCalledWith('[qaStep] jumped to "mult-6-9"')
+  })
+
+  it('an unknown qaStep warns once, writes nothing, and Splash goes to Greet', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const backend = memoryBackend()
+    bootNative({
+      backend,
+      env: EMPTY_ENV,
+      flags: { ...DEBUG_FLAGS, qaStep: 'digraphs' },
+    })
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0]![0]).toContain('Unknown step: "digraphs"')
+    expect(backend.map.size).toBe(0)
+    expect(nextAfterSplash()).toBe('greet')
+  })
+
+  it('qaStep is written on every launch: play made since is reset', () => {
+    jest.spyOn(console, 'log').mockImplementation(() => {})
+    const backend = memoryBackend()
+    const flags = { ...DEBUG_FLAGS, qaStep: 'cvc-words' }
+    bootNative({ backend, env: EMPTY_ENV, flags })
+    const played = loadProgress()!
+    saveProgress({
+      ...played,
+      skillLevels: { ...played.skillLevels, 'cvc-words': 'mastered' },
+    })
+    expect(currentStepOf(loadProgress()!, 'word-song')).toBe(
+      'cvc-words-short-o',
+    )
+    bootNative({ backend, env: EMPTY_ENV, flags })
+    expect(currentStepOf(loadProgress()!, 'word-song')).toBe('cvc-words')
+  })
+
+  it('a seed given with qaStep patches on top of the jump', () => {
+    jest.spyOn(console, 'log').mockImplementation(() => {})
+    bootNative({
+      backend: memoryBackend(),
+      env: EMPTY_ENV,
+      flags: { ...DEBUG_FLAGS, qaStep: 'mult-6-9', seed: 'cvc-words' },
+    })
+    expect(currentStepOf(loadProgress()!, 'math')).toBe('mult-6-9')
+    expect(currentStepOf(loadProgress()!, 'word-song')).toBe('cvc-words')
+  })
+
+  it('every step (11 + 13): qaStep lands the Hub and the session start on it', () => {
+    jest.spyOn(console, 'log').mockImplementation(() => {})
+    const landed: string[] = []
+    for (const { node, world } of QA_STEPS) {
+      bootNative({
+        backend: memoryBackend(),
+        env: EMPTY_ENV,
+        flags: { ...DEBUG_FLAGS, qaStep: node },
+      })
+      expect(currentStepOf(loadProgress()!, world)).toBe(node)
+      const payload =
+        world === 'math'
+          ? buildMathSessionPayload(readMathProgressHints(), true)
+          : buildWordSongSessionPayload(readWordSongProgressHints(), true)
+      expect(payload.track).toBe(world)
+      expect((payload.progress as { focusNode?: string }).focusNode).toBe(node)
+      landed.push(node)
+    }
+    expect(landed).toEqual(QA_STEPS.map((s) => s.node))
+    expect(landed).toHaveLength(24)
+  })
+
+  it('release safety: without debug 1, a qaStep from either source writes nothing', () => {
+    const backend = memoryBackend()
+    const launchArgs: LaunchFlagSource = (name) =>
+      name === 'qaStep' ? 'mult-6-9' : undefined
+    const flags = resolveLaunchFlags([
+      launchArgs,
+      buildEnvSource({ ...EMPTY_ENV, qaStep: 'simple-sentences' }),
+    ])
+    bootNative({ backend, env: EMPTY_ENV, flags })
+    expect(flags.qaStep).toBeNull()
+    expect(backend.map.size).toBe(0)
+    expect(nextAfterSplash()).toBe('greet')
   })
 })
