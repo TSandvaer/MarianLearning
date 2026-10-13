@@ -1,0 +1,9 @@
+# Opens the app in the Expo Go that `launchApp` just started, from the
+# harness's Metro (`METRO_URL`, passed by run.sh). iOS asks "Open in
+# 'Expo Go'?" for an exp:// link; the tap answers it.
+appId: host.exp.Exponent
+---
+- openLink: ${METRO_URL}
+- tapOn:
+    text: Open
+    optional: true

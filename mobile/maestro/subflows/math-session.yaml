@@ -1,0 +1,23 @@
+# One Math session, from Math's mount to Session End's "All done" button.
+# The QA autotap answers (problem 1: three wrong, then the guided answer;
+# problem 2: one wrong; the rest right), so the session is 7 of 8: a good
+# day. With the API unreachable, Math runs core's static plan with silent
+# captions.
+appId: host.exp.Exponent
+---
+- extendedWaitUntil:
+    visible:
+      id: math
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: math-chips
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: session-end
+    timeout: 300000
+- extendedWaitUntil:
+    visible:
+      id: session-end-cta
+    timeout: 60000
