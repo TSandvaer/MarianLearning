@@ -31,8 +31,14 @@
  * Garden) or Word Song, a map button to that world's map and Emma's 3 s
  * press to Parent Settings. On Hub entry App prefetches the glowing
  * world's session (no glow: Word Song; web `hubSessionPrefetch.ts`); the
- * card tap kicks it, which adopts the prefetch. Emma fades in when the Hub is the first screen after Splash,
+ * card tap kicks it, which adopts the prefetch, and records the world as
+ * played today (`todayTreesTouched`, as the web's `handleHubPickTree`).
+ * Emma fades in when the Hub is the first screen after Splash,
  * and wears her baked shadow on the Hub.
+ *
+ * At launch App reconciles progress with the cloud once, as the web's
+ * boot effect does (`./lifecycle/launchReconcile.ts`): off without the
+ * progress secret, never waited for, local kept on any failure.
  *
  * The map (`./screens/map/MapScreen.tsx`) opens with a handoff (`MapEntry`,
  * the world) from a Hub map button or Session End's "All done"; it may
@@ -98,6 +104,7 @@ import { wordSongLayout } from './layout/wordSongLayout'
 import { layoutForRoute } from './layout/routeLayout'
 import { sessionEndLayout } from './layout/sessionEndLayout'
 import { useAppVisibilityChange } from './lifecycle/appVisibility'
+import { reconcileOncePerLaunch } from './lifecycle/launchReconcile'
 import { readBuildEnv } from './platform/buildEnv'
 import { getLaunchFlags } from './platform/launchFlags'
 import {
@@ -567,6 +574,16 @@ function parseQaRoute(raw: string | undefined): Route {
 
 export default function App() {
   const fontsReady = useAppFonts()
+
+  // The web's boot-time cloud reconcile: once per launch, from the first
+  // mount, while Splash runs; nothing waits for it.
+  useEffect(() => {
+    void reconcileOncePerLaunch().then((result) => {
+      if (getLaunchFlags().debug) {
+        console.log(`[cloudSync] launch reconcile: ${result.kind}`)
+      }
+    })
+  }, [])
 
   useEffect(() => {
     if (fontsReady) void SplashScreen.hideAsync()
