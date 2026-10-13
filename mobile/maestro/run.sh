@@ -24,6 +24,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 MOBILE="$(cd "$HERE/.." && pwd)"
 PORT="${MAESTRO_METRO_PORT:-8399}"
 OUT="${MAESTRO_OUT:-$(mktemp -d -t marian-maestro)}"
+mkdir -p "$OUT"
 EXPO_GO=host.exp.Exponent
 
 # The API base the bundle gets: a closed local port. Every /api/claude call
@@ -39,10 +40,11 @@ fail() {
 
 # ── Tools ────────────────────────────────────────────────────────────────
 if [[ -z "${JAVA_HOME:-}" ]] && ! /usr/libexec/java_home >/dev/null 2>&1; then
-  # Maestro needs Java 17+. Android Studio bundles one.
-  JBR="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
-  [[ -x "$JBR/bin/java" ]] || fail "Maestro needs Java 17+: set JAVA_HOME"
-  export JAVA_HOME="$JBR"
+  # Maestro needs Java 17+. Homebrew's keg-only openjdk@17 is not on PATH.
+  BREW_JDK=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+  [[ -x "$BREW_JDK/bin/java" ]] ||
+    fail "Maestro needs Java 17+: brew install openjdk@17, or set JAVA_HOME"
+  export JAVA_HOME="$BREW_JDK"
 fi
 MAESTRO="$(command -v maestro || true)"
 [[ -n "$MAESTRO" ]] || MAESTRO="$HOME/.maestro/bin/maestro"

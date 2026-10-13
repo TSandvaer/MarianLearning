@@ -1,0 +1,22 @@
+# One Word Song session, from Word Song's mount to Session End's "All
+# done" button. The QA autotap answers as in Math (7 of 8: a good day).
+# With the API unreachable, Word Song runs one of core's static plans
+# (picked by the clock's minute) with silent captions.
+appId: host.exp.Exponent
+---
+- extendedWaitUntil:
+    visible:
+      id: word-song
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: word-song-chips
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: session-end
+    timeout: 300000
+- extendedWaitUntil:
+    visible:
+      id: session-end-cta
+    timeout: 60000

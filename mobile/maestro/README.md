@@ -1,0 +1,76 @@
+# Maestro flows (native critical paths)
+
+Phase 4 of `design/react-native-migration-plan.md`: the native app's critical paths as [Maestro](https://maestro.dev) flows, run on the **iOS Simulator with Expo Go**.
+
+| Flow                                 | Path                                                                                                                  |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `flows/01-first-launch.yaml`         | empty storage: Splash → Greet (heart tap) → Math → Session End "1 of 3" → Hub                                         |
+| `flows/02-hub-math-session-end.yaml` | returning child: Splash → Hub → Number Garden → Math → Session End "1 of 3" → Hub                                     |
+| `flows/03-word-song.yaml`            | returning child on CVC words: Hub → Word Song → Session End "1 of 3" → Hub                                            |
+| `flows/04-mastery-promotion.yaml`    | `cvc-words-short-o` seed, three Word Song days ("1/2/3 of 3"), the third promotes: "All done" → map unlock beat → Hub |
+
+`subflows/` holds the shared steps (open the app from Metro, one Math or Word Song session).
+
+## Run
+
+Prerequisites (once):
+
+- Xcode with an iOS simulator. Any iPad works; the flows were written on "iPad Pro 11-inch (M5)", iOS 27.
+- Expo Go on that simulator: `cd mobile && npx expo start --go --ios` installs it.
+- Java 17+: `brew install openjdk@17` (keg-only: it is not put on the PATH, so pass `JAVA_HOME` as below).
+- The Maestro CLI in `~/.maestro/bin` (`curl -fsSL "https://get.maestro.mobile.dev" | bash`, or unzip the `maestro.zip` of a [CLI release](https://github.com/mobile-dev-inc/maestro/releases) there). Written against 2.11.0.
+
+Then, from `mobile/`:
+
+```bash
+xcrun simctl list devices booted       # pick the simulator's UDID
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+MAESTRO_DEVICE=<UDID> \
+maestro/run.sh                          # all four flows, in order
+```
+
+One flow: `maestro/run.sh maestro/flows/03-word-song.yaml`. With exactly one booted simulator, `MAESTRO_DEVICE` can be left out. `MAESTRO_METRO_PORT` (default 8399) and `MAESTRO_OUT` (Metro's log and Maestro's screenshots/logs per flow; default: a fresh temp dir) are optional.
+
+**The runner empties the app's storage inside Expo Go on that simulator before every flow**, so each flow starts as a fresh install. Don't point it at a simulator whose progress you want to keep.
+
+### What `run.sh` does
+
+1. Starts one Metro (`npx expo start --go --offline --clear`) with the harness's bundle-time flags:
+
+   | Flag                              | Value                | Why                                                                                 |
+   | --------------------------------- | -------------------- | ----------------------------------------------------------------------------------- |
+   | `EXPO_PUBLIC_API_BASE`            | `http://127.0.0.1:9` | a closed local port: no paid call can happen (see below)                            |
+   | `EXPO_PUBLIC_PROGRESS_API_SECRET` | unset                | cloud sync off: nothing is written to the production progress store                 |
+   | `EXPO_NO_DOTENV`                  | `1`                  | a local `mobile/.env*` can't slip a secret or another API base into the bundle      |
+   | `EXPO_PUBLIC_MUTE`                | `1`                  | silent runs                                                                         |
+   | `EXPO_PUBLIC_DEBUG`               | `1`                  | enables the seed, day offset and autotap                                            |
+   | `EXPO_PUBLIC_QA_AUTOTAP_MS`       | `2500`               | Greet's wake tap and every Math / Word Song answer (7 of 8 per session: a good day) |
+
+   `--clear` matters: Metro caches inlined `EXPO_PUBLIC_*` values across restarts.
+
+2. Per flow: quits Expo Go, empties the app's key-value store (`ExponentExperienceData/*/marian-tutor*/SQLite/ExpoSQLiteStorage`), runs the flow.
+3. Prints a PASS/FAIL line per flow with its duration, stops Metro, exits non-zero if any flow failed.
+
+Per-flow state goes in as **iOS launch arguments** in the flow's `launchApp: arguments:` (`seed`, `dayOffset`; `src/platform/launchFlags.ts` reads them before the env flags). That is what lets one Metro serve all four flows, and lets flow 4 move the clock a day per relaunch.
+
+### No paid calls
+
+`/api/claude` (Haiku plus TTS) is never reached: the bundle's API base is a closed port on the Mac, so every session start fails at once with "Could not connect to the server" (visible in Metro's log), and Math and Word Song run core's static plans with silent captions, exactly as an offline iPad does. `run.sh` refuses to start if something listens on that port. A local stub of `/api/claude` was the alternative; it was not chosen because it would have to track the planner's response contract and audio, the static-plan path needs nothing, and the server-plan parsing is covered by core's unit tests and the web e2e suite.
+
+## Timing
+
+Measured on this Mac (Apple Silicon, iPad Pro 11-inch (M5) simulator): see the PR for the per-flow seconds. Flow 4 plays three sessions and is the long one.
+
+## Writing a flow
+
+- `testID` is the element's `id` in Maestro (`resource-id` in `maestro hierarchy`). Run `maestro --device <UDID> hierarchy --compact` on a live screen to see what is exposed.
+- A `Pressable` with an accessibility label is one accessibility element on iOS, so the ids **inside** it are not reliably visible (the Hub cards' current step, tray and map button). Assert on the card itself, or on what the next screen shows.
+- iOS asks "Open in 'Expo Go'?" for an `exp://` link the first time; `subflows/open-app.yaml` taps "Open" when it shows.
+- Don't tap Greet's wake target: the QA autotap fires it at 2.5 s and the two would race. The heart has no autotap; the flow taps it.
+- Splash lasts 1.75 s; it is checked by where it routes (Greet or Hub), not asserted itself.
+
+## Why Expo Go on the iOS Simulator
+
+- **Development build:** `npx expo run:ios` builds, but iOS 27 simulators refuse to launch it (`UIScene life cycle is required`, see `mobile/README.md`).
+- **Android emulator:** possible (the SDK and an API 37 AVD are on this Mac), but the target is the iPad.
+- **Expo Go + Maestro:** this Mac's Xcode 27 has no Simulator.app and `simctl` can't tap, but Maestro's XCTest driver taps, reads the accessibility tree and launches with arguments on an iOS 27 simulator. The trade-off: Expo Go is not the shipped binary. Native-module or entitlement differences of a release build are Phase 5's TestFlight check.

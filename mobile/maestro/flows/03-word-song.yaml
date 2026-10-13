@@ -1,0 +1,24 @@
+# Critical path 3: Word Song.
+# Splash → Hub → Word Song (Word Song card) → Session End → Hub.
+appId: host.exp.Exponent
+name: Word Song
+tags:
+  - critical-path
+---
+# `cvc-words`: a returning child practising CVC words (Marian's current
+# literacy step).
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: cvc-words
+- runFlow: ../subflows/open-app.yaml
+- runFlow:
+    file: ../subflows/word-song-day.yaml
+    env:
+      COUNT: 1 of 3
+- tapOn:
+    id: session-end-cta
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 30000
