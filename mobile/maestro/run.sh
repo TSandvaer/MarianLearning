@@ -30,6 +30,18 @@
 #
 # WARNING: it empties the Marian Tutor storage inside Expo Go on the chosen
 # simulator. Use a simulator you don't need the progress of.
+#
+# The every-step sweep (on demand; not part of the per-PR flows):
+#
+#   mobile/maestro/run.sh --sweep            # all 24 steps of both worlds
+#   mobile/maestro/run.sh --sweep add-to-20  # one step
+#
+# Per step: the `qaStep` launch flag, Hub, the world's card, one session,
+# Session End. Instead of the closed port, the bundle's API base is a local
+# keyless server that serves the committed session canon through the
+# production handler (sweep/sweep.sh, scripts/maestroSweepApi.ts). Needs
+# the repo's root `yarn install`. MAESTRO_SWEEP_API_PORT (default 8398).
+# The expected-fail list is sweep/expected-fail.txt.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -49,6 +61,17 @@ fail() {
   echo "run.sh: $*" >&2
   exit 1
 }
+
+SWEEP=0
+SWEEP_ONLY=""
+if [[ "${1:-}" == "--sweep" ]]; then
+  (($# <= 2)) || fail "usage: run.sh --sweep [<step>]"
+  SWEEP=1
+  SWEEP_ONLY="${2:-}"
+  # shellcheck source=sweep/sweep.sh
+  source "$HERE/sweep/sweep.sh"
+fi
+API_BASE="$UNREACHABLE_API"
 
 # ── Tools ────────────────────────────────────────────────────────────────
 if [[ -z "${JAVA_HOME:-}" ]] && ! /usr/libexec/java_home >/dev/null 2>&1; then
@@ -91,12 +114,16 @@ fi
 # ── Metro ────────────────────────────────────────────────────────────────
 stop_metro() {
   xcrun simctl terminate "$UDID" "$EXPO_GO" >/dev/null 2>&1 || true
+  ((SWEEP)) && sweep_stop_api
   [[ -n "${METRO_PID:-}" ]] && kill "$METRO_PID" >/dev/null 2>&1 || true
   local pids
   pids="$(lsof -ti tcp:"$PORT" -sTCP:LISTEN 2>/dev/null || true)"
   [[ -n "$pids" ]] && kill $pids >/dev/null 2>&1 || true
 }
 trap stop_metro EXIT
+
+# The sweep's API server; it sets API_BASE before Metro inlines it.
+((SWEEP)) && sweep_setup "$SWEEP_ONLY"
 
 echo "Metro on :$PORT (log: $OUT/metro.log)"
 # `env -i`-style hygiene without losing PATH/HOME: drop every app flag the
@@ -114,7 +141,7 @@ echo "Metro on :$PORT (log: $OUT/metro.log)"
     -u EXPO_PUBLIC_AUDIO_CHECK \
     EXPO_NO_DOTENV=1 \
     CI=1 \
-    EXPO_PUBLIC_API_BASE="$UNREACHABLE_API" \
+    EXPO_PUBLIC_API_BASE="$API_BASE" \
     EXPO_PUBLIC_MUTE=1 \
     EXPO_PUBLIC_DEBUG=1 \
     EXPO_PUBLIC_QA_AUTOTAP_MS=2500 \
@@ -160,6 +187,10 @@ reset_app_storage() {
   done
   return 0
 }
+
+if ((SWEEP)); then
+  if sweep_run; then exit 0; else exit 1; fi
+fi
 
 if [[ $# -gt 0 ]]; then
   FLOWS=("$@")
