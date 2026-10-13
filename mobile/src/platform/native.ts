@@ -10,8 +10,8 @@
  *   - day offset: the debug launch flag
  *
  * `bootNative()` installs them and then applies a debug step jump and a
- * debug seed, in that order, before anything reads storage. `./boot.ts` calls it with the
- * real dependencies; tests call it with fakes.
+ * debug seed, in that order, before anything reads storage. `./boot.ts`
+ * calls it with the real dependencies; tests call it with fakes.
  */
 import {
   setApiBase,

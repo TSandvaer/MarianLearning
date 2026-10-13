@@ -15,7 +15,7 @@
  * itself (§ 4): bottom padding plus scroll-into-view for the restore field.
  *
  * Debug only: with `onQaJump` (App passes it only when the debug launch
- * flag is on) a "QA: jump to a step" row closes the column and opens the
+ * flag is on) a "QA: jump to a step" row ends the column and opens the
  * step picker (`./QaStepPicker.tsx`) over the screen; Android back closes
  * the picker first.
  */
