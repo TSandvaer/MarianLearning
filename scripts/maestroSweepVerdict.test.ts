@@ -4,15 +4,22 @@
  * The every-step Maestro sweep's per-step verdict
  * (`scripts/maestroSweepVerdict.ts`, `mobile/maestro/run.sh --sweep`).
  */
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
+import { QA_STEPS } from '@marian/core/debug/stepProgress'
 import {
+  EXPECTED_FAIL_FILE,
   classifyStep,
   parseApiLog,
   parseExpectedFail,
   type StepEvidence,
   type SweepApiRecord,
 } from './maestroSweepVerdict.ts'
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 // Lines in the shape Expo CLI prints a device's console to Metro's log.
 const JUMP = (node: string) => ` LOG  [qaStep] jumped to "${node}"`
@@ -326,5 +333,11 @@ describe('parseExpectedFail', () => {
     expect(() => parseExpectedFail('skip-countin\n', steps)).toThrow(
       /"skip-countin" is not a step/,
     )
+  })
+
+  it('the committed list names only real steps', () => {
+    const text = readFileSync(join(ROOT, EXPECTED_FAIL_FILE), 'utf8')
+    const names = QA_STEPS.map((s) => s.node)
+    expect(() => parseExpectedFail(text, names)).not.toThrow()
   })
 })
