@@ -39,6 +39,12 @@
           "enableBackgroundPlayback": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "3ed1920d-bab2-4fef-ab11-6413a74d5e62"
+      }
+    },
+    "owner": "sandvaer"
   }
 }
