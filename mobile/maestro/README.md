@@ -61,6 +61,16 @@ Per-flow state goes in as **iOS launch arguments** in the flow's `launchApp: arg
 
 Three consecutive runs on 2026-10-13 (iPad Pro 11-inch (M5) simulator, iOS 27): first launch 117 / 109 / 97 s, Hub → Math 112 / 88 / 88 s, Word Song 100 / 99 / 99 s, mastery promotion 292 / 291 / 289 s (it plays three sessions). The whole suite takes about 10 minutes.
 
+## CI
+
+`.github/workflows/maestro.yml` runs `run.sh` (all four flows) on every pull request to `main` that touches `mobile/**`, `packages/core/**` or the workflow, on pushes to `main` under `mobile/**` or `packages/core/**`, and by hand (`workflow_dispatch`). It is not a required check.
+
+- **Runner:** GitHub-hosted `macos-26` (arm64; free for this public repo). It creates and boots a fresh "iPad Pro 11-inch (M5)" on the image's iOS 26.5 runtime.
+- **Pinned and checksum-verified:** Maestro 2.11.0 (`maestro.zip` from the `cli-2.11.0` release; the hash is the release's `checksums_sha256.txt`) and Expo Go 57.0.9 for the simulator (the `Expo-Go-57.0.9.tar.gz` from `expo/expo-go-releases`, the URL Expo's versions API gives for SDK 57). JDK 17 comes from `actions/setup-java` (Temurin).
+- **No production calls, no secrets:** the same `run.sh` guards (closed-port API base, no progress secret, `EXPO_NO_DOTENV=1`); the workflow reads no repository secrets and has `contents: read` only.
+- **On failure:** the `maestro-output-<attempt>` artifact holds Metro's log, the console log and Maestro's per-flow debug output with screenshots. The job summary lists the PASS/FAIL line per flow.
+- **Bumping:** a new Expo SDK needs a matching Expo Go (`sdkVersions["<sdk>"].iosClientUrl` in `https://exp.host/--/api/v2/versions`); update `EXPO_GO_VERSION` and `EXPO_GO_SHA256` together, and `MAESTRO_VERSION` and `MAESTRO_SHA256` together.
+
 ## Writing a flow
 
 - `testID` is the element's `id` in Maestro (`resource-id` in `maestro hierarchy`). Run `maestro --device <UDID> hierarchy --compact` on a live screen to see what is exposed.

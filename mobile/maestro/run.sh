@@ -2,7 +2,10 @@
 # Runs the Maestro flows against Expo Go on an iOS simulator.
 #
 #   mobile/maestro/run.sh                    # every flow in flows/, in order
-#   mobile/maestro/run.sh flows/03-word-song.yaml
+#   mobile/maestro/run.sh mobile/maestro/flows/03-word-song.yaml
+#
+# Run from the repo root as above, or from mobile/ as maestro/run.sh. Flow
+# paths are relative to the current directory.
 #
 # Env:
 #   MAESTRO_DEVICE      simulator UDID (default: the only booted simulator)
