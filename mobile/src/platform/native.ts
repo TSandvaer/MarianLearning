@@ -9,9 +9,9 @@
  *     sync recorded as Parent Settings' "Last synced" (`recordLastSync`)
  *   - day offset: the debug launch flag
  *
- * `bootNative()` installs them and then applies a debug seed, in that
- * order, before anything reads storage. `./boot.ts` calls it with the
- * real dependencies; tests call it with fakes.
+ * `bootNative()` installs them and then applies a debug step jump and a
+ * debug seed, in that order, before anything reads storage. `./boot.ts`
+ * calls it with the real dependencies; tests call it with fakes.
  */
 import {
   setApiBase,
@@ -22,6 +22,7 @@ import {
   type KeyValueStore,
 } from '@marian/core'
 import { applyDebugSeed } from '@marian/core/debug/seeds'
+import { applyQaStep } from '@marian/core/debug/stepProgress'
 import { recordLastSync } from '@marian/core/progress'
 import type { BuildEnv } from './buildEnv'
 import { setLaunchFlags, type LaunchFlags } from './launchFlags'
@@ -88,12 +89,19 @@ export function installNativePlatform({
 
 /**
  * Install the platform, record the launch flags (`getLaunchFlags()`),
- * then apply the debug seed (if any) through the freshly installed
- * store. Must run before any core storage read.
+ * then apply the debug step jump and the debug seed (if any) through the
+ * freshly installed store. Must run before any core storage read. Both
+ * flags are already null unless debug is on. The jump goes first: it
+ * replaces the progress doc, and a seed given with it patches on top.
  */
 export function bootNative(deps: NativePlatformDeps): void {
   installNativePlatform(deps)
   setLaunchFlags(deps.flags)
+  if (deps.flags.qaStep !== null) {
+    if (applyQaStep(deps.flags.qaStep)) {
+      console.log(`[qaStep] jumped to "${deps.flags.qaStep}"`)
+    }
+  }
   if (deps.flags.seed !== null) {
     if (applyDebugSeed(deps.flags.seed)) {
       console.log(`[debugSeed] applied "${deps.flags.seed}"`)

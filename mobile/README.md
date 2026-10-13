@@ -43,15 +43,18 @@ On a physical iPhone / iPad, Expo Go needs `npx expo login` and the same Expo ac
 
 ## Debug flags
 
-Same names as the web's query parameters. `seed` and `dayOffset` only apply with `debug=1`.
+Same names as the web's query parameters (`qaStep` is native-only). `seed`, `qaStep` and `dayOffset` only apply with `debug=1`.
 
-| Web               | iOS launch argument | Env flag (bundle time)       |
-| ----------------- | ------------------- | ---------------------------- |
-| `?debug=1`        | `-debug 1`          | `EXPO_PUBLIC_DEBUG=1`        |
-| `?seed=cvc-words` | `-seed cvc-words`   | `EXPO_PUBLIC_SEED=cvc-words` |
-| `?dayOffset=2`    | `-dayOffset 2`      | `EXPO_PUBLIC_DAY_OFFSET=2`   |
+| Web               | iOS launch argument | Env flag (bundle time)         |
+| ----------------- | ------------------- | ------------------------------ |
+| `?debug=1`        | `-debug 1`          | `EXPO_PUBLIC_DEBUG=1`          |
+| `?seed=cvc-words` | `-seed cvc-words`   | `EXPO_PUBLIC_SEED=cvc-words`   |
+| none              | `-qaStep mult-6-9`  | `EXPO_PUBLIC_QA_STEP=mult-6-9` |
+| `?dayOffset=2`    | `-dayOffset 2`      | `EXPO_PUBLIC_DAY_OFFSET=2`     |
 
 Seeds are `@marian/core/debug/seeds` (the same table the web uses). Launch arguments win over env flags.
+
+`qaStep` takes any step of either tree and writes `progressAtStep(node)` (`@marian/core/debug/stepProgress`): every earlier step of that world mastered, the step open, later steps locked, the other world at Marian's defaults. Splash then opens the Hub on that step. It is written on every launch while the flag is set, so play made in between is reset at the next launch; a `seed` given with it patches on top. With debug on, the same jump is a row at the bottom of Parent Settings, "QA: jump to a step", with a "Back to Marian's real start" button. A jump replaces the progress doc and clears today's session history; the device ID stays. With the progress secret set, the jump is this device's newest progress, so the next launch pushes it to the cloud like any session's progress.
 
 ```bash
 # launch arguments, on an installed dev build

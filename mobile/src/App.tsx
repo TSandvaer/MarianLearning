@@ -50,7 +50,12 @@
  * from Emma's 3 s press on the Hub and needs no handoff: it writes
  * nothing on mount, only on a control change, so the QA route and
  * re-entry are safe. Emma is not on it (a parent's screen), and Done /
- * Android back return to the Hub.
+ * Android back return to the Hub. In debug only, its "QA: jump to a step"
+ * row opens the step picker; a jump (or "Back to Marian's real start")
+ * writes the progress, then App mounts its screens afresh on the Hub, so
+ * every once-per-mount read (Math's fallback focus node, plan and
+ * scaffold decisions, Word Song's fallback plan) sees the new step, as a
+ * relaunch would. The launch reconcile is App's and does not run again.
  *
  * `@marian/core` is wired to the device before this module loads
  * (`./platform/boot.ts`, imported first by `index.ts`).
@@ -190,7 +195,14 @@ function mathSessionDefaults() {
   }
 }
 
-function Shell() {
+interface ShellProps {
+  /** The first route; unset → Splash (or the debug QA route). */
+  startRoute?: Route
+  /** Debug only: a QA step jump was written; mount afresh on the Hub. */
+  onQaJump: () => void
+}
+
+function Shell({ startRoute, onQaJump }: ShellProps) {
   // The provider's measured frame, not `useWindowDimensions()`: on Android
   // (API 37 emulator, edge-to-edge) the window height leaves out the
   // navigation bar (667×351) while the app draws under it (667×375) and
@@ -212,8 +224,8 @@ function Shell() {
   }, [flags.debug, width, height, insets])
   const env = readBuildEnv()
   const qaAutoTapMs = flags.debug ? parseQaAutoTap(env.qaAutoTapMs) : undefined
-  const [route, setRoute] = useState<Route>(() =>
-    flags.debug ? parseQaRoute(env.qaRoute) : FIRST_ROUTE,
+  const [route, setRoute] = useState<Route>(
+    () => startRoute ?? (flags.debug ? parseQaRoute(env.qaRoute) : FIRST_ROUTE),
   )
 
   // Math: session start, result handoff, Emma's pose.
@@ -511,7 +523,12 @@ function Shell() {
               onHome={onMapHome}
             />
           ) : parent ? (
-            <ParentSettings layout={parent} onExit={onParentSettingsExit} />
+            <ParentSettings
+              layout={parent}
+              onExit={onParentSettingsExit}
+              // The step picker is debug-only, gated like the seeds.
+              onQaJump={flags.debug ? onQaJump : undefined}
+            />
           ) : end ? (
             <SessionEnd
               layout={end}
@@ -574,6 +591,14 @@ function parseQaRoute(raw: string | undefined): Route {
 
 export default function App() {
   const fontsReady = useAppFonts()
+  // A QA step jump mounts the screens afresh on the Hub (debug only).
+  const [shell, setShell] = useState<{ key: number; start?: Route }>({
+    key: 0,
+  })
+  const onQaJump = useCallback(
+    () => setShell((prev) => ({ key: prev.key + 1, start: 'hub' })),
+    [],
+  )
 
   // The web's boot-time cloud reconcile: once per launch, from the first
   // mount, while Splash runs; nothing waits for it.
@@ -592,7 +617,7 @@ export default function App() {
   if (!fontsReady) return null
   return (
     <SafeAreaProvider>
-      <Shell />
+      <Shell key={shell.key} startRoute={shell.start} onQaJump={onQaJump} />
     </SafeAreaProvider>
   )
 }

@@ -11,8 +11,10 @@
  * | ---------------------------------- | --------------------------------------------- |
  * | `EXPO_PUBLIC_API_BASE`             | origin of `/api/*` (default: production)      |
  * | `EXPO_PUBLIC_PROGRESS_API_SECRET`  | cloud-sync bearer secret (unset: sync off)    |
- * | `EXPO_PUBLIC_DEBUG=1`              | debug mode, gates the two flags below         |
+ * | `EXPO_PUBLIC_DEBUG=1`              | debug mode, gates the three flags below       |
  * | `EXPO_PUBLIC_SEED=<name>`          | debug seed, see `@marian/core/debug/seeds`    |
+ * | `EXPO_PUBLIC_QA_STEP=<node>`       | debug: start on that step (every launch), see |
+ * |                                    | `@marian/core/debug/stepProgress`             |
  * | `EXPO_PUBLIC_DAY_OFFSET=<n>`       | moves the progress clock n days (0..60)       |
  * | `EXPO_PUBLIC_MUTE=1`               | every audio player muted (automated runs)     |
  * | `EXPO_PUBLIC_AUDIO_CHECK=1`        | runs `src/audio/debug/audioCheck.ts` at boot  |
@@ -33,6 +35,7 @@ export interface BuildEnv {
   progressApiSecret: string | undefined
   debug: string | undefined
   seed: string | undefined
+  qaStep: string | undefined
   dayOffset: string | undefined
   mute: string | undefined
   audioCheck: string | undefined
@@ -46,6 +49,7 @@ export function readBuildEnv(): BuildEnv {
     progressApiSecret: process.env.EXPO_PUBLIC_PROGRESS_API_SECRET,
     debug: process.env.EXPO_PUBLIC_DEBUG,
     seed: process.env.EXPO_PUBLIC_SEED,
+    qaStep: process.env.EXPO_PUBLIC_QA_STEP,
     dayOffset: process.env.EXPO_PUBLIC_DAY_OFFSET,
     mute: process.env.EXPO_PUBLIC_MUTE,
     audioCheck: process.env.EXPO_PUBLIC_AUDIO_CHECK,

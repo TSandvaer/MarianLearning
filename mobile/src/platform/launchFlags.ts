@@ -2,24 +2,32 @@
  * Debug launch flags: the native counterpart of the web's
  * `?debug=1&seed=<name>&dayOffset=<n>` query parameters.
  *
- * Two sources, same names as the web parameters:
+ * Two sources, same names as the web parameters (`qaStep` is native-only):
  *
- *   1. iOS launch arguments, `-debug 1 -seed cvc-words -dayOffset 2`.
+ *   1. iOS launch arguments, `-debug 1 -seed cvc-words -dayOffset 2`,
+ *      `-debug 1 -qaStep mult-6-9`.
  *      iOS puts `-key value` launch arguments into NSUserDefaults (the
  *      argument domain), which React Native's `Settings` module exposes.
  *      Pass them with `xcrun simctl launch <device> <bundle id> -debug 1
  *      -seed cvc-words`, from an Xcode scheme, or from a Maestro
  *      `launchApp: arguments:` block.
- *   2. Build-time env flags, `EXPO_PUBLIC_DEBUG=1 EXPO_PUBLIC_SEED=...`
- *      (see `./buildEnv.ts`).
+ *   2. Build-time env flags, `EXPO_PUBLIC_DEBUG=1 EXPO_PUBLIC_SEED=...`,
+ *      `EXPO_PUBLIC_QA_STEP=...` (see `./buildEnv.ts`).
  *
  * Per flag, the first source with a non-empty value wins (launch
- * arguments first). Exactly like the web, `seed` and `dayOffset` are
- * ignored unless `debug` is `1`: Marian's normal launch never sets it.
+ * arguments first). Exactly like the web, `seed`, `qaStep` and
+ * `dayOffset` are ignored unless `debug` is `1`: Marian's normal launch
+ * never sets it.
+ *
+ * `qaStep` names a step of either tree (`@marian/core/debug/stepProgress`):
+ * at boot, where the seed applies, the app writes `progressAtStep(node)`
+ * and opens on the Hub with that step current. Unlike a seed it is
+ * written on EVERY launch while the flag is set, so play made in between
+ * is reset at the next launch.
  */
 import type { BuildEnv } from './buildEnv'
 
-export type LaunchFlagName = 'debug' | 'seed' | 'dayOffset'
+export type LaunchFlagName = 'debug' | 'seed' | 'qaStep' | 'dayOffset'
 
 /** One place a flag can come from. Returns `undefined` when unset. */
 export type LaunchFlagSource = (name: LaunchFlagName) => string | undefined
@@ -29,6 +37,8 @@ export interface LaunchFlags {
   readonly debug: boolean
   /** The seed name, only when `debug`. */
   readonly seed: string | null
+  /** The step to start on (core validates it), only when `debug`. */
+  readonly qaStep: string | null
   /** The raw day offset (core validates it), only when `debug`. */
   readonly dayOffset: string | null
 }
@@ -36,6 +46,7 @@ export interface LaunchFlags {
 export const NO_LAUNCH_FLAGS: LaunchFlags = {
   debug: false,
   seed: null,
+  qaStep: null,
   dayOffset: null,
 }
 
@@ -66,6 +77,7 @@ export function buildEnvSource(env: BuildEnv): LaunchFlagSource {
   return (name) => {
     if (name === 'debug') return env.debug
     if (name === 'seed') return env.seed
+    if (name === 'qaStep') return env.qaStep
     return env.dayOffset
   }
 }
@@ -89,6 +101,7 @@ export function resolveLaunchFlags(
   return {
     debug,
     seed: firstValue(sources, 'seed'),
+    qaStep: firstValue(sources, 'qaStep'),
     dayOffset: firstValue(sources, 'dayOffset'),
   }
 }
