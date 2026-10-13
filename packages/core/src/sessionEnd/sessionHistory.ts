@@ -315,6 +315,30 @@ export function markTreeTouched(
 }
 
 /**
+ * Record a Hub pick: `tree` was touched today. The web's
+ * `handleHubPickTree` write (`src/App.tsx`), as one call for the native
+ * App: read, mark, and write only when the state changed (a second pick of
+ * the same tree on the same day writes nothing). The frozen web keeps its
+ * inline copy; `sessionHistory.test.ts` pins the two equal.
+ *
+ * Never throws: a storage failure leaves today's list as it was, and the
+ * pick goes ahead (web parity).
+ */
+export function recordTreeTouched(
+  tree: SkillTreeId,
+  now: Date,
+  adapter: StorageAdapter = defaultAdapter(),
+): void {
+  try {
+    const prev = readSessionHistory(adapter)
+    const next = markTreeTouched(prev, tree, now)
+    if (next !== prev) writeSessionHistory(next, adapter)
+  } catch {
+    // Non-fatal, as on the web.
+  }
+}
+
+/**
  * Read history and return it with any stale `todayTreesTouched` cleared.
  * Convenience wrapper for screens that only want today's trees.
  */

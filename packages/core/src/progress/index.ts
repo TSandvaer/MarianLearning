@@ -119,10 +119,16 @@ export {
 } from './deviceId'
 export {
   fetchProgressFromCloud,
+  isCloudSyncConfigured,
   mergeSessionHistories,
   pushProgressToCloud,
   reconcileWithCloud,
 } from './cloudSync'
+export { reconcileAtLaunch } from './launchReconcile'
+export type {
+  LaunchReconcileDeps,
+  LaunchReconcileResult,
+} from './launchReconcile'
 export type {
   CloudErrorReason,
   FetchResult,

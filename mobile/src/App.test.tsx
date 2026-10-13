@@ -12,12 +12,17 @@ import {
   defaultProgress,
   loadProgress,
   saveProgress,
+  readStoredDeviceId,
   STORAGE_KEY,
   type Progress,
+  type SessionHistoryEntry,
 } from '@marian/core/progress'
 import { seedUnlocksCelebrated } from '@marian/core/progress/pathBeats'
+import { now as progressNow } from '@marian/core/progress/clock'
 import {
+  isoDate,
   readSessionHistory,
+  SESSION_HISTORY_KEY,
   writeSessionHistory,
 } from '@marian/core/sessionEnd/sessionHistory'
 import { WARM_CAP_MS } from '@marian/core/splash/splashTiming'
@@ -43,6 +48,7 @@ import { mathLayout } from './layout/mathLayout'
 import * as buildEnv from './platform/buildEnv'
 import { NO_LAUNCH_FLAGS, type LaunchFlags } from './platform/launchFlags'
 import { bootNative, type SyncKeyValueBackend } from './platform/native'
+import { resetLaunchReconcileForTests } from './lifecycle/launchReconcile'
 import {
   HEART_TAP_TRANSITION_MS,
   WAKE_REPROMPT_AFTER_MS,
@@ -58,7 +64,10 @@ let progressWrites = 0
 /** Writes per storage key since the last `boot()`. */
 const keyWrites = new Map<string, number>()
 
-function boot(flags: LaunchFlags = NO_LAUNCH_FLAGS): void {
+function boot(
+  flags: LaunchFlags = NO_LAUNCH_FLAGS,
+  progressApiSecret?: string,
+): void {
   const map = new Map<string, string>()
   progressWrites = 0
   keyWrites.clear()
@@ -75,7 +84,7 @@ function boot(flags: LaunchFlags = NO_LAUNCH_FLAGS): void {
     backend,
     env: {
       apiBase: undefined,
-      progressApiSecret: undefined,
+      progressApiSecret,
       debug: undefined,
       seed: undefined,
       dayOffset: undefined,
@@ -137,6 +146,8 @@ beforeEach(() => {
   // remount clock, and the app's session prefetch.
   resetHubAudioForTests()
   sessionPrefetcher.discard()
+  // A render is a new launch: the cloud reconcile may run again.
+  resetLaunchReconcileForTests()
   resetFakePlayers()
   jest.useFakeTimers()
   ;(globalThis.fetch as jest.Mock).mockClear()
@@ -671,6 +682,78 @@ it('the Hub prefetch survives a map visit: Number Garden glowing → map → Hom
   expect(sessionStarts()).toHaveLength(1)
 })
 
+/** Writes to the session-history key since the last `boot()`. */
+const historyWrites = () => keyWrites.get(SESSION_HISTORY_KEY) ?? 0
+
+it('a Hub pick records the world as played today (web handleHubPickTree): once per new world, nothing more for a repeat', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  boot({ debug: true, seed: 'add-to-20', dayOffset: null })
+  await renderPastSplash()
+  await flushAll()
+  const today = isoDate(progressNow())
+  expect(readSessionHistory().todayTreesTouched.trees).toEqual([])
+
+  // Number Garden: the Hub's suggestion write, then App's.
+  let before = historyWrites()
+  await fireEvent.press(screen.getByTestId('hub-card-number-garden'))
+  await flushAll()
+  expect(screen.getByTestId('math')).toBeOnTheScreen()
+  expect(historyWrites() - before).toBe(2)
+  expect(readSessionHistory().todayTreesTouched).toEqual({
+    date: today,
+    trees: ['number-garden'],
+  })
+
+  // Word Song joins the list.
+  await fireEvent.press(screen.getByTestId('math-back-to-hub'))
+  await flushAll()
+  before = historyWrites()
+  await fireEvent.press(screen.getByTestId('hub-card-word-song'))
+  await flushAll()
+  expect(screen.getByTestId('word-song')).toBeOnTheScreen()
+  expect(historyWrites() - before).toBe(2)
+  expect(readSessionHistory().todayTreesTouched).toEqual({
+    date: today,
+    trees: ['number-garden', 'word-song'],
+  })
+
+  // Number Garden again: only the Hub's write; the list is unchanged.
+  await fireEvent.press(screen.getByTestId('word-song-back-to-hub'))
+  await flushAll()
+  before = historyWrites()
+  await fireEvent.press(screen.getByTestId('hub-card-number-garden'))
+  await flushAll()
+  expect(screen.getByTestId('math')).toBeOnTheScreen()
+  expect(historyWrites() - before).toBe(1)
+  expect(readSessionHistory().todayTreesTouched).toEqual({
+    date: today,
+    trees: ['number-garden', 'word-song'],
+  })
+})
+
+it('a Hub pick on a stepped day (EXPO_PUBLIC_DAY_OFFSET) starts that day’s list fresh', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  boot({ debug: true, seed: 'add-to-20', dayOffset: '1' })
+  const realToday = isoDate(new Date())
+  writeSessionHistory({
+    ...readSessionHistory(),
+    todayTreesTouched: {
+      date: realToday,
+      trees: ['number-garden', 'word-song'],
+    },
+  })
+  await renderPastSplash()
+  await flushAll()
+  await fireEvent.press(screen.getByTestId('hub-card-word-song'))
+  await flushAll()
+  const stepped = isoDate(progressNow())
+  expect(stepped).not.toBe(realToday)
+  expect(readSessionHistory().todayTreesTouched).toEqual({
+    date: stepped,
+    trees: ['word-song'],
+  })
+})
+
 it("Hub: the map button opens that world's map, Home returns to a quiet Hub, a 3 s press on Emma opens Parent Settings", async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {})
   boot({ debug: true, seed: 'add-to-20', dayOffset: null })
@@ -818,5 +901,283 @@ it('QA route parent-settings: the real screen at once, nothing written on mount,
     expect(screen.getByTestId('hub')).toBeOnTheScreen()
   } finally {
     env.mockRestore()
+  }
+})
+
+// ── Launch-time cloud reconcile (web boot effect, src/App.tsx) ─────────
+
+const LOCAL_PLAYED = '2026-10-12T08:00:00.000Z'
+const CLOUD_PLAYED = '2026-10-13T08:00:00.000Z'
+
+interface CloudInit {
+  method?: string
+  body?: string
+  signal?: AbortSignal
+}
+
+/** The `/api/progress` requests App made. */
+function progressRequests(): { url: string; method: string | undefined }[] {
+  return (globalThis.fetch as jest.Mock).mock.calls
+    .filter(([url]) => String(url).includes('/api/progress'))
+    .map(([url, init]) => ({
+      url: String(url),
+      method: (init as CloudInit | undefined)?.method,
+    }))
+}
+
+/** The bodies App POSTed to `/api/progress`. */
+function progressPushes(): {
+  deviceId: string
+  blob: Progress
+  lastModifiedISO: string
+}[] {
+  return (globalThis.fetch as jest.Mock).mock.calls
+    .filter(
+      ([url, init]) =>
+        String(url).includes('/api/progress') &&
+        (init as CloudInit | undefined)?.method === 'POST',
+    )
+    .map(([, init]) => JSON.parse(String((init as CloudInit).body)))
+}
+
+const offlineFetch = () =>
+  Promise.reject(new TypeError('Network request failed (jest is offline)'))
+
+/**
+ * jest's offline fetch, except `/api/progress`: `answer` serves its GET,
+ * and a POST (a push) succeeds.
+ */
+function withCloud(answer: (init: CloudInit) => Promise<unknown>): void {
+  ;(globalThis.fetch as jest.Mock).mockImplementation(
+    (url: string, init: CloudInit) => {
+      if (!String(url).includes('/api/progress')) return offlineFetch()
+      if (init.method === 'POST') return Promise.resolve(response(200, {}))
+      return answer(init)
+    },
+  )
+}
+
+function response(status: number, body: unknown) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+  }
+}
+
+/** A 200 from `/api/progress` holding `blob`, saved at `iso`. */
+function cloudRecord(blob: unknown, iso: string) {
+  return response(200, { ok: true, blob, lastModifiedISO: iso })
+}
+
+/** One recorded session. */
+function session(dateISO: string, successRate: number): SessionHistoryEntry {
+  return { dateISO, skillFocus: ['add-to-20'], successRate }
+}
+
+/**
+ * The seeded progress, saved as last played at LOCAL_PLAYED with one
+ * session; returns it and a newer cloud copy (another device's: another
+ * session, add-to-20 mastered, named "Cloud").
+ */
+function localAndNewerCloud(): { local: Progress; cloud: Progress } {
+  const seeded = loadProgress()!
+  const local: Progress = {
+    ...seeded,
+    profile: { ...seeded.profile, lastPlayedISO: LOCAL_PLAYED },
+    history: [session('2026-10-12T07:50:00.000Z', 0.75)],
+  }
+  saveProgress(local)
+  const cloud: Progress = {
+    ...seeded,
+    profile: {
+      ...seeded.profile,
+      lastPlayedISO: CLOUD_PLAYED,
+      childName: 'Cloud',
+    },
+    skillLevels: { ...seeded.skillLevels, 'add-to-20': 'mastered' },
+    history: [session('2026-10-13T07:50:00.000Z', 1)],
+  }
+  return { local: loadProgress()!, cloud }
+}
+
+it('launch reconcile without the progress secret: off, so no request, no device ID and no write', async () => {
+  boot()
+  await renderPastSplash()
+  await settle(4000)
+  expect(screen.getByTestId('greet')).toBeOnTheScreen()
+  expect(progressRequests()).toHaveLength(0)
+  expect(keyWrites.get(DEVICE_ID_STORAGE_KEY)).toBeUndefined()
+  expect(progressWrites).toBe(0)
+})
+
+it('launch reconcile, cloud newer: installed once while Splash runs (fields from the cloud, sessions merged so no local one is lost), and App mounting again does not reconcile again', async () => {
+  const log = jest.spyOn(console, 'log').mockImplementation(() => {})
+  boot({ debug: true, seed: 'add-to-20', dayOffset: null }, 's3cret')
+  const { local, cloud } = localAndNewerCloud()
+  withCloud(async () => cloudRecord(cloud, CLOUD_PLAYED))
+  try {
+    const before = progressWrites
+    const view = await render(<App />)
+    await flushAll()
+    // Installed before Splash is done: nothing waited for it.
+    expect(screen.getByTestId('route-splash')).toBeOnTheScreen()
+    expect(progressRequests()).toEqual([
+      {
+        url: expect.stringMatching(/\/api\/progress\?deviceId=[0-9a-f-]{36}$/),
+        method: 'GET',
+      },
+    ])
+    expect(progressWrites - before).toBe(1)
+    const installed = loadProgress()!
+    // Field by field the cloud wins ...
+    expect(installed.profile).toMatchObject({
+      childName: 'Cloud',
+      lastPlayedISO: CLOUD_PLAYED,
+    })
+    expect(installed.skillLevels['add-to-20']).toBe('mastered')
+    // ... but both devices' sessions are kept, oldest first.
+    expect(installed.history).toEqual([...local.history, ...cloud.history])
+    expect(log).toHaveBeenCalledWith(
+      '[cloudSync] launch reconcile: installed-from-cloud',
+    )
+    await advance(WARM_CAP_MS + SPLASH_FADE_OUT_MS)
+    expect(screen.getByTestId('hub')).toBeOnTheScreen()
+
+    // The same launch, App mounted again: no second read, no second write.
+    await view.unmount()
+    await render(<App />)
+    await settle(4000)
+    expect(progressRequests()).toHaveLength(1)
+    expect(progressWrites - before).toBe(1)
+  } finally {
+    ;(globalThis.fetch as jest.Mock).mockImplementation(offlineFetch)
+  }
+})
+
+/** The cloud's answer to the launch GET, given the newer cloud copy. */
+type CloudAnswer = (cloud: Progress) => unknown
+
+it.each<[string, CloudAnswer, string, 'pushed' | 'kept']>([
+  [
+    'local newer: local is pushed',
+    (cloud) =>
+      cloudRecord(
+        { ...cloud, profile: { ...cloud.profile, lastPlayedISO: null } },
+        '2026-10-01T08:00:00.000Z',
+      ),
+    'pushed-to-cloud',
+    'pushed',
+  ],
+  [
+    'no cloud record (404): local is pushed',
+    () => response(404, { error: 'not-found' }),
+    'pushed-to-cloud',
+    'pushed',
+  ],
+  [
+    'cloud server error (503): local is left alone',
+    () => response(503, { error: 'kv-failed' }),
+    'cloud-error',
+    'kept',
+  ],
+  [
+    'malformed cloud copy: local is left alone',
+    () => cloudRecord({ schemaVersion: 1, garbage: true }, CLOUD_PLAYED),
+    'cloud-blob-rejected',
+    'kept',
+  ],
+])(
+  'launch reconcile, %s; nothing is written',
+  async (_name, answer, kind, push) => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {})
+    jest.spyOn(console, 'warn').mockImplementation(() => {})
+    boot({ debug: true, seed: 'add-to-20', dayOffset: null }, 's3cret')
+    const { local, cloud } = localAndNewerCloud()
+    withCloud(async () => answer(cloud))
+    try {
+      const before = progressWrites
+      await renderPastSplash()
+      await settle(1000)
+      expect(screen.getByTestId('hub')).toBeOnTheScreen()
+      expect(log).toHaveBeenCalledWith(`[cloudSync] launch reconcile: ${kind}`)
+      expect(progressWrites).toBe(before)
+      expect(loadProgress()).toEqual(local)
+      const deviceId = readStoredDeviceId()
+      expect(progressRequests().map((r) => r.method)).toEqual(
+        push === 'pushed' ? ['GET', 'POST'] : ['GET'],
+      )
+      expect(progressPushes()).toEqual(
+        push === 'pushed'
+          ? [{ deviceId, blob: local, lastModifiedISO: LOCAL_PLAYED }]
+          : [],
+      )
+    } finally {
+      ;(globalThis.fetch as jest.Mock).mockImplementation(offlineFetch)
+    }
+  },
+)
+
+it('launch reconcile answering after the Hub is up: Emma plays on (no remount) and the cloud blob is installed', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  boot({ debug: true, seed: 'add-to-20', dayOffset: null }, 's3cret')
+  const { cloud } = localAndNewerCloud()
+  let answer: (record: unknown) => void = () => {}
+  withCloud(
+    () =>
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+  )
+  try {
+    const before = progressWrites
+    await renderPastSplash()
+    await flushAll()
+    const hub = screen.getByTestId('hub')
+    const line = voiceLine()
+    expect(line).toMatch(/^hub-guide:/)
+    await act(async () => {
+      answer(cloudRecord(cloud, CLOUD_PLAYED))
+      await flush()
+    })
+    await flushAll()
+    expect(screen.getByTestId('hub')).toBe(hub)
+    expect(voiceLine()).toBe(line)
+    expect(progressWrites - before).toBe(1)
+    expect(loadProgress()?.profile.childName).toBe('Cloud')
+  } finally {
+    ;(globalThis.fetch as jest.Mock).mockImplementation(offlineFetch)
+  }
+})
+
+it('launch reconcile that times out keeps local progress: nothing written, and the app runs on', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+  boot({ debug: true, seed: 'add-to-20', dayOffset: null }, 's3cret')
+  localAndNewerCloud()
+  const local = loadProgress()
+  // The read hangs until core's 3 s timeout aborts it.
+  withCloud(
+    ({ signal }) =>
+      new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () =>
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+        )
+      }),
+  )
+  try {
+    const before = progressWrites
+    await renderPastSplash()
+    expect(screen.getByTestId('hub')).toBeOnTheScreen()
+    await settle(3000)
+    expect(warn).toHaveBeenCalledWith(
+      '[cloudSync] reconcile read failed — timeout',
+    )
+    expect(progressRequests()).toHaveLength(1)
+    expect(progressWrites).toBe(before)
+    expect(loadProgress()).toEqual(local)
+    expect(screen.getByTestId('hub')).toBeOnTheScreen()
+  } finally {
+    ;(globalThis.fetch as jest.Mock).mockImplementation(offlineFetch)
   }
 })

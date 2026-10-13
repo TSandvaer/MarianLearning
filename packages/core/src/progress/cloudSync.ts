@@ -111,6 +111,15 @@ function readAuthSecret(): string | null {
   return secret
 }
 
+/**
+ * Is cloud sync on: does the host's source give a non-empty secret? The
+ * same test every helper applies before it sends; a host uses it to skip
+ * cloud work entirely when the build has no secret.
+ */
+export function isCloudSyncConfigured(): boolean {
+  return readAuthSecret() !== null
+}
+
 function authHeaders(): Record<string, string> {
   const secret = readAuthSecret()
   if (secret === null) return {}
