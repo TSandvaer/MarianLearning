@@ -1,0 +1,19 @@
+# Steps the every-step sweep (run.sh --sweep) expects to fail today.
+#
+# The sweep reports these as XFAIL when their only problem is the silent
+# fallback and the sweep API did serve the step (the app can't read the
+# server plan). If one plays its server plan, the sweep reports XPASS and
+# fails: take the step off this list in the PR that fixes it. Any other
+# failure of a listed step is a plain FAIL.
+#
+# One step per line (a core SkillNode, see run.sh --sweep's step list);
+# `#` starts a comment. A name that is not a step stops the sweep.
+
+# Number Garden 8-11: the native Math parser
+# (packages/core/src/math/planFromServer.ts `parseReadOperands`) only reads
+# "plus" / "minus" / "take away" lines, so these plans fall back to the
+# static sums-to-10 plan. Being built (2026-10-13).
+skip-counting
+mult-2-5-10
+mult-3-4
+mult-6-9

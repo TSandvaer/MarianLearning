@@ -1,0 +1,70 @@
+# One step of the every-step sweep (`run.sh --sweep`, see README.md).
+#
+#   STEP   the step, a core SkillNode, e.g. add-to-20
+#   WORLD  math | word-song
+#
+# The `qaStep` launch flag puts the child on STEP (every earlier step of
+# its world mastered, STEP at 'intro'; core `progressAtStep`) and opens on
+# the Hub. The flow taps the world's card, plays one session with the QA
+# autotap and goes back to the Hub from Session End.
+#
+# `qaStep` rewrites the progress on every launch while it is set, so the
+# flow launches once. run.sh judges the step from Metro's log and the
+# sweep API's request log (scripts/maestroSweepVerdict.ts); the flow only
+# has to get through.
+appId: host.exp.Exponent
+name: Step sweep
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      debug: 1
+      qaStep: ${STEP}
+- runFlow: ../subflows/open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 120000
+- runFlow:
+    when:
+      true: ${WORLD == 'math'}
+    commands:
+      - tapOn:
+          id: hub-card-number-garden
+      - extendedWaitUntil:
+          visible:
+            id: math
+          timeout: 30000
+- runFlow:
+    when:
+      true: ${WORLD == 'word-song'}
+    commands:
+      - tapOn:
+          id: hub-card-word-song
+      - extendedWaitUntil:
+          visible:
+            id: word-song
+          timeout: 30000
+# Not the shared math-session / word-song-session subflows: Maestro 2.11.0
+# counts an extendedWaitUntil timeout from the last interaction (here the
+# card tap), not from the wait's start, so their 60 s wait for the "All
+# done" button is used up by the session itself. With the server plan's
+# audio, Session End's lines still play when it shows (seen on
+# digraphs-sh, 2026-10-13). So each wait here gets the budget of the
+# waits before it plus its own.
+- extendedWaitUntil:
+    visible:
+      id: session-end
+    timeout: 300000
+- extendedWaitUntil:
+    visible:
+      id: session-end-cta
+    timeout: 420000
+- assertVisible:
+    id: session-end-count
+- tapOn:
+    id: session-end-cta
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 30000
