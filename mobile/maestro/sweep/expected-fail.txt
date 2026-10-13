@@ -8,14 +8,6 @@
 #
 # One step per line (a core SkillNode, see run.sh --sweep's step list);
 # `#` starts a comment. A name that is not a step stops the sweep.
-
-# Number Garden 1 and 8-11: the native Math parser
-# (packages/core/src/math/planFromServer.ts `parseReadOperands`) only reads
-# "plus" / "minus" / "take away" lines, so these plans fall back to the
-# static sums-to-10 plan. Being built (2026-10-13).
-# All five XFAILs are removed by the math-steps PR (Number Garden 1, 8-11).
-number-recog
-skip-counting
-mult-2-5-10
-mult-3-4
-mult-6-9
+#
+# Empty: every step plays its server plan (Number Garden 1 and 8-11 came off
+# with the PR that built them, 2026-10-13).
