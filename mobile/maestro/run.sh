@@ -96,6 +96,7 @@ echo "Metro on :$PORT (log: $OUT/metro.log)"
   exec env \
     -u EXPO_PUBLIC_PROGRESS_API_SECRET \
     -u EXPO_PUBLIC_SEED \
+    -u EXPO_PUBLIC_QA_STEP \
     -u EXPO_PUBLIC_DAY_OFFSET \
     -u EXPO_PUBLIC_QA_ROUTE \
     -u EXPO_PUBLIC_AUDIO_CHECK \
