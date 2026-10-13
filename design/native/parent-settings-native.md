@@ -16,7 +16,7 @@
 6. **Restore asks once, in a system alert,** before it switches the device ID. Pasting this device's own ID is caught inline (§ 4).
 7. **The screen handles the keyboard itself:** bottom padding plus scroll-into-view, and taps reach Restore while the keyboard is up (§ 4).
 8. **Every transient status lasts 2.4 s from the latest tap, and each status line has a reserved slot** (§ 5).
-9. **Last synced shows local date and time,** not a UTC ISO string (§ 5).
+9. **Last synced shows this device's last successful cloud sync, in local date and time,** not the web's last-session time as a UTC ISO string (§ 4, § 5).
 10. **Done and Android back → Hub. No Emma stage on this route. The iOS audio session is released on entry** (§ 6).
 11. **Two web strings that core contradicts are corrected, and the defaults footnote is generated from core** (§ 7).
 
@@ -159,7 +159,7 @@ Blocks are 16 apart (web `mt-4`); field label → box 4 (web `mt-1`).
 
 - Value left, Push now right (`minWidth` 112), in every form. Push calls the web seam (`pushProgressToCloud(getOrCreateDeviceId(), progress)`). While sending, the label is "Sending…" and the button is disabled. Statuses, web strings: "Synced.", "Couldn't reach the server.", "Cloud sync isn't configured." (a build without `EXPO_PUBLIC_PROGRESS_API_SECRET`).
 - **Local time.** `formatLastSynced(iso)`: `new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })`. `null` → "Never" (web); an unparseable value, or a throw → the raw string. The web prints the UTC ISO string, which in Denmark reads one or two hours off.
-- The value is `profile.lastPlayedISO` (web): the session-end push stamps it. **A manual Push now does not change it.** That is web behaviour, not a bug: the line keeps the last session's time after "Synced.".
+- **The value is this device's last successful cloud sync** (native departure, Thomas 2026-10-13: the web shows `profile.lastPlayedISO`, so on his iPhone Push now said "Synced." and the row didn't move). A sync counts when the device and its cloud copy agree after a cloud call (a push the server accepts, or a launch reconcile or Restore that read the cloud and installed, pushed or found it equal), and its time is stored under its own device-local key, `marian-tutor:last-sync`, outside the Progress blob, so it never syncs or restores to another device.
 
 **Restore from device ID:**
 
@@ -253,8 +253,8 @@ The web keeps its strings (UI freeze). Native changes these, and only these:
 - [ ] Backup → Copy: "Copied to clipboard." shows, then clears about 2.4 s later. Pasted into Notes, the text starts with `{` and contains `"kind": "marian-tutor.backup"`.
 - [ ] Backup → Share…: the share sheet opens (on the iPad, a popover pointing at Share…); Notes saves the same JSON; dismissing the sheet shows no status.
 - [ ] Device ID → Copy: "Copied to clipboard.", then it clears; pasted elsewhere, it matches the 36 characters on screen. A long-press on the ID offers the system Copy.
-- [ ] Push now: "Sending…" on a greyed button of unchanged width, then "Synced." on the right, clearing after about 2.4 s. "Last synced" doesn't change.
-- [ ] "Last synced" shows the local date and time at which the last session ended, or "Never" on a fresh install.
+- [ ] Push now: "Sending…" on a greyed button of unchanged width, then "Synced." on the right, clearing after about 2.4 s. "Last synced" shows the current local date and time at once.
+- [ ] "Last synced" shows the local date and time of this device's last successful sync, or "Never" until the first one. In a build without the progress secret nothing changes it, and Push now says "Cloud sync isn't configured."
 - [ ] Phone portrait and landscape, tap the restore field: no suggestion bar and no auto-capital; the field, its status line and Restore are above the keyboard. Type "abc" and tap Restore once with the keyboard still up: the amber "doesn't look like a device ID" line shows and no alert. Editing the text clears it.
 - [ ] Paste this device's own ID → Restore: "That's this device's own ID." and no alert.
 - [ ] Phone that has never played a session: copy the iPad's device ID, paste it into the phone's field with the system Paste, tap Restore → the alert → Cancel: nothing changes. Again → Restore: "Restoring…", then "Restored Marian's progress from that device."; the phone's Device ID now shows the iPad's; Done → the phone's Hub shows the iPad's flowers and land numbers.
@@ -265,4 +265,4 @@ The web keeps its strings (UI freeze). Native changes these, and only these:
 
 ## Open questions
 
-None for Thomas. He checks the PR on his devices, as for every Phase 3 screen (`team/DECISIONS.md` 2026-10-09). The native screen departs from the web in eleven places: the fixed header, compact stacking, the row-wide native Switch, Share… in place of the textarea, the restore alert and the own-ID check, the screen-owned keyboard handling, the per-tap 2.4 s timer (with the Backup status clearing), local-time Last synced, two corrected strings and the generated footnote, the audio-session release, and 44 pt touch targets (the web's are 32–36 px). None touches anything Marian sees or hears, so no Dave consult is needed. The system font, and no Emma on this screen, are the web's own choices, not departures.
+None for Thomas. He checks the PR on his devices, as for every Phase 3 screen (`team/DECISIONS.md` 2026-10-09). The native screen departs from the web in eleven places: the fixed header, compact stacking, the row-wide native Switch, Share… in place of the textarea, the restore alert and the own-ID check, the screen-owned keyboard handling, the per-tap 2.4 s timer (with the Backup status clearing), Last synced as this device's last successful sync in local time, two corrected strings and the generated footnote, the audio-session release, and 44 pt touch targets (the web's are 32–36 px). None touches anything Marian sees or hears, so no Dave consult is needed. The system font, and no Emma on this screen, are the web's own choices, not departures.

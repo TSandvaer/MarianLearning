@@ -5,7 +5,8 @@
  *
  *   - storage:    a synchronous `KeyValueStore` on expo-sqlite
  *   - API base:   `EXPO_PUBLIC_API_BASE`, default production
- *   - cloud sync: `EXPO_PUBLIC_PROGRESS_API_SECRET`
+ *   - cloud sync: `EXPO_PUBLIC_PROGRESS_API_SECRET`, and each successful
+ *     sync recorded as Parent Settings' "Last synced" (`recordLastSync`)
  *   - day offset: the debug launch flag
  *
  * `bootNative()` installs them and then applies a debug seed, in that
@@ -15,11 +16,13 @@
 import {
   setApiBase,
   setCloudSyncAuthSecretSource,
+  setCloudSyncSuccessListener,
   setDayOffsetSource,
   setKeyValueStore,
   type KeyValueStore,
 } from '@marian/core'
 import { applyDebugSeed } from '@marian/core/debug/seeds'
+import { recordLastSync } from '@marian/core/progress'
 import type { BuildEnv } from './buildEnv'
 import { setLaunchFlags, type LaunchFlags } from './launchFlags'
 
@@ -78,6 +81,7 @@ export function installNativePlatform({
   setKeyValueStore(sqliteKeyValueStore(backend))
   setApiBase(resolveApiBase(env.apiBase))
   setCloudSyncAuthSecretSource(() => env.progressApiSecret)
+  setCloudSyncSuccessListener(() => recordLastSync())
   // `flags.dayOffset` is already null unless debug is on.
   setDayOffsetSource(() => flags.dayOffset)
 }

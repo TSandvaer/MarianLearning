@@ -12,6 +12,7 @@ import {
   getOrCreateDeviceId,
   loadProgress,
   pushProgressToCloud,
+  readLastSyncISO,
   reconcileWithCloud,
   saveProgress,
   writeStoredDeviceId,
@@ -42,6 +43,12 @@ export interface ParentSettingsDeps {
   share: (text: string, anchor: number | null) => Promise<void>
   /** The persisted device ID (generated and stored on first call). */
   getDeviceId: () => string
+  /**
+   * This device's last successful cloud sync (ISO), or null: "Last synced"
+   * (`@marian/core/progress/lastSync`). The cloud helpers record it, so
+   * the screen re-reads it after Push now and Restore.
+   */
+  readLastSync: () => string | null
   pushNow: (progress: Progress, signal: AbortSignal) => Promise<PushResult>
   /**
    * Reconcile against `uuid`, then adopt it as this device's ID (unless
@@ -72,6 +79,7 @@ export const DEFAULT_PARENT_SETTINGS_DEPS: ParentSettingsDeps = {
   writeClipboard,
   share,
   getDeviceId: () => getOrCreateDeviceId(),
+  readLastSync: readLastSyncISO,
   pushNow: (progress, signal) =>
     pushProgressToCloud(getOrCreateDeviceId(), progress, {
       fetchImpl: abortableFetch(globalThis.fetch, signal),

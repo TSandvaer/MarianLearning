@@ -37,10 +37,13 @@ export interface FakeDeps {
   saved: Progress[]
   current: () => Progress | null
   setStored: (p: Progress | null) => void
+  /** Stores the last-sync time `readLastSync` returns (null: never). */
+  setLastSync: (iso: string | null) => void
   mocks: {
     writeClipboard: jest.Mock
     share: jest.Mock
     getDeviceId: jest.Mock
+    readLastSync: jest.Mock
     pushNow: jest.Mock
     restoreFromDeviceId: jest.Mock
   }
@@ -50,11 +53,13 @@ export function fakeDeps(
   initial: Progress | null = defaultProgress(),
 ): FakeDeps {
   let current = initial
+  let lastSync: string | null = null
   const saved: Progress[] = []
   const mocks = {
     writeClipboard: jest.fn<Promise<void>, [string]>(async () => {}),
     share: jest.fn<Promise<void>, [string, number | null]>(async () => {}),
     getDeviceId: jest.fn(() => DEVICE_ID),
+    readLastSync: jest.fn<string | null, []>(() => lastSync),
     pushNow: jest.fn<Promise<PushResult>, [Progress, AbortSignal]>(
       async () => 'sent',
     ),
@@ -78,6 +83,9 @@ export function fakeDeps(
     current: () => current,
     setStored: (p) => {
       current = p
+    },
+    setLastSync: (iso) => {
+      lastSync = iso
     },
     mocks,
   }

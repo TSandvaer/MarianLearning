@@ -29,10 +29,13 @@ import {
   OTHER_ID,
   PHONE,
 } from '../../../test/parentSettingsHarness'
+import { formatLastSynced } from './nativeCopy'
 
 const INPUT = 'parent-settings-cloud-restore-input'
 const SUBMIT = 'parent-settings-cloud-restore-submit'
 const STATUS = 'parent-settings-cloud-restore-status'
+const LAST_SYNCED = 'parent-settings-cloud-last-synced'
+const SYNCED_AT = '2026-10-13T09:41:00.000Z'
 
 let alert: jest.SpyInstance
 
@@ -171,6 +174,23 @@ describe('confirmed restore', () => {
     expect(screen.getByTestId(STATUS).props.children).toBe(
       'Restore failed (boom).',
     )
+  })
+
+  it('a restore that synced shows the new Last synced at once', async () => {
+    const fake = fakeDeps()
+    fake.mocks.restoreFromDeviceId.mockImplementationOnce(async () => {
+      // What core's sync listener records during the restore's read.
+      fake.setLastSync(SYNCED_AT)
+      return { kind: 'installed-from-cloud', progress: defaultProgress() }
+    })
+    await mount(fake)
+    expect(screen.getByTestId(LAST_SYNCED).props.children).toBe('Never')
+    await typeAndRestore(OTHER_ID)
+    await answerAlert('Restore')
+    expect(screen.getByTestId(LAST_SYNCED).props.children).toBe(
+      formatLastSynced(SYNCED_AT, 'Never'),
+    )
+    expect(fake.mocks.readLastSync).toHaveBeenCalledTimes(2)
   })
 
   it('leaving mid-restore aborts the request; its late result is ignored', async () => {
