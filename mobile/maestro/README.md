@@ -59,7 +59,7 @@ Per-flow state goes in as **iOS launch arguments** in the flow's `launchApp: arg
 
 ## Timing
 
-Measured on this Mac (Apple Silicon, iPad Pro 11-inch (M5) simulator): see the PR for the per-flow seconds. Flow 4 plays three sessions and is the long one.
+Three consecutive runs on 2026-10-13 (iPad Pro 11-inch (M5) simulator, iOS 27): first launch 117 / 109 / 97 s, Hub → Math 112 / 88 / 88 s, Word Song 100 / 99 / 99 s, mastery promotion 292 / 291 / 289 s (it plays three sessions). The whole suite takes about 10 minutes.
 
 ## Writing a flow
 
