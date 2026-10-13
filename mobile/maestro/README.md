@@ -105,7 +105,7 @@ The other guards are the per-PR ones: no progress secret, `EXPO_NO_DOTENV=1`, mu
 
 ### Expected failures
 
-`sweep/expected-fail.txt`, one step per line. Today it lists Number Garden 8–11 (`skip-counting`, `mult-2-5-10`, `mult-3-4`, `mult-6-9`): the API serves their canon, but the native Math parser (`parseReadOperands` in `packages/core/src/math/planFromServer.ts`) reads only "plus", "minus" and "take away" lines, so the app falls back to the static plan. A name on the list that is not a step stops the sweep before it starts.
+`sweep/expected-fail.txt`, one step per line. Today it lists Number Garden 1 and 8–11 (`number-recog`, `skip-counting`, `mult-2-5-10`, `mult-3-4`, `mult-6-9`), which the math-steps PR takes off: the API serves their canon, but the native Math parser (`parseReadOperands` in `packages/core/src/math/planFromServer.ts`) reads only "plus", "minus" and "take away" lines, so the app falls back to the static plan. A name on the list that is not a step stops the sweep before it starts.
 
 ### Sweep timing
 
