@@ -48,6 +48,7 @@ import {
   buildLeitnerSessionHint,
   buildSlowFactSessionHint,
   dueLeitnerItems,
+  leitnerBoxForFocus,
   loadProgress,
   pickFocusNode,
   pickRecentSuccessRate,
@@ -97,8 +98,14 @@ export function readMathProgressHints(): MathProgressHints {
   }
   const sessionCount = readSessionHistory().sessionCount
   const { node, mode } = pickFocusNode(progress, 'math', sessionCount)
+  // Multiplication facts only reach a multiplication step's request
+  // (core `leitnerBoxForFocus`): the planner's add-to-10 Leitner directive
+  // would plan "Two times three" into an addition session.
   const leitner = buildLeitnerSessionHint(
-    dueLeitnerItems(progress.mathFactsLeitner, progressNowMs()),
+    leitnerBoxForFocus(
+      dueLeitnerItems(progress.mathFactsLeitner, progressNowMs()),
+      node,
+    ),
   )
   const slowFacts = buildSlowFactSessionHint(progress)
   return {

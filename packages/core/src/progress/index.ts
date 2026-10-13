@@ -46,6 +46,7 @@ export {
   dueLeitnerItems,
   emptyLeitner,
   findItem,
+  leitnerBoxForFocus,
   promote,
 } from './leitner'
 export type { LeitnerSessionHintItem } from './leitner'
