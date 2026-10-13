@@ -134,12 +134,15 @@ jobs:
             sed -n '/── Maestro results/,$p' "$log"
             echo '```'
           } >>"$GITHUB_STEP_SUMMARY"
-          # A lost Hub-card tap or a flow rerun passes the job but must not
+          # A re-tapped element or a rerun flow passes the job but must not
           # go unseen: a tap dropped on a real iPad would be an app bug.
-          if grep -q 'MAESTRO-RETAP\|MAESTRO-RETRY' "$log"; then
-            grep 'MAESTRO-RETAP\|MAESTRO-RETRY\|PASS (retry)' "$log" | while IFS= read -r l; do
+          # One warning per MAESTRO-RETRY line and per result line with a
+          # re-tap or a rerun.
+          flaky="$(grep '^MAESTRO-RETRY \|  MAESTRO-RETAP x\|^PASS (retry) ' "$log" || true)"
+          if [[ -n "$flaky" ]]; then
+            while IFS= read -r l; do
               echo "::warning title=Maestro flake::$l"
-            done
+            done <<<"$flaky"
             echo "flaky=true" >>"$GITHUB_OUTPUT"
           fi
 

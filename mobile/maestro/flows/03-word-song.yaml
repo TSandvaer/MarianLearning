@@ -16,8 +16,11 @@ tags:
     file: ../subflows/word-song-day.yaml
     env:
       COUNT: 1 of 3
-- tapOn:
-    id: session-end-cta
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: session-end-cta
+      NEXT: hub
 - extendedWaitUntil:
     visible:
       id: hub

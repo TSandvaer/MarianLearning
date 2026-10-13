@@ -17,8 +17,9 @@
 #                       passes on a rerun reports "PASS (retry)".
 #
 # Markers in the output, for grepping a CI log:
-#   MAESTRO-RETAP  a Hub card tap was lost and tapped again
-#                  (subflows/tap-hub-card.yaml); counted per flow
+#   MAESTRO-RETAP  a tap was lost and the element tapped again
+#                  (subflows/tap-and-confirm.yaml, open-app.yaml); counted
+#                  and named per flow
 #   MAESTRO-RETRY  a failed flow is being run again
 #
 # What it does: starts ONE Metro with the harness's bundle-time flags
@@ -195,11 +196,21 @@ for flow in "${FLOWS[@]}"; do
     passed=0
     run_attempt "$flow" "$dir" && passed=1
     # Maestro prints a command once, when it ends: one line per re-tap.
-    n="$(grep -c 'MAESTRO-RETAP' "$dir.log" 2>/dev/null || true)"
+    # WARNED means the element was gone by then, so nothing was tapped.
+    n="$(grep -c 'MAESTRO-RETAP.*\.\.\. COMPLETED' "$dir.log" 2>/dev/null || true)"
     retaps=$((retaps + ${n:-0}))
-    # Which card: tap-hub-card.yaml's `when` (the only one in the flows)
-    # completes only when it re-taps.
-    retapped+="$(sed -n 's/.*Run flow when id: \([A-Za-z0-9_-]*\) is visible\.\.\. COMPLETED.*/ \1/p' "$dir.log" 2>/dev/null | tr -d '\n' || true)"
+    # What was re-tapped: Maestro prints the re-tap's `when` (the only
+    # `when`s in the flows), which names the element, right after it.
+    names="$(awk '
+      /MAESTRO-RETAP.*\.\.\. COMPLETED/ { hit = 1; next }
+      hit && /Run flow when .* is visible\.\.\. COMPLETED/ {
+        s = $0
+        sub(/.*Run flow when (id: )?/, "", s)
+        sub(/ is visible\.\.\. COMPLETED.*/, "", s)
+        print s
+        hit = 0
+      }' "$dir.log" 2>/dev/null | paste -sd, - || true)"
+    [[ -n "$names" ]] && retapped+="${retapped:+,}$names"
     ((passed || attempt > RETRIES)) && break
     attempt=$((attempt + 1))
     TOTAL_RERUNS=$((TOTAL_RERUNS + 1))
@@ -217,7 +228,7 @@ for flow in "${FLOWS[@]}"; do
   fi
   line+="  $name  $((SECONDS - start)) s"
   ((attempt > 1)) && line+="  ($attempt attempts)"
-  ((retaps > 0)) && line+="  MAESTRO-RETAP x$retaps${retapped:+ (${retapped# })}"
+  ((retaps > 0)) && line+="  MAESTRO-RETAP x$retaps${retapped:+ (${retapped//,/, })}"
   ((passed)) || line+="  (debug: $dir)"
   RESULTS+=("$line")
 done

@@ -7,9 +7,9 @@ appId: host.exp.Exponent
       id: hub
     timeout: 120000
 - runFlow:
-    file: tap-hub-card.yaml
+    file: tap-and-confirm.yaml
     env:
-      CARD: hub-card-word-song
+      TARGET: hub-card-word-song
       NEXT: word-song
 - runFlow: word-song-session.yaml
 - assertVisible:

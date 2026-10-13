@@ -26,8 +26,11 @@ tags:
     file: ../subflows/word-song-day.yaml
     env:
       COUNT: 1 of 3
-- tapOn:
-    id: session-end-cta
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: session-end-cta
+      NEXT: hub
 - extendedWaitUntil:
     visible:
       id: hub
@@ -43,8 +46,11 @@ tags:
     file: ../subflows/word-song-day.yaml
     env:
       COUNT: 2 of 3
-- tapOn:
-    id: session-end-cta
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: session-end-cta
+      NEXT: hub
 - extendedWaitUntil:
     visible:
       id: hub
@@ -63,8 +69,11 @@ tags:
 - assertVisible:
     id: session-end-slot-grown
     index: 2
-- tapOn:
-    id: session-end-cta
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: session-end-cta
+      NEXT: map-word-song-beat-unlock
 # An unlock is waiting, so "All done" opens the map (not the Hub), on the
 # unlock beat, with short-u on the path.
 - extendedWaitUntil:
@@ -73,8 +82,11 @@ tags:
     timeout: 30000
 - assertVisible:
     id: map-stop-cvc-words-short-u
-- tapOn:
-    id: map-home
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: map-home
+      NEXT: hub
 - extendedWaitUntil:
     visible:
       id: hub

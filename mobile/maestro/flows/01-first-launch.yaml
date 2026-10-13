@@ -24,15 +24,21 @@ tags:
     visible:
       id: greet-heart
     timeout: 180000
-- tapOn:
-    id: greet-heart
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: greet-heart
+      NEXT: math
 - runFlow: ../subflows/math-session.yaml
 # Session End's one write: today's first good day on the step.
 - assertVisible:
     id: session-end-count
     text: 1 of 3
-- tapOn:
-    id: session-end-cta
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: session-end-cta
+      NEXT: hub
 - extendedWaitUntil:
     visible:
       id: hub

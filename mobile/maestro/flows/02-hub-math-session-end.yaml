@@ -18,16 +18,19 @@ tags:
       id: hub
     timeout: 120000
 - runFlow:
-    file: ../subflows/tap-hub-card.yaml
+    file: ../subflows/tap-and-confirm.yaml
     env:
-      CARD: hub-card-number-garden
+      TARGET: hub-card-number-garden
       NEXT: math
 - runFlow: ../subflows/math-session.yaml
 - assertVisible:
     id: session-end-count
     text: 1 of 3
-- tapOn:
-    id: session-end-cta
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: session-end-cta
+      NEXT: hub
 - extendedWaitUntil:
     visible:
       id: hub
