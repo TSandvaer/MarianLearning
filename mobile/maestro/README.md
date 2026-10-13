@@ -79,6 +79,7 @@ Three consecutive runs on 2026-10-13 (iPad Pro 11-inch (M5) simulator, iOS 27): 
 - iOS asks "Open in 'Expo Go'?" for an `exp://` link the first time; `subflows/open-app.yaml` taps "Open" when it shows.
 - Don't tap Greet's wake target: the QA autotap fires it at 2.5 s and the two would race. The heart has no autotap; the flow taps it.
 - Splash lasts 1.75 s; it is checked by where it routes (Greet or Hub), not asserted itself.
+- An `extendedWaitUntil` timeout counts from the last interaction (launch, link, tap), not from the start of the wait (Maestro 2.11.0, `Orchestra.adjustedToLatestInteraction`). Back-to-back waits share one budget, so give the later wait the sum. Flow 1's heart wait is 180 s because the Greet wait before it can use most of its 120 s on a CI runner.
 
 ## Why Expo Go on the iOS Simulator
 
