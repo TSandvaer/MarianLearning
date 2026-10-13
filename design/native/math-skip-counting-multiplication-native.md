@@ -1,8 +1,8 @@
-# Number Garden 8–11 (skip counting + multiplication): native UX calls
+# Number Garden 1 and 8–11 (number recognition, skip counting, multiplication): native UX calls
 
-**Scope:** steps 8–11 of the native Math screen: `skip-counting`, `mult-2-5-10`, `mult-3-4` and `mult-6-9`. Neither app has ever built them. Their canon (`public/canon/math/level-1/*.json`) has all 8 problems with Emma's lines and audio. Today the read lines don't parse, so the session falls back to a silent sums-to-10 set. Devon's core model (`packages/core/src/math/extendedProblems.ts`, branch `devon/rn-math-skip-mult`) parses them into `SkipCountProblem` (`sequence`, `step`, `correct`) and `MultiplyProblem` (`factorA`, `factorB`, `correct`). This spec covers what the screen does with them. Everything not named here stays as `mobile/src/screens/math/Math.tsx` does it today. That includes the lesson-frame calls in `greet-math-native.md` (Fredoka, HUD, beads, back arrow, chip floors, the 375×667 / 667×375 phone floor, "tablet" = shorter side ≥ 600 pt) and the chip tap-gate, streak, stardust, sounds, poses and advance timings.
+**Scope:** five steps of the native Math screen: step 1 `number-recog` (§ 10) and steps 8–11 `skip-counting`, `mult-2-5-10`, `mult-3-4` and `mult-6-9`. Neither app has ever built them. Their canon (`public/canon/math/level-1/*.json`) has all 8 problems with Emma's lines and audio. Today the read lines don't parse, so the session falls back to a silent sums-to-10 set. Devon's core model (`packages/core/src/math/extendedProblems.ts`, branch `devon/rn-math-skip-mult`) parses them into `SkipCountProblem` (`sequence`, `step`, `correct`) and `MultiplyProblem` (`factorA`, `factorB`, `correct`). This spec covers what the screen does with them. Everything not named here stays as `mobile/src/screens/math/Math.tsx` does it today. That includes the lesson-frame calls in `greet-math-native.md` (Fredoka, HUD, beads, back arrow, chip floors, the 375×667 / 667×375 phone floor, "tablet" = shorter side ≥ 600 pt) and the chip tap-gate, streak, stardust, sounds, poses and advance timings.
 
-**Goal:** Marian hears Emma read each step-8–11 problem and answers it with a picture of the pattern on screen: stepping stones for counting on, groups of flowers for "times".
+**Goal:** Marian hears Emma read each problem and answers it with a picture on screen: a 1–10 number strip for finding a number, stepping stones for counting on, groups of flowers for "times".
 
 **Entering:** Emma's Path or the Hub opens Number Garden on one of these steps (Thomas checks them through the QA step picker, #557). Every session is one step, so all 8 problems are the same kind.
 
@@ -13,20 +13,23 @@
 1. **Three answer chips**, as on every Math step. _Why:_ it is the format Marian already knows, and three 88 pt chips fit the phone floor (§ 4).
 2. **Skip counting shows a track of stepping stones**: every term she hears, then a "?" stone. There is no equation and no counters. _Why:_ the numbers are the content of a counting sequence. Counters for 40–70 would be impossible to count on a phone and would break the 20 pt dot floor (§ 2).
 3. **Multiplication shows the equation `A × B = ?` above B plates of A flowers.** _Why:_ this is the add/sub layout (equation over counters), with groups as the counters (§ 3).
-4. **The × sign appears at all three tiers.** _Why:_ Emma says "times" in all 24 read lines, and the ribbon shows the word. The equation is where her word becomes a sign, as "plus" becomes "+". The groups next to it always carry the meaning, so the sign never has to stand alone. The diagnostic's "no x symbol" describes where she is now. It is not a ban, and 3rd grade will need the sign.
+4. **The × sign appears at all three tiers** (× rather than ·, Thomas confirmed 2026-10-13). _Why:_ Emma says "times" in all 24 read lines, and the ribbon shows the word. The equation is where her word becomes a sign, as "plus" becomes "+". The groups next to it always carry the meaning, so the sign never has to stand alone. The diagnostic's "no x symbol" describes where she is now. It is not a ban, and 3rd grade will need the sign.
 5. **Repeated addition (a number tag on each plate with "+" between the plates) is shown from the start in `mult-2-5-10`. In `mult-3-4` and `mult-6-9` it appears at hint 2.** _Why:_ this is concrete → visual → abstract across the tiers. The first tier translates × into "2 + 2 + 2", which she can already read. Later tiers ask her to see it herself first.
 6. **The groups never fade in v1.** _Why:_ `mult-6-9` is still at the conceptual stage (products 12–27, `design/research/w12-generic-tier-hint-templates.md` § Tier 5). Hiding the groups would leave her with no support until two wrong answers.
 7. **Every hint line has its own picture beat** (§ 5). On hint 2 of a multiplication problem, each plate lights up as Emma names it. _Why:_ she should hear one spoken "two" for each plate she sees.
 8. **"This one is …" (the guided answer) is the explanation moment.** All the support shows at once: every hop, every tag (§ 5).
 9. **Phone landscape uses Word Song's L frame (the chip column).** Multiplication's ribbon is 1 line there (§ 6). _Why:_ under Math's bottom row of chips, the 5-tall groups and the 56 pt equation don't fit a 375 pt-tall screen.
 10. **Sizes are computed once per plan** from its largest problem. _Why:_ stones and plates keep one size for the whole session, and the equation never moves.
-11. **No new lines, art or sounds.** _Why:_ the canon already has every line, and its audio is baked. Flowers, stones and plates are drawn in code.
+11. **No new lines, art or sounds.** _Why:_ the canon already has every line, and its audio is baked. Flowers, stones, plates and the strip are drawn in code.
+12. **Number recognition shows a 1–10 number strip in one row, and the chips carry the answer** (§ 10). _Why:_ every hint-2 line is a fact about where the number sits on that line ("Five is in the middle.", "Nine is close to ten."), and in one row those facts are literally true on screen.
+13. **Number recognition keeps Math's own frames and chips** (`pickDistractors` unchanged). _Why:_ a 48 pt strip fits Math's problem rect on every form, and adjacent numbers are the near-miss that has already been reviewed for add-to-10.
 
 ## 1. Data notes for Devon
 
-- Use the core model as-is. A `kind` other than `'arithmetic'` renders the new problem block (§ 2, § 3) instead of the equation + `CountingRow` + `ScaffoldFlash`. The subitising gates never run for these kinds.
+- Use the core model as-is. A `kind` other than `'arithmetic'` renders the new problem block (§ 2, § 3, § 10) instead of the equation + `CountingRow` + `ScaffoldFlash`. The subitising gates never run for these kinds.
 - Supported range: skip sequences up to 8 terms + "?" (canon has at most 8). With more terms, draw only the last 8. Terms and answers can go up to 100. Groups: `factorA` 1–10, `factorB` 1–5. The planner's hint-2 forms exist only for 1–5 copies (`api/_planner.ts:2135`). Outside that range the problem shows the equation and the chips without groups, and logs a `recordAudio` note.
-- Parser note: the planner's example on `api/_planner.ts:2110` reads "Two, four, six, ... what's next?", while the canon and Devon's regex use "What is next?". A live-planner skip read written in the example's form would fail to parse and fall back silently. Accept both forms, or fix the prompt example.
+- **Parser: accept both skip-count read forms**, "…What is next?" (the canon) and "…what's next?" (the example on `api/_planner.ts:2110`). Devon's regex accepts only the first. The live planner runs whenever Leitner items are due, so a plan written in the example's form would otherwise fall back silently.
+- Number recognition needs a third kind: suggested `NumberRecogProblem { kind: 'recognize'; index; correct; utterances }`, parsed from "Tap the <number-word>." with `correct` 1–10 (Dave's hint-2 table covers only 1–10). Name it before the kinds are wired in parallel.
 
 ## 2. Skip counting: `SkipTrack`
 
@@ -40,7 +43,7 @@ New file `mobile/src/screens/math/SkipTrack.tsx` (`testID="math-skip-track"`, `a
 
 ## 3. Multiplication: equation + `GroupsRow`
 
-- **Equation:** Math's `math-symbolic` row, with tokens `[factorA, '×', factorB, '=', '?']`, at 96 / 72 / 56 pt as today. The sign is one constant, `TIMES_GLYPH = '×'` (U+00D7; Fredoka has the glyph, checked in the `@fontsource/fredoka` Latin file); see Open questions.
+- **Equation:** Math's `math-symbolic` row, with tokens `[factorA, '×', factorB, '=', '?']`, at 96 / 72 / 56 pt as today. The sign is one constant, `TIMES_GLYPH = '×'` (U+00D7; Fredoka has the glyph, checked in the `@fontsource/fredoka` Latin file).
 - **New file** `mobile/src/screens/math/GroupsRow.tsx` (`testID="math-groups"`, hidden from accessibility like `CountingRow`). It draws `factorB` plates in one row, left to right.
 - **Plate:** a white rounded rect (radius 12, tablet 16) with a 2 pt `colors.myPink` border and 6 pt padding (tablet 8). Inside are `factorA` `FlowerGlyph`s, 20 pt (tablet 24), 4 pt apart (tablet 6). They fill **columns of 5, top to bottom, left column first**, so a group of 6–10 is a full column of five plus the rest. _Why:_ the five-structure, so 7 reads as "five and two" at a glance.
 - **Tag:** a pill on the plate's top edge, centred and half overlapping it. It is 28 pt tall (tablet 32), `colors.myPink`, and holds the group size in Fredoka 700 `colors.ink` at 20 pt (tablet 24).
@@ -95,7 +98,7 @@ The slots fire exactly as today: read on reveal, reprompt on wrongs 1–2, the t
 
 ## 6. Layouts
 
-**New:** `extendedMathLayout(viewport, kind)` in `mobile/src/layout/mathLayout.ts` returns a `MathLayout` plus `chipsAxis: 'row' | 'column'` and `ribbonLines: number | undefined`.
+**New:** `extendedMathLayout(viewport, kind)` in `mobile/src/layout/mathLayout.ts` returns a `MathLayout` plus `chipsAxis: 'row' | 'column'` and `ribbonLines: number | undefined`. For `'recognize'` it returns `mathLayout(viewport)` unchanged (§ 10).
 
 - **P (phone portrait):** Math's P frame, unchanged: HUD, Emma (147 at the floor, so she doesn't jump between steps), ribbon, the bottom chip row and the `problem` rect. The ribbon gets `maxLines={4}` as a guard: 4 lines end at 253 pt, above the problem's top at 259. No canon line is longer; the longest skip read takes 4 lines at 228.7 pt.
 - **L (phone landscape):** `wordSongLayout`'s L frame: Math's Emma column and back arrow, the HUD row, the ribbon at S.y + 60, the chip column `C = clamp(88, ⌊(S.h − 56) / 3⌋, 104)` on the right, and `stage` as the problem rect. Ribbon slot: **skip 2 lines** (`maxLines={2}`; only the 8-term read scrolls once, on 667-wide screens), **multiply 1 line** (`maxLines={1}`; all 168 multiply lines measure 1 line at ≥ 339 pt). The chip container gets `flexDirection: 'column'`.
@@ -176,9 +179,25 @@ L multiply (667×375, "Nine times three"; mult-6-9, so the tags show from hint 2
 6. The skip "?" fills with the answer on a correct tap. Arithmetic's "?" stays as it is.
 7. Chip values come from the new picker + `buildExtendedChipOrder`, not `buildChipOrder`.
 8. Phone landscape uses the Word Song L frame with a chip column; the ribbon's `maxLines` is 4 (P), 2 (L skip) or 1 (L multiply).
-9. Session end: `op: '*'` facts for multiply; no facts for skip-count.
+9. Session end: `op: '*'` facts for multiply; no facts for skip-count or number recognition.
+10. Number recognition: `NumberStrip` instead of `math-symbolic`, plus its hint/correct/guided beats (§ 10). Frames, ribbon and chip picker are Math's own.
 
-**New:** `SkipTrack`, `GroupsRow`, `extendedMathLayout`, `buildExtendedChipOrder`, the core chip picker, `TIMES_GLYPH`. **Reused:** `AnswerChip`, `MathHud`, `CaptionRibbon` (`maxLines`), `GettingReady`, `FlowerGlyph`, `wordToNumber`, `pickDistractors`, `wrongOpDistractors`, every sound effect and pose.
+**New:** `SkipTrack`, `GroupsRow`, `NumberStrip`, `extendedMathLayout`, `buildExtendedChipOrder`, the core chip picker, `TIMES_GLYPH`. **Reused:** `AnswerChip`, `MathHud`, `CaptionRibbon` (`maxLines`), `GettingReady`, `FlowerGlyph`, `wordToNumber`, `pickDistractors`, `wrongOpDistractors`, every sound effect and pose.
+
+## 10. Step 1, number recognition: `NumberStrip`
+
+Canon (`number-recog.json`, targets 1, 3, 5, 2, 7, 4, 9, 6): read "Tap the seven.", correct "Yes! Seven!", reprompt "Hmm... try again?", hint1 "Look at the numbers.", hint2 a fact from Dave's 10-entry table (here "Seven is bigger than five."), hint3 "Which one is seven?", giveAnswer "This one is seven.".
+
+- **What shows:** no equation. New `mobile/src/screens/math/NumberStrip.tsx` (`testID="math-number-strip"`, `accessibilityLabel` = the read line) takes the place of `math-symbolic`, centred in the problem rect, from reveal. It is a ruler-like strip of 10 touching cells, 1 to 10 left to right: one white rounded rect (radius 12) with a 2 pt `colors.myPink` border and 1 pt `colors.myPink` dividers. The numerals are Fredoka 700 `colors.ink`, 22 pt (tablet 32). Cell width = `min(⌊area width / 10⌋, 48)` (tablet 72), height 48 (tablet 64). The strip is flat with `pointerEvents: 'none'`, so it doesn't read as chips. _Why visible from reveal:_ "Look at the numbers." needs numbers to look at, and an empty stage reads as broken.
+- **Chips:** 3, from `pickDistractors(correct, index, 10)` unchanged: gentle on P1–P3, off-by-one on P4–P8, offered class `'off-by-one'` on P4–P8. Canon: 1 [3, 10] · 3 [1, 10] · 5 [1, 10] · 2 [1, 3] · 7 [6, 8] · 4 [3, 5] · 9 [8, 10] · 6 [5, 7].
+- **Hints and moments:**
+  - hint1 "Look at the numbers.": the numerals ripple 1 → 10 (§ 7 ripple, scale 1.2).
+  - hint2: the **landmark** cell the fact names fills `colors.myPink` (200 ms fade), and its numeral pulses once; it stays lit. Landmarks: 1 → 1, 2 → 1, 3 → 2, 4 → 3, 5 → 5, 6 → 5, 7 → 5, 8 → 7, 9 → 10, 10 → 10. Each is the number the fact mentions ("Two comes right after one." → 1); for 1, 5 and 10 it is the target itself.
+  - hint3 "Which one is seven?": no strip change; the question is about the chips.
+  - giveAnswer "This one is seven.": the target's cell gets the 4 pt `colors.myRose` ring, and the correct chip glows (as today).
+  - correct "Yes! Seven!": the target's cell fills `colors.myPink`, and its numeral springs 1 → 1.25 → 1 (stiffness 260, damping 20) [200 ms fade].
+- **Layouts:** Math's frames on every form (P, L with its chip row, tablet), with no ribbon change: the longest line, "Two comes right after one.", is 2 lines in P (228.7 pt) and 1 in L. Strip: P floor 340 × 48 (cells 34), L 667×375 480 × 48 (Math's 491 pt pane), tablet 710 × 64 (portrait) / 720 × 64 (landscape). "10" measures 20.8 pt wide at 22 pt.
+- **Session end:** no fact (no Leitner outcome, no `mathFacts`). It counts only through `perProblemCorrect`, `latencyMs` and `perProblemAnswerValue`, as skip-count does. _Why:_ recognising a numeral is not an a/b arithmetic fact.
 
 ## Acceptance criteria (Jessica: unit tests + on device)
 
@@ -193,9 +212,10 @@ L multiply (667×375, "Nine times three"; mult-6-9, so the tags show from hint 2
 - [ ] Ribbon: the 8-term skip read ("Five, ten, fifteen, twenty, twenty-five, thirty, thirty-five, forty. What is next?") scrolls inside its slot in L and never covers the stones. Every multiply line is one line in L.
 - [ ] Session end: a multiply session writes 8 `op: '*'` facts (Leitner keys like `2*3`). A skip session writes no facts, changes no Leitner box, and still counts toward mastery and the good day.
 - [ ] Web unchanged: the web's Math for these steps still takes its static fallback (Devon's opt-in parser).
-- [ ] Reduce Motion: no scaling anywhere in § 7; fades only.
+- [ ] Number recognition (QA step picker → `number-recog`): the 8 canon problems in order, with Emma's voice. P1 "Tap the one." shows the 1–10 strip and the chips 1, 3, 10. Hint 2 lights the landmark per § 10 ("Seven is bigger than five." lights 5). The guided answer rings the target cell, and a correct tap fills it. Tapping the strip does nothing. The session writes no facts.
+- [ ] Parser: a skip read ending "what's next?" parses the same as one ending "What is next?" (unit test).
+- [ ] Reduce Motion: no scaling anywhere in § 7 or § 10; fades only.
 
 ## Open questions
 
-- **Thomas (does not block; default ×):** which multiplication sign does Marian's class write, × or ·? The team recommends × until we hear otherwise. It is one constant (`TIMES_GLYPH`).
-- **Dave, review requested via the orchestrator (does not block the build; the picker is one pure function):** the two new chip traps (§ 4) and the tier fade of the repeated-addition layer with the × introduction (decisions 4–5).
+None for Thomas (the × sign is confirmed). The orchestrator is routing these to Dave in parallel, and none of them blocks the build: the two new chip traps (§ 4), the tier fade of the repeated-addition layer (decision 5), and the number strip being visible from reveal (§ 10).
