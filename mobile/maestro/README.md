@@ -62,6 +62,8 @@ Per-flow state goes in as **iOS launch arguments** in the flow's `launchApp: arg
 
 Three consecutive runs on 2026-10-13 (iPad Pro 11-inch (M5) simulator, iOS 27): first launch 117 / 109 / 97 s, Hub → Math 112 / 88 / 88 s, Word Song 100 / 99 / 99 s, mastery promotion 292 / 291 / 289 s (it plays three sessions). The whole suite takes about 10 minutes.
 
+On the hosted `macos-26` runner (CI run 38396715552, 2026-10-13): 409 / 335 / 287 / 619 s for flows 1–4. The flows step took 30 minutes and the job 36, including about 5 minutes to boot the simulator and install Expo Go.
+
 ## CI
 
 `.github/workflows/maestro.yml` runs `run.sh` (all four flows) on every pull request to `main` that touches `mobile/**`, `packages/core/**` or the workflow, on pushes to `main` under `mobile/**` or `packages/core/**`, and by hand (`workflow_dispatch`). It is not a required check.
