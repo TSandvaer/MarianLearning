@@ -1148,11 +1148,11 @@ describe('setCloudSyncSuccessListener', () => {
       number,
     ]
   >([
-    ['the server accepts it', 200, 'sent', 1],
-    ['a 5xx', 502, 'failed', 0],
-    ['a network error', 'throw', 'failed', 0],
-    ['no secret', 'no-secret', 'skipped', 0],
-  ])('push, %s: told %i time(s)', async (_label, server, result, told) => {
+    ['the server accepts it: synced', 200, 'sent', 1],
+    ['a 5xx: not synced', 502, 'failed', 0],
+    ['a network error: not synced', 'throw', 'failed', 0],
+    ['no secret: not synced', 'no-secret', 'skipped', 0],
+  ])('push, %s', async (_label, server, result, told) => {
     const fetchImpl = vi.fn(async () => {
       if (server === 'throw') throw new Error('offline')
       return new Response('', {
@@ -1206,7 +1206,7 @@ describe('setCloudSyncSuccessListener', () => {
     ]
   >([
     [
-      'cloud newer: installed',
+      'cloud newer, installed: synced',
       'found-T2',
       200,
       played(T1),
@@ -1214,9 +1214,17 @@ describe('setCloudSyncSuccessListener', () => {
       1,
       1,
     ],
-    ['equal: nothing to change', 'found-T1', 200, played(T1), 'noop', 1, 1],
     [
-      'local newer, push accepted',
+      'equal, nothing to change: synced',
+      'found-T1',
+      200,
+      played(T1),
+      'noop',
+      1,
+      1,
+    ],
+    [
+      'local newer, push accepted: synced',
       'found-T1',
       200,
       played(T2),
@@ -1225,7 +1233,7 @@ describe('setCloudSyncSuccessListener', () => {
       1,
     ],
     [
-      'local newer, push failed',
+      'local newer, push failed: not synced',
       'found-T1',
       503,
       played(T2),
@@ -1233,13 +1241,37 @@ describe('setCloudSyncSuccessListener', () => {
       2,
       0,
     ],
-    ['404, push accepted', 404, 200, played(T1), 'pushed-to-cloud', 2, 1],
-    ['404, push failed', 404, 500, played(T1), 'pushed-to-cloud', 2, 0],
-    ['404, no local blob', 404, 200, null, 'noop', 1, 0],
-    ['read 5xx', 503, 200, played(T1), 'cloud-error', 1, 0],
-    ['malformed copy', 'malformed', 200, played(T1), 'cloud-error', 1, 0],
     [
-      'blob rejected',
+      '404, push accepted: synced',
+      404,
+      200,
+      played(T1),
+      'pushed-to-cloud',
+      2,
+      1,
+    ],
+    [
+      '404, push failed: not synced',
+      404,
+      500,
+      played(T1),
+      'pushed-to-cloud',
+      2,
+      0,
+    ],
+    ['404, no local blob: not synced', 404, 200, null, 'noop', 1, 0],
+    ['read 5xx: not synced', 503, 200, played(T1), 'cloud-error', 1, 0],
+    [
+      'malformed copy: not synced',
+      'malformed',
+      200,
+      played(T1),
+      'cloud-error',
+      1,
+      0,
+    ],
+    [
+      'blob rejected: not synced',
       'found-bad-blob',
       200,
       played(T1),
@@ -1248,7 +1280,7 @@ describe('setCloudSyncSuccessListener', () => {
       0,
     ],
   ])(
-    'reconcile, %s: told %i time(s)',
+    'reconcile, %s',
     async (_label, get, post, local, kind, requests, told) => {
       const fetchImpl = routedFetch(get, post)
       const outcome = await reconcileWithCloud(VALID_UUID, local, {
