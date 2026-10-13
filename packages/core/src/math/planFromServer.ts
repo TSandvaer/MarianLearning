@@ -52,10 +52,10 @@
  *
  * Extended kinds (opt-in, native only)
  * ------------------------------------
- * `{ extendedKinds: true }` also reads the skip-count ("Two, four, six,
- * eight. What is next?") and multiplication ("Two times three. How many?")
- * read lines and returns an `ExtendedMathSessionPlan` (see
- * `extendedProblems.ts`). Without the option (the frozen web app's call) the
+ * `{ extendedKinds: true }` also reads the number-recognition ("Tap the
+ * seven."), skip-count ("Two, four, six, eight. What is next?") and
+ * multiplication ("Two times three. How many?") read lines and returns an
+ * `ExtendedMathSessionPlan` (see `extendedProblems.ts`). Without the option (the frozen web app's call) the
  * output is exactly what it was before: arithmetic only, and those read
  * lines throw.
  *
@@ -214,8 +214,9 @@ export class PlanFromServerError extends Error {
 
 /** Options for {@link mathSessionPlanFromServer}. */
 export interface MathPlanFromServerOptions {
-  /** Also read the skip-count and multiplication read lines, and return an
-   *  `ExtendedMathSessionPlan` whose problems carry a `kind`. Default
+  /** Also read the number-recognition, skip-count and multiplication read
+   *  lines, and return an `ExtendedMathSessionPlan` whose problems carry a
+   *  `kind`. Default
    *  `false`: arithmetic only, the web app's behaviour. */
   readonly extendedKinds?: boolean
 }
@@ -224,8 +225,8 @@ export interface MathPlanFromServerOptions {
  * Build a `MathSessionPlan` from a server-returned plan blob.
  *
  * With `{ extendedKinds: true }`, build an `ExtendedMathSessionPlan` instead:
- * every problem carries a `kind`, and skip-count and multiplication read
- * lines parse too.
+ * every problem carries a `kind`, and number-recognition, skip-count and
+ * multiplication read lines parse too.
  *
  * @throws {PlanFromServerError} if the blob isn't shaped right or any
  *   `read` text fails to parse against the template.
@@ -334,14 +335,18 @@ function arithmeticProblem(
 }
 
 /** One problem of an extended plan, dispatched on the read line's template.
- *  The templates are disjoint (comma list + "What is next?", "times",
- *  "plus" / "minus" / "take away"), so the order only decides which error a
- *  near-miss gets. */
+ *  The templates are disjoint ("Tap the", comma list + "What is next?",
+ *  "times", "plus" / "minus" / "take away"), so the order only decides which
+ *  error a near-miss gets. */
 function extendedProblemFromRead(
   index: number,
   utterances: MathProblemUtterances,
 ): ExtendedMathProblem {
   const { read } = utterances
+  const recognize = matchRecognizeRead(read)
+  if (recognize !== null) {
+    return { kind: 'recognize', index, correct: recognize, utterances }
+  }
   const skipCount = matchSkipCountRead(read)
   if (skipCount) {
     return {
@@ -375,8 +380,9 @@ function extendedProblemFromRead(
     `math read line "${read}" did not match any known math read template ` +
       `(addition "<W> plus <W>. How many?"; subtraction "<W> minus <W>. ` +
       `How many are left?"; subtraction first-session "<W> take away <W>. ` +
-      `How many are left?"; skip-count "<W>, <W>, <W>. What is next?"; ` +
-      `multiplication "<W> times <W>. How many?")`,
+      `How many are left?"; number recognition "Tap the <W>."; skip-count ` +
+      `"<W>, <W>, <W>. What is next?"; multiplication "<W> times <W>. How ` +
+      `many?")`,
   )
 }
 
@@ -454,13 +460,37 @@ function matchReadOperands(read: string): {
   return null
 }
 
+/** Extract the target number from a number-recognition `read` line.
+ *
+ *  Template (canon and planner, `api/_planner.ts` number-recog):
+ *  `"Tap the <number-word>."`, e.g. `"Tap the seven."` → 7.
+ *
+ *  The word must be a number word in 1..10 (the planner's hint-2 table
+ *  covers only those): "Tap the <word>." is also Word Song's blending read
+ *  line, so a non-number word is not a recognition problem. Throws on a
+ *  miss or a number outside 1..10.
+ *
+ *  Opt-in kind: only `mathSessionPlanFromServer(plan, { extendedKinds: true
+ *  })` reads this template. */
+export function parseRecognizeRead(read: string): number {
+  const target = matchRecognizeRead(read)
+  if (target !== null) return target
+  throw new PlanFromServerError(
+    `math read line "${read}" did not match the number-recognition read ` +
+      `template "Tap the <W>." with a number word`,
+  )
+}
+
 /** Extract the sequence, step and next term from a skip-count `read` line.
  *
- *  Template (the committed canon's, and the planner's generic-tier hint
- *  template `"<sequence-terms>. What is next?"`):
+ *  Templates: the committed canon's, which is the planner's generic-tier
+ *  hint template `"<sequence-terms>. What is next?"`, and the example form
+ *  on the planner's skip-counting line, "... what's next?" (the live planner
+ *  writes plans whenever Leitner items are due):
  *
  *   - `"Two, four, six, eight. What is next?"` → sequence [2, 4, 6, 8],
  *     step 2, next 10
+ *   - `"Two, four, six. What's next?"` → sequence [2, 4, 6], step 2, next 8
  *
  *  Case-insensitive; hyphenated terms ("twenty-five") decode through
  *  {@link wordToNumber}. Throws unless the line has at least three terms
@@ -478,7 +508,7 @@ export function parseSkipCountRead(read: string): {
   if (skipCount) return skipCount
   throw new PlanFromServerError(
     `math read line "${read}" did not match the skip-count read template ` +
-      `"<W>, <W>, <W>. What is next?"`,
+      `"<W>, <W>, <W>. What is next?" (or "What's next?")`,
   )
 }
 
@@ -504,14 +534,32 @@ export function parseMultiplyRead(read: string): {
   )
 }
 
+/** {@link parseRecognizeRead}'s template: `null` when the line is not
+ *  "Tap the <word>." or the word is not a number word (Word Song's blending
+ *  line has the same shape); throws when the number is outside 1..10. */
+function matchRecognizeRead(read: string): number | null {
+  const match = read.match(/^\s*tap\s+the\s+([a-z-]+)\s*\.\s*$/i)
+  if (!match) return null
+  const target = wordToNumber(match[1]!.toLowerCase())
+  if (target === undefined) return null
+  if (target < 1 || target > 10) {
+    throw new PlanFromServerError(
+      `math read line "${read}" asks for ${target}; number recognition ` +
+        `covers 1..10`,
+    )
+  }
+  return target
+}
+
 /** {@link parseSkipCountRead}'s template: `null` when the line is not a
- *  comma-separated list of words followed by "What is next?"; throws when it
- *  is one but the terms don't form a skip-count sequence. */
+ *  comma-separated list of words followed by "What is next?" / "What's
+ *  next?"; throws when it is one but the terms don't form a skip-count
+ *  sequence. */
 function matchSkipCountRead(
   read: string,
 ): { sequence: number[]; step: number; next: number } | null {
   const match = read.match(
-    /^\s*([a-z-]+(?:\s*,\s*[a-z-]+)+)\s*\.\s*what\s+is\s+next\s*\?\s*$/i,
+    /^\s*([a-z-]+(?:\s*,\s*[a-z-]+)+)\s*\.\s*what(?:\s+is|['’]s)\s+next\s*\?\s*$/i,
   )
   if (!match) return null
   const sequence: number[] = []

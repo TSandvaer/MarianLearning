@@ -1,10 +1,11 @@
 /**
- * The frozen web app keeps its silent fallback for Number Garden steps 8–11.
+ * The frozen web app keeps its silent fallback for Number Garden steps 1 and
+ * 8–11.
  *
- * Core's math parser gained opt-in skip-count and multiplication kinds for
- * the native app (`mathSessionPlanFromServer(plan, { extendedKinds: true })`).
- * The web caller, `prepareMathPathA`, does not opt in, so the committed canon
- * for those four steps must still fail rehydration here with the same error
+ * Core's math parser gained opt-in number-recognition, skip-count and
+ * multiplication kinds for the native app (`mathSessionPlanFromServer(plan,
+ * { extendedKinds: true })`). The web caller, `prepareMathPathA`, does not
+ * opt in, so the committed canon for those five steps must still fail rehydration here with the same error
  * as before — which is what sends App.tsx to the static plan with silent
  * captions. A served canon file is a whole `SessionStartResponse`, so it is
  * fed to the caller as the `/api/claude` response body.
@@ -35,8 +36,9 @@ function deps(node: string) {
   }
 }
 
-describe('prepareMathPathA — steps 8–11 canon still falls back on the web', () => {
+describe('prepareMathPathA — steps 1 and 8–11 canon still fall back on the web', () => {
   it.each([
+    ['number-recog', 'Tap the one.'],
     ['skip-counting', 'Two, four, six, eight. What is next?'],
     ['mult-2-5-10', 'Two times two. How many?'],
     ['mult-3-4', 'Two times three. How many?'],

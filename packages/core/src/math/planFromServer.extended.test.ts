@@ -1,6 +1,7 @@
 /**
  * The opt-in extended kinds of `mathSessionPlanFromServer` (Number Garden
- * steps 8–11: skip-counting, mult-2-5-10, mult-3-4, mult-6-9), run against
+ * step 1, number-recog, and steps 8–11: skip-counting, mult-2-5-10,
+ * mult-3-4, mult-6-9), run against
  * the committed canon files, plus the proof that the default call (the frozen
  * web app's) is unchanged for those files: it still throws, so the web keeps
  * its silent static fallback there.
@@ -15,6 +16,7 @@ import { describe, expect, it } from 'vitest'
 import {
   isArithmeticProblem,
   isMultiplyProblem,
+  isNumberRecogProblem,
   isSkipCountProblem,
   type MultiplyProblem,
   type SkipCountProblem,
@@ -23,6 +25,7 @@ import {
   PlanFromServerError,
   mathSessionPlanFromServer,
   parseMultiplyRead,
+  parseRecognizeRead,
   parseSkipCountRead,
   wordToNumber,
 } from './planFromServer'
@@ -61,6 +64,37 @@ const ARITHMETIC_CANON = [
   'two-digit-addsub',
   'two-digit-addsub-with-regroup',
 ] as const
+
+describe('extended kinds — number-recog canon', () => {
+  const plan = mathSessionPlanFromServer(canonPlan('number-recog'), {
+    extendedKinds: true,
+  })
+  const recognize = plan.problems.filter(isNumberRecogProblem)
+
+  it('reads 8/8 problems as recognize, targets in canon order', () => {
+    expect(plan.problems).toHaveLength(8)
+    expect(recognize.map((p) => [p.index, p.correct])).toEqual([
+      [1, 1],
+      [2, 3],
+      [3, 5],
+      [4, 2],
+      [5, 7],
+      [6, 4],
+      [7, 9],
+      [8, 6],
+    ])
+  })
+
+  it.each([1, 2, 3, 4, 5, 6, 7, 8])(
+    'problem %i: confirm, hint 3 and give-answer lines name the target',
+    (index) => {
+      const p = recognize[index - 1]!
+      expectAnswerLinesName(p.correct, p.utterances)
+      const hint3 = p.utterances.hint3?.match(/^Which one is ([a-z-]+)\?$/)
+      expect(hint3 && num(hint3[1]!)).toBe(p.correct)
+    },
+  )
+})
 
 describe('extended kinds — skip-counting canon', () => {
   const plan = mathSessionPlanFromServer(canonPlan('skip-counting'), {
@@ -211,7 +245,7 @@ describe.each([
   )
 })
 
-describe('default call (the web app) is unchanged for steps 8–11', () => {
+describe('default call (the web app) is unchanged for steps 1 and 8–11', () => {
   // The exact errors the parser threw on origin/main before the extended
   // kinds existed: the web keeps falling back on these four files.
   const ARITHMETIC_TEMPLATES =
@@ -219,6 +253,7 @@ describe('default call (the web app) is unchanged for steps 8–11', () => {
     'How many are left?"; subtraction first-session "<W> take away <W>. ' +
     'How many are left?")'
   it.each([
+    ['number-recog', 'Tap the one.'],
     ['skip-counting', 'Two, four, six, eight. What is next?'],
     ['mult-2-5-10', 'Two times two. How many?'],
     ['mult-3-4', 'Two times three. How many?'],
@@ -281,6 +316,17 @@ describe('parseSkipCountRead', () => {
     })
   })
 
+  it('reads "What\'s next?" exactly as "What is next?"', () => {
+    const canonForm = parseSkipCountRead('Two, four, six. What is next?')
+    expect(parseSkipCountRead("Two, four, six. What's next?")).toEqual(
+      canonForm,
+    )
+    expect(parseSkipCountRead('Two, four, six. what\u2019s next?')).toEqual(
+      canonForm,
+    )
+    expect(canonForm).toEqual({ sequence: [2, 4, 6], step: 2, next: 8 })
+  })
+
   it('accepts hyphenated terms and any case / spacing', () => {
     expect(
       parseSkipCountRead('twenty-five ,thirty,  thirty-five. what is NEXT ?'),
@@ -311,7 +357,7 @@ describe('parseSkipCountRead', () => {
     ],
     [
       'a different question',
-      "Two, four, six. What's next?",
+      'Two, four, six. What comes next?',
       'did not match the skip-count read template',
     ],
     [
@@ -322,6 +368,31 @@ describe('parseSkipCountRead', () => {
   ])('rejects %s', (_label, read, message) => {
     expect(() => parseSkipCountRead(read)).toThrow(PlanFromServerError)
     expect(() => parseSkipCountRead(read)).toThrow(message)
+  })
+})
+
+describe('parseRecognizeRead', () => {
+  it('parses the canon template, any case', () => {
+    expect(parseRecognizeRead('Tap the seven.')).toBe(7)
+    expect(parseRecognizeRead('tap the TEN .')).toBe(10)
+  })
+
+  it.each([
+    [
+      "a Word Song word (blending's template)",
+      'Tap the cat.',
+      'did not match the number-recognition read template',
+    ],
+    ['zero', 'Tap the zero.', 'covers 1..10'],
+    ['eleven', 'Tap the eleven.', 'covers 1..10'],
+    [
+      'a question',
+      'Which one is seven?',
+      'did not match the number-recognition read template',
+    ],
+  ])('rejects %s', (_label, read, message) => {
+    expect(() => parseRecognizeRead(read)).toThrow(PlanFromServerError)
+    expect(() => parseRecognizeRead(read)).toThrow(message)
   })
 })
 
@@ -384,7 +455,7 @@ describe('extended kinds — mixed and failing plans', () => {
         'Five times two. How many?',
         'Ten, twenty, thirty. What is next?',
         'Thirty-one plus four. How many?',
-        'Nine times three. How many?',
+        'Tap the seven.',
       ]),
       { extendedKinds: true },
     )
@@ -396,22 +467,23 @@ describe('extended kinds — mixed and failing plans', () => {
       ['multiply', 10],
       ['skip-count', 40],
       ['arithmetic', 35],
-      ['multiply', 27],
+      ['recognize', 7],
     ])
     expect(plan.problems.map((p) => p.index)).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
   })
 
-  it('an unknown read line names all five templates', () => {
+  it('an unknown read line names all six templates', () => {
     const reads = Array.from({ length: 8 }, () => 'Two times two. How many?')
-    reads[2] = 'Tap the one.'
+    reads[2] = 'Tap the cat.'
     expect(() =>
       mathSessionPlanFromServer(serverPlan(reads), { extendedKinds: true }),
     ).toThrow(
-      'math read line "Tap the one." did not match any known math read template ' +
+      'math read line "Tap the cat." did not match any known math read template ' +
         '(addition "<W> plus <W>. How many?"; subtraction "<W> minus <W>. ' +
         'How many are left?"; subtraction first-session "<W> take away <W>. ' +
-        'How many are left?"; skip-count "<W>, <W>, <W>. What is next?"; ' +
-        'multiplication "<W> times <W>. How many?")',
+        'How many are left?"; number recognition "Tap the <W>."; skip-count ' +
+        '"<W>, <W>, <W>. What is next?"; multiplication "<W> times <W>. How ' +
+        'many?")',
     )
   })
 
