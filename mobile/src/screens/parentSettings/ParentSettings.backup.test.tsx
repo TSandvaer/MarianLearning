@@ -16,6 +16,7 @@ import {
   flushPromises,
   mount,
 } from '../../../test/parentSettingsHarness'
+import { formatLastSynced } from './nativeCopy'
 
 beforeEach(() => {
   jest.useFakeTimers()
@@ -119,18 +120,60 @@ describe('Device ID', () => {
 })
 
 describe('Last synced and Push now', () => {
-  it('"Never" before any session', async () => {
-    await mount()
-    expect(status('parent-settings-cloud-last-synced')).toBe('Never')
+  const LAST_SYNCED = 'parent-settings-cloud-last-synced'
+  const EARLIER = '2026-10-11T12:32:00.000Z'
+  const NOW = '2026-10-13T09:41:00.000Z'
+  const shown = (iso: string) => formatLastSynced(iso, 'Never')
+
+  it('"Never" until a sync succeeds, even after a played session', async () => {
+    const doc = defaultProgress()
+    doc.profile.lastPlayedISO = EARLIER
+    await mount(fakeDeps(doc))
+    expect(status(LAST_SYNCED)).toBe('Never')
   })
 
-  it('shows a played session in local time, not the ISO string', async () => {
+  it("shows this device's last sync in local time, not the last session", async () => {
     const doc = defaultProgress()
-    doc.profile.lastPlayedISO = '2026-10-11T12:32:00.000Z'
-    await mount(fakeDeps(doc))
-    const shown = String(status('parent-settings-cloud-last-synced'))
-    expect(shown).not.toBe('2026-10-11T12:32:00.000Z')
-    expect(shown).toContain('2026')
+    doc.profile.lastPlayedISO = '2026-10-01T08:00:00.000Z'
+    const fake = fakeDeps(doc)
+    fake.setLastSync(EARLIER)
+    await mount(fake)
+    expect(status(LAST_SYNCED)).toBe(shown(EARLIER))
+    expect(status(LAST_SYNCED)).not.toBe(EARLIER)
+  })
+
+  it('"Synced." shows the new time at once, without leaving the screen', async () => {
+    const fake = fakeDeps()
+    fake.setLastSync(EARLIER)
+    fake.mocks.pushNow.mockImplementationOnce(async () => {
+      // What core's sync listener records before the push resolves.
+      fake.setLastSync(NOW)
+      return 'sent'
+    })
+    await mount(fake)
+    expect(status(LAST_SYNCED)).toBe(shown(EARLIER))
+    await fireEvent.press(screen.getByTestId('parent-settings-cloud-push-now'))
+    await flushPromises()
+    expect(status('parent-settings-cloud-push-status')).toBe('Synced.')
+    expect(status(LAST_SYNCED)).toBe(shown(NOW))
+    expect(fake.mocks.readLastSync).toHaveBeenCalledTimes(2)
+  })
+
+  it.each<[PushResult | 'reject', string]>([
+    ['skipped', "Cloud sync isn't configured."],
+    ['failed', "Couldn't reach the server."],
+    ['reject', "Couldn't reach the server."],
+  ])('push %s: "%s", and Last synced keeps its time', async (result, text) => {
+    const fake = fakeDeps()
+    fake.setLastSync(EARLIER)
+    if (result === 'reject') {
+      fake.mocks.pushNow.mockRejectedValueOnce(new Error('x'))
+    } else fake.mocks.pushNow.mockResolvedValueOnce(result)
+    await mount(fake)
+    await fireEvent.press(screen.getByTestId('parent-settings-cloud-push-now'))
+    await flushPromises()
+    expect(status('parent-settings-cloud-push-status')).toBe(text)
+    expect(status(LAST_SYNCED)).toBe(shown(EARLIER))
   })
 
   it('"Sending…" on a disabled button, then "Synced." on the right for 2.4 s', async () => {
@@ -154,21 +197,6 @@ describe('Last synced and Push now', () => {
     expect(screen.queryByTestId('parent-settings-cloud-push-status')).toBeNull()
   })
 
-  it.each<[PushResult | 'reject', string]>([
-    ['skipped', "Cloud sync isn't configured."],
-    ['failed', "Couldn't reach the server."],
-    ['reject', "Couldn't reach the server."],
-  ])('push %s → %s', async (result, text) => {
-    const fake = fakeDeps()
-    if (result === 'reject') {
-      fake.mocks.pushNow.mockRejectedValueOnce(new Error('x'))
-    } else fake.mocks.pushNow.mockResolvedValueOnce(result)
-    await mount(fake)
-    await fireEvent.press(screen.getByTestId('parent-settings-cloud-push-now'))
-    await flushPromises()
-    expect(status('parent-settings-cloud-push-status')).toBe(text)
-  })
-
   it('leaving mid-push aborts the request and ignores its result', async () => {
     const fake = fakeDeps()
     const push = deferred<PushResult>()
@@ -181,5 +209,6 @@ describe('Last synced and Push now', () => {
     push.resolve('sent')
     await flushPromises()
     await advance(3000)
+    expect(fake.mocks.readLastSync).toHaveBeenCalledTimes(1)
   })
 })

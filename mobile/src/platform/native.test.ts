@@ -1,10 +1,18 @@
 import { apiUrl, getKeyValueStore, setApiBase } from '@marian/core'
 import { DEBUG_SEED_NAMES } from '@marian/core/debug/seeds'
-import { loadProgress } from '@marian/core/progress'
+import {
+  LAST_SYNC_STORAGE_KEY,
+  loadProgress,
+  readLastSyncISO,
+  reconcileAtLaunch,
+  saveProgress,
+  type Progress,
+} from '@marian/core/progress'
 import { dayOffset } from '@marian/core/progress/clock'
 import { pushProgressToCloud } from '@marian/core/progress/cloudSync'
 import { defaultProgress } from '@marian/core/progress/defaults'
 import { nextAfterSplash } from '@marian/core/router/nextAfterSplash'
+import { recordProgressOnSessionEnd } from '@marian/core/sessionEnd/progressHistory'
 import {
   SESSION_HISTORY_KEY,
   readSessionHistory,
@@ -169,6 +177,114 @@ describe('installNativePlatform', () => {
     expect((init?.headers as Record<string, string>).Authorization).toBe(
       'Bearer s3cret',
     )
+  })
+
+  describe('records each successful cloud sync as "Last synced"', () => {
+    const SYNC_AT = '2026-10-13T09:41:00.000Z'
+    const PLAYED_AT = '2026-10-12T18:00:00.000Z'
+    const SECRET_ENV: BuildEnv = { ...EMPTY_ENV, progressApiSecret: 's3cret' }
+
+    function install(env: BuildEnv = SECRET_ENV) {
+      const backend = memoryBackend()
+      installNativePlatform({ backend, env, flags: NO_LAUNCH_FLAGS })
+      return backend
+    }
+
+    function played(): Progress {
+      const p = defaultProgress()
+      return { ...p, profile: { ...p.profile, lastPlayedISO: PLAYED_AT } }
+    }
+
+    beforeEach(() => {
+      jest.useFakeTimers({ now: new Date(SYNC_AT) })
+      jest.spyOn(console, 'warn').mockImplementation(() => {})
+      // `fetch` is the setup file's jest.fn, which restoreAllMocks leaves
+      // alone: clear its calls so each test counts its own.
+      jest.mocked(globalThis.fetch).mockClear()
+    })
+    afterEach(() => {
+      jest.useRealTimers()
+    })
+
+    it('a push the server accepts (Push now, session end)', async () => {
+      jest
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response('{"ok":true}', { status: 200 }))
+      const backend = install()
+      await expect(
+        pushProgressToCloud(
+          '11111111-2222-4333-8444-555555555555',
+          defaultProgress(),
+        ),
+      ).resolves.toBe('sent')
+      expect(backend.map.get(LAST_SYNC_STORAGE_KEY)).toBe(SYNC_AT)
+      expect(readLastSyncISO()).toBe(SYNC_AT)
+    })
+
+    it("the session-end write's own push", async () => {
+      const fetchSpy = jest
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response('{"ok":true}', { status: 200 }))
+      const backend = install()
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 8,
+        dateISO: PLAYED_AT,
+        focusNode: 'add-to-10',
+      })
+      expect(backend.map.has(LAST_SYNC_STORAGE_KEY)).toBe(false)
+      // The write doesn't await its push; let it settle.
+      for (let i = 0; i < 10; i++) await Promise.resolve()
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(backend.map.get(LAST_SYNC_STORAGE_KEY)).toBe(SYNC_AT)
+    })
+
+    it('a launch reconcile that finds the cloud copy equal', async () => {
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            blob: played(),
+            lastModifiedISO: PLAYED_AT,
+          }),
+          { status: 200 },
+        ),
+      )
+      const backend = install()
+      saveProgress(played())
+      await expect(reconcileAtLaunch()).resolves.toEqual({
+        kind: 'noop',
+        reason: 'equal',
+      })
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(backend.map.get(LAST_SYNC_STORAGE_KEY)).toBe(SYNC_AT)
+    })
+
+    it('a push the server refuses records nothing', async () => {
+      jest
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response('', { status: 503 }))
+      const backend = install()
+      await expect(
+        pushProgressToCloud(
+          '11111111-2222-4333-8444-555555555555',
+          defaultProgress(),
+        ),
+      ).resolves.toBe('failed')
+      expect(backend.map.has(LAST_SYNC_STORAGE_KEY)).toBe(false)
+    })
+
+    it('without the secret, Push now and the launch reconcile record nothing', async () => {
+      const fetchSpy = jest.spyOn(globalThis, 'fetch')
+      const backend = install(EMPTY_ENV)
+      saveProgress(played())
+      await expect(
+        pushProgressToCloud('11111111-2222-4333-8444-555555555555', played()),
+      ).resolves.toBe('skipped')
+      await expect(reconcileAtLaunch()).resolves.toEqual({ kind: 'off' })
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(backend.map.has(LAST_SYNC_STORAGE_KEY)).toBe(false)
+    })
   })
 })
 

@@ -2,6 +2,11 @@
  * Cloud backup (`design/native/parent-settings-native.md` § 4): device ID
  * + Copy, Last synced (local time) + Push now, Restore from device ID.
  *
+ * Last synced is this device's last successful cloud sync (`readLastSync`),
+ * not the web's `profile.lastPlayedISO`. The cloud helpers record it; the
+ * row reads it on mount and again when a push or restore settles, so a
+ * "Synced." shows the new time at once.
+ *
  * A Restore tap, in order: an invalid ID → the web's invalid-format line
  * (amber field); this device's own ID → an inline line; else the keyboard
  * closes and a system alert asks once. Restore then reads the other
@@ -101,6 +106,8 @@ export function CloudBackupSection({
   }
   // Generated and stored on first read, as on the web: idempotent.
   const [deviceId, setDeviceId] = useState(() => deps.getDeviceId())
+  const [lastSyncISO, setLastSyncISO] = useState(() => deps.readLastSync())
+  const refreshLastSync = () => setLastSyncISO(deps.readLastSync())
   const idCopy = useTransientStatus<CopyStatus>('idle', copyStatusResets)
   const push = useTransientStatus<PushStatus>('idle', pushStatusResets)
   const [input, setInput] = useState('')
@@ -125,8 +132,16 @@ export function CloudBackupSection({
     const signal = lifetime()
     push.set('sending')
     deps.pushNow(progress, signal).then(
-      (result) => !signal.aborted && push.set(result),
-      () => !signal.aborted && push.set('failed'),
+      (result) => {
+        if (signal.aborted) return
+        push.set(result)
+        refreshLastSync()
+      },
+      () => {
+        if (signal.aborted) return
+        push.set('failed')
+        refreshLastSync()
+      },
     )
   }
 
@@ -138,6 +153,7 @@ export function CloudBackupSection({
       (outcome) => {
         if (signal.aborted) return
         showRestore({ kind: 'restored', outcome })
+        refreshLastSync()
         // What storage now holds: the adopted ID, or this device's own
         // when the read failed.
         setDeviceId(deps.getDeviceId())
@@ -150,6 +166,7 @@ export function CloudBackupSection({
           kind: 'restore-failed',
           reason: restoreFailureReason(err),
         })
+        refreshLastSync()
       },
     )
   }
@@ -223,7 +240,7 @@ export function CloudBackupSection({
         />
         <LastSyncedBlock
           lastSynced={formatLastSynced(
-            progress.profile.lastPlayedISO,
+            lastSyncISO,
             CLOUD_BACKUP_COPY.neverSynced,
           )}
           sending={push.value === 'sending'}
