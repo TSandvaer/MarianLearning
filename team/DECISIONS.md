@@ -227,3 +227,9 @@ Distinct from its siblings:
 - **Context:** Thomas asked what dropping the PWA would mean. The native app still depends on the Vercel backend: `/api/claude` plans each session and carries Emma's audio, and `/api/progress` is the cloud backup on the Upstash store. The plan left the call open ("Then decide: retire the PWA, or keep the web build").
 - **Decided:** Go native-only. The web front end (screens, Vite/PWA build, the web Playwright suite) is deleted once Marian is on the native app through TestFlight, not before, because until Apple enrollment clears the PWA is the only installable build. Vercel stays as the app's API server. Phase 4 still sorts the Playwright specs, porting the product invariants to Maestro or core tests; the web specs are not maintained beyond that.
 - **Decided by:** Thomas (popup).
+
+## 2026-10-13 — Work while Apple enrollment is pending: Phase 4 and the native parity gaps
+
+- **Context:** Thomas can enroll in the Apple Developer Program only in a few days, and approval takes longer, so TestFlight (Phase 5) is blocked. Main's Mobile check had gone red on expo-doctor after Expo shipped SDK 57 patches; #549 (`7c11a56`) bumped them (Thomas's popup).
+- **Decided:** (1) Start Phase 4 now, since it needs no Apple account: Kevin builds the Maestro harness and the plan's four critical-path flows, run locally; Jessica sorts the 67 Playwright specs into invariants to port and web-only mechanics to drop. Adding a CI workflow for Maestro is Thomas's call (macOS runner minutes). (2) Close the two parked native parity gaps in one PR: the Hub pick records the world played today, and native gets the web's launch-time cloud reconcile. Thomas device-checks them.
+- **Decided by:** Thomas (popups).
