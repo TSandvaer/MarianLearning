@@ -60,7 +60,7 @@ Per-flow state goes in as **iOS launch arguments** in the flow's `launchApp: arg
 
 ## Every-step sweep (on demand)
 
-`run.sh --sweep` checks that every step of both worlds plays, without playing through to it. It is not part of the per-PR flows. Per step, `sweep/step.yaml` launches with `debug: 1` and `qaStep: <step>` (core `progressAtStep`: the earlier steps of the step's world mastered, the step at `intro`), taps the world's card on the Hub, plays one session with the QA autotap to Session End and goes back to the Hub.
+`run.sh --sweep` checks that every step of both worlds plays, without playing through to it. It is not part of the per-PR flows; in CI it runs only by hand (see CI). Per step, `sweep/step.yaml` launches with `debug: 1` and `qaStep: <step>` (core `progressAtStep`: the earlier steps of the step's world mastered, the step at `intro`), taps the world's card on the Hub (through `subflows/tap-and-confirm.yaml`, like every tap in the flows), plays one session with the QA autotap to Session End and goes back to the Hub.
 
 ```bash
 yarn install                             # at the repo root, once: the sweep runs the API handler
@@ -130,7 +130,8 @@ On the hosted `macos-26` runner (CI run 38396715552, 2026-10-13): 409 / 335 / 28
 - **No production calls, no secrets:** the same `run.sh` guards (closed-port API base, no progress secret, `EXPO_NO_DOTENV=1`); the workflow reads no repository secrets and has `contents: read` only.
 - **Flake handling:** the hosted simulator sometimes drops a tap that Maestro reports as done. This was seen three times on 2026-10-13: once on a Hub card, and twice in a row on iOS's "Open in “Expo Go”?" dialog. Each tap is re-tapped once if its element is still up (`MAESTRO-RETAP`, see Writing a flow). A failed flow is also rerun once (`MAESTRO_FLOW_RETRIES=1`, workflow only) and shows as `PASS (retry)`. Every re-tap and rerun also becomes a "Maestro flake" warning on the run, so a pass that needed one is visible on the PR. If the same element keeps showing up, try it on a real iPad: a tap the app drops there would be an app bug.
 - **Artifact:** on a failure, a re-tap or a rerun, the `maestro-output-<attempt>` artifact holds Metro's log, the console log and Maestro's per-flow debug output with screenshots (a rerun's is in `<flow>-attempt2/`). The job summary lists the result line per flow.
-- **Bumping:** a new Expo SDK needs a matching Expo Go (`sdkVersions["<sdk>"].iosClientUrl` in `https://exp.host/--/api/v2/versions`); update `EXPO_GO_VERSION` and `EXPO_GO_SHA256` together, and `MAESTRO_VERSION` and `MAESTRO_SHA256` together.
+- **Bumping:** a new Expo SDK needs a matching Expo Go (`sdkVersions["<sdk>"].iosClientUrl` in `https://exp.host/--/api/v2/versions`); update `EXPO_GO_VERSION` and `EXPO_GO_SHA256` together, and `MAESTRO_VERSION` and `MAESTRO_SHA256` together. The pins are workflow-level `env`, shared by both jobs.
+- **The step sweep, by hand only:** Actions → maestro → Run workflow, tick `sweep` (and optionally name one `step`). The `sweep` job then runs `run.sh --sweep` instead of the four flows; it never runs on a pull request or a push. It also does the root `yarn install` for the sweep API, writes the step table to the job summary, turns each `MAESTRO-RETAP` step into a warning, and always uploads `maestro-sweep-output-<attempt>`, which holds `sweep-results.tsv` and each step's Maestro output, Metro slice and API requests. It has no flow reruns, so a flaky step is rerun with `step`. A manual run is in its own concurrency group, so a push to `main` doesn't cancel it.
 
 ## Writing a flow
 

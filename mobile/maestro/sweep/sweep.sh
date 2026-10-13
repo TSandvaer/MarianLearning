@@ -66,6 +66,7 @@ _lines() { [[ -f "$1" ]] && wc -l <"$1" | tr -d ' ' || echo 0; }
 sweep_run() {
   local sweep_start=$SECONDS entry node world position xfail
   local dir metro_from api_from start flow_exit verdict_line verdict detail note secs
+  local retaps retap_note
   local TAB=$'\t'
   local n_pass=0 n_xfail=0 n_xpass=0 n_fail=0
   declare -a rows=()
@@ -109,11 +110,17 @@ sweep_run() {
       *) n_fail=$((n_fail + 1)) ;;
     esac
     secs=$((SECONDS - start))
-    echo "$verdict  $node  $secs s  $detail"
+    # Lost taps tapped again (subflows/tap-and-confirm.yaml, open-app.yaml),
+    # in the same "MAESTRO-RETAP xN" form as run.sh's flow result lines.
+    retaps="$(grep -c 'MAESTRO-RETAP.*\.\.\. COMPLETED' "$dir/maestro.log" 2>/dev/null || true)"
+    retap_note=""
+    ((${retaps:-0} > 0)) && retap_note="  MAESTRO-RETAP x$retaps"
+    echo "$verdict  $node  $secs s  $detail$retap_note"
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$verdict" "$world" "$position" "$node" "$secs" "$detail" >>"$tsv"
+      "$verdict" "$world" "$position" "$node" "$secs" "$detail$retap_note" >>"$tsv"
     # The table keeps a line per step; the full detail is in the TSV.
     ((${#detail} > 110)) && detail="${detail:0:107}..."
+    detail+="$retap_note"
     [[ "$verdict" == PASS || "$verdict" == XFAIL ]] || detail+="  (output: $dir)"
     rows+=("$(printf '%-5s  %-9s  %2s  %-29s  %4s s  %s' \
       "$verdict" "$world" "$position" "$node" "$secs" "$detail")")

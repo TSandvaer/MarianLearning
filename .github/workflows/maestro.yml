@@ -18,6 +18,16 @@
 #     github.com/expo/expo-go-releases, the same URL the Expo versions API
 #     (exp.host/--/api/v2/versions, sdkVersions["57.0.0"].iosClientUrl) and
 #     `npx expo start --go --ios` use for SDK 57.
+#
+# Two jobs:
+#   - `maestro`: the four flows, on pull requests, pushes to main and a
+#     manual run;
+#   - `sweep`: the every-step sweep (run.sh --sweep, README § Every-step
+#     sweep), ONLY on a manual run with the `sweep` input ticked. Its API
+#     base is a local keyless server over the committed canon instead of
+#     the closed port (scripts/maestroSweepApi.ts: no credentials, a Haiku
+#     stub that throws, outbound fetch blocked, 127.0.0.1 only). It needs
+#     the root yarn install for that server.
 
 name: maestro
 
@@ -29,36 +39,49 @@ on:
     branches: [main]
     paths: ['mobile/**', 'packages/core/**']
   workflow_dispatch:
+    inputs:
+      sweep:
+        description: 'Run the every-step sweep (run.sh --sweep) instead of the four flows'
+        type: boolean
+        default: false
+      step:
+        description: 'Sweep only this step (e.g. add-to-10); empty: all 24'
+        type: string
+        default: ''
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
+# Both jobs install these (one place to bump them).
+env:
+  MAESTRO_VERSION: '2.11.0'
+  MAESTRO_SHA256: 5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
+  EXPO_GO_VERSION: '57.0.9'
+  EXPO_GO_SHA256: faff18034c9f3504ea4786f07350efab604610c61cfcabd0f2191fc4416a7614
+  SIM_DEVICE_TYPE: iPad Pro 11-inch (M5)
+  SIM_RUNTIME: com.apple.CoreSimulator.SimRuntime.iOS-26-5
+  # A cold hosted runner starts Maestro's XCTest driver slowly (default
+  # 15 s). Maestro's own iOS CI on macos-26 uses 240 s.
+  MAESTRO_DRIVER_STARTUP_TIMEOUT: '240000'
+  MAESTRO_CLI_NO_ANALYTICS: '1'
+  MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true'
+  EXPO_NO_TELEMETRY: '1'
+  EXPO_NO_DOTENV: '1'
 
 jobs:
   maestro:
     name: Maestro (iOS Simulator + Expo Go)
+    # Not on a manual run that asked for the sweep.
+    if: github.event_name != 'workflow_dispatch' || !inputs.sweep
     runs-on: macos-26
     timeout-minutes: 85
     defaults:
       run:
         shell: bash
-    env:
-      MAESTRO_VERSION: '2.11.0'
-      MAESTRO_SHA256: 5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
-      EXPO_GO_VERSION: '57.0.9'
-      EXPO_GO_SHA256: faff18034c9f3504ea4786f07350efab604610c61cfcabd0f2191fc4416a7614
-      SIM_DEVICE_TYPE: iPad Pro 11-inch (M5)
-      SIM_RUNTIME: com.apple.CoreSimulator.SimRuntime.iOS-26-5
-      # A cold hosted runner starts Maestro's XCTest driver slowly (default
-      # 15 s). Maestro's own iOS CI on macos-26 uses 240 s.
-      MAESTRO_DRIVER_STARTUP_TIMEOUT: '240000'
-      MAESTRO_CLI_NO_ANALYTICS: '1'
-      MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true'
-      EXPO_NO_TELEMETRY: '1'
-      EXPO_NO_DOTENV: '1'
     steps:
       - uses: actions/checkout@v4
 
@@ -157,6 +180,107 @@ jobs:
           # Maestro writes each flow's logs and screenshots under
           # <flow>/.maestro/tests/<timestamp>/, which upload-artifact skips
           # unless hidden files are included.
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
+  sweep:
+    name: Maestro step sweep (manual)
+    # Manual only: never on a pull request or a push.
+    if: github.event_name == 'workflow_dispatch' && inputs.sweep
+    runs-on: macos-26
+    # ~45 min on an M5 Mac; flows run 2-3x slower on a hosted runner.
+    timeout-minutes: 200
+    defaults:
+      run:
+        shell: bash
+    # The setup steps are the maestro job's; keep them in step.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Set up JDK 17 (Maestro)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: npm ci (mobile)
+        working-directory: mobile
+        run: npm ci
+
+      - name: yarn install (root, for the sweep API)
+        run: yarn install --frozen-lockfile
+
+      - name: Install Maestro ${{ env.MAESTRO_VERSION }}
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/maestro.zip" \
+            "https://github.com/mobile-dev-inc/maestro/releases/download/cli-${MAESTRO_VERSION}/maestro.zip"
+          echo "${MAESTRO_SHA256}  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c -
+          unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP/maestro-dist"
+          mkdir -p "$HOME/.maestro"
+          cp -R "$RUNNER_TEMP/maestro-dist/maestro/." "$HOME/.maestro/"
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" --version
+
+      - name: Create and boot the iPad simulator
+        run: |
+          xcrun simctl list runtimes
+          udid="$(xcrun simctl create "Maestro iPad" "$SIM_DEVICE_TYPE" "$SIM_RUNTIME")"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          echo "MAESTRO_DEVICE=$udid" >> "$GITHUB_ENV"
+
+      - name: Install Expo Go ${{ env.EXPO_GO_VERSION }} into the simulator
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/expo-go.tar.gz" \
+            "https://github.com/expo/expo-go-releases/releases/download/Expo-Go-${EXPO_GO_VERSION}/Expo-Go-${EXPO_GO_VERSION}.tar.gz"
+          echo "${EXPO_GO_SHA256}  $RUNNER_TEMP/expo-go.tar.gz" | shasum -a 256 -c -
+          mkdir -p "$RUNNER_TEMP/ExpoGo.app"
+          tar -xzf "$RUNNER_TEMP/expo-go.tar.gz" -C "$RUNNER_TEMP/ExpoGo.app"
+          xcrun simctl install "$MAESTRO_DEVICE" "$RUNNER_TEMP/ExpoGo.app"
+          app="$(xcrun simctl get_app_container "$MAESTRO_DEVICE" host.exp.Exponent)"
+          installed="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Info.plist")"
+          echo "Expo Go $installed on $MAESTRO_DEVICE"
+          [[ "$installed" == "$EXPO_GO_VERSION" ]] ||
+            { echo "::error::expected Expo Go $EXPO_GO_VERSION, got $installed"; exit 1; }
+
+      - name: Run the step sweep
+        timeout-minutes: 180
+        env:
+          MAESTRO_OUT: ${{ runner.temp }}/maestro-out
+          # Through env, not inline: run.sh checks it against the step list.
+          SWEEP_STEP: ${{ inputs.step }}
+        run: mobile/maestro/run.sh --sweep ${SWEEP_STEP:+"$SWEEP_STEP"} 2>&1 | tee "$RUNNER_TEMP/maestro-run.log"
+
+      - name: Results summary
+        if: always()
+        run: |
+          log="$RUNNER_TEMP/maestro-run.log"
+          [[ -f "$log" ]] || exit 0
+          {
+            echo '### Maestro step sweep'
+            echo '```'
+            sed -n '/── Step sweep results/,$p' "$log"
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
+          grep '  MAESTRO-RETAP x' "$log" | while IFS= read -r l; do
+            echo "::warning title=Maestro flake::$l"
+          done || true
+
+      - name: Upload the sweep output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-sweep-output-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/maestro-out
+            ${{ runner.temp }}/maestro-run.log
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14
