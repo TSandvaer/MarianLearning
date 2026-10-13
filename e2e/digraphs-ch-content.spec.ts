@@ -1,6 +1,11 @@
 /**
  * E2E spec — digraphs-ch CONTENT presence + intro→practicing transition.
  *
+ * React Native Phase 4: Test 2 moved to
+ * `scripts/canonDigraphsCh.test.ts`. It reads the canon from disk and
+ * needs no browser, so it runs in Vitest, which outlives the web
+ * front end. Test numbers below are the original ones.
+ *
  * Ticket: PR 3 of the 3-PR digraphs-ch content build wave. Paired with
  *         Kevin's planner PR (`feat/digraphs-ch-planner`) and Devon's
  *         wordPack PR (`feat/digraphs-ch-wordpack`), both in flight in
@@ -241,25 +246,6 @@ const ALLOWED_CHIP_WORDS: ReadonlySet<string> = new Set([
   ...CH_TIER_WORDS,
   ...CH_DISTRACTOR_ONLY_WORDS,
 ])
-
-/**
- * Decode-style prompt-type slots that the ch tier must NEVER emit. The
- * sh tier gated these THREE slots for its 3 `hybridMode: true` words
- * (`shoe`, `sheep`, `shark`). The ch tier has ZERO `hybridMode` words
- * (`digraphs-ch-word-list.md` §6.1 + §8 AC12 — Dave's addendum §3d /
- * non-obvious finding #1), so the gate is TOTAL for ch: no problem in
- * the ch canon may carry any of these slots. A regression that emitted
- * a decode-style prompt for any ch word is caught by test 2.
- *
- * The canon's per-problem utterance ids follow the `word.p<N>.<slot>`
- * template (verified against the shipped digraphs-sh canon: slots today
- * are `read | correct | reprompt | hint | giveAnswer`).
- */
-const FORBIDDEN_DECODE_SLOTS: ReadonlyArray<string> = [
-  'segmentation',
-  'spelling',
-  'decode_from_phoneme',
-]
 
 /** Minimal shape of the on-disk session canon this spec inspects. */
 interface CanonUtterance {
@@ -577,80 +563,6 @@ test.describe('digraphs-ch content + intro→practicing transition (AC1 + AC9 + 
     const targetWords = [...byProblem.values()]
     const offPoolWords = targetWords.filter((w) => !CH_TIER_WORDS.has(w))
     expect(offPoolWords).toEqual([])
-  })
-
-  /**
-   * AC12 — the ch tier has ZERO `hybridMode` words → NO problem in the
-   * ch canon may carry a decode-style prompt slot.
-   *
-   * Pure payload assertion — runs on BOTH chromium + webkit. The sh
-   * tier gated `segmentation` / `spelling` / `decode_from_phoneme`
-   * slots for its 3 `hybridMode: true` words only; the 4 non-hybrid sh
-   * words were un-gated. The ch tier has ZERO `hybridMode` words
-   * (`digraphs-ch-word-list.md` §6.1, §8 AC12 — Dave's addendum §3d /
-   * non-obvious finding #1: "the ch tier sets `hybridMode: true` on
-   * ZERO entries"). So the gate is TOTAL for ch: this test asserts NO
-   * problem — for any of the 7 ch words — carries any forbidden
-   * decode-style slot. A regression where Kevin's planner emitted a
-   * decode-style prompt for a ch word (e.g. by misapplying the sh
-   * tier's hybridMode planner logic to ch) is caught here.
-   *
-   * On pre-merge main this fails at `readDigraphsChCanon()` → explicit
-   * ENOENT throw.
-   */
-  test('2. AC12: zero hybridMode words → no segmentation/spelling/decode-from-phoneme slot on any ch-tier problem', async () => {
-    const { parsed: canon } = readDigraphsChCanon()
-    const byProblem = targetWordsByProblem(canon)
-    expect(byProblem.size).toBe(8)
-
-    // Build the per-problem slot inventory from the canon's
-    // `plan.utterances` array. Key = problem number, value = the set of
-    // slot names emitted for that problem.
-    const slotsByProblem = new Map<number, Set<string>>()
-    for (const u of canon.plan.utterances) {
-      const m = u.id.match(/^word\.p(\d+)\.(\w+)$/)
-      if (m === null) continue // session.end.* etc — not per-problem
-      const problemNum = Number(m[1])
-      const slot = m[2]!
-      if (!slotsByProblem.has(problemNum)) {
-        slotsByProblem.set(problemNum, new Set())
-      }
-      slotsByProblem.get(problemNum)!.add(slot)
-    }
-
-    // Collect every (problem, word, forbidden-slot) violation across
-    // all 8 problems, then assert the violation list is empty. The
-    // list-then-assert-empty shape gives a failure message that names
-    // exactly which ch word got which forbidden decode-style slot.
-    const decodeSlotViolations: Array<{
-      problem: number
-      word: string
-      slot: string
-    }> = []
-    for (const [problemNum, word] of byProblem) {
-      const slots = slotsByProblem.get(problemNum) ?? new Set<string>()
-      for (const forbidden of FORBIDDEN_DECODE_SLOTS) {
-        if (slots.has(forbidden)) {
-          decodeSlotViolations.push({
-            problem: problemNum,
-            word,
-            slot: forbidden,
-          })
-        }
-      }
-    }
-
-    // The ch tier is hybridMode-free: zero decode-style slots on ANY
-    // problem. Total gate — unlike sh, there is no un-gated subset.
-    expect(decodeSlotViolations).toEqual([])
-
-    // Sanity: the test actually exercised all 8 problems against ch
-    // words (guards against a vacuous pass on an empty/malformed
-    // canon). Every problem's target word is a ch-pool word.
-    const offPoolTargets = [...byProblem.values()].filter(
-      (w) => !CH_TIER_WORDS.has(w),
-    )
-    expect(offPoolTargets).toEqual([])
   })
 
   /**

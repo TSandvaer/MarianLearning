@@ -5,6 +5,11 @@
  * `-with-regroup` entry, intro→practicing self-heal after session 1,
  * and full intro → mastered ladder under the 2-session test threshold.
  *
+ * React Native Phase 4: Test 1 (canon file existence) moved to
+ * `scripts/canonTwoDigitAddsubWithRegroup.test.ts`. It checks a file
+ * on disk and needs no browser, so it runs in Vitest, which outlives
+ * the web front end. Test numbers below are the original ones.
+ *
  * Ticket: Wave 6B — paired with Kevin's Wave 6C canon-bake PR (epic
  * `86c9y34xn`).
  *
@@ -242,7 +247,6 @@
 
 import { test, expect } from '@playwright/test'
 import { returnToHubAfterAllDone } from './_helpers/allDoneToHub'
-import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
   installClaudeMock,
@@ -406,48 +410,6 @@ function buildWithRegroupSeedProgress(): unknown {
 // ────────────────────────────────────────────────────────────────────────
 
 test.describe('two-digit-addsub-with-regroup — Wave 6 progression (failing-first paired with Wave 6C canon-bake)', () => {
-  // ── Test 1 — RED-on-base canon-existence lever ─────────────────────
-  //
-  // The load-bearing failing-first assertion. Asserts the
-  // `two-digit-addsub-with-regroup.json` canon file exists on disk.
-  // Today on `main` (HEAD `b4ebfa7`), this file is absent — only
-  // `two-digit-addsub.json` (the `-no-regroup` canon, baked by PR
-  // #309) sits in `public/canon/math/level-1/`.
-  //
-  // Per Kyle's spec §5 (`design/math/two-digit-addsub-with-regroup-
-  // content.md` line 516): "No `two-digit-addsub-with-regroup` canon
-  // currently exists." This is the empirically-verified state being
-  // locked.
-  //
-  // Failure mode on base is a concrete one-line assertion error:
-  //
-  //   Error: expect(received).toBe(true)
-  //     received: false
-  //     Expected the with-regroup canon to exist at
-  //     <abs-path>/public/canon/math/level-1/two-digit-addsub-with-
-  //     regroup.json. Wave 6C bake has not landed yet.
-  //
-  // NOT a flake; NOT a timeout. Wave 6C's bake materialises the file
-  // and the assertion turns green.
-  //
-  // Engine-agnostic (no browser interaction); runs on both chromium
-  // and webkit projects.
-  test('canon file existence — public/canon/math/level-1/two-digit-addsub-with-regroup.json must exist on disk', async () => {
-    const exists = existsSync(TWO_DIGIT_ADDSUB_WITH_REGROUP_CANON_PATH)
-    expect(
-      exists,
-      `Expected the with-regroup canon to exist at ` +
-        `${TWO_DIGIT_ADDSUB_WITH_REGROUP_CANON_PATH}. Wave 6C bake has ` +
-        `not landed yet. Per canonFileTierFor (api/_canon.ts:148), the ` +
-        `wire literal 'two-digit-addsub-with-regroup' passes through ` +
-        `unchanged to the disk filename. Until this file ships, a runtime ` +
-        `request for focusNode=two-digit-addsub-with-regroup hits canon ` +
-        `miss → falls through to Haiku (which has no -with-regroup ` +
-        `directive on base) OR fails. Wave 6C is the canon-bake PR ` +
-        `that creates this file.`,
-    ).toBe(true)
-  })
-
   // ── Test 2 — Regression-lock via canon-bytes mock (Wave 6D upgrade) ─
   //
   // **History — `.fixme` removed in Wave 6D.** This test was originally
