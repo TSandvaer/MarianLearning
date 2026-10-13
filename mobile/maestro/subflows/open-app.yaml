@@ -1,9 +1,24 @@
 # Opens the app in the Expo Go that `launchApp` just started, from the
 # harness's Metro (`METRO_URL`, passed by run.sh). iOS asks "Open in
 # 'Expo Go'?" for an exp:// link; the tap answers it.
+#
+# On a hosted CI runner that tap can be lost (run 38405534142 attempt 2:
+# `Tapping 491.0, 615.0` on Open, twice, and the dialog stayed up), so if
+# the dialog is still there, tap Open once more, labelled MAESTRO-RETAP
+# (see tap-and-confirm.yaml). The title's quotes are curly; `.` matches
+# them.
 appId: host.exp.Exponent
 ---
 - openLink: ${METRO_URL}
 - tapOn:
     text: Open
     optional: true
+- runFlow:
+    when:
+      visible:
+        text: Open in .Expo Go.\?
+    commands:
+      - tapOn:
+          text: Open
+          optional: true
+          label: 'MAESTRO-RETAP: the Open in Expo Go dialog is still up, tapping Open again'

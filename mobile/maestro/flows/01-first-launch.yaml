@@ -16,19 +16,29 @@ tags:
     timeout: 120000
 # The QA autotap wakes Emma (Maestro does not race it for the wake tap);
 # her four lines play muted, and the heart shows after line 3.
+# Maestro counts a wait's timeout from the last interaction (the "Open"
+# tap), not from the wait's start, so this budget includes the wait for
+# Greet above: 120 s for Greet plus 60 s for the heart. On a CI runner
+# Greet alone can take ~70 s.
 - extendedWaitUntil:
     visible:
       id: greet-heart
-    timeout: 60000
-- tapOn:
-    id: greet-heart
+    timeout: 180000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: greet-heart
+      NEXT: math
 - runFlow: ../subflows/math-session.yaml
 # Session End's one write: today's first good day on the step.
 - assertVisible:
     id: session-end-count
     text: 1 of 3
-- tapOn:
-    id: session-end-cta
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: session-end-cta
+      NEXT: hub
 - extendedWaitUntil:
     visible:
       id: hub
