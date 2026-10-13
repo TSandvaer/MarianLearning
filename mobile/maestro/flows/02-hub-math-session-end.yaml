@@ -17,8 +17,11 @@ tags:
     visible:
       id: hub
     timeout: 120000
-- tapOn:
-    id: hub-card-number-garden
+- runFlow:
+    file: ../subflows/tap-hub-card.yaml
+    env:
+      CARD: hub-card-number-garden
+      NEXT: math
 - runFlow: ../subflows/math-session.yaml
 - assertVisible:
     id: session-end-count

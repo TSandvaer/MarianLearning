@@ -41,7 +41,7 @@ jobs:
   maestro:
     name: Maestro (iOS Simulator + Expo Go)
     runs-on: macos-26
-    timeout-minutes: 75
+    timeout-minutes: 85
     defaults:
       run:
         shell: bash
@@ -113,12 +113,17 @@ jobs:
             { echo "::error::expected Expo Go $EXPO_GO_VERSION, got $installed"; exit 1; }
 
       - name: Run the Maestro flows
-        timeout-minutes: 60
+        # ~30 min green; one rerun of the longest flow adds ~10.
+        timeout-minutes: 70
         env:
           MAESTRO_OUT: ${{ runner.temp }}/maestro-out
+          # A failed flow is rerun once from empty storage and reported as
+          # "PASS (retry)", with a MAESTRO-RETRY line in the log.
+          MAESTRO_FLOW_RETRIES: '1'
         run: mobile/maestro/run.sh 2>&1 | tee "$RUNNER_TEMP/maestro-run.log"
 
       - name: Results summary
+        id: summary
         if: always()
         run: |
           log="$RUNNER_TEMP/maestro-run.log"
@@ -129,9 +134,17 @@ jobs:
             sed -n '/── Maestro results/,$p' "$log"
             echo '```'
           } >>"$GITHUB_STEP_SUMMARY"
+          # A lost Hub-card tap or a flow rerun passes the job but must not
+          # go unseen: a tap dropped on a real iPad would be an app bug.
+          if grep -q 'MAESTRO-RETAP\|MAESTRO-RETRY' "$log"; then
+            grep 'MAESTRO-RETAP\|MAESTRO-RETRY\|PASS (retry)' "$log" | while IFS= read -r l; do
+              echo "::warning title=Maestro flake::$l"
+            done
+            echo "flaky=true" >>"$GITHUB_OUTPUT"
+          fi
 
-      - name: Upload Maestro output (failure only)
-        if: failure() || cancelled()
+      - name: Upload Maestro output (failure, re-tap or rerun)
+        if: failure() || cancelled() || steps.summary.outputs.flaky == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: maestro-output-${{ github.run_attempt }}

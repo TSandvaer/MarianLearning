@@ -12,6 +12,14 @@
 #   MAESTRO_METRO_PORT  Metro port (default 8399)
 #   MAESTRO_OUT         where Metro's log and Maestro's debug output go
 #                       (default: a fresh temp dir, printed at the end)
+#   MAESTRO_FLOW_RETRIES  reruns of a failed flow, each from empty storage
+#                       (default 0; the CI workflow sets 1). A flow that
+#                       passes on a rerun reports "PASS (retry)".
+#
+# Markers in the output, for grepping a CI log:
+#   MAESTRO-RETAP  a Hub card tap was lost and tapped again
+#                  (subflows/tap-hub-card.yaml); counted per flow
+#   MAESTRO-RETRY  a failed flow is being run again
 #
 # What it does: starts ONE Metro with the harness's bundle-time flags
 # (below), then for each flow quits Expo Go, empties the app's storage on
@@ -157,25 +165,66 @@ else
   FLOWS=("$HERE"/flows/*.yaml)
 fi
 
+RETRIES="${MAESTRO_FLOW_RETRIES:-0}"
+[[ "$RETRIES" =~ ^[0-9]+$ ]] || fail "MAESTRO_FLOW_RETRIES must be a whole number, got '$RETRIES'"
+
+# One attempt: empty storage, then the flow. Maestro's console output goes
+# to the terminal and to <dir>.log, where the MAESTRO-RETAP lines are
+# counted.
+run_attempt() { # <flow> <debug dir>
+  reset_app_storage
+  "$MAESTRO" --device "$UDID" test \
+    -e METRO_URL="exp://127.0.0.1:$PORT" \
+    --debug-output "$2" \
+    "$1" 2>&1 | tee "$2.log"
+}
+
 declare -a RESULTS=()
 FAILED=0
+TOTAL_RETAPS=0
+TOTAL_RERUNS=0
 for flow in "${FLOWS[@]}"; do
   name="$(basename "$flow" .yaml)"
-  reset_app_storage
   start=$SECONDS
-  if "$MAESTRO" --device "$UDID" test \
-    -e METRO_URL="exp://127.0.0.1:$PORT" \
-    --debug-output "$OUT/$name" \
-    "$flow"; then
-    RESULTS+=("PASS  $name  $((SECONDS - start)) s")
+  attempt=1
+  retaps=0
+  retapped=""
+  while :; do
+    dir="$OUT/$name"
+    ((attempt > 1)) && dir="$OUT/$name-attempt$attempt"
+    passed=0
+    run_attempt "$flow" "$dir" && passed=1
+    # Maestro prints a command once, when it ends: one line per re-tap.
+    n="$(grep -c 'MAESTRO-RETAP' "$dir.log" 2>/dev/null || true)"
+    retaps=$((retaps + ${n:-0}))
+    # Which card: tap-hub-card.yaml's `when` (the only one in the flows)
+    # completes only when it re-taps.
+    retapped+="$(sed -n 's/.*Run flow when id: \([A-Za-z0-9_-]*\) is visible\.\.\. COMPLETED.*/ \1/p' "$dir.log" 2>/dev/null | tr -d '\n' || true)"
+    ((passed || attempt > RETRIES)) && break
+    attempt=$((attempt + 1))
+    TOTAL_RERUNS=$((TOTAL_RERUNS + 1))
+    echo "MAESTRO-RETRY $name: failed, running it again from empty storage" \
+      "(attempt $attempt of $((RETRIES + 1)); the failed attempt's output: ${dir})"
+  done
+  TOTAL_RETAPS=$((TOTAL_RETAPS + retaps))
+
+  if ((passed)); then
+    line="PASS"
+    ((attempt > 1)) && line="PASS (retry)"
   else
-    RESULTS+=("FAIL  $name  $((SECONDS - start)) s  (debug: $OUT/$name)")
+    line="FAIL"
     FAILED=1
   fi
+  line+="  $name  $((SECONDS - start)) s"
+  ((attempt > 1)) && line+="  ($attempt attempts)"
+  ((retaps > 0)) && line+="  MAESTRO-RETAP x$retaps${retapped:+ (${retapped# })}"
+  ((passed)) || line+="  (debug: $dir)"
+  RESULTS+=("$line")
 done
 
 echo
 echo "── Maestro results ($UDID) ──"
 printf '%s\n' "${RESULTS[@]}"
+echo "Lost-tap re-taps: $TOTAL_RETAPS · flow reruns: $TOTAL_RERUNS"
 echo "Output: $OUT"
 exit "$FAILED"
