@@ -12,8 +12,10 @@ import {
   defaultProgress,
   loadProgress,
   saveProgress,
+  readStoredDeviceId,
   STORAGE_KEY,
   type Progress,
+  type SessionHistoryEntry,
 } from '@marian/core/progress'
 import { seedUnlocksCelebrated } from '@marian/core/progress/pathBeats'
 import { now as progressNow } from '@marian/core/progress/clock'
@@ -907,53 +909,96 @@ it('QA route parent-settings: the real screen at once, nothing written on mount,
 const LOCAL_PLAYED = '2026-10-12T08:00:00.000Z'
 const CLOUD_PLAYED = '2026-10-13T08:00:00.000Z'
 
+interface CloudInit {
+  method?: string
+  body?: string
+  signal?: AbortSignal
+}
+
 /** The `/api/progress` requests App made. */
 function progressRequests(): { url: string; method: string | undefined }[] {
   return (globalThis.fetch as jest.Mock).mock.calls
     .filter(([url]) => String(url).includes('/api/progress'))
     .map(([url, init]) => ({
       url: String(url),
-      method: (init as { method?: string } | undefined)?.method,
+      method: (init as CloudInit | undefined)?.method,
     }))
+}
+
+/** The bodies App POSTed to `/api/progress`. */
+function progressPushes(): {
+  deviceId: string
+  blob: Progress
+  lastModifiedISO: string
+}[] {
+  return (globalThis.fetch as jest.Mock).mock.calls
+    .filter(
+      ([url, init]) =>
+        String(url).includes('/api/progress') &&
+        (init as CloudInit | undefined)?.method === 'POST',
+    )
+    .map(([, init]) => JSON.parse(String((init as CloudInit).body)))
 }
 
 const offlineFetch = () =>
   Promise.reject(new TypeError('Network request failed (jest is offline)'))
 
-/** jest's offline fetch, except `/api/progress`, which `answer` serves. */
-function withCloud(
-  answer: (init: { signal?: AbortSignal }) => Promise<unknown>,
-): void {
+/**
+ * jest's offline fetch, except `/api/progress`: `answer` serves its GET,
+ * and a POST (a push) succeeds.
+ */
+function withCloud(answer: (init: CloudInit) => Promise<unknown>): void {
   ;(globalThis.fetch as jest.Mock).mockImplementation(
-    (url: string, init: { signal?: AbortSignal }) =>
-      String(url).includes('/api/progress') ? answer(init) : offlineFetch(),
+    (url: string, init: CloudInit) => {
+      if (!String(url).includes('/api/progress')) return offlineFetch()
+      if (init.method === 'POST') return Promise.resolve(response(200, {}))
+      return answer(init)
+    },
   )
 }
 
-/** A 200 from `/api/progress` holding `blob`, saved at `iso`. */
-function cloudRecord(blob: Progress, iso: string) {
+function response(status: number, body: unknown) {
   return {
-    ok: true,
-    status: 200,
-    json: async () => ({ ok: true, blob, lastModifiedISO: iso }),
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
   }
 }
 
-/** Seeded progress, last played at LOCAL_PLAYED; returns a newer cloud copy. */
-function localAndNewerCloud(): Progress {
+/** A 200 from `/api/progress` holding `blob`, saved at `iso`. */
+function cloudRecord(blob: unknown, iso: string) {
+  return response(200, { ok: true, blob, lastModifiedISO: iso })
+}
+
+/** One recorded session. */
+function session(dateISO: string, successRate: number): SessionHistoryEntry {
+  return { dateISO, skillFocus: ['add-to-20'], successRate }
+}
+
+/**
+ * The seeded progress, saved as last played at LOCAL_PLAYED with one
+ * session; returns it and a newer cloud copy (another device's: another
+ * session, add-to-20 mastered, named "Cloud").
+ */
+function localAndNewerCloud(): { local: Progress; cloud: Progress } {
   const seeded = loadProgress()!
-  saveProgress({
+  const local: Progress = {
     ...seeded,
     profile: { ...seeded.profile, lastPlayedISO: LOCAL_PLAYED },
-  })
-  return {
+    history: [session('2026-10-12T07:50:00.000Z', 0.75)],
+  }
+  saveProgress(local)
+  const cloud: Progress = {
     ...seeded,
     profile: {
       ...seeded.profile,
       lastPlayedISO: CLOUD_PLAYED,
       childName: 'Cloud',
     },
+    skillLevels: { ...seeded.skillLevels, 'add-to-20': 'mastered' },
+    history: [session('2026-10-13T07:50:00.000Z', 1)],
   }
+  return { local: loadProgress()!, cloud }
 }
 
 it('launch reconcile without the progress secret: off, so no request, no device ID and no write', async () => {
@@ -966,10 +1011,10 @@ it('launch reconcile without the progress secret: off, so no request, no device 
   expect(progressWrites).toBe(0)
 })
 
-it('launch reconcile with the secret: a newer cloud blob is installed once while Splash runs, and App mounting again does not reconcile again', async () => {
+it('launch reconcile, cloud newer: installed once while Splash runs (fields from the cloud, sessions merged so no local one is lost), and App mounting again does not reconcile again', async () => {
   const log = jest.spyOn(console, 'log').mockImplementation(() => {})
   boot({ debug: true, seed: 'add-to-20', dayOffset: null }, 's3cret')
-  const cloud = localAndNewerCloud()
+  const { local, cloud } = localAndNewerCloud()
   withCloud(async () => cloudRecord(cloud, CLOUD_PLAYED))
   try {
     const before = progressWrites
@@ -984,10 +1029,15 @@ it('launch reconcile with the secret: a newer cloud blob is installed once while
       },
     ])
     expect(progressWrites - before).toBe(1)
-    expect(loadProgress()?.profile).toMatchObject({
+    const installed = loadProgress()!
+    // Field by field the cloud wins ...
+    expect(installed.profile).toMatchObject({
       childName: 'Cloud',
       lastPlayedISO: CLOUD_PLAYED,
     })
+    expect(installed.skillLevels['add-to-20']).toBe('mastered')
+    // ... but both devices' sessions are kept, oldest first.
+    expect(installed.history).toEqual([...local.history, ...cloud.history])
     expect(log).toHaveBeenCalledWith(
       '[cloudSync] launch reconcile: installed-from-cloud',
     )
@@ -1005,10 +1055,73 @@ it('launch reconcile with the secret: a newer cloud blob is installed once while
   }
 })
 
+/** The cloud's answer to the launch GET, given the newer cloud copy. */
+type CloudAnswer = (cloud: Progress) => unknown
+
+it.each<[string, CloudAnswer, string, 'pushed' | 'kept']>([
+  [
+    'local newer: local is pushed',
+    (cloud) =>
+      cloudRecord(
+        { ...cloud, profile: { ...cloud.profile, lastPlayedISO: null } },
+        '2026-10-01T08:00:00.000Z',
+      ),
+    'pushed-to-cloud',
+    'pushed',
+  ],
+  [
+    'no cloud record (404): local is pushed',
+    () => response(404, { error: 'not-found' }),
+    'pushed-to-cloud',
+    'pushed',
+  ],
+  [
+    'cloud server error (503): local is left alone',
+    () => response(503, { error: 'kv-failed' }),
+    'cloud-error',
+    'kept',
+  ],
+  [
+    'malformed cloud copy: local is left alone',
+    () => cloudRecord({ schemaVersion: 1, garbage: true }, CLOUD_PLAYED),
+    'cloud-blob-rejected',
+    'kept',
+  ],
+])(
+  'launch reconcile, %s; nothing is written',
+  async (_name, answer, kind, push) => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {})
+    jest.spyOn(console, 'warn').mockImplementation(() => {})
+    boot({ debug: true, seed: 'add-to-20', dayOffset: null }, 's3cret')
+    const { local, cloud } = localAndNewerCloud()
+    withCloud(async () => answer(cloud))
+    try {
+      const before = progressWrites
+      await renderPastSplash()
+      await settle(1000)
+      expect(screen.getByTestId('hub')).toBeOnTheScreen()
+      expect(log).toHaveBeenCalledWith(`[cloudSync] launch reconcile: ${kind}`)
+      expect(progressWrites).toBe(before)
+      expect(loadProgress()).toEqual(local)
+      const deviceId = readStoredDeviceId()
+      expect(progressRequests().map((r) => r.method)).toEqual(
+        push === 'pushed' ? ['GET', 'POST'] : ['GET'],
+      )
+      expect(progressPushes()).toEqual(
+        push === 'pushed'
+          ? [{ deviceId, blob: local, lastModifiedISO: LOCAL_PLAYED }]
+          : [],
+      )
+    } finally {
+      ;(globalThis.fetch as jest.Mock).mockImplementation(offlineFetch)
+    }
+  },
+)
+
 it('launch reconcile answering after the Hub is up: Emma plays on (no remount) and the cloud blob is installed', async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {})
   boot({ debug: true, seed: 'add-to-20', dayOffset: null }, 's3cret')
-  const cloud = localAndNewerCloud()
+  const { cloud } = localAndNewerCloud()
   let answer: (record: unknown) => void = () => {}
   withCloud(
     () =>
