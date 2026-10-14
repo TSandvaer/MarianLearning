@@ -234,17 +234,17 @@ describe('skipCountDistractors — repair', () => {
     expect(skipCountDistractors(skip(4, [3, 4, 5]))).toEqual([5, 7])
   })
 
-  it('correct + step above 100 → the last term', () => {
-    // 70, 80, 90 → 100; 110 is out, so the last term, 90.
-    expect(skipCountDistractors(skip(2, [70, 80, 90]))).toEqual([70, 90])
-    expect(skipCountDistractors(skip(5, [70, 80, 90]))).toEqual([90, 91])
+  it('correct + step above 99 → the last term', () => {
+    // 80, 85, 90 → 95; 100 is out (the 99 cap), so the last term, 90.
+    expect(skipCountDistractors(skip(2, [80, 85, 90]))).toEqual([80, 90])
+    expect(skipCountDistractors(skip(5, [80, 85, 90]))).toEqual([90, 91])
   })
 
   it('a repair that would repeat the other chip takes the first term', () => {
-    // 98, 99, 100 → 101 on P4: last + 1 is the answer → the last term
-    // (100); answer + step (102) is out → the last term is taken → the
-    // first term (98).
-    expect(skipCountDistractors(skip(4, [98, 99, 100]))).toEqual([98, 100])
+    // 96, 97, 98 → 99 on P4: last + 1 is the answer → the last term (98);
+    // answer + step (100) is out → the last term is taken → the first term
+    // (96).
+    expect(skipCountDistractors(skip(4, [96, 97, 98]))).toEqual([96, 98])
   })
 
   it('canon kinds are told apart by their guards', () => {

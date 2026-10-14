@@ -64,9 +64,10 @@
  * fallback path fires cleanly.
  */
 
-import type {
-  ExtendedMathProblem,
-  ExtendedMathSessionPlan,
+import {
+  EXTENDED_ANSWER_MAX,
+  type ExtendedMathProblem,
+  type ExtendedMathSessionPlan,
 } from './extendedProblems'
 import {
   type MathProblem,
@@ -360,6 +361,7 @@ function extendedProblemFromRead(
   }
   const multiply = matchMultiplyRead(read)
   if (multiply) {
+    assertRecordableAnswer(read, multiply.factorA * multiply.factorB)
     return {
       kind: 'multiply',
       index,
@@ -587,7 +589,22 @@ function matchSkipCountRead(
         `(the terms must go up by the same step)`,
     )
   }
-  return { sequence, step, next: sequence[sequence.length - 1]! + step }
+  const next = sequence[sequence.length - 1]! + step
+  assertRecordableAnswer(read, next)
+  return { sequence, step, next }
+}
+
+/** Throws when an extended problem's answer can't be recorded: the
+ *  progress guard holds answers up to {@link EXTENDED_ANSWER_MAX} (99), and
+ *  the session falls back rather than lose the progress doc. */
+function assertRecordableAnswer(read: string, answer: number): void {
+  if (answer > EXTENDED_ANSWER_MAX) {
+    throw new PlanFromServerError(
+      `math read line "${read}" has the answer ${answer}, above ` +
+        `${EXTENDED_ANSWER_MAX} (the progress record holds answers up to ` +
+        `${EXTENDED_ANSWER_MAX})`,
+    )
+  }
 }
 
 /** {@link parseMultiplyRead}'s template: `null` on a miss; throws on an

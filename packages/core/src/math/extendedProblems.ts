@@ -39,6 +39,16 @@
 
 import type { MathProblem, MathProblemUtterances } from './sessionPlans'
 
+/**
+ * The largest answer (and chip) an extended problem may have. The progress
+ * guard accepts recorded answers in 0..99 only (`progress/guards.ts`,
+ * `perProblemAnswerValue`); one recorded 100 makes the whole progress doc
+ * fail the guard and load as a fresh start. So the parser sends a problem
+ * whose answer is above this to the static fallback, and the chip pickers
+ * never offer more.
+ */
+export const EXTENDED_ANSWER_MAX = 99
+
 /** The problem kinds of an {@link ExtendedMathSessionPlan}. */
 export type ExtendedMathProblemKind =
   | 'arithmetic'

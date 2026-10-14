@@ -17,17 +17,20 @@
  */
 
 import { GENTLE_RAMP_THROUGH, pickDistractors } from './distractors'
-import type {
-  MultiplyProblem,
-  NumberRecogProblem,
-  SkipCountProblem,
+import {
+  EXTENDED_ANSWER_MAX,
+  type MultiplyProblem,
+  type NumberRecogProblem,
+  type SkipCountProblem,
 } from './extendedProblems'
 
 /** Number recognition: the chips are numbers 1..10 (spec § 10). */
 export const RECOGNIZE_CHIP_MAX = 10
-/** Skip counting: every chip stays in 1..100 (spec § 4 "Skip repair"). */
+/** Skip counting: every chip stays in 1..99. The spec's § 4 "Skip repair"
+ *  says 1..100; 99 is the progress guard's ceiling for a recorded answer
+ *  ({@link EXTENDED_ANSWER_MAX}), so a tapped 100 can't reset the doc. */
 export const SKIP_COUNT_CHIP_MIN = 1
-export const SKIP_COUNT_CHIP_MAX = 100
+export const SKIP_COUNT_CHIP_MAX = EXTENDED_ANSWER_MAX
 
 /** The trap a problem's chips offer on P4–P8 (`null` on the gentle P1–P3).
  *  Recorded as `perProblemDistractorClass`; like the arithmetic tiers it is
@@ -45,15 +48,17 @@ const sortPair = (a: number, b: number): [number, number] =>
 
 /**
  * The multiplication chip ceiling M for a plan: the smallest multiple of 10
- * above its largest answer, `10 × ceil((max + 1) / 10)` (spec § 4).
- * `mult-2-5-10` → 30, `mult-3-4` → 20, `mult-6-9` → 30. The +1 chip always
- * fits under it, and no chip reads "99" beside "Six times two".
+ * above its largest answer, `10 × ceil((max + 1) / 10)` (spec § 4), and
+ * never above {@link EXTENDED_ANSWER_MAX} (99, the progress guard's ceiling).
+ * `mult-2-5-10` → 30, `mult-3-4` → 20, `mult-6-9` → 30. The +1 chip fits
+ * under it (below the 99 cap), and no chip reads "99" beside "Six times
+ * two".
  *
  * @param corrects the answers of the plan's multiply problems.
  */
 export function multiplyChipCeiling(corrects: readonly number[]): number {
   const max = corrects.length === 0 ? 0 : Math.max(...corrects)
-  return 10 * Math.ceil((max + 1) / 10)
+  return Math.min(EXTENDED_ANSWER_MAX, 10 * Math.ceil((max + 1) / 10))
 }
 
 /** Number recognition: `pickDistractors(correct, index, 10)`, unchanged
@@ -71,7 +76,8 @@ export function recognizeDistractors(
  * - P4–P8: `last + 1` (counted on by one) and `correct + step` (skipped a
  *   term).
  * - Repair: a value equal to the answer or to the other value, or outside
- *   1..100, becomes the last term, or failing that the first term.
+ *   1..99 (the spec says 100; see {@link SKIP_COUNT_CHIP_MAX}), becomes the
+ *   last term, or failing that the first term.
  */
 export function skipCountDistractors(
   problem: SkipCountProblem,
