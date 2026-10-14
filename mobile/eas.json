@@ -41,7 +41,7 @@
   "submit": {
     "production": {
       "ios": {
-        "ascAppId": "REPLACE_WITH_ASC_APP_ID__see_mobile_docs_testflight_md"
+        "ascAppId": "6822444808"
       }
     }
   }
