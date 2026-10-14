@@ -1,10 +1,10 @@
 # Same-day mixed review + return warm-up (native)
 
-**Scope:** the native app (`mobile/`), `@marian/core`, and one new branch in `/api/claude`. The web UI is frozen and never sends the new request fields, so the web is unchanged. Thomas approved both changes by popup on 2026-10-14, after Dave's research consult: keep the overnight gap, and fill the idle same-day time (Change 1, Dave's #1, "review") and warm up after days away (Change 2, Dave's #3, "warm-up"). Conventions follow `design/native/greet-math-native.md`: the 375×667 / 667×375 phone floor, and tablet = shorter side ≥ 600 pt. Code is anchored by names, not line numbers (`.claude/docs/screens-and-flows.md` § Math, spec-authoring convention).
+**Scope:** the native app (`mobile/`), `@marian/core`, and one new branch in `/api/claude`. The web UI is frozen and never sends the new request fields, so the web is unchanged. Thomas approved both changes by popup on 2026-10-14, after Dave's research consult: keep the overnight gap, and fill the idle same-day time (Change 1, Dave's #1, "review") and warm up when she comes back (Change 2, Dave's #3, "warm-up"). Dave's verdicts on this spec's three open readings (2026-10-14) are folded in (§ 10). Conventions follow `design/native/greet-math-native.md`: the 375×667 / 667×375 phone floor, and tablet = shorter side ≥ 600 pt. Code is anchored by names, not line numbers (`.claude/docs/screens-and-flows.md` § Math, spec-authoring convention).
 
 ## Goal
 
-Once today's flower is asleep, playing that world again gives Marian a calm mix of 8 problems from steps she already knows, with no flower and no bonus. The first session after a missed day opens with 2 "Remember this one?" problems, and they never count against today's flower.
+Once today's flower is asleep, playing that world again gives Marian a calm mix of 8 problems from steps she already knows, with no flower and no bonus. The first session of each day in a world opens with up to 2 "Remember this one?" problems, and they never count against today's flower.
 
 ## Research basis
 
@@ -12,26 +12,27 @@ Once today's flower is asleep, playing that world again gives Marian a calm mix 
 - **Rohrer & Taylor 2006:** extra practice in the same session (overlearning) showed no retention benefit. So a same-day replay switches to review instead of more of the current step, and the overnight gap stays.
 - **Deci, Koestner & Ryan 1999:** expected tangible rewards undermine intrinsic motivation. So a review gives no flower and no bonus stardust, only the normal per-answer stars.
 - **Dave, `design/research/leitner-interval-tuning-marian.md` §6:** at most 2–3 overdue Leitner items per session (`LEITNER_DUE_PER_SESSION_CAP = 3`, `packages/core/src/progress/leitner.ts`). The warm-up's facts count against that cap (§ 7.4).
+- **Dave, verdict 2026-10-14:** one night's sleep is delay enough, and it matches the 1-day box-2 interval. A warm-up that only follows a missed day can read to a child as a consequence of skipping, while a daily ritual is predictable. So the warm-up opens the first session of every day. Math overdue facts are picked by due date, which is exactly delayed retrieval, so they may come from the current step (add-to-10 is where she most needs to move from counting to recall).
 
 ## User state entering
 
 - **Review:** she has already earned today's flower in this world. The Hub card shows it asleep (closed bud, moon, z), and she taps that card again. Often she has just heard `guide.hub.both-sleeping`, "Both flowers are sleeping. Want to practise more?"
-- **Warm-up:** she hasn't played this world for at least one whole calendar day. She may have just heard "Your flower woke up!" on the Hub.
+- **Warm-up:** this is her first session in this world today. On a new day she may have just heard "Your flower woke up!" on the Hub.
 
 ## 1. Decisions
 
-| #   | Call                                                                                                                                                                                                                                                                                                                                                            |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | **A review runs when** the world's Hub card has `earnedToday && !complete` (`buildHubCardModel`) **and** its review pool is not empty. Otherwise the replay stays today's same-step practice.                                                                                                                                                                   |
-| D2  | **Baseline steps are never reviewed or warmed up.** Baseline = the steps that are `'mastered'` in `defaultProgress()` (today `number-recog` and `letter-names`, from the diagnostic). Computed from the defaults, not hardcoded.                                                                                                                                |
-| D3  | **There is no new Hub card state, and the Map doesn't change.** The sleeping bud already says "today's flower is done", and a review badge would be a new symbol and a "more here" lure. A review shows that it is a review inside the session: Emma's opener line and a moon at the start of the bead track. Its Session End is the approved practice-day end. |
-| D4  | **Warm-up:** 2 problems (never more than 3), never from the current step. They show as hearts in the bead track, and "Remember this one?" plays before each. They are left out of the score, the streak and the flower. Leitner promote and demote do apply.                                                                                                    |
-| D5  | **Days away** = whole calendar days with no session in that world. A warm-up runs when the world's last session was **before yesterday**. Daily play never triggers it (§ 7.3).                                                                                                                                                                                 |
-| D6  | **Problems are canon blocks.** Core picks `(step, problem 1–8)` references, and the server copies those blocks out of the canon files **with their own baked audio**. There is no planner call, no TTS and no credits.                                                                                                                                          |
-| D7  | **A review appends no `progress.history` entry.** No rule can then count it toward a good day (§ 7.6).                                                                                                                                                                                                                                                          |
-| D8  | **There are two new Lily lines.** Everything else reuses approved lines (§ 4).                                                                                                                                                                                                                                                                                  |
+| #   | Call                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| D1  | **A review runs when** the world's Hub card has `earnedToday && !complete` (`buildHubCardModel`) **and** its review pool is not empty. Otherwise the replay stays today's same-step practice.                                                                                                                                                                                                                                                                                                                      |
+| D2  | **Baseline steps are never reviewed and never a Word Song warm-up source.** Baseline = the steps that are `'mastered'` in `defaultProgress()` (today `number-recog` and `letter-names`, from the diagnostic). Computed from the defaults, not hardcoded. (Math warm-ups pick facts, and `number-recog` has none.)                                                                                                                                                                                                  |
+| D3  | **There is no new Hub card state, and the Map doesn't change.** The sleeping bud already says "today's flower is done", and a review badge would be a new symbol and a "more here" lure. A review shows that it is a review inside the session: Emma's opener line and a moon at the start of the bead track. Its Session End is the approved practice-day end.                                                                                                                                                    |
+| D4  | **Warm-up:** up to 2 problems (the wire never carries more than 3). **Math:** the 2 most overdue **due** Leitner facts that a canon block can serve, **the current step included**. **Word Song:** 2 items from the most recently mastered non-baseline step, **never the current step**. They show as hearts in the bead track, and "Remember this one?" plays before each. They are left out of the score, the streak and the flower. Leitner promote and demote do apply. No fact is served twice in a session. |
+| D5  | **Trigger:** the **first session of each calendar day in that world**, meaning no `progress.history` entry for that world is dated today (§ 7.3). Daily play gets it every day.                                                                                                                                                                                                                                                                                                                                    |
+| D6  | **Problems are canon blocks.** Core picks `(step, problem 1–8)` references, and the server copies those blocks out of the canon files **with their own baked audio**. There is no planner call, no TTS and no credits.                                                                                                                                                                                                                                                                                             |
+| D7  | **A review appends no `progress.history` entry.** No rule can then count it toward a good day (§ 7.6).                                                                                                                                                                                                                                                                                                                                                                                                             |
+| D8  | **There are two new Lily lines, both approved as written by Thomas on 2026-10-14.** Everything else reuses approved lines (§ 4).                                                                                                                                                                                                                                                                                                                                                                                   |
 
-**Dormant for the default profile:** with Marian's defaults, the only mastered steps are the baseline steps. So both changes stay off until she masters `add-to-10` (Number Garden) or `letter-sounds` (Word Song). QA uses `qaStep` (§ 9).
+**With the default profile:** the math warm-up is live from her second day of Number Garden, once the Leitner box holds due facts that a canon block can serve. The review (both worlds) and the Word Song warm-up stay off until she masters a step beyond the baseline: `add-to-10` for the math review, `letter-sounds` for Word Song. QA uses `qaStep` (§ 9).
 
 ## 2. Which session runs
 
@@ -45,7 +46,7 @@ if isReviewSession(progress, world, today):            // D1
 ```
 
 - `seed` = `readSessionHistory().sessionCount` at kick time. It rises every session, reviews included, so back-to-back reviews draw different blocks.
-- A review and a warm-up never meet. A review needs a good day today, so `daysAway` is −1 at that point, and a warm-up needs `daysAway ≥ 1`.
+- A review and a warm-up never meet. A review needs a good day today, so that world already has a history entry dated today, and a warm-up only runs when it has none.
 - **Complete world** (every step mastered): there is no sleeping flower, so behaviour is unchanged (the forward picker's last step, or the CVC review in `pickCvcReviewNode`).
 - **Parent switched `crossDayEnforcement` off:** nothing sleeps (`buildHubCardModel`), so reviews never run. Warm-ups still do.
 
@@ -83,7 +84,7 @@ Worst-case track width (all beads completed except the last one current, plus th
 
 ### 3.3 Review opener: the stage starts empty
 
-During the review opener (§ 4) the screen shows the HUD, Emma and the caption ribbon, but **no problem stage and no chips**. The equation, visual row, number strip, skip track, groups and chips in Math, and the card and chips in Word Song, mount at the opener's end and fade in (§ 5). This keeps a wrapped opener caption off problem 1 in every form. In phone landscape the arithmetic frame may fall back to a 1-line ribbon slot, and the opener will need 2 lines there. Estimated wraps at 22 pt: phone portrait about 3 lines in the ~231 pt inner ribbon (its `maxHeight` holds 4); phone landscape 2 lines; tablet 1–2 lines. These are estimates, and AC 15 checks them.
+During the review opener (§ 4) the screen shows the HUD, Emma and the caption ribbon, but **no problem stage and no chips**. The equation, visual row, number strip, skip track, groups and chips in Math, and the card and chips in Word Song, mount at the opener's end and fade in (§ 5). This keeps a wrapped opener caption off problem 1 in every form. In phone landscape the arithmetic frame may fall back to a 1-line ribbon slot, and the opener will need 2 lines there. Estimated wraps at 22 pt: phone portrait about 3 lines in the ~231 pt inner ribbon (its `maxHeight` holds 4); phone landscape 2 lines; tablet 1–2 lines. These are estimates, and AC 17 checks them.
 
 The warm-up line "Remember this one?" (18 characters) fits one line in every form, and **the stage stays visible** while it plays, because "this one" points at the problem on screen.
 
@@ -93,7 +94,7 @@ Today App sizes Math from the plan's **first** problem (`mathKind` = `mathState.
 
 ## 4. Copy / TTS script
 
-**New lines** (they go in `GUIDANCE_LINES`, `packages/core/src/emmasPath/guidanceLines.ts`, with new kinds `'session-review'` and `'session-warmup'`):
+**New lines**, text **approved as written by Thomas, 2026-10-14**. They go in `GUIDANCE_LINES` (`packages/core/src/emmasPath/guidanceLines.ts`) with new kinds `'session-review'` and `'session-warmup'`:
 
 | ID                     | Text                                                     | When                                                                                                                       |
 | ---------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
@@ -128,10 +129,10 @@ No other line is added. There is no transition line between the warm-up and prob
   - **Word Song review:** no +5 completion bonus. Word Song gives no stardust in-session (`WordSong.tsx` header), so a Word Song review earns none.
   - **Warm-up problems:** +1 stardust per right answer in Math. They never change the streak (`streakRef`), `totalCorrect` or the scored per-problem arrays.
 - **Review request fails** (network error, invalid response, or a `plan.id` that doesn't start with `review-`): there is no opener and no moon. The session runs the static plan for the current step, which is today's same-step practice, and records as a forward session.
-- **Warm-up blocks missing** (old server, a block that can't be served or parsed, a duplicate): the session starts at scored problem 1 with 0–1 hearts. The warm-up never delays the session beyond the forward plan's own readiness.
-- **Fallbacks (D1, D2):** with an empty pool, the replay is today's same-step practice (`'practice'` end). With no warm-up material, there are no hearts.
+- **Warm-up blocks missing** (old server, a block that can't be served or parsed, a fact or word the forward plan already has): the session starts at scored problem 1 with 0–1 hearts. The warm-up never delays the session beyond the forward plan's own readiness.
+- **Fallbacks (D1, D2, D4):** with an empty pool, the replay is today's same-step practice (`'practice'` end). With no warm-up material (math: no due fact a canon block can serve; Word Song: an empty pool), there are no hearts.
 - **First ever review / warm-up:** the same as every later one. No tutorial line, and the flow is predictable.
-- **Quit mid-session** (back): nothing is recorded, as today. A warm-up quit leaves the next session still "first of the day", so it warms up again.
+- **Quit mid-session** (back): nothing is recorded, as today. A session quit before its end writes no history, so the next one is still "first of the day" and warms up again.
 - **Midnight rollover during a review:** Session End computes the new day, so the `'practice'` branch no longer applies. She gets the not-yet end ("You practised hard! Good work!" and, once a day, "Play again to get today's flower."). That is correct, because a new flower can be earned.
 - **Transitions:** these are the existing Hub → session → Session End → Hub routes. A review can't trigger an unlock, so "All done" always goes to the Hub.
 
@@ -157,7 +158,7 @@ export function pickReviewBlocks(
   nowMs: number,
   seed: number,
 ): CanonBlockRef[]
-export function daysAway(p, world, today: string): number | null // § 7.3
+export function isFirstSessionToday(p, world, today: string): boolean // § 7.3
 export function pickWarmupBlocks(p, world, nowMs, today, seed): CanonBlockRef[] // 0..2
 export type SessionPlanKind =
   | { kind: 'review'; blocks: CanonBlockRef[] }
@@ -171,38 +172,42 @@ export function sessionPlanKind(p, world, nowMs, today, seed): SessionPlanKind
 
 Definitions:
 
-- `P = reviewPool(p, world)` and `S = reverse(P)`, so the most recently mastered step comes first. `R = P[P.length − 1]` is the most recently mastered step. Mastery follows tree order, and the current step is the first one not mastered.
+- `P = reviewPool(p, world)` and `S = reverse(P)`, so the most recently mastered step comes first. `R = P[P.length − 1]` is the most recently mastered step. `C = currentStepOf(p, world)`. Mastery follows tree order, and the current step is the first one not mastered.
 - `rot(seed) = [((seed + i) % 8) + 1 for i = 0..7]`.
 - `overdueMs(item) = nowMs − item.lastSeen − LEITNER_REVIEW_INTERVAL_DAYS[item.box] × 86 400 000`. An item is due when this is ≥ 0, the same rule as `dueLeitnerItems`. **Rank** = `overdueMs` descending, then box ascending, then the key `${a}${op}${b}` ascending.
-- `blockFor(fact)` = for the first step in `S` whose `CANON_MATH_FACTS[step]` contains `fact` at index j: `{ node: step, problem: j + 1 }`. If no step has it, `null`.
+- `blockFor(fact, steps)` = for the first step in `steps` whose `CANON_MATH_FACTS[step]` contains `fact` at index j: `{ node: step, problem: j + 1 }`. If no step has it, `null`. The review searches `S`; the math warm-up searches `[C, ...S]`.
 
 **`pickReviewBlocks`** returns 8 refs, or `[]` when `P` is empty:
 
-1. **Math only, due facts first:** take the box's **due** items in rank order, map each through `blockFor`, and keep up to `LEITNER_DUE_PER_SESSION_CAP` (3) distinct facts.
+1. **Math only, due facts first:** take the box's **due** items in rank order, map each through `blockFor(fact, S)`, and keep up to `LEITNER_DUE_PER_SESSION_CAP` (3) distinct facts.
 2. **Fill:** go round-robin over `S`. Each step offers its next index from `rot(seed)`. Skip a ref that is already picked, or (Math) one whose fact equals a picked fact. Stop at 8. A step that runs out drops out.
 3. **Order:** group the picks by step, with due picks first inside each group, then emit by cycling `S`, one from each non-empty group per cycle. With 2 or more steps, adjacent problems come from different steps whenever possible. With one step, all 8 come from it, which is still a review of an older step.
 
-**`pickWarmupBlocks`** returns 0–2 refs. It returns `[]` unless `daysAway ≥ 1` and `P` is non-empty (D4, D5):
+**`pickWarmupBlocks`** returns 0–2 refs. It returns `[]` unless `isFirstSessionToday(p, world, today)` (D4, D5):
 
-- **Math:** take **all** box items in rank order ("most overdue", so not-yet-due items count when there are fewer than 2 due). Map each through `blockFor` and take the first 2 distinct. Fill any shortfall from `R` in `rot(seed)` order, skipping duplicates.
-- **Word Song:** the first 2 of `rot(seed)` from `R`.
+- **Math:** take the box's **due** items in rank order, map each through `blockFor(fact, [C, ...S])`, and keep the first 2 distinct facts. There is no fill. Not-yet-due facts are never used, so the Leitner spacing holds, and fewer than 2 servable due facts means fewer hearts. `P` may be empty.
+- **Word Song:** `[]` when `P` is empty. Otherwise the first 2 of `rot(seed)` from `R`, never `C`.
 
-Example: `P = [add-to-10, add-to-20]`, seed 5, nothing due. `S = [add-to-20, add-to-10]` and `rot(5) = [6,7,8,1,2,3,4,5]`. The review is add-to-20 #6, add-to-10 #6, add-to-20 #7, add-to-10 #7, add-to-20 #8, add-to-10 #8, add-to-20 #1, add-to-10 #1, with any add-to-10 block whose fact add-to-20 already supplied skipped.
+Review example: `P = [add-to-10, add-to-20]`, seed 5, nothing due. `S = [add-to-20, add-to-10]` and `rot(5) = [6,7,8,1,2,3,4,5]`. The review is add-to-20 #6, add-to-10 #6, add-to-20 #7, add-to-10 #7, add-to-20 #8, add-to-10 #8, add-to-20 #1, add-to-10 #1, with any add-to-10 block whose fact add-to-20 already supplied skipped.
 
-### 7.3 Days away
+Warm-up example (defaults, `C = add-to-10`, `P = []`): Tuesday 08:00. The box holds `3+2` box 1 (seen Monday 18:00), `4+5` box 1 (Monday 18:05) and `2+4` box 2 (Monday 17:00). Box 2's interval is 24 h of elapsed time, so after only 15 h `2+4` is **not** due. The warm-up is `3+2` (add-to-10 #3) and `4+5` (add-to-10 #8), the two facts in that canon plan's problem 3 (`math.p3.read`, "Three plus two. How many?") and problem 8 (`math.p8.read`, "Four plus five. How many?").
+
+### 7.3 First session today
 
 ```
-lastDay  = max over progress.history entries whose skillFocus has a step of `world`
-           of localDayKey(entry.dateISO)          // the mastery rule's local-day key
-daysAway = lastDay === null ? null : diffDays(lastDay, today) − 1
-diffDays = (Date.UTC(today) − Date.UTC(lastDay)) / 86 400 000   // YYYY-MM-DD parsed as UTC dates
+isFirstSessionToday = !progress.history.some(entry =>
+    entry.skillFocus has a step of `world` &&
+    localDayKey(entry.dateISO) === today)          // the mastery rule's local-day key
 ```
 
-- Mon → Tue: 0, no warm-up. Mon → Wed: 1, warm-up. Played earlier today: −1, no warm-up.
+- Examples: Tuesday's first session warms up. A second Tuesday session, after a finished one, doesn't. Wednesday's first session warms up again.
 - `today` = `todayKey()` (`progress/clock`, which honours the debug day offset).
-- This is per world, because the gap that matters is since she last practised that material.
-- `null` (never played this world, or its last entry aged out of the 30-entry history) means no warm-up.
-- Reviews write no history (D7), but a review day always has that world's forward entry, so days away is unaffected.
+- This is per world: Number Garden and Word Song each get their own first session of the day.
+- Only today's entries are checked, so the 30-entry history cap can't hide a return.
+- The very first session in a world counts as first, but has no material: the box is empty, and the Word Song pool is empty with the defaults.
+- Reviews write no history (D7), but a review always follows that world's forward entry today, so it never makes a later session look like the first.
+
+The Hub's morning wake-up ("Your flower woke up!") and the warm-up are independent. The first comes from the flower record, the second from history.
 
 ### 7.4 Wire and server
 
@@ -229,8 +234,10 @@ diffDays = (Date.UTC(today) − Date.UTC(lastDay)) / 86 400 000   // YYYY-MM-DD 
 
 - **Review:** the snapshot is `kind: 'review'` only if `plan.id` starts with `review-` and the plan parses to 8 problems. Otherwise it is a failure (§ 6). There are no Leitner or slow-fact hints, so the 5 s hinted-request fallback never applies.
 - **Warm-up refs** ride on the forward request, including its hint-free 5 s fallback request.
-- **Warm-up parse:** new core functions `mathWarmupFromServer(plan)` / `wordSongWarmupFromServer(plan)` read `<ns>.w<N>.<slot>` with the `p` parsers' slot sets and per-problem builders. A block that fails to parse is dropped. Then drop any warm-up problem whose fact (Math) or target word (Word Song) equals one of the forward problems'.
-- **Forward Leitner hint on a math warm-up day:** remove the warm-up facts from the due box before `leitnerBoxForFocus`. Then call `buildLeitnerSessionHint(box, LEITNER_DUE_PER_SESSION_CAP − warmupFactCount)`. The session's overdue items stay ≤ 3.
+- **Warm-up parse:** new core functions `mathWarmupFromServer(plan)` / `wordSongWarmupFromServer(plan)` read `<ns>.w<N>.<slot>` with the `p` parsers' slot sets and per-problem builders. A block that fails to parse is dropped.
+- **No fact served twice:** after both settle, drop any warm-up problem whose fact (Math) or target word (Word Song) equals one of the forward problems'. So a fact gets at most one Leitner outcome per session.
+- **One shared cap of 3 overdue facts per session (Dave, confirmed 2026-10-14):** when math warm-up refs are sent, remove their facts from the due box before `leitnerBoxForFocus`. Then call `buildLeitnerSessionHint(box, LEITNER_DUE_PER_SESSION_CAP − warmupFactCount)`. That keeps the warm-up plus the planner hint at 3 or fewer, and the planner is never steered to a warm-up fact. Word Song's warm-up is just its own 2 items; it has no Leitner box.
+- **Predicted consequence (verify on device):** when the forward plan is the current step's canon plan, its 8 problems are exactly `CANON_MATH_FACTS[C]`. That happens when the adjusted hint is empty (2 due facts or fewer) or when the 5 s fallback fires. Current-step warm-up facts then always collide and are dropped by the no-repeat rule, and that session shows hearts only for facts served from a mastered step (§ 10, open item).
 - **Prefetch key:** `mode: 'review'` for a review, `` `${focusMode}+warmup` `` when the warm-up refs are non-empty.
 
 **Screens** (Math, and Word Song where it applies):
@@ -270,7 +277,7 @@ diffDays = (Date.UTC(today) − Date.UTC(lastDay)) / 86 400 000   // YYYY-MM-DD 
 
 ## 8. Assets required
 
-- **New:** the 2 Lily lines in § 4, rendered by `scripts/renderGuidanceLinesLily.ts` (ElevenLabs, 72 characters in total), exported with `npm run export-audio` in `mobile/` (it regenerates `audioRegistry.ts`), and added to the hardcoded guide list in `public/voice-qa.html`. Thomas ear-tests them there before the native build ships. Prediction for the soak: the opener renders at roughly 3.3–4.0 s, so the renderer's 3.5 s flag may fire.
+- **New:** the 2 Lily lines in § 4, rendered by `scripts/renderGuidanceLinesLily.ts` (ElevenLabs, 72 characters in total), exported with `npm run export-audio` in `mobile/` (it regenerates `audioRegistry.ts`), and added to the hardcoded guide list in `public/voice-qa.html`. Thomas approved the text on 2026-10-14. He still ear-tests the renders there before the native build ships. Prediction for the soak: the opener renders at roughly 3.3–4.0 s, so the renderer's 3.5 s flag may fire.
 - **Code-drawn:** the heart bead SVG (§ 3.2).
 - **Reused:** `MoonIcon`, all canon problem audio, the G2 practice-day end. No new Emma pose, background or SFX.
 
@@ -281,35 +288,44 @@ diffDays = (Date.UTC(today) − Date.UTC(lastDay)) / 86 400 000   // YYYY-MM-DD 
 1. `reviewBaseline()` equals the set of `'mastered'` steps in `defaultProgress()`. With defaults, `isReviewSession` is false for both worlds even after a good day today.
 2. `progressAtStep('sub-to-10')` plus one history entry today on `sub-to-10` at 7/8: `isReviewSession(…, 'math')` is true, and `pickReviewBlocks` returns 8 refs from {add-to-10, add-to-20} that alternate steps, with no two refs sharing a fact.
 3. The same doc with 5 due box items whose facts appear in `CANON_MATH_FACTS['add-to-10']`: the 3 highest-ranked are among the 8 refs. Step 1 (due first) contributes exactly 3, so a 4th or 5th due fact appears only if the step-2 fill reaches its block.
-4. `daysAway`: Mon → Tue = 0, Mon → Wed = 1, same day = −1, no entry in the world = null. A warm-up is returned only for ≥ 1.
-5. `pickWarmupBlocks` never returns a ref whose node is the current step, a baseline step, or more than 2 refs. Word Song refs all come from `R`.
-6. The `CANON_MATH_FACTS` drift test passes on `main`'s canon.
-7. `recordReviewOnSessionEnd` leaves `history`, `goodDays` and `skillLevels` byte-identical, updates `mathFactsLeitner` and `profile.lastPlayedISO`, and pushes to the cloud once.
+4. `isFirstSessionToday`: true with no entry for the world today, including when the only entries are from yesterday or the other world. False after a finished session in that world today. A review today doesn't change it.
+5. `pickWarmupBlocks` returns at most 2 refs, and `[]` when it isn't the first session today. **Math:** with the defaults (`C = add-to-10`, `P = []`) and the box from the § 7.2 warm-up example, it returns add-to-10 #3 and #8. A not-yet-due fact is never returned. **Word Song:** every ref comes from `R`, never `C` or a baseline step, and the result is `[]` when `P` is empty.
+6. **Shared cap:** on a math session with 2 warm-up refs, the forward Leitner hint holds at most 1 fact and contains neither warm-up fact. With 1 warm-up ref it holds at most 2.
+7. The `CANON_MATH_FACTS` drift test passes on `main`'s canon.
+8. `recordReviewOnSessionEnd` leaves `history`, `goodDays` and `skillLevels` byte-identical, updates `mathFactsLeitner` and `profile.lastPlayedISO`, and pushes to the cloud once.
 
 **Server (vitest):**
 
-8. A `review` request with 8 valid refs returns ids `math.p1–p8.*` whose texts and base64 equal the source canon blocks. It makes no Anthropic or TTS call and doesn't consume the rate limiter.
-9. A `review` request with 7 refs, or with `problem: 9`, returns 400 `invalid-request`.
-10. A forward request with `warmup` returns the normal forward plan plus `math.w1/w2.*`. A second identical forward request without `warmup` gets a response with no `w` ids (the cache was not polluted), and the module canon entry is unchanged.
+9. A `review` request with 8 valid refs returns ids `math.p1–p8.*` whose texts and base64 equal the source canon blocks. It makes no Anthropic or TTS call and doesn't consume the rate limiter.
+10. A `review` request with 7 refs, or with `problem: 9`, returns 400 `invalid-request`.
+11. A forward request with `warmup` returns the normal forward plan plus `math.w1/w2.*`. A second identical forward request without `warmup` gets a response with no `w` ids (the cache was not polluted), and the module canon entry is unchanged.
 
 **Native (jest):**
 
-11. Review: Math gets `review: true`, the HUD shows `math-review-moon`, the opener plays before problem 1's read, the stage mounts only after the opener, and the streak plays its chime but grants no stardust.
-12. Warm-up: 2 `math-warmup-dot-*` hearts precede 8 `math-problem-dot-*` beads. "Remember this one?" plays before each warm-up read and never before a scored read. `totalCorrect` and `perProblemCorrect` count only the 8 scored problems.
-13. A failed review request (or a response whose `plan.id` doesn't start with `review-`) runs the current step's static plan, with no opener and no moon, and records a forward history entry.
-14. Session End after a review: the panel `nativeID` starts with `practice:`, the tray shows the current step with today's slot `sleeping`, the only line is "You practised hard! Good work!", "All done" goes to the Hub, and no Word Song +5 is granted.
+12. Review: Math gets `review: true`, the HUD shows `math-review-moon`, the opener plays before problem 1's read, the stage mounts only after the opener, and the streak plays its chime but grants no stardust.
+13. Warm-up: 2 `math-warmup-dot-*` hearts precede 8 `math-problem-dot-*` beads. "Remember this one?" plays before each warm-up read and never before a scored read. `totalCorrect` and `perProblemCorrect` count only the 8 scored problems.
+14. No repeat: given a forward plan that contains one warm-up fact, that warm-up problem is dropped (1 heart), and the session-end Leitner outcomes contain that fact once.
+15. A failed review request (or a response whose `plan.id` doesn't start with `review-`) runs the current step's static plan, with no opener and no moon, and records a forward history entry.
+16. Session End after a review: the panel `nativeID` starts with `practice:`, the tray shows the current step with today's slot `sleeping`, the only line is "You practised hard! Good work!", "All done" goes to the Hub, and no Word Song +5 is granted.
 
 **Device (Expo Go, `EXPO_PUBLIC_QA_STEP=sub-to-10`, then `cvc-words-short-o`; `EXPO_PUBLIC_DAY_OFFSET` steps days):**
 
-15. At 375×667 portrait, 667×375 landscape and on a tablet, the opener caption is never clipped and never overlaps the equation or the chips. The warm-up track and the status cluster don't overlap in phone landscape on a skip-count or multiply problem.
-16. Play one forward session at ≥ 7/8, then tap the same card. A review starts, its 8 problems mix steps, and each one draws its own kind of visual and chips.
-17. Phone landscape review: when the frame switches between arithmetic and multiply, Emma springs to her new frame and the chips sit in the right frame. No chip is ever tappable during the opener.
-18. Word Song review (`cvc-words-short-o` jump): problems from letter-sounds, blending-cv and cvc-words appear in one session, each drawn with its own card and chips.
-19. Day offset +2 after a session: the first session in that world shows 2 hearts and "Remember this one?" twice, and a second session that day shows none.
-20. With Reduce Motion on, the stage appears at the opener's end without a fade.
+17. At 375×667 portrait, 667×375 landscape and on a tablet, the opener caption is never clipped and never overlaps the equation or the chips. The warm-up track and the status cluster don't overlap in phone landscape on a skip-count or multiply problem.
+18. Play one forward session at ≥ 7/8, then tap the same card. A review starts, its 8 problems mix steps, and each one draws its own kind of visual and chips.
+19. Phone landscape review: when the frame switches between arithmetic and multiply, Emma springs to her new frame and the chips sit in the right frame. No chip is ever tappable during the opener.
+20. Word Song review (`cvc-words-short-o` jump): problems from letter-sounds, blending-cv and cvc-words appear in one session, each drawn with its own card and chips.
+21. Word Song warm-up (`cvc-words-short-o` jump): play one session, then set day offset +1. The first Word Song session shows 2 hearts with cvc-words items and "Remember this one?" twice, and a second session that day shows none.
+22. Math warm-up (`sub-to-10` jump): play one session and miss at least 3 problems on the first tap, so their facts sit in box 1. Set day offset +1. Number Garden must be the glowing card; if Word Song glows, first finish one Word Song session at ≥ 7/8 so that its flower sleeps. Wait ≥ 10 s on the Hub so the hinted request is prefetched. The first Number Garden session then shows 1–2 hearts for the missed sub-to-10 facts, and the scored 8 don't repeat them.
+23. With Reduce Motion on, the stage appears at the opener's end without a fade.
 
-## 10. Open questions (Dave / Thomas, via Matt)
+## 10. Resolved and open
 
-1. **"Never the current step" in math (D4):** I applied the brief's rule to both worlds. The consequence is that a math warm-up is dormant until a non-baseline math step is mastered. The other reading allows current-step overdue facts, which would make the warm-up live now, with the first 2 problems absorbing the post-gap rustiness. Dave to confirm.
-2. **"Days away" (D5):** I read it as a missed calendar day, so daily play never triggers a warm-up. The other reading ("any new day") makes every first session of the day 10 problems. Dave to confirm.
-3. **"At most 3 items" (§ 7.4):** I read it as Dave's per-session overdue cap, which now includes the warm-up's facts, so the forward Leitner hint drops to 1 fact on a math warm-up day. Dave to confirm.
+**Resolved by Dave, 2026-10-14 (relayed by Matt):**
+
+1. **The math warm-up may use overdue facts from the current step** (D4, § 7.2). "Never the current step" was meant for Word Song only, where the current step is the session's own content, and Word Song keeps it.
+2. **The trigger is the first session of each calendar day in the world**, not only after a missed day (D5, § 7.3).
+3. **There is one shared cap of 3 overdue Leitner facts per session, the warm-up included** (§ 7.4). Word Song's warm-up is just its own 2 items.
+
+**Approved by Thomas, 2026-10-14:** both new lines as written (§ 4).
+
+**Open (Dave):** the predicted consequence in § 7.4. When the forward session is the current step's canon plan (2 due facts or fewer, or the 5 s fallback fired), the no-repeat rule drops every current-step warm-up fact. This spec keeps the no-repeat rule. The other option is to allow the repeat and count that fact's Leitner outcome once, from the warm-up.
