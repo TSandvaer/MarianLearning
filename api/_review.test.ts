@@ -1,0 +1,334 @@
+/**
+ * @vitest-environment node
+ *
+ * The review and warm-up branches of /api/claude session-start (native spec
+ * `design/native/review-mode-and-warmup-native.md` § 7.4, AC 9–11), over
+ * the committed canon in public/canon/.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('./_session.js', () => ({
+  renderSessionAudio: vi.fn(),
+  EMMA_VOICE_CONFIG: {
+    voice: 'en-GB-OliviaNeural',
+    rate: '-10%',
+    pitch: '+0Hz',
+    volume: '+0%',
+  },
+  extractUtteranceTexts: vi.fn(),
+}))
+
+import { handler } from './claude.js'
+import { renderSessionAudio } from './_session.js'
+import { getCanonEntry } from './_canon.js'
+import { createRateLimiter, type RateLimiter } from './_rateLimit.js'
+import { createSessionCache } from './_sessionCache.js'
+import type { PlannerAnthropicClient } from './_planner.js'
+import type { SessionStartResponse } from './_types.js'
+
+const mockedRender = vi.mocked(renderSessionAudio)
+
+interface Line {
+  id: string
+  text: string
+}
+
+function anthropicSpy(): PlannerAnthropicClient {
+  return {
+    messages: {
+      create: vi.fn(async () => ({
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              id: 'live-sub-to-10',
+              label: 'Live',
+              utterances: [
+                {
+                  id: 'math.p1.read',
+                  text: 'Five minus two. How many are left?',
+                },
+              ],
+            }),
+          },
+        ],
+      })),
+    },
+  }
+}
+
+function limiterSpy(): RateLimiter & { check: ReturnType<typeof vi.fn> } {
+  const real = createRateLimiter({ limit: 6, windowMs: 60_000 })
+  return { check: vi.fn((key: string, now: number) => real.check(key, now)) }
+}
+
+function request(payload: unknown): Request {
+  return new Request('https://example.test/api/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'session-start', payload }),
+  })
+}
+
+const canon = (focusNode: string) =>
+  getCanonEntry({ track: 'math', level: 1, focusNode })!
+
+const planLines = (r: SessionStartResponse) =>
+  (r.plan as { utterances: Line[] }).utterances
+
+/** A canon block's lines (plan + audio), keyed by slot. */
+function block(focusNode: string, problem: number) {
+  const entry = canon(focusNode)
+  const prefix = `math.p${problem}.`
+  const slot = (id: string) => id.slice(prefix.length)
+  return {
+    plan: planLines(entry)
+      .filter((u) => u.id.startsWith(prefix))
+      .map((u) => [slot(u.id), u.text]),
+    audio: entry.utterances
+      .filter((u) => u.id.startsWith(prefix))
+      .map((u) => [slot(u.id), u.text, u.audio.base64]),
+  }
+}
+
+function blockOf(r: SessionStartResponse, id: string) {
+  const prefix = `math.${id}.`
+  const slot = (x: string) => x.slice(prefix.length)
+  return {
+    plan: planLines(r)
+      .filter((u) => u.id.startsWith(prefix))
+      .map((u) => [slot(u.id), u.text]),
+    audio: r.utterances
+      .filter((u) => u.id.startsWith(prefix))
+      .map((u) => [slot(u.id), u.text, u.audio.base64]),
+  }
+}
+
+const REVIEW_REFS = [
+  { node: 'add-to-20', problem: 6 },
+  { node: 'add-to-10', problem: 6 },
+  { node: 'add-to-20', problem: 7 },
+  { node: 'add-to-10', problem: 7 },
+  { node: 'add-to-20', problem: 8 },
+  { node: 'add-to-10', problem: 8 },
+  { node: 'add-to-20', problem: 1 },
+  { node: 'add-to-10', problem: 1 },
+]
+
+const base = { track: 'math', level: 1, childName: 'Marian' }
+
+beforeEach(() => {
+  process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
+  mockedRender.mockReset()
+})
+afterEach(() => {
+  delete process.env.ANTHROPIC_API_KEY
+})
+
+describe('review (payload.review)', () => {
+  it('AC9: 8 refs → math.p1–p8 copied from the source canon blocks; no Anthropic, no TTS, no limiter', async () => {
+    const anthropicClient = anthropicSpy()
+    const rateLimiter = limiterSpy()
+    const res = await handler(
+      request({
+        ...base,
+        // Every other hint is ignored.
+        progress: {
+          focusNode: 'sub-to-10',
+          leitner: [{ a: 1, b: 2, op: '+', box: 1 }],
+        },
+        review: { blocks: REVIEW_REFS },
+      }),
+      {
+        anthropicClient,
+        rateLimiter,
+        sessionCache: createSessionCache({ ttlMs: 60_000 }),
+      },
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as SessionStartResponse
+    expect((body.plan as { id: string }).id).toBe('review-math')
+    expect((body.plan as { label: string }).label).toBe('Review')
+    REVIEW_REFS.forEach((ref, i) => {
+      const want = block(ref.node, ref.problem)
+      expect(want.plan.length).toBeGreaterThanOrEqual(5)
+      expect(blockOf(body, `p${i + 1}`)).toEqual(want)
+    })
+    const ids = new Set(body.utterances.map((u) => u.id))
+    expect([...ids].every((id) => /^math\.p[1-8]\./.test(id))).toBe(true)
+    expect(body.utterances).toHaveLength(
+      REVIEW_REFS.reduce(
+        (n, r) => n + block(r.node, r.problem).audio.length,
+        0,
+      ),
+    )
+    expect(anthropicClient.messages.create).not.toHaveBeenCalled()
+    expect(mockedRender).not.toHaveBeenCalled()
+    expect(rateLimiter.check).not.toHaveBeenCalled()
+  })
+
+  it('AC10: 7 refs, problem 9, or a step of the other track → 400 invalid-request', async () => {
+    for (const blocks of [
+      REVIEW_REFS.slice(0, 7),
+      [...REVIEW_REFS.slice(0, 7), { node: 'add-to-10', problem: 9 }],
+      [...REVIEW_REFS.slice(0, 7), { node: 'cvc-words', problem: 1 }],
+      [...REVIEW_REFS.slice(0, 7), { node: '../../etc', problem: 1 }],
+    ]) {
+      const res = await handler(request({ ...base, review: { blocks } }), {
+        anthropicClient: anthropicSpy(),
+      })
+      expect(res.status).toBe(400)
+      expect(await res.json()).toMatchObject({ error: 'invalid-request' })
+    }
+  })
+
+  it('a Word Song review copies word.p blocks', async () => {
+    const refs = Array.from({ length: 8 }, (_, i) => ({
+      node: i % 2 === 0 ? 'cvc-words' : 'blending-cv',
+      problem: (i % 8) + 1,
+    }))
+    const res = await handler(
+      request({
+        track: 'word-song',
+        level: 1,
+        childName: 'Marian',
+        review: { blocks: refs },
+      }),
+      { anthropicClient: anthropicSpy() },
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as SessionStartResponse
+    expect((body.plan as { id: string }).id).toBe('review-word-song')
+    expect(new Set(planLines(body).map((u) => u.id.split('.')[1]))).toEqual(
+      new Set(['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8']),
+    )
+  })
+})
+
+describe('warm-up (payload.warmup)', () => {
+  const WARMUP = {
+    blocks: [
+      { node: 'add-to-10', problem: 4 },
+      { node: 'add-to-10', problem: 3 },
+    ],
+  }
+
+  it('AC11: the canon forward plan plus math.w1/w2; the module canon entry is unchanged', async () => {
+    const entry = canon('sub-to-10')
+    const before = JSON.stringify(entry)
+    const res = await handler(
+      request({
+        ...base,
+        progress: { focusNode: 'sub-to-10' },
+        warmup: WARMUP,
+      }),
+      { anthropicClient: anthropicSpy() },
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as SessionStartResponse
+    // The forward response, untouched...
+    expect(planLines(body).filter((u) => !/^math\.w/.test(u.id))).toEqual(
+      planLines(entry),
+    )
+    expect(body.utterances.filter((u) => !/^math\.w/.test(u.id))).toEqual(
+      entry.utterances,
+    )
+    // ...plus the two blocks.
+    expect(blockOf(body, 'w1')).toEqual(block('add-to-10', 4))
+    expect(blockOf(body, 'w2')).toEqual(block('add-to-10', 3))
+    expect(JSON.stringify(canon('sub-to-10'))).toBe(before)
+
+    const again = await handler(
+      request({ ...base, progress: { focusNode: 'sub-to-10' } }),
+      { anthropicClient: anthropicSpy() },
+    )
+    const plain = (await again.json()) as SessionStartResponse
+    expect(plain.utterances.some((u) => /^math\.w/.test(u.id))).toBe(false)
+  })
+
+  it('AC11: a live (cache-missing) response gets the blocks, the session cache does not', async () => {
+    const sessionCache = createSessionCache({ ttlMs: 60_000 })
+    mockedRender.mockResolvedValue({
+      ok: true,
+      kind: 'session-start',
+      plan: {
+        id: 'live-sub-to-10',
+        label: 'Live',
+        utterances: [
+          { id: 'math.p1.read', text: 'Five minus two. How many are left?' },
+        ],
+      },
+      utterances: [
+        {
+          id: 'math.p1.read',
+          text: 'Five minus two. How many are left?',
+          audio: { kind: 'inline', base64: 'AAAA', mime: 'audio/mpeg' },
+        },
+      ],
+    })
+    // The forward step misses the canon; the warm-up step is served.
+    const resolver = (key: {
+      track: 'math' | 'word-song'
+      level: number
+      focusNode: string
+    }) => (key.focusNode === 'add-to-10' ? getCanonEntry(key) : null)
+    const payload = { ...base, progress: { focusNode: 'sub-to-10' } }
+    const first = await handler(request({ ...payload, warmup: WARMUP }), {
+      anthropicClient: anthropicSpy(),
+      sessionCache,
+      getCanonEntry: resolver,
+      now: () => 1000,
+    })
+    const live = (await first.json()) as SessionStartResponse
+    expect(blockOf(live, 'w1')).toEqual(block('add-to-10', 4))
+
+    const second = await handler(request(payload), {
+      anthropicClient: anthropicSpy(),
+      sessionCache,
+      getCanonEntry: resolver,
+      now: () => 2000,
+    })
+    const cached = (await second.json()) as SessionStartResponse
+    expect(mockedRender).toHaveBeenCalledTimes(1) // the second was a cache hit
+    expect(cached.utterances.map((u) => u.id)).toEqual(['math.p1.read'])
+  })
+
+  it('skips a ref it cannot serve (its w number stays unused); ignores a malformed warm-up', async () => {
+    const resolver = (key: {
+      track: 'math' | 'word-song'
+      level: number
+      focusNode: string
+    }) => (key.focusNode === 'add-to-20' ? null : getCanonEntry(key))
+    const res = await handler(
+      request({
+        ...base,
+        progress: { focusNode: 'sub-to-10' },
+        warmup: {
+          blocks: [
+            { node: 'add-to-20', problem: 1 },
+            { node: 'add-to-10', problem: 3 },
+          ],
+        },
+      }),
+      { anthropicClient: anthropicSpy(), getCanonEntry: resolver },
+    )
+    const body = (await res.json()) as SessionStartResponse
+    expect(blockOf(body, 'w1').plan).toEqual([])
+    expect(blockOf(body, 'w2')).toEqual(block('add-to-10', 3))
+
+    for (const warmup of [
+      { blocks: [] },
+      { blocks: [1, 2] },
+      { blocks: Array(4).fill({ node: 'add-to-10', problem: 1 }) },
+      'nope',
+    ]) {
+      const r = await handler(
+        request({ ...base, progress: { focusNode: 'sub-to-10' }, warmup }),
+        { anthropicClient: anthropicSpy() },
+      )
+      expect(r.status).toBe(200)
+      const b = (await r.json()) as SessionStartResponse
+      expect(b.utterances.some((u) => /^math\.w/.test(u.id))).toBe(false)
+    }
+  })
+})
