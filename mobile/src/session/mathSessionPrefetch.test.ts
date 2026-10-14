@@ -33,6 +33,7 @@ const ADD_10: MathProgressHints = {
   leitner: undefined,
   slowFacts: undefined,
   lifetimeFirstEncounters: ['add-to-10'],
+  planKind: { kind: 'forward', warmup: [] },
 }
 
 function fakeAudio(): LoadedSessionAudio & { unload: jest.Mock } {

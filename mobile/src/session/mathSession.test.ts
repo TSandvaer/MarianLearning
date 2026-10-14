@@ -30,6 +30,7 @@ const NO_HINTS: MathProgressHints = {
   leitner: undefined,
   slowFacts: undefined,
   lifetimeFirstEncounters: undefined,
+  planKind: { kind: 'forward', warmup: [] },
 }
 
 const HINTS: MathProgressHints = {
@@ -39,6 +40,7 @@ const HINTS: MathProgressHints = {
   leitner: [{ a: 3, b: 4, op: '+', box: 1 }],
   slowFacts: undefined,
   lifetimeFirstEncounters: ['add-to-10'],
+  planKind: { kind: 'forward', warmup: [] },
 }
 
 function fakeAudio(): LoadedSessionAudio & {
@@ -176,6 +178,9 @@ describe('the session start', () => {
       plan: null,
       playUtterance: null,
       audioReady: true,
+      review: false,
+      warmupCount: 0,
+      problemNodes: null,
     })
     expect(session.sessionFocus).toEqual({ node: 'add-to-10', mode: 'forward' })
   })
@@ -191,6 +196,9 @@ describe('the session start', () => {
       plan: null,
       playUtterance: null,
       audioReady: true,
+      review: false,
+      warmupCount: 0,
+      problemNodes: null,
     })
   })
 
@@ -217,6 +225,9 @@ describe('the session start', () => {
       plan: null,
       playUtterance: null,
       audioReady: false,
+      review: false,
+      warmupCount: 0,
+      problemNodes: null,
     })
   })
 

@@ -46,6 +46,7 @@ function hints(
     isGraduationSession: false,
     lifetimeFirstEncounters: [],
     letterSoundsVowelStates: undefined,
+    planKind: { kind: 'forward', warmup: [] },
     ...over,
   }
 }

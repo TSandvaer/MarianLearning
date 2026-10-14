@@ -37,6 +37,7 @@ const NO_HINTS: WordSongProgressHints = {
   isGraduationSession: undefined,
   lifetimeFirstEncounters: undefined,
   letterSoundsVowelStates: undefined,
+  planKind: { kind: 'forward', warmup: [] },
 }
 
 const GRADUATION: WordSongProgressHints = {
@@ -46,6 +47,7 @@ const GRADUATION: WordSongProgressHints = {
   isGraduationSession: true,
   lifetimeFirstEncounters: ['blending-cv'],
   letterSoundsVowelStates: undefined,
+  planKind: { kind: 'forward', warmup: [] },
 }
 
 function fakeAudio() {

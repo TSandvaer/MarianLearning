@@ -57,6 +57,14 @@
  * scaffold decisions, Word Song's fallback plan) sees the new step, as a
  * relaunch would. The launch reconcile is App's and does not run again.
  *
+ * Same-day review and daily warm-up (native spec
+ * `design/native/review-mode-and-warmup-native.md`): the session controllers
+ * pick them (core `sessionPlanKind`) and their snapshots say how the round
+ * is made up (`review`, `warmupCount`, `problemNodes`), which App hands to
+ * the screens and, at the end, to Session End's payload. Math reports the
+ * CURRENT problem's kind, so a mixed round's frame follows each problem
+ * (§ 3.4; only phone landscape differs).
+ *
  * `@marian/core` is wired to the device before this module loads
  * (`./platform/boot.ts`, imported first by `index.ts`).
  */
@@ -69,6 +77,7 @@ import {
   computeSuggestion,
   prefetchTrackFor,
 } from '@marian/core/hub/hubSuggestion'
+import type { ExtendedMathProblem } from '@marian/core/math/extendedProblems'
 import { pickStaticSessionPlan } from '@marian/core/math/sessionPlans'
 import { pickStaticWordSongPlan } from '@marian/core/wordSong/wordSessionPlans'
 import { loadProgress, type MasteryTrack } from '@marian/core/progress'
@@ -241,6 +250,10 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
     mathSession.getSnapshot,
   )
   const [mathPose, setMathPose] = useState<EmmaPose>('idle')
+  // The kind of the problem on screen (§ 3.4); `null` until Math reports.
+  const [mathProblemKind, setMathProblemKind] = useState<
+    ExtendedMathProblem['kind'] | null
+  >(null)
 
   // Word Song: session start, result handoff, Emma's pose (as Math's).
   const [wordSongFallbackPlan] = useState(() => pickStaticWordSongPlan())
@@ -274,6 +287,8 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
       if (from === 'session-end' || !MATH_AUDIO_ROUTES.has(next)) {
         mathSession.tearDown()
       }
+      // The next Math reports its own first problem.
+      if (from === 'math') setMathProblemKind(null)
       // Word Song's session likewise (a request in flight is aborted: it
       // must not outlive the screen).
       if (from === 'session-end' || !WORD_SONG_AUDIO_ROUTES.has(next)) {
@@ -341,11 +356,15 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
   // Web `handleMathComplete`.
   const onMathComplete = useCallback(
     (result: MathSessionResult) => {
+      const snapshot = mathSession.getSnapshot()
       setSessionEnd(
         mathSessionEndPayload(
           result,
-          mathSession.getSnapshot().plan ?? mathDefaults.plan,
+          snapshot.plan ?? mathDefaults.plan,
           mathSession.sessionFocus,
+          snapshot.plan !== null
+            ? { review: snapshot.review, warmupCount: snapshot.warmupCount }
+            : undefined,
         ),
       )
       setSessionEndPose('idle')
@@ -356,11 +375,15 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
   // Web `handleWordSongComplete`.
   const onWordSongComplete = useCallback(
     (result: WordSongSessionResult) => {
+      const snapshot = wordSongSession.getSnapshot()
       setSessionEnd(
         wordSongSessionEndPayload(
           result,
           wordSongSession.currentTargetVowel,
           wordSongSession.sessionFocus,
+          snapshot.plan !== null
+            ? { review: snapshot.review, warmupCount: snapshot.warmupCount }
+            : undefined,
         ),
       )
       setSessionEndPose('idle')
@@ -440,9 +463,11 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
   )
 
   const greet = route === 'greet' ? greetLayout(viewport) : null
-  // The server plan's kind picks the frame (number recognition, skip
-  // counting and multiplication; all 8 problems of a session share it).
-  const mathKind = mathState.plan?.problems[0]?.kind ?? 'arithmetic'
+  // The problem on screen picks the frame (number recognition, skip
+  // counting and multiplication). A forward session's 8 share one kind; a
+  // review or a warm-up may mix them, so Math reports each (§ 3.4).
+  const mathKind =
+    mathProblemKind ?? mathState.plan?.problems[0]?.kind ?? 'arithmetic'
   const math = route === 'math' ? extendedMathLayout(viewport, mathKind) : null
   const wordSong = route === 'literacy' ? wordSongLayout(viewport) : null
   // Session End needs a finished session; without one (the QA route, or
@@ -496,6 +521,10 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               }
               subitisingScaffoldActive={mathDefaults.scaffold.add}
               subitisingSubScaffoldActive={mathDefaults.scaffold.sub}
+              review={mathState.review}
+              warmupCount={mathState.warmupCount}
+              problemNodes={mathState.problemNodes ?? undefined}
+              onProblemKindChange={setMathProblemKind}
               onSessionComplete={onMathComplete}
               onRequestExit={onMathExit}
               onPoseChange={setMathPose}
@@ -511,6 +540,8 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               crossVowelMixing={wordSongState.crossVowel}
               digraphsThNodeLevel={wordSongState.thLevel}
               digraphsThFirstEncounter={wordSongState.thFirstEncounter}
+              review={wordSongState.review}
+              warmupCount={wordSongState.warmupCount}
               onSessionComplete={onWordSongComplete}
               onRequestExit={onWordSongExit}
               onPoseChange={setWordSongPose}

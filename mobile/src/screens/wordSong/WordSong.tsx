@@ -1078,7 +1078,7 @@ function StageLayer({
   if (!review) return <>{children}</>
   return (
     <Animated.View
-      testID="word-song-stage"
+      testID="word-song-review-stage"
       entering={
         reducedMotion
           ? undefined

@@ -34,13 +34,23 @@ beforeEach(() => {
 afterEach(() => setKeyValueStore(null))
 
 /** `node` as the current step, with these facts in the Leitner box, all
- *  due (never shown). */
+ *  due (never shown). A weak session on `node` today keeps the daily
+ *  warm-up (first session of the day) and the review (a good day today)
+ *  out of these cases: the warm-up's share of the cap has its own test
+ *  (`reviewSession.test.ts`). */
 function seed(
   node: SkillNode,
   facts: [number, number, MathFact['op'], LeitnerBoxIndex][],
 ) {
   saveProgress({
     ...progressAtStep(node),
+    history: [
+      {
+        dateISO: new Date().toISOString(),
+        skillFocus: [node],
+        successRate: 3 / 8,
+      },
+    ],
     mathFactsLeitner: {
       items: facts.map(([a, b, op, box]) => ({
         item: { a, b, op },
