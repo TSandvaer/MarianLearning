@@ -250,10 +250,18 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
     mathSession.getSnapshot,
   )
   const [mathPose, setMathPose] = useState<EmmaPose>('idle')
-  // The kind of the problem on screen (§ 3.4); `null` until Math reports.
-  const [mathProblemKind, setMathProblemKind] = useState<
-    ExtendedMathProblem['kind'] | null
-  >(null)
+  // The kind of the problem on screen (§ 3.4), with the server plan it was
+  // reported for: a report about an earlier plan is ignored, so the frame
+  // never lags a plan swap by a render. `null` until Math reports.
+  const [reportedKind, setReportedKind] = useState<{
+    plan: unknown
+    kind: ExtendedMathProblem['kind']
+  } | null>(null)
+  const onMathProblemKind = useCallback(
+    (kind: ExtendedMathProblem['kind']) =>
+      setReportedKind({ plan: mathSession.getSnapshot().plan, kind }),
+    [mathSession],
+  )
 
   // Word Song: session start, result handoff, Emma's pose (as Math's).
   const [wordSongFallbackPlan] = useState(() => pickStaticWordSongPlan())
@@ -288,7 +296,7 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
         mathSession.tearDown()
       }
       // The next Math reports its own first problem.
-      if (from === 'math') setMathProblemKind(null)
+      if (from === 'math') setReportedKind(null)
       // Word Song's session likewise (a request in flight is aborted: it
       // must not outlive the screen).
       if (from === 'session-end' || !WORD_SONG_AUDIO_ROUTES.has(next)) {
@@ -467,7 +475,9 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
   // counting and multiplication). A forward session's 8 share one kind; a
   // review or a warm-up may mix them, so Math reports each (§ 3.4).
   const mathKind =
-    mathProblemKind ?? mathState.plan?.problems[0]?.kind ?? 'arithmetic'
+    reportedKind !== null && reportedKind.plan === mathState.plan
+      ? reportedKind.kind
+      : (mathState.plan?.problems[0]?.kind ?? 'arithmetic')
   const math = route === 'math' ? extendedMathLayout(viewport, mathKind) : null
   const wordSong = route === 'literacy' ? wordSongLayout(viewport) : null
   // Session End needs a finished session; without one (the QA route, or
@@ -524,7 +534,7 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               review={mathState.review}
               warmupCount={mathState.warmupCount}
               problemNodes={mathState.problemNodes ?? undefined}
-              onProblemKindChange={setMathProblemKind}
+              onProblemKindChange={onMathProblemKind}
               onSessionComplete={onMathComplete}
               onRequestExit={onMathExit}
               onPoseChange={setMathPose}
