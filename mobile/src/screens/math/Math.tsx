@@ -395,6 +395,11 @@ export function MathScreen({
   const [hintStep, setHintStep] = useState<1 | 2 | 3 | null>(null)
   /** Hint 2 has ended: every plate not lit by a word yet lights. */
   const [hint2Done, setHint2Done] = useState(false)
+  /** Plates hint 2's words have lit so far. Only goes up within a problem:
+   *  a line that takes the ribbon mid-hint (her answer's "Yes!", a third
+   *  wrong's re-prompt) must not unlight them (spec § 3: after hint 2 the
+   *  tags stay). */
+  const [hint2Lit, setHint2Lit] = useState(0)
   const [shakingChip, setShakingChip] = useState<number | null>(null)
   const [captionText, setCaptionText] = useState('')
   const [captionRevealed, setCaptionRevealed] = useState(0)
@@ -509,7 +514,12 @@ export function MathScreen({
    * once if it fails. Never rejects.
    */
   const speak = useCallback(
-    async (text: string, isReadAloud = false): Promise<void> => {
+    async (
+      text: string,
+      isReadAloud = false,
+      /** Called with the count of words revealed so far, per word tick. */
+      onWords?: (revealed: number) => void,
+    ): Promise<void> => {
       setCaptionText(text)
       setCaptionRevealed(0)
       setCaptionVisible(false)
@@ -524,6 +534,7 @@ export function MathScreen({
         onWordTick: (i) => {
           if (unmountedRef.current) return
           setCaptionRevealed((prev) => Math.max(prev, i + 1))
+          onWords?.(i + 1)
         },
       }
       const myLine = ++lineGenerationRef.current
@@ -625,6 +636,7 @@ export function MathScreen({
       setHintBeat(null)
       setHintStep(null)
       setHint2Done(false)
+      setHint2Lit(0)
       if (hintTimerRef.current !== null) {
         clearTimeout(hintTimerRef.current)
         hintTimerRef.current = null
@@ -746,7 +758,25 @@ export function MathScreen({
       await speak(triple.hint1)
       if (!stillLive()) return
       if (extended) setHintStep(2)
-      await speak(triple.hint2)
+      // Multiplication: Emma's k-th spoken group size lights plate k (the
+      // same word ticks that drive the ribbon, so the silent walk lights
+      // them too). The count only goes up.
+      const lightPlates =
+        problem.kind === 'multiply'
+          ? (revealed: number) =>
+              setHint2Lit((lit) =>
+                Math.max(
+                  lit,
+                  countSpokenFactor(
+                    triple.hint2,
+                    revealed,
+                    problem.factorA,
+                    problem.factorB,
+                  ),
+                ),
+              )
+          : undefined
+      await speak(triple.hint2, false, lightPlates)
       if (!stillLive()) return
       if (extended) {
         setHint2Done(true)
@@ -1097,18 +1127,7 @@ export function MathScreen({
   const groupsDrawn =
     multiply !== null && groupsAreDrawn(multiply.factorA, multiply.factorB)
   const litCount =
-    multiply === null || hintStep === null || hintStep < 2
-      ? 0
-      : hint2Done
-        ? multiply.factorB
-        : captionText === multiply.utterances.hint2
-          ? countSpokenFactor(
-              captionText,
-              captionRevealed,
-              multiply.factorA,
-              multiply.factorB,
-            )
-          : 0
+    multiply === null ? 0 : hint2Done ? multiply.factorB : hint2Lit
   useEffect(() => {
     if (multiply === null || groupsDrawn) return
     recordAudio({

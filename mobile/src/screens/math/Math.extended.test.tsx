@@ -318,6 +318,29 @@ describe('multiplication', () => {
     expect(group('math-group-plus-2')).toBeTruthy()
   })
 
+  it.each([
+    ['a correct tap ("Yes! Six!")', 6, 'Yes! Six!'],
+    ['a third wrong tap ("Hmm... try again?")', 20, 'Hmm... try again?'],
+  ])(
+    'mult-3-4: tags lit by hint 2 stay when %s takes the caption mid-hint',
+    async (_label, chip, line) => {
+      const h = await setup(canon('mult-3-4'), { planFocusNode: 'mult-3-4' })
+      await twoWrongs(h, 0)
+      await say(h.voice.last()) // hint 1 ends; hint 2 starts
+      const hint2 = h.voice.last()
+      expect(hint2.text).toBe('Two, then two, then two.')
+      await say(hint2, { end: false, words: 3 }) // "Two, then two,"
+      expect(group('math-group-tag-1')).toBeTruthy()
+      await tap(chip)
+      expect(h.voice.last().text).toBe(line)
+      await say(h.voice.last(), { end: false })
+      expect(group('math-group-tag-0')).toBeTruthy()
+      expect(group('math-group-tag-1')).toBeTruthy()
+      expect(group('math-group-plus-1')).toBeTruthy()
+      expect(group('math-group-plate-1-lit')).toBeTruthy()
+    },
+  )
+
   it('mult-3-4 with silent captions: the caption walk lights the plates too', async () => {
     await setup(canon('mult-3-4'), { planFocusNode: 'mult-3-4', silent: true })
     const W = CAPTION_WALK_MS_PER_WORD
