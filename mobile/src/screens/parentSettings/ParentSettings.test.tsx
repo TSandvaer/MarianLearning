@@ -109,7 +109,7 @@ describe('rendering', () => {
     await mount()
     expect(
       screen.getAllByText(
-        "How many sessions at this success rate Marian needs before a skill counts as mastered. They don't have to be in a row.",
+        "How many sessions at this success rate Marian needs before a skill counts as mastered. They don't have to be in a row. Two days with every answer right on the first try also count.",
       ),
     ).toHaveLength(2)
     expect(screen.queryByText(/in-a-row sessions/)).toBeNull()

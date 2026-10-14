@@ -30,6 +30,8 @@ export interface SessionEndViewProps {
   flower: FlowerStage | null
   /** Today's flower is in its slot. */
   landed: boolean
+  /** Fast track: how many of `guidance.bonusSlots` have grown (§ 4.2). */
+  bonusLanded?: number
   flight: { x: number; y: number; scale: number } | null
   reducedMotion: boolean
   onAllDone: () => void
@@ -45,6 +47,7 @@ export function SessionEndView({
   showCta,
   flower,
   landed,
+  bonusLanded = 0,
   flight,
   reducedMotion,
   onAllDone,
@@ -52,8 +55,21 @@ export function SessionEndView({
 }: SessionEndViewProps) {
   const { panel, inner, button: b } = layout
   const flowerDay = g?.newSlot != null
+  const bonus = g?.bonusSlots ?? []
+  // Fast track (§ 4.2): once today's flower lands, slot i shows its after
+  // state when it is today's slot or one of the bonus slots grown so far.
   const slots: readonly FlowerSlot[] =
-    g === null ? [] : landed || !flowerDay ? g.slotsAfter : g.slotsBefore
+    g === null
+      ? []
+      : !flowerDay
+        ? g.slotsAfter
+        : !landed
+          ? g.slotsBefore
+          : g.slotsAfter.map((after, i) => {
+              const k = bonus.indexOf(i)
+              return k === -1 || k < bonusLanded ? after : g.slotsBefore[i]!
+            })
+  const allGrown = bonusLanded >= bonus.length
   const notYet = g?.day === 'not-yet'
   const k = layout.panelSlab / 14
 
@@ -99,12 +115,15 @@ export function SessionEndView({
               world={g.world}
               slots={slots}
               inner={inner}
-              popSlot={landed ? g.newSlot : null}
+              popSlots={
+                landed && g.newSlot !== null ? [g.newSlot, ...bonus] : []
+              }
               reducedMotion={reducedMotion}
             />
           </>
         )}
-        {landed && g?.countText != null && (
+        {/* Never over an empty hole: after the last bonus (§ 4.2). */}
+        {landed && allGrown && g?.countText != null && (
           <CountBadge
             text={g.countText}
             rect={inner.count.rect}
