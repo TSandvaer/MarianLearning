@@ -57,7 +57,7 @@ if isReviewSession(progress, world, today):            // D1
 ### 3.1 Hub, Map, Session End: no layout change
 
 - **Hub (all forms):** no change to the card, the glow or the lines. A sleeping card stays a full-size door. A tap starts a review (D1), or same-step practice as today. The prefetch for the suggested world (`null` → Word Song, `hub-native.md` § 5) asks for whatever `sessionPlanKind` returns.
-- **Map:** no change. The Map never starts a session, and its buds are binary (open per good day, `emmas-path-spec.md` §3.4). They don't show the sleeping state, and this spec leaves that as it is.
+- **Map:** no change. The Map never starts a session (it starts peeks since `fast-track-native.md` § 6, and a peek is not a session), and its buds are binary (open per good day, `emmas-path-spec.md` §3.4). They don't show the sleeping state, and this spec leaves that as it is.
 - **Session End after a review:** this is the existing `'practice'` day of `sessionEndGuidance`, laid out as today by `sessionEndLayout.ts` in all four forms. The panel shows the stars (`totalCorrect` of the review's 8), the **current step's** picture and its flower tray with today's flower **sleeping** (moon + z). There is no new flower and no count badge. Emma says one line, "You practised hard! Good work!". The only button is "All done", which goes to the Hub. The sleeping bud on the tray answers "where is my flower?" with the same picture the Hub uses.
 - **Session End after a warm-up session:** this is the normal forward end, scored on the 8 forward problems only. The warm-up is not mentioned.
 

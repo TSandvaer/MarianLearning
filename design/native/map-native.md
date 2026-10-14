@@ -153,7 +153,7 @@ iOS supports only `brightness` and `opacity` in RN's `filter` (hub-native § 4),
 - **Decision: the caption shows the whole line at once** (as the web map does), not the Hub's word walk. Map lines answer taps and are read at a glance. It enters with a fade and an 8 pt rise over 200 ms, keyed by line id, and keeps the last line until the next one.
 - **Taps:**
   - Open, mastered or current stop → `stopLine` (its name).
-  - Locked stop → `sfx-poof` at 0.45, one wiggle (rotate 0, −7, 7, −4, 0 over 500 ms), Emma's badge tilts (`attentive-pointing`, 1500 ms), and the requirement line.
+  - Locked stop → `sfx-poof` at 0.45, one wiggle (rotate 0, −7, 7, −4, 0 over 500 ms), Emma's badge tilts (`attentive-pointing`, 1500 ms), and the requirement line. **Superseded by `fast-track-native.md` § 6.1:** a locked stop, or any open stop after the current one, now starts a peek.
   - Gate → `gateLine`.
 
   Stops and gates have no press visual (web).
