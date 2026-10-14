@@ -97,3 +97,19 @@ export function localDateKey(date: Date): string {
 export function todayKey(): string {
   return localDateKey(now())
 }
+
+/**
+ * Calendar days from day key `from` to day key `to` (both `YYYY-MM-DD`):
+ * `1` from Monday to Tuesday, negative when `to` is earlier. The keys are
+ * read as UTC dates, so a DST change between them cannot make a day 23 or
+ * 25 hours long. `NaN` when a key does not parse.
+ */
+export function dayDiff(from: string, to: string): number {
+  return (utcDayMs(to) - utcDayMs(from)) / 86_400_000
+}
+
+function utcDayMs(key: string): number {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key)
+  if (m === null) return Number.NaN
+  return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+}

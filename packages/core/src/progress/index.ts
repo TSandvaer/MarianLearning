@@ -47,6 +47,7 @@ export {
   emptyLeitner,
   findItem,
   leitnerBoxForFocus,
+  leitnerOverdueDays,
   promote,
 } from './leitner'
 export type { LeitnerSessionHintItem } from './leitner'

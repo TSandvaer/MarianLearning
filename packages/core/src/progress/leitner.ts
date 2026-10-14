@@ -10,6 +10,7 @@
  */
 
 import { leitnerFactAllowedForFocus } from '../wire/leitnerFocus'
+import { dayDiff, localDateKey } from './clock'
 import type { LeitnerBox, LeitnerBoxIndex, LeitnerItem } from './types'
 
 /** Max box index. Mirrors the type union bound. */
@@ -112,9 +113,6 @@ export function emptyLeitner<T>(): LeitnerBox<T> {
 //   - box1 / box4 / box5 hold (research says they are correct as-is).
 // --------------------------------------------------------------------------
 
-/** Milliseconds in one calendar day. */
-const MS_PER_DAY = 86_400_000
-
 /**
  * Per-box review interval in calendar days, keyed by box index. Box 1 is
  * `0` so freshly-added (and freshly-demoted) facts — which carry
@@ -135,10 +133,35 @@ export const LEITNER_REVIEW_INTERVAL_DAYS: Readonly<
 }
 
 /**
+ * Local calendar days an item is past its review date at `now`: the days
+ * from `lastSeen`'s local day to `now`'s, minus its box's interval. The
+ * item is due when this is `>= 0`. Day keys are `localDateKey`'s, the
+ * good days' convention, so a box-2 fact promoted Monday evening is due
+ * all of Tuesday (Thomas, 2026-10-14; native spec
+ * `design/native/review-mode-and-warmup-native.md` § 7.7).
+ */
+export function leitnerOverdueDays<T>(
+  entry: LeitnerItem<T>,
+  now: number,
+  schedule: Readonly<
+    Record<LeitnerBoxIndex, number>
+  > = LEITNER_REVIEW_INTERVAL_DAYS,
+): number {
+  return (
+    dayDiff(
+      localDateKey(new Date(entry.lastSeen)),
+      localDateKey(new Date(now)),
+    ) - schedule[entry.box]
+  )
+}
+
+/**
  * Filter a Leitner box down to the items that are DUE for review at
- * `now`. An item is due when the time elapsed since `lastSeen` is at
- * least its box's review interval. Box-1 items (interval 0) are always
- * due; a freshly-promoted box-2 item is NOT due again until 1 day passes.
+ * `now`. An item is due once its box's review interval, counted in local
+ * calendar days, has passed since the day of `lastSeen`
+ * ({@link leitnerOverdueDays} `>= 0`). Box-1 items (interval 0) are due
+ * the same day; a box-2 item promoted on Monday is due on Tuesday, at any
+ * hour. `lastSeen: 0` (`addItem`) is always due.
  *
  * Pure: returns a new box; never mutates input. Item order is preserved,
  * so a downstream `buildLeitnerSessionHint` still sorts box-ascending
@@ -155,10 +178,9 @@ export function dueLeitnerItems<T>(
     Record<LeitnerBoxIndex, number>
   > = LEITNER_REVIEW_INTERVAL_DAYS,
 ): LeitnerBox<T> {
-  const items = box.items.filter((entry) => {
-    const intervalMs = schedule[entry.box] * MS_PER_DAY
-    return now - entry.lastSeen >= intervalMs
-  })
+  const items = box.items.filter(
+    (entry) => leitnerOverdueDays(entry, now, schedule) >= 0,
+  )
   return { items }
 }
 
