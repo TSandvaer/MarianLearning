@@ -9,6 +9,7 @@
  * double invocations.
  */
 
+import { leitnerFactAllowedForFocus } from '../wire/leitnerFocus'
 import type { LeitnerBox, LeitnerBoxIndex, LeitnerItem } from './types'
 
 /** Max box index. Mirrors the type union bound. */
@@ -221,36 +222,30 @@ export const LEITNER_HINT_MAX_ITEMS = 60
  */
 export const LEITNER_DUE_PER_SESSION_CAP = 3
 
-/** The math steps whose sessions practise multiplication (`op: '*'`) facts. */
-const MULTIPLICATION_FOCUS_NODES: ReadonlySet<string> = new Set([
-  'mult-2-5-10',
-  'mult-3-4',
-  'mult-6-9',
-])
-
 /**
  * The box narrowed to the facts a session on `focusNode` may be hinted
  * with: a multiplication fact (`op: '*'`) only on a multiplication step.
  * Addition and subtraction facts pass for every step, as before.
  *
- * Why: the native app records `*` facts for multiplication sessions
- * (native spec `math-skip-counting-multiplication-native.md` § 8), and the
- * planner's Leitner directive (`api/_planner.ts` `isLeitnerDirectiveActive`
- * / `buildLeitnerDirective`) runs for `add-to-10` and asks Haiku to use the
- * Box-1 facts it is sent, whatever their op. Without this filter, an
- * add-to-10 session for a child with due `2*3` could be planned with
- * "Two times three". Apply it BEFORE {@link buildLeitnerSessionHint}: the
- * per-session cap is 3, and a `*` fact must not take an addition fact's
- * slot.
+ * The rule is `wire/leitnerFocus.ts`'s, which the server applies to every
+ * request too (the frozen web sends the whole due box). Native applies it
+ * BEFORE {@link buildLeitnerSessionHint}: the per-session cap is 3, and a
+ * `*` fact must not take an addition fact's slot.
  */
 export function leitnerBoxForFocus<T extends { op: '+' | '-' | '*' }>(
   box: LeitnerBox<T>,
   focusNode: string | undefined,
 ): LeitnerBox<T> {
-  if (focusNode !== undefined && MULTIPLICATION_FOCUS_NODES.has(focusNode)) {
+  if (
+    box.items.every((e) => leitnerFactAllowedForFocus(e.item.op, focusNode))
+  ) {
     return box
   }
-  return { items: box.items.filter((entry) => entry.item.op !== '*') }
+  return {
+    items: box.items.filter((e) =>
+      leitnerFactAllowedForFocus(e.item.op, focusNode),
+    ),
+  }
 }
 
 /**

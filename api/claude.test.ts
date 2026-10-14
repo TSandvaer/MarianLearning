@@ -1543,6 +1543,99 @@ describe('M4 Leitner-hint payload (ticket 86c9pwgc8)', () => {
     expect(canonStub.mock.calls.length).toBeLessThanOrEqual(1)
   })
 
+  // Multiplication facts (op '*') belong only to a multiplication step
+  // (core wire/leitnerFocus.ts). The frozen web sends the whole due box,
+  // and a native multiplication session's facts can reach it through
+  // cloud sync, so the server filters every request.
+  it.each([
+    ['add-to-10', { focusNode: 'add-to-10' }],
+    ['no focus node (defaults to add-to-10)', {}],
+  ])(
+    '%s with a "*"-only leitner hint: the "*" facts are dropped, canon is served',
+    async (_label, focus) => {
+      const canonStub = vi.fn(() => CANON_FIXTURE)
+      const capture: { lastArgs?: unknown } = {}
+      const anthropicClient = makeStubAnthropicClient(
+        STUB_MATH_PLAN_BODY,
+        capture,
+      )
+
+      const res = await handler(
+        makeRequest({
+          kind: 'session-start',
+          payload: {
+            track: 'math',
+            level: 1,
+            childName: 'Marian',
+            progress: {
+              ...focus,
+              leitner: [
+                { a: 2, b: 3, op: '*', box: 1 },
+                { a: 3, b: 2, op: '*', box: 1 },
+              ],
+            },
+          },
+        }),
+        {
+          anthropicClient,
+          sessionCache,
+          rateLimiter,
+          now: nowFn,
+          getCanonEntry: canonStub,
+        },
+      )
+
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as { utterances: { text: string }[] }
+      expect(body.utterances[0]!.text).toContain('CANON')
+      // No live planner run: nothing could carry 2*3 into a directive.
+      expect(capture.lastArgs).toBeUndefined()
+      expect(canonStub).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('add-to-10 with a mixed leitner hint: the directive lists the "+" fact and no "*" fact', async () => {
+    const canonStub = vi.fn(() => CANON_FIXTURE)
+    const capture: { lastArgs?: unknown } = {}
+    const anthropicClient = makeStubAnthropicClient(
+      STUB_MATH_PLAN_BODY,
+      capture,
+    )
+
+    await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'add-to-10',
+            leitner: [
+              { a: 2, b: 3, op: '*', box: 1 },
+              { a: 6, b: 2, op: '*', box: 1 },
+              { a: 6, b: 4, op: '+', box: 2 },
+            ],
+          },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const content = args.messages[0]!.content
+    expect(content).toContain('LEITNER PRIORITY DIRECTIVE')
+    expect(content).toContain('Box 2: 6+4.')
+    expect(content.match(/\d+\*\d+/g)).toBeNull()
+    expect(content).not.toContain('Box 1:')
+  })
+
   const SLOW_FACT_ITEM = {
     fact: { a: 6, b: 4, op: '+' as const },
     attempts: 6,
