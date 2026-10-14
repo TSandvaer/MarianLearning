@@ -16,6 +16,7 @@ const RESULT: MathSessionResult = {
   subitisingScaffoldRendered: false,
   subitisingScaffoldSubRendered: false,
   perProblemAnswerValue: [5, 4, 7, 9, 3, 8, 6, 10],
+  warmupCorrect: [],
   perProblemDistractorClass: [
     null,
     null,

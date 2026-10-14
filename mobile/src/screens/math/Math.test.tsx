@@ -252,6 +252,7 @@ describe('the problem loop', () => {
       ],
       subitisingScaffoldRendered: false,
       subitisingScaffoldSubRendered: false,
+      warmupCorrect: [],
     })
     // Sparkle + plink on every right answer; the chime only at 3, 5, 8.
     expect(h.sfx.sparkle.play).toHaveBeenCalledTimes(8)

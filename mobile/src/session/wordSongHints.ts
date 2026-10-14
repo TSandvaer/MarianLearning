@@ -25,8 +25,14 @@ import {
   type SkillNode,
   type VowelSubMasteryState,
 } from '@marian/core/progress'
+import { localDateKey, now as progressNow } from '@marian/core/progress/clock'
+import {
+  sessionPlanKind,
+  type SessionPlanKind,
+} from '@marian/core/progress/reviewPlan'
 import { readSessionHistory } from '@marian/core/sessionEnd/sessionHistory'
 import type { PrefetchKey, SessionStartPayload } from '../audio'
+import { planKindFields, planModeOf } from './reviewSession'
 
 /** The progress hints the Word Song request carries. */
 export interface WordSongProgressHints {
@@ -38,6 +44,9 @@ export interface WordSongProgressHints {
   letterSoundsVowelStates:
     | Record<LetterSoundsVowel, VowelSubMasteryState>
     | undefined
+  /** Review, or forward with its warm-up refs (native spec
+   *  review-mode-and-warmup-native.md § 2, core `sessionPlanKind`). */
+  planKind: SessionPlanKind
 }
 
 const NO_HINTS: WordSongProgressHints = {
@@ -47,6 +56,7 @@ const NO_HINTS: WordSongProgressHints = {
   isGraduationSession: undefined,
   lifetimeFirstEncounters: undefined,
   letterSoundsVowelStates: undefined,
+  planKind: { kind: 'forward', warmup: [] },
 }
 
 /** Read the hints from the persisted progress, exactly as the web does. */
@@ -55,6 +65,7 @@ export function readWordSongProgressHints(): WordSongProgressHints {
   if (progress === null) return NO_HINTS
   const sessionCount = readSessionHistory().sessionCount
   const { node, mode } = pickFocusNode(progress, 'word-song', sessionCount)
+  const now = progressNow()
   return {
     focusNode: node,
     focusMode: mode,
@@ -69,11 +80,22 @@ export function readWordSongProgressHints(): WordSongProgressHints {
       node === 'letter-sounds'
         ? progress.literacy?.letterSoundsVowelStates
         : undefined,
+    planKind: sessionPlanKind(
+      progress,
+      'word-song',
+      now.getTime(),
+      localDateKey(now),
+      sessionCount,
+    ),
   }
 }
 
-/** The graduation probe and the vowel map bypass canon (live planner, slow). */
+/**
+ * The graduation probe and the vowel map bypass canon (live planner,
+ * slow). A review sends neither, so it never takes the 5 s fallback.
+ */
 export function hasCanonBypassingHints(hints: WordSongProgressHints): boolean {
+  if (hints.planKind.kind === 'review') return false
   return (
     hints.isGraduationSession === true ||
     hints.letterSoundsVowelStates !== undefined
@@ -82,9 +104,32 @@ export function hasCanonBypassingHints(hints: WordSongProgressHints): boolean {
 
 /**
  * The `session-start` payload (web `prepareWordSongPathA`). `withHints:
- * false` strips the canon-bypassing hints (the visible-wait fallback).
+ * false` strips the canon-bypassing hints (the visible-wait fallback); the
+ * warm-up refs ride on both. A review sends its 8 blocks and the focus node
+ * (the server ignores every other hint for it).
  */
 export function buildWordSongSessionPayload(
+  hints: WordSongProgressHints,
+  withHints: boolean,
+): SessionStartPayload {
+  if (hints.planKind.kind === 'review') {
+    return {
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      ...(hints.focusNode !== undefined
+        ? { progress: { focusNode: hints.focusNode } }
+        : {}),
+      ...planKindFields(hints.planKind),
+    }
+  }
+  return {
+    ...forwardPayload(hints, withHints),
+    ...planKindFields(hints.planKind),
+  }
+}
+
+function forwardPayload(
   hints: WordSongProgressHints,
   withHints: boolean,
 ): SessionStartPayload {
@@ -125,9 +170,12 @@ export function buildWordSongSessionPayload(
   }
 }
 
-/** A Word Song session's prefetch identity: its focus node and mode. */
+/**
+ * A Word Song session's prefetch identity: its focus node and mode
+ * (`review` for a review, `<mode>+warmup` with warm-up refs, § 7.4).
+ */
 export function wordSongPrefetchKey(hints: WordSongProgressHints): PrefetchKey {
-  return { track: 'word-song', node: hints.focusNode, mode: hints.focusMode }
+  return { track: 'word-song', node: hints.focusNode, mode: planModeOf(hints) }
 }
 
 /**
@@ -158,9 +206,13 @@ export function readWordSongSessionExtras(
 ): WordSongSessionExtras {
   const progress = loadProgress()
   if (progress === null) return NO_EXTRAS
+  // A review reads the extras as today with cross-vowel off (native spec
+  // review-mode-and-warmup-native.md § 7.4): its problems come from
+  // several steps, not from the CVC step the mixing is for.
   const eligible =
-    (hints.focusNode !== undefined && CVC_TIERS.has(hints.focusNode)) ||
-    hints.focusMode === 'cvc-review'
+    hints.planKind.kind !== 'review' &&
+    ((hints.focusNode !== undefined && CVC_TIERS.has(hints.focusNode)) ||
+      hints.focusMode === 'cvc-review')
   const thLevel = progress.skillLevels['digraphs-th-voiceless']
   const met = hints.lifetimeFirstEncounters ?? []
   return {

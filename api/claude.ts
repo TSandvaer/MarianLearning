@@ -101,6 +101,11 @@ import {
 } from './_sessionCache.js'
 import { getCanonEntry } from './_canon.js'
 import { applyFirstEncounterGate } from './_firstEncounterGate.js'
+import {
+  buildReviewResponse,
+  hasReviewRequest,
+  withWarmupBlocks,
+} from './_review.js'
 import { leitnerFactAllowedForFocus } from '../packages/core/src/wire/leitnerFocus.js'
 
 /**
@@ -803,6 +808,44 @@ export async function handler(
     // to Haiku + Azure on a miss.
     const trackPayload = withLeitnerForFocus(extractTrackPayload(body.payload))
     if (trackPayload !== null) {
+      const canonResolver = overrides.getCanonEntry ?? getCanonEntry
+      // Review (native spec review-mode-and-warmup-native.md § 7.4): step
+      // 0, before the canon lookup, the session cache and the rate limiter.
+      // Eight canon blocks copied with their baked audio; every other
+      // progress hint is ignored. Free: no Anthropic call, no TTS.
+      if (hasReviewRequest(body.payload)) {
+        const review = buildReviewResponse(
+          body.payload,
+          trackPayload.track,
+          canonResolver,
+        )
+        if (review === null) {
+          return jsonResponse(
+            {
+              error: 'invalid-request',
+              message: 'review must name 8 canon blocks of the track',
+            },
+            400,
+            headers,
+          )
+        }
+        return jsonResponse(review, 200, headers)
+      }
+      // Warm-up (§ 7.4): whichever branch answers the forward request, a
+      // `payload.warmup`'s canon blocks are appended to a copy of its
+      // response as `<ns>.w<i>.*`. The canon entry and the session cache
+      // never see them.
+      const serve = (response: SessionStartResponse) =>
+        jsonResponse(
+          withWarmupBlocks(
+            response,
+            body.payload,
+            trackPayload.track,
+            canonResolver,
+          ),
+          200,
+          headers,
+        )
       // Canon hit (ticket 86c9kwhbc, D — pre-baked session canon). We
       // pre-render every active (track, level, focusNode) combo at
       // build time as a static blob and ship it inside the function
@@ -832,7 +875,6 @@ export async function handler(
       // the planner weights box-1 facts toward problems 4-8. The
       // hint only ships when the box has at least one item, so the
       // empty-box first-session case still hits canon (free).
-      const canonResolver = overrides.getCanonEntry ?? getCanonEntry
       const hasLeitnerHint =
         trackPayload.leitner !== undefined && trackPayload.leitner.length > 0
       // Slow-fact-hint bypass (M4.x — follow-up to 86c9pwgc8). Same
@@ -911,7 +953,7 @@ export async function handler(
             focusNode: effectiveFocus,
             lifetimeFirstEncounters: trackPayload.lifetimeFirstEncounters,
           })
-          return jsonResponse(gated, 200, headers)
+          return serve(gated)
         }
       }
 
@@ -963,7 +1005,7 @@ export async function handler(
             focusNode: effectiveFocus,
             lifetimeFirstEncounters: trackPayload.lifetimeFirstEncounters,
           })
-          return jsonResponse(gated, 200, headers)
+          return serve(gated)
         }
       }
 
@@ -1101,7 +1143,7 @@ export async function handler(
           derivedTargetVowel !== null
             ? { ...gated, currentTargetVowel: derivedTargetVowel }
             : gated
-        return jsonResponse(withVowel, 200, headers)
+        return serve(withVowel)
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         const stack = err instanceof Error ? err.stack : undefined

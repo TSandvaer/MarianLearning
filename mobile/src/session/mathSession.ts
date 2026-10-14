@@ -31,10 +31,24 @@
  *   starts. The visible-wait timer still starts on Math, so Hub dwell
  *   never counts toward its 5 s budget.
  *
+ * - **Review and warm-up** (native spec
+ *   `design/native/review-mode-and-warmup-native.md` §§ 2, 7.4): the hints
+ *   carry core's `sessionPlanKind`. A review asks for 8 canon blocks
+ *   (`payload.review`; no hints, so no 5 s fallback) and is accepted only
+ *   when the plan id starts `review-` and the plan reads; anything else is a
+ *   failure (the static same-step plan, recorded as a forward session). A
+ *   warm-up's refs ride on the forward request (both of its requests), its
+ *   facts leave the Leitner hint (one shared cap of 3), and its blocks come
+ *   back as `math.w<i>.*`, parsed into the round ahead of the 8 scored
+ *   problems; a block that is missing or unreadable is dropped.
+ *
  * The Claude key never reaches the app: `/api/claude` is the Vercel
  * function. App subscribes with `useSyncExternalStore`.
  */
-import { mathSessionPlanFromServer } from '@marian/core/math/planFromServer'
+import {
+  mathSessionPlanFromServer,
+  mathWarmupFromServer,
+} from '@marian/core/math/planFromServer'
 import type { ExtendedMathSessionPlan } from '@marian/core/math/extendedProblems'
 import {
   createSubitisingRng,
@@ -45,10 +59,7 @@ import {
   shouldScaffoldThisSession,
 } from '@marian/core/math/subitisingScaffold'
 import {
-  buildLeitnerSessionHint,
   buildSlowFactSessionHint,
-  dueLeitnerItems,
-  leitnerBoxForFocus,
   loadProgress,
   pickFocusNode,
   pickRecentSuccessRate,
@@ -57,7 +68,13 @@ import {
   type SkillNode,
   type SlowFactHint,
 } from '@marian/core/progress'
-import { nowMs as progressNowMs } from '@marian/core/progress/clock'
+import { localDateKey, now as progressNow } from '@marian/core/progress/clock'
+import {
+  forwardLeitnerHint,
+  sessionPlanKind,
+  WARMUP_PROBLEMS,
+  type SessionPlanKind,
+} from '@marian/core/progress/reviewPlan'
 import { readSessionHistory } from '@marian/core/sessionEnd/sessionHistory'
 import {
   recordAudio,
@@ -68,6 +85,7 @@ import {
   type SessionStartPayload,
 } from '../audio'
 import type { PlayMathUtteranceFn } from '../screens/math/mathTypes'
+import { isReviewPlan, planKindFields, planModeOf } from './reviewSession'
 import {
   startSessionWithFallback,
   type SessionStartFallbackHandle,
@@ -81,7 +99,11 @@ export interface MathProgressHints {
   leitner: LeitnerSessionHintItem[] | undefined
   slowFacts: SlowFactHint[] | undefined
   lifetimeFirstEncounters: readonly string[] | undefined
+  /** Review, or forward with its warm-up refs (core `sessionPlanKind`). */
+  planKind: SessionPlanKind
 }
+
+const FORWARD: SessionPlanKind = { kind: 'forward', warmup: [] }
 
 /** Read the hints from the persisted progress, exactly as the web does. */
 export function readMathProgressHints(): MathProgressHints {
@@ -94,18 +116,28 @@ export function readMathProgressHints(): MathProgressHints {
       leitner: undefined,
       slowFacts: undefined,
       lifetimeFirstEncounters: undefined,
+      planKind: FORWARD,
     }
   }
   const sessionCount = readSessionHistory().sessionCount
   const { node, mode } = pickFocusNode(progress, 'math', sessionCount)
-  // Multiplication facts only reach a multiplication step's request
-  // (core `leitnerBoxForFocus`): the planner's add-to-10 Leitner directive
-  // would plan "Two times three" into an addition session.
-  const leitner = buildLeitnerSessionHint(
-    leitnerBoxForFocus(
-      dueLeitnerItems(progress.mathFactsLeitner, progressNowMs()),
-      node,
-    ),
+  const now = progressNow()
+  const planKind = sessionPlanKind(
+    progress,
+    'math',
+    now.getTime(),
+    localDateKey(now),
+    sessionCount,
+  )
+  // The due box without the warm-up's facts, then the multiplication rule
+  // (core `leitnerBoxForFocus`: the planner's add-to-10 Leitner directive
+  // would plan "Two times three" into an addition session), capped at 3
+  // minus the warm-up's facts (core `forwardLeitnerHint`, § 7.4).
+  const leitner = forwardLeitnerHint(
+    progress.mathFactsLeitner,
+    now.getTime(),
+    node,
+    planKind.kind === 'forward' ? planKind.warmup : [],
   )
   const slowFacts = buildSlowFactSessionHint(progress)
   return {
@@ -115,19 +147,47 @@ export function readMathProgressHints(): MathProgressHints {
     leitner: leitner.length > 0 ? leitner : undefined,
     slowFacts: slowFacts.length > 0 ? slowFacts : undefined,
     lifetimeFirstEncounters: progress.lifetimeFirstEncounters ?? [],
+    planKind,
   }
 }
 
-/** Leitner or slow-fact hints bypass canon (live planner, slow). */
+/**
+ * Leitner or slow-fact hints bypass canon (live planner, slow). A review
+ * sends neither, so it never takes the 5 s fallback.
+ */
 export function hasCanonBypassingHints(hints: MathProgressHints): boolean {
+  if (hints.planKind.kind === 'review') return false
   return (hints.leitner?.length ?? 0) > 0 || (hints.slowFacts?.length ?? 0) > 0
 }
 
 /**
  * The `session-start` payload (web `prepareMathPathA`). `withHints: false`
- * strips the canon-bypassing hints (the visible-wait fallback request).
+ * strips the canon-bypassing hints (the visible-wait fallback request); the
+ * warm-up refs ride on both. A review sends its 8 blocks and the focus node
+ * (the sweep reads it); the server ignores every other hint for it.
  */
 export function buildMathSessionPayload(
+  hints: MathProgressHints,
+  withHints: boolean,
+): SessionStartPayload {
+  if (hints.planKind.kind === 'review') {
+    return {
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      ...(hints.focusNode !== undefined
+        ? { progress: { focusNode: hints.focusNode } }
+        : {}),
+      ...planKindFields(hints.planKind),
+    }
+  }
+  return {
+    ...forwardPayload(hints, withHints),
+    ...planKindFields(hints.planKind),
+  }
+}
+
+function forwardPayload(
   hints: MathProgressHints,
   withHints: boolean,
 ): SessionStartPayload {
@@ -161,9 +221,63 @@ export function buildMathSessionPayload(
   return { track: 'math', level: 1, childName: 'Marian', ...progressBlock }
 }
 
-/** A Math session's prefetch identity: the focus node and mode it asks for. */
+/**
+ * A Math session's prefetch identity: the focus node and the mode it asks
+ * for (`review` for a review, `<mode>+warmup` with warm-up refs, § 7.4).
+ */
 export function mathPrefetchKey(hints: MathProgressHints): PrefetchKey {
-  return { track: 'math', node: hints.focusNode, mode: hints.focusMode }
+  return { track: 'math', node: hints.focusNode, mode: planModeOf(hints) }
+}
+
+/** The round a settled response gives: what Math plays, in order. */
+export interface MathRound {
+  /** The warm-up problems first, then the 8 scored ones. */
+  plan: ExtendedMathSessionPlan
+  review: boolean
+  /** The first `warmupCount` problems of `plan` are the warm-up (0–2). */
+  warmupCount: number
+  /** Each problem's source step; `null` = the session's focus step. */
+  problemNodes: readonly (SkillNode | null)[]
+}
+
+/**
+ * Read a settled response for the session the hints asked for. A review
+ * needs a `review-` plan id and 8 readable problems, else it throws (the
+ * caller's failure path). A forward plan reads as before, and the warm-up
+ * blocks that parse (`math.w<i>`, `i` = the ref's position) go in front.
+ */
+export function mathRoundFromServer(
+  serverPlan: unknown,
+  hints: Pick<MathProgressHints, 'planKind'>,
+): MathRound {
+  if (hints.planKind.kind === 'review') {
+    if (!isReviewPlan(serverPlan)) {
+      throw new Error('the review request was answered with a forward plan')
+    }
+    return {
+      plan: mathSessionPlanFromServer(serverPlan, { extendedKinds: true }),
+      review: true,
+      warmupCount: 0,
+      problemNodes: hints.planKind.blocks.map((b) => b.node),
+    }
+  }
+  const forward = mathSessionPlanFromServer(serverPlan, { extendedKinds: true })
+  const refs = hints.planKind.warmup
+  const warmup = mathWarmupFromServer(serverPlan)
+    .filter((w) => w.block >= 1 && w.block <= refs.length)
+    .slice(0, WARMUP_PROBLEMS)
+  return {
+    plan: {
+      ...forward,
+      problems: [...warmup.map((w) => w.problem), ...forward.problems],
+    },
+    review: false,
+    warmupCount: warmup.length,
+    problemNodes: [
+      ...warmup.map((w) => refs[w.block - 1]!.node),
+      ...forward.problems.map(() => null),
+    ],
+  }
 }
 
 /**
@@ -201,14 +315,21 @@ export function mathScaffoldDecisions(sessionStartISO: string): {
 }
 
 export interface MathSessionSnapshot {
-  /** The server plan; `null` until resolved, and on any failure. Read with
-   *  core's extended kinds (number recognition, skip counting,
-   *  multiplication), which only the native app opts in to. */
+  /** The server plan (warm-ups first); `null` until resolved, and on any
+   *  failure. Read with core's extended kinds (number recognition, skip
+   *  counting, multiplication), which only the native app opts in to. */
   plan: ExtendedMathSessionPlan | null
   /** The session audio's player; `null` = Math's silent caption walk. */
   playUtterance: PlayMathUtteranceFn | null
   /** The start settled (either way): Math may read problem 1 aloud. */
   audioReady: boolean
+  /** A same-day review (only once its plan settled). */
+  review: boolean
+  /** How many of `plan`'s first problems are the warm-up (0–2). */
+  warmupCount: number
+  /** Each problem's source step (`null` = the session focus); `null`
+   *  without a server plan. */
+  problemNodes: readonly (SkillNode | null)[] | null
 }
 
 export interface MathSessionFocus {
@@ -233,8 +354,7 @@ export interface MathSessionController {
   subscribe(listener: () => void): () => void
 }
 
-interface Loaded {
-  plan: ExtendedMathSessionPlan
+interface Loaded extends MathRound {
   audio: LoadedSessionAudio
 }
 
@@ -254,7 +374,13 @@ const IDLE: MathSessionSnapshot = {
   plan: null,
   playUtterance: null,
   audioReady: false,
+  review: false,
+  warmupCount: 0,
+  problemNodes: null,
 }
+
+/** Settled without a server plan: the static plan, silent captions. */
+const FAILED: MathSessionSnapshot = { ...IDLE, audioReady: true }
 
 export function createMathSessionController(
   deps: MathSessionDeps,
@@ -329,9 +455,7 @@ export function createMathSessionController(
           }))
         try {
           return {
-            plan: mathSessionPlanFromServer(prepared.plan, {
-              extendedKinds: true,
-            }),
+            ...mathRoundFromServer(prepared.plan, hints),
             audio: prepared.audio,
           }
         } catch (err) {
@@ -364,13 +488,16 @@ export function createMathSessionController(
           recordAudio({
             kind: 'note',
             label: 'math-session',
-            detail: `ready (${prepared.plan.id}${usedFallback ? ', hint-free fallback' : ''})`,
+            detail: `ready (${prepared.plan.id}${usedFallback ? ', hint-free fallback' : ''}${prepared.warmupCount > 0 ? `, ${prepared.warmupCount} warm-up` : ''})`,
           })
           publish({
             plan: prepared.plan,
             playUtterance: (text, opts) =>
               prepared.audio.playUtterance(text, opts),
             audioReady: true,
+            review: prepared.review,
+            warmupCount: prepared.warmupCount,
+            problemNodes: prepared.problemNodes,
           })
         },
         (err: unknown) => {
@@ -381,7 +508,7 @@ export function createMathSessionController(
             label: 'math-session',
             detail: `unavailable, silent fallback: ${err instanceof Error ? err.message : String(err)}`,
           })
-          publish({ plan: null, playUtterance: null, audioReady: true })
+          publish(FAILED)
         },
       )
     },

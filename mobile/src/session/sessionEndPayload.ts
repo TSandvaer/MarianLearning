@@ -4,6 +4,12 @@
  * native SessionEnd (`../screens/sessionEnd/`) receives exactly what the
  * web's does. Math and Word Song build it the way the web's
  * `handleMathComplete` / `handleWordSongComplete` do.
+ *
+ * Native additions (native spec `design/native/review-mode-and-warmup-native.md`
+ * § 7.4): `review` marks a same-day review, which Session End records with no
+ * history entry; `problemFacts` is a review's per-problem fact list (its
+ * steps mix, so some problems may have none); `warmupFacts` +
+ * `warmupCorrect` are a forward session's warm-up outcomes.
  */
 import type {
   ExtendedMathProblem,
@@ -36,9 +42,26 @@ export interface SessionEndPayload {
   perProblemDistractorClass?: readonly (MathOfferedClass | null)[]
   currentTargetVowel?: '/o/' | '/u/' | '/i/' | '/e/'
   sessionFocus?: { node: SkillNode; mode: FocusMode }
+  /** A same-day review (no history entry, no flower, no bonus). */
+  review?: true
+  /** A review's 8 problems' facts; `null` for a problem with none. */
+  problemFacts?: readonly (MathFact | null)[]
+  /** The warm-up problems' facts (math), in order. */
+  warmupFacts?: readonly (MathFact | null)[]
+  /** The warm-up problems' first-tap correctness, in order. */
+  warmupCorrect?: readonly boolean[]
 }
 
 type MathFact = { a: number; b: number; op: '+' | '-' | '*' }
+
+/** How the round on screen was made up (the session controller's snapshot). */
+export interface RoundShape {
+  review: boolean
+  /** The first `warmupCount` problems of the plan are the warm-up. */
+  warmupCount: number
+}
+
+const FORWARD_ROUND: RoundShape = { review: false, warmupCount: 0 }
 
 /** A problem's fact (native spec § 8): `a ± b` for arithmetic, `A * B` for
  *  multiplication (`2*3` and `3*2` are separate facts, as the canon reads
@@ -52,15 +75,16 @@ function problemFact(p: MathProblem | ExtendedMathProblem): MathFact | null {
   return null
 }
 
-/** The plan's facts, one per problem, or `undefined` when a problem has
+/** The problems' facts, one per problem, or `undefined` when a problem has
  *  none: `mathFacts` is zipped with `perProblemCorrect` by position for
  *  the Leitner box, so a fact list with holes cannot be sent. Every
- *  session is one step, so a plan is all-facts or no-facts. */
+ *  forward session is one step, so its 8 are all-facts or no-facts (a
+ *  review sends `problemFacts`, holes allowed, instead). */
 function planFacts(
-  plan: MathSessionPlan | ExtendedMathSessionPlan,
+  problems: readonly (MathProblem | ExtendedMathProblem)[],
 ): MathFact[] | undefined {
   const facts: MathFact[] = []
-  for (const p of plan.problems) {
+  for (const p of problems) {
     const fact = problemFact(p)
     if (fact === null) return undefined
     facts.push(fact)
@@ -79,8 +103,13 @@ export function mathSessionEndPayload(
   result: MathSessionResult,
   activePlan: MathSessionPlan | ExtendedMathSessionPlan | null,
   sessionFocus: { node: SkillNode; mode: FocusMode } | null,
+  round: RoundShape = FORWARD_ROUND,
 ): SessionEndPayload {
-  const mathFacts = activePlan ? planFacts(activePlan) : undefined
+  const problems: readonly (MathProblem | ExtendedMathProblem)[] =
+    activePlan?.problems ?? []
+  const warmup = problems.slice(0, round.warmupCount)
+  const scored = problems.slice(round.warmupCount)
+  const mathFacts = activePlan && !round.review ? planFacts(scored) : undefined
   return {
     totalCorrect: result.totalCorrect,
     totalStardust: result.totalStardust,
@@ -99,6 +128,15 @@ export function mathSessionEndPayload(
     perProblemAnswerValue: result.perProblemAnswerValue,
     perProblemDistractorClass: result.perProblemDistractorClass,
     ...(sessionFocus !== null ? { sessionFocus } : {}),
+    ...(round.review
+      ? { review: true as const, problemFacts: scored.map(problemFact) }
+      : {}),
+    ...(warmup.length > 0
+      ? {
+          warmupFacts: warmup.map(problemFact),
+          warmupCorrect: result.warmupCorrect.slice(0, warmup.length),
+        }
+      : {}),
   }
 }
 
@@ -112,6 +150,7 @@ export function wordSongSessionEndPayload(
   result: WordSongSessionResult,
   currentTargetVowel: '/o/' | '/u/' | '/i/' | '/e/' | null,
   sessionFocus: { node: SkillNode; mode: FocusMode } | null,
+  round: RoundShape = FORWARD_ROUND,
 ): SessionEndPayload {
   return {
     totalCorrect: result.totalCorrect,
@@ -124,5 +163,9 @@ export function wordSongSessionEndPayload(
     perProblemAnswerWord: result.perProblemAnswerWord,
     ...(currentTargetVowel !== null ? { currentTargetVowel } : {}),
     ...(sessionFocus !== null ? { sessionFocus } : {}),
+    ...(round.review ? { review: true as const } : {}),
+    ...(result.warmupCorrect.length > 0
+      ? { warmupCorrect: result.warmupCorrect }
+      : {}),
   }
 }

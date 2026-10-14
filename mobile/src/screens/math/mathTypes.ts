@@ -31,6 +31,12 @@ export interface MathSessionResult {
   perProblemAnswerValue: readonly (number | null)[]
   /** Per problem: the distractor class offered (`null` for P1–P3). */
   perProblemDistractorClass: readonly (MathOfferedClass | null)[]
+  /**
+   * First-tap correctness of the warm-up problems, in order (native spec
+   * review-mode-and-warmup-native.md § 7.4). Every per-problem array above
+   * covers the 8 scored problems only; `totalCorrect` and the streak too.
+   */
+  warmupCorrect: readonly boolean[]
 }
 
 export interface PlayMathUtteranceOptions {

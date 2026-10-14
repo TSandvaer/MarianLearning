@@ -77,3 +77,9 @@ export { useAudioEngine, configureAudioSession, AUDIO_MODE } from './lifecycle'
 export { isAudioMuted } from './mute'
 export { readAudioLog, recordAudio } from './audioLog'
 export type { AudioLogRow } from './audioLog'
+export {
+  sessionGuidePlayer,
+  SESSION_GUIDE_GAP_MS,
+  SESSION_GUIDE_MANIFEST,
+} from './sessionGuide'
+export type { SessionGuideLineId, SessionGuidePlayer } from './sessionGuide'

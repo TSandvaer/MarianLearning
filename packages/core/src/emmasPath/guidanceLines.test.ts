@@ -26,11 +26,13 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'end-not-yet-praise': 1,
       'end-not-yet-again': 1,
       'end-world-done': 1,
+      'session-review': 1,
+      'session-warmup': 1,
     })
-    expect(GUIDANCE_LINES).toHaveLength(19)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(19)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(19)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(19)
+    expect(GUIDANCE_LINES).toHaveLength(21)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(21)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(21)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(21)
   })
 
   it('bakes each world and count variant', () => {
@@ -64,6 +66,20 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     expect(guidanceLine('guide.end.right.7')?.src).toBe(
       '/assets/audio/path/guide-end-right-7.mp3',
     )
+    // The review opener and the warm-up line (native review / warm-up
+    // spec § 4, approved as written by Thomas 2026-10-14).
+    expect(guidanceLine('guide.session.review')?.text).toBe(
+      "Your flower is sleeping. Let's play the ones you know!",
+    )
+    expect(guidanceLine('guide.session.review')?.src).toBe(
+      '/assets/audio/path/guide-session-review.mp3',
+    )
+    expect(guidanceLine('guide.session.warmup')?.text).toBe(
+      'Remember this one?',
+    )
+    expect(guidanceLine('guide.session.warmup')?.src).toBe(
+      '/assets/audio/path/guide-session-warmup.mp3',
+    )
   })
 
   it('has a bundled MP3 for every line', () => {
@@ -75,7 +91,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(19)
+    ).toHaveLength(21)
   })
 
   it('repeats no Emma’s Path line', () => {

@@ -1,0 +1,376 @@
+/**
+ * The review / warm-up session starts and Session End's outcomes (native
+ * spec `design/native/review-mode-and-warmup-native.md` § 7.4–7.5, AC 6,
+ * 14, 15): what the request carries, how a response becomes the round, and
+ * the one Leitner outcome per fact. The progress clock is pinned with fake
+ * timers to Tuesday 2026-10-13 08:00 local; `startSession` is faked.
+ */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { setKeyValueStore } from '@marian/core'
+import { progressAtStep } from '@marian/core/debug/stepProgress'
+import {
+  defaultProgress,
+  saveProgress,
+  type Progress,
+  type SessionHistoryEntry,
+} from '@marian/core/progress'
+import { REPO_ROOT } from '../../test/webSource'
+import type { LoadedSessionAudio, PreparedSession } from '../audio'
+import type { MathSessionResult } from '../screens/math/mathTypes'
+import {
+  buildMathSessionPayload,
+  createMathSessionController,
+  hasCanonBypassingHints,
+  mathPrefetchKey,
+  mathRoundFromServer,
+  readMathProgressHints,
+} from './mathSession'
+import { mathSessionEndPayload } from './sessionEndPayload'
+import { forwardLeitnerOutcomes } from './sessionEndWrite'
+import {
+  buildWordSongSessionPayload,
+  readWordSongProgressHints,
+  readWordSongSessionExtras,
+} from './wordSongHints'
+
+interface Line {
+  id: string
+  text: string
+}
+interface Plan {
+  id: string
+  label: string
+  utterances: Line[]
+}
+
+const canonPlan = (track: string, file: string): Plan =>
+  (
+    JSON.parse(
+      readFileSync(
+        resolve(REPO_ROOT, 'public', 'canon', track, 'level-1', `${file}.json`),
+        'utf8',
+      ),
+    ) as { plan: Plan }
+  ).plan
+
+/** Canon block `problem` of `file`, renamed `math.<to>.*` (the server's copy). */
+function block(file: string, problem: number, to: string): Line[] {
+  const from = `math.p${problem}.`
+  return canonPlan('math', file)
+    .utterances.filter((u) => u.id.startsWith(from))
+    .map((u) => ({ ...u, id: `math.${to}.${u.id.slice(from.length)}` }))
+}
+
+const at = (day: number, h: number, m = 0) => new Date(2026, 9, day, h, m)
+const MON = 12
+const TUE = 13
+
+function entry(
+  node: Progress['history'][number]['skillFocus'][number],
+  when: Date,
+  correct: number,
+): SessionHistoryEntry {
+  return {
+    dateISO: when.toISOString(),
+    skillFocus: [node],
+    successRate: correct / 8,
+  }
+}
+
+beforeEach(() => {
+  jest.useFakeTimers({ now: at(TUE, 8) })
+  const map = new Map<string, string>()
+  setKeyValueStore({
+    getItem: (k) => map.get(k) ?? null,
+    setItem: (k, v) => {
+      map.set(k, v)
+    },
+    removeItem: (k) => {
+      map.delete(k)
+    },
+  })
+})
+afterEach(() => {
+  setKeyValueStore(null)
+  jest.useRealTimers()
+})
+
+/** The spec's § 7.2 warm-up example: defaults, Monday's session, Tuesday 08:00. */
+function seedWarmupExample() {
+  saveProgress({
+    ...defaultProgress(),
+    history: [entry('add-to-10', at(MON, 18, 10), 6)],
+    mathFactsLeitner: {
+      items: [
+        {
+          item: { a: 3, b: 2, op: '+' },
+          box: 1,
+          lastSeen: at(MON, 18).getTime(),
+        },
+        {
+          item: { a: 4, b: 5, op: '+' },
+          box: 1,
+          lastSeen: at(MON, 18, 5).getTime(),
+        },
+        {
+          item: { a: 2, b: 4, op: '+' },
+          box: 2,
+          lastSeen: at(MON, 17).getTime(),
+        },
+      ],
+    },
+  })
+}
+
+type Leitner = { a: number; b: number; op: string; box: number }[]
+const leitnerOf = (payload: unknown): Leitner =>
+  ((payload as { progress?: { leitner?: Leitner } }).progress?.leitner ??
+    []) as Leitner
+
+describe('warm-up request (§ 7.4, AC 6)', () => {
+  it('the refs ride on both requests; the Leitner hint keeps 1 fact, neither warm-up fact', () => {
+    seedWarmupExample()
+    const hints = readMathProgressHints()
+    expect(hints.planKind).toEqual({
+      kind: 'forward',
+      warmup: [
+        { node: 'add-to-10', problem: 4 },
+        { node: 'add-to-10', problem: 3 },
+      ],
+    })
+    const withHints = buildMathSessionPayload(hints, true)
+    const fallback = buildMathSessionPayload(hints, false)
+    for (const p of [withHints, fallback]) {
+      expect(p.warmup).toEqual({
+        blocks: [
+          { node: 'add-to-10', problem: 4 },
+          { node: 'add-to-10', problem: 3 },
+        ],
+      })
+      expect(p).not.toHaveProperty('review')
+    }
+    const leitner = leitnerOf(withHints)
+    expect(leitner).toHaveLength(1)
+    expect(leitner).toEqual([{ a: 4, b: 5, op: '+', box: 1 }])
+    expect(mathPrefetchKey(hints)).toEqual({
+      track: 'math',
+      node: 'add-to-10',
+      mode: 'forward+warmup',
+    })
+  })
+
+  it('a second session today sends no warm-up and the usual hint', () => {
+    seedWarmupExample()
+    saveProgress({
+      ...defaultProgress(),
+      history: [entry('add-to-10', at(TUE, 7), 6)],
+      mathFactsLeitner: {
+        items: [
+          { item: { a: 3, b: 2, op: '+' }, box: 1, lastSeen: 0 },
+          { item: { a: 4, b: 5, op: '+' }, box: 1, lastSeen: 0 },
+        ],
+      },
+    })
+    const payload = buildMathSessionPayload(readMathProgressHints(), true)
+    expect(payload).not.toHaveProperty('warmup')
+    expect(leitnerOf(payload)).toHaveLength(2)
+  })
+})
+
+describe('review request', () => {
+  const seedReview = () =>
+    saveProgress({
+      ...progressAtStep('sub-to-10'),
+      history: [entry('sub-to-10', at(TUE, 7), 7)],
+      mathFactsLeitner: {
+        items: [{ item: { a: 9, b: 2, op: '+' }, box: 1, lastSeen: 0 }],
+      },
+    })
+
+  it('8 blocks and the focus node; no Leitner, no fallback; key mode "review"', () => {
+    seedReview()
+    const hints = readMathProgressHints()
+    expect(hints.planKind.kind).toBe('review')
+    const payload = buildMathSessionPayload(hints, true)
+    expect(payload).toEqual({
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      progress: { focusNode: 'sub-to-10' },
+      review: {
+        blocks: hints.planKind.kind === 'review' ? hints.planKind.blocks : [],
+      },
+    })
+    expect((payload.review as { blocks: unknown[] }).blocks).toHaveLength(8)
+    expect(hasCanonBypassingHints(hints)).toBe(false)
+    expect(mathPrefetchKey(hints).mode).toBe('review')
+  })
+
+  it('AC15: a forward plan answering a review request is a failure: no plan, not a review', async () => {
+    seedReview()
+    const hints = readMathProgressHints()
+    const audio = { unload: jest.fn() } as unknown as LoadedSessionAudio
+    const start = jest.fn(
+      (): Promise<PreparedSession> =>
+        Promise.resolve({
+          sessionId: 'x',
+          track: 'math',
+          plan: canonPlan('math', 'sub-to-10'),
+          audio,
+          fetchMs: 1,
+        }),
+    )
+    const session = createMathSessionController({
+      start,
+      readHints: () => hints,
+      fallbackPlanId: () => 'static',
+      now: () => 1,
+    })
+    session.kick()
+    await jest.runAllTimersAsync()
+    expect(start).toHaveBeenCalledTimes(1)
+    expect(session.getSnapshot()).toMatchObject({
+      plan: null,
+      audioReady: true,
+      review: false,
+      warmupCount: 0,
+    })
+    expect(audio.unload).toHaveBeenCalledTimes(1)
+  })
+
+  it('a review plan reads as 8 problems with their source steps', () => {
+    const refs = [
+      { node: 'add-to-20' as const, problem: 6 },
+      { node: 'add-to-10' as const, problem: 6 },
+      { node: 'add-to-20' as const, problem: 7 },
+      { node: 'add-to-10' as const, problem: 7 },
+      { node: 'add-to-20' as const, problem: 8 },
+      { node: 'add-to-10' as const, problem: 8 },
+      { node: 'add-to-20' as const, problem: 1 },
+      { node: 'add-to-10' as const, problem: 1 },
+    ]
+    const plan: Plan = {
+      id: 'review-math',
+      label: 'Review',
+      utterances: refs.flatMap((r, i) => block(r.node, r.problem, `p${i + 1}`)),
+    }
+    const round = mathRoundFromServer(plan, {
+      planKind: { kind: 'review', blocks: refs },
+    })
+    expect(round.review).toBe(true)
+    expect(round.plan.problems).toHaveLength(8)
+    expect(round.problemNodes).toEqual(refs.map((r) => r.node))
+    expect(round.plan.problems[0]!.utterances.read).toBe(
+      block('add-to-20', 6, 'p1').find((u) => u.id === 'math.p1.read')!.text,
+    )
+  })
+})
+
+describe('warm-up round and its Leitner outcomes (AC 14)', () => {
+  const WARMUP = [
+    { node: 'add-to-10' as const, problem: 4 }, // 2+4
+    { node: 'add-to-10' as const, problem: 3 }, // 3+2
+  ]
+  const forward = canonPlan('math', 'add-to-10')
+  const response: Plan = {
+    ...forward,
+    utterances: [
+      ...forward.utterances,
+      ...block('add-to-10', 4, 'w1'),
+      ...block('add-to-10', 3, 'w2'),
+    ],
+  }
+
+  it('the repeats stay: 2 hearts + 8 scored, the warm-up blocks first', () => {
+    const round = mathRoundFromServer(response, {
+      planKind: { kind: 'forward', warmup: WARMUP },
+    })
+    expect(round.warmupCount).toBe(2)
+    expect(round.plan.problems).toHaveLength(10)
+    expect(round.problemNodes).toEqual([
+      'add-to-10',
+      'add-to-10',
+      ...Array(8).fill(null),
+    ])
+    expect(round.plan.problems[0]!.utterances.read).toBe(
+      'Two plus four. How many?',
+    )
+  })
+
+  it('each repeated fact gets exactly one outcome, the warm-up first tap, even when the scored repeat differs', () => {
+    const round = mathRoundFromServer(response, {
+      planKind: { kind: 'forward', warmup: WARMUP },
+    })
+    // Warm-up: 2+4 wrong first, 3+2 right. Scored (canon add-to-10, in
+    // order 1+2, 2+2, 3+2, 2+4, ...): all right, but the repeats differ.
+    const result: MathSessionResult = {
+      totalCorrect: 8,
+      totalStardust: 20,
+      finalStreak: 8,
+      earnedThisSession: 13,
+      perProblemCorrect: [true, true, false, true, true, true, true, true],
+      latencyMs: Array(8).fill(900),
+      subitisingScaffoldRendered: false,
+      subitisingScaffoldSubRendered: false,
+      perProblemAnswerValue: Array(8).fill(null),
+      perProblemDistractorClass: Array(8).fill(null),
+      warmupCorrect: [false, true],
+    }
+    const payload = mathSessionEndPayload(
+      result,
+      round.plan,
+      { node: 'add-to-10', mode: 'forward' },
+      { review: false, warmupCount: 2 },
+    )
+    expect(payload.mathFacts).toHaveLength(8)
+    expect(payload.warmupFacts).toEqual([
+      { a: 2, b: 4, op: '+' },
+      { a: 3, b: 2, op: '+' },
+    ])
+    expect(payload).not.toHaveProperty('review')
+    const outcomes = forwardLeitnerOutcomes(payload)!
+    expect(outcomes).toHaveLength(8)
+    const keys = outcomes.map((o) => `${o.fact.a}${o.fact.op}${o.fact.b}`)
+    expect(new Set(keys).size).toBe(8)
+    expect(keys.filter((k) => k === '2+4')).toHaveLength(1)
+    expect(keys.filter((k) => k === '3+2')).toHaveLength(1)
+    expect(
+      outcomes.find((o) => o.fact.a === 2 && o.fact.b === 4)!.correct,
+    ).toBe(false)
+    expect(
+      outcomes.find((o) => o.fact.a === 3 && o.fact.b === 2)!.correct,
+    ).toBe(true)
+    // Warm-up outcomes come first.
+    expect(keys.slice(0, 2)).toEqual(['2+4', '3+2'])
+  })
+})
+
+describe('Word Song review / warm-up requests', () => {
+  it('a review: 8 blocks, cross-vowel off; a first session: 2 warm-up refs from cvc-words', () => {
+    saveProgress({
+      ...progressAtStep('cvc-words-short-o'),
+      history: [entry('cvc-words-short-o', at(TUE, 7), 8)],
+    })
+    const review = readWordSongProgressHints()
+    expect(review.planKind.kind).toBe('review')
+    const payload = buildWordSongSessionPayload(review, true)
+    expect((payload.review as { blocks: unknown[] }).blocks).toHaveLength(8)
+    expect(payload).not.toHaveProperty('progress.isGraduationSession')
+    expect(readWordSongSessionExtras(review).crossVowel).toBe(false)
+
+    saveProgress({
+      ...progressAtStep('cvc-words-short-o'),
+      history: [entry('cvc-words-short-o', at(MON, 18), 8)],
+    })
+    const first = readWordSongProgressHints()
+    expect(first.planKind.kind).toBe('forward')
+    const blocks = (
+      buildWordSongSessionPayload(first, false).warmup as {
+        blocks: { node: string }[]
+      }
+    ).blocks
+    expect(blocks).toHaveLength(2)
+    expect(blocks.every((b) => b.node === 'cvc-words')).toBe(true)
+  })
+})

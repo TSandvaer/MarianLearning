@@ -323,8 +323,14 @@ describe('buildLeitnerSessionHint', () => {
 
 describe('dueLeitnerItems (spaced-review schedule — 86c9kmwf8)', () => {
   const MS_PER_DAY = 86_400_000
-  // Fixed "now" so day-arithmetic is exact and timezone-free.
-  const NOW = 1_700_000_000_000
+  // Due dates count LOCAL calendar days (native spec
+  // design/native/review-mode-and-warmup-native.md § 7.7), so the fixed
+  // "now" is a local wall-clock time: Monday 2026-10-12 is the day the
+  // cases below call "Monday", in any timezone the suite runs in.
+  const at = (day: number, h: number, m = 0) =>
+    new Date(2026, 9, day, h, m).getTime()
+  const MON = 12
+  const NOW = at(MON + 1, 12) // Tuesday 12:00
 
   /** Build a single-item box at a given box index + lastSeen offset. */
   function boxAt(
@@ -341,54 +347,43 @@ describe('dueLeitnerItems (spaced-review schedule — 86c9kmwf8)', () => {
     })
   })
 
-  it('box-1 facts are ALWAYS due regardless of lastSeen (interval 0)', () => {
-    // Just-promoted box-1 fact (lastSeen === now) is still due.
+  it('box-1 facts are due the same minute (interval 0)', () => {
     const box = boxAt(1, NOW)
     expect(dueLeitnerItems(box, NOW).items).toHaveLength(1)
-    // And a box-1 fact seen a microsecond from the future-ish edge.
-    const box2 = boxAt(1, NOW - 1)
-    expect(dueLeitnerItems(box2, NOW).items).toHaveLength(1)
+    expect(dueLeitnerItems(boxAt(1, NOW - 1), NOW).items).toHaveLength(1)
   })
 
-  it('box-2 fact is NOT due before 1 day, IS due at/after 1 day (tuned 2→1)', () => {
-    // box2 tightened from 2→1 day (Backhaus overnight-consolidation window,
-    // research #450). Seen 23 h ago → not yet due.
-    const notYet = boxAt(2, NOW - (MS_PER_DAY - 3_600_000))
-    expect(dueLeitnerItems(notYet, NOW).items).toHaveLength(0)
-    // Seen exactly 1 day ago → due (>= boundary).
-    const exact = boxAt(2, NOW - 1 * MS_PER_DAY)
-    expect(dueLeitnerItems(exact, NOW).items).toHaveLength(1)
-    // One ms short of 1 day → not due.
-    const justShort = boxAt(2, NOW - 1 * MS_PER_DAY + 1)
-    expect(dueLeitnerItems(justShort, NOW).items).toHaveLength(0)
+  it('lastSeen 0 (a fact addItem just added) is due', () => {
+    expect(dueLeitnerItems(boxAt(1, 0), NOW).items).toHaveLength(1)
+    expect(dueLeitnerItems(boxAt(5, 0), NOW).items).toHaveLength(1)
   })
 
-  it('box-3 fact is NOT due before 3 days, IS due at/after 3 days (tuned 4→3)', () => {
-    // box3 tightened from 4→3 days (Cepeda 20% ratio, research #450).
-    // Seen 2 days ago → not yet due.
-    const notYet = boxAt(3, NOW - 2 * MS_PER_DAY)
-    expect(dueLeitnerItems(notYet, NOW).items).toHaveLength(0)
-    // Seen exactly 3 days ago → due (>= boundary).
-    const exact = boxAt(3, NOW - 3 * MS_PER_DAY)
-    expect(dueLeitnerItems(exact, NOW).items).toHaveLength(1)
-    // One ms short of 3 days → not due.
-    const justShort = boxAt(3, NOW - 3 * MS_PER_DAY + 1)
-    expect(dueLeitnerItems(justShort, NOW).items).toHaveLength(0)
+  it('box 2 promoted Monday 20:00 is not due Monday 23:59, is due Tuesday 07:00', () => {
+    const box = boxAt(2, at(MON, 20))
+    expect(dueLeitnerItems(box, at(MON, 23, 59)).items).toHaveLength(0)
+    expect(dueLeitnerItems(box, at(MON + 1, 7)).items).toHaveLength(1)
   })
 
-  it('honours the full per-box schedule (box 4 → 7d, box 5 → 14d)', () => {
-    expect(dueLeitnerItems(boxAt(4, NOW - 6 * MS_PER_DAY), NOW).items).toEqual(
+  it('box 3 promoted Monday 09:00 is not due Wednesday 23:59, is due Thursday 00:00', () => {
+    const box = boxAt(3, at(MON, 9))
+    expect(dueLeitnerItems(box, at(MON + 2, 23, 59)).items).toHaveLength(0)
+    expect(dueLeitnerItems(box, at(MON + 3, 0)).items).toHaveLength(1)
+  })
+
+  it('honours the full per-box schedule (box 4 → 7 days, box 5 → 14 days)', () => {
+    const seen = at(MON, 18)
+    expect(dueLeitnerItems(boxAt(4, seen), at(MON + 6, 23, 59)).items).toEqual(
       [],
     )
-    expect(
-      dueLeitnerItems(boxAt(4, NOW - 7 * MS_PER_DAY), NOW).items,
-    ).toHaveLength(1)
-    expect(dueLeitnerItems(boxAt(5, NOW - 13 * MS_PER_DAY), NOW).items).toEqual(
+    expect(dueLeitnerItems(boxAt(4, seen), at(MON + 7, 0)).items).toHaveLength(
+      1,
+    )
+    expect(dueLeitnerItems(boxAt(5, seen), at(MON + 13, 23, 59)).items).toEqual(
       [],
     )
-    expect(
-      dueLeitnerItems(boxAt(5, NOW - 14 * MS_PER_DAY), NOW).items,
-    ).toHaveLength(1)
+    expect(dueLeitnerItems(boxAt(5, seen), at(MON + 14, 0)).items).toHaveLength(
+      1,
+    )
   })
 
   it('preserves item order so a downstream sort stays deterministic', () => {

@@ -22,6 +22,12 @@ export interface WordSongSessionResult {
   targetWords: readonly string[]
   /** Per problem: the word on the first chip tapped, `null` if none. */
   perProblemAnswerWord: readonly (string | null)[]
+  /**
+   * First-tap correctness of the warm-up problems, in order (native spec
+   * review-mode-and-warmup-native.md § 7.4). The per-problem arrays above
+   * cover the 8 scored problems only; `totalCorrect` and the streak too.
+   */
+  warmupCorrect: readonly boolean[]
 }
 
 export interface PlayWordSongUtteranceOptions {
