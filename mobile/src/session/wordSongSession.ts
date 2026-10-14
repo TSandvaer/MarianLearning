@@ -21,9 +21,19 @@
  *   request starts through the app's `sessionPrefetcher`; `kick()` adopts
  *   it when its focus still matches, else a fresh request starts.
  *
+ * - **Review and warm-up** (native spec
+ *   `design/native/review-mode-and-warmup-native.md` § 7.4), as Math's: a
+ *   review is accepted only with a `review-` plan id and 8 readable
+ *   problems; the warm-up's `word.w<i>` blocks that parse go in front of
+ *   the 8 scored problems.
+ *
  * The Claude key never reaches the app: `/api/claude` is the Vercel function.
  */
-import { wordSongSessionPlanFromServer } from '@marian/core/wordSong/planFromServer'
+import { WARMUP_PROBLEMS } from '@marian/core/progress/reviewPlan'
+import {
+  wordSongSessionPlanFromServer,
+  wordSongWarmupFromServer,
+} from '@marian/core/wordSong/planFromServer'
 import type { WordSongSessionPlan } from '@marian/core/wordSong/wordSessionPlans'
 import type { FocusMode, SkillNode } from '@marian/core/progress'
 import {
@@ -36,6 +46,7 @@ import type {
   ClipFileFn,
   PlayWordSongUtteranceFn,
 } from '../screens/wordSong/wordSongTypes'
+import { isReviewPlan } from './reviewSession'
 import {
   startSessionWithFallback,
   type SessionStartFallbackHandle,
@@ -54,8 +65,13 @@ import {
 } from './wordSongHints'
 
 export interface WordSongSessionSnapshot extends WordSongSessionExtras {
-  /** The server plan; `null` until resolved, and on any failure. */
+  /** The server plan (warm-ups first); `null` until resolved, and on any
+   *  failure. */
   plan: WordSongSessionPlan | null
+  /** A same-day review (only once its plan settled). */
+  review: boolean
+  /** How many of `plan`'s first problems are the warm-up (0–2). */
+  warmupCount: number
   /** The session audio's player; `null` = the silent caption walk. */
   playUtterance: PlayWordSongUtteranceFn | null
   /** A line's file on disk (tap sounds, blend marks); `null` = none. */
@@ -94,8 +110,50 @@ export interface WordSongSessionDeps {
   prefetcher?: SessionPrefetcher
 }
 
-interface Loaded {
+/** The round a settled response gives: what Word Song plays, in order. */
+export interface WordSongRound {
+  /** The warm-up problems first, then the 8 scored ones. */
   plan: WordSongSessionPlan
+  review: boolean
+  warmupCount: number
+}
+
+/**
+ * Read a settled response for the session the hints asked for: a review
+ * needs a `review-` plan id and 8 readable problems, else it throws (the
+ * failure path); a forward plan reads as before, with the warm-up blocks
+ * that parse (`word.w<i>`, `i` = the ref's position) in front.
+ */
+export function wordSongRoundFromServer(
+  serverPlan: unknown,
+  hints: Pick<WordSongProgressHints, 'planKind'>,
+): WordSongRound {
+  if (hints.planKind.kind === 'review') {
+    if (!isReviewPlan(serverPlan)) {
+      throw new Error('the review request was answered with a forward plan')
+    }
+    return {
+      plan: wordSongSessionPlanFromServer(serverPlan),
+      review: true,
+      warmupCount: 0,
+    }
+  }
+  const forward = wordSongSessionPlanFromServer(serverPlan)
+  const refs = hints.planKind.warmup
+  const warmup = wordSongWarmupFromServer(serverPlan)
+    .filter((w) => w.block >= 1 && w.block <= refs.length)
+    .slice(0, WARMUP_PROBLEMS)
+  return {
+    plan: {
+      ...forward,
+      problems: [...warmup.map((w) => w.problem), ...forward.problems],
+    },
+    review: false,
+    warmupCount: warmup.length,
+  }
+}
+
+interface Loaded extends WordSongRound {
   audio: LoadedSessionAudio
   vowel: TargetVowel | undefined
 }
@@ -105,6 +163,8 @@ const IDLE: WordSongSessionSnapshot = {
   playUtterance: null,
   clipFor: null,
   audioReady: false,
+  review: false,
+  warmupCount: 0,
   ...NO_EXTRAS,
 }
 
@@ -176,7 +236,7 @@ export function createWordSongSessionController(
           }))
         try {
           return {
-            plan: wordSongSessionPlanFromServer(prepared.plan),
+            ...wordSongRoundFromServer(prepared.plan, hints),
             audio: prepared.audio,
             vowel: narrowTargetVowel(prepared.currentTargetVowel),
           }
@@ -204,11 +264,13 @@ export function createWordSongSessionController(
           sessionFocus = focus
           vowel = prepared.vowel ?? null
           note(
-            `ready (${prepared.plan.id}${usedFallback ? ', hint-free fallback' : ''})`,
+            `ready (${prepared.plan.id}${usedFallback ? ', hint-free fallback' : ''}${prepared.warmupCount > 0 ? `, ${prepared.warmupCount} warm-up` : ''})`,
           )
           publish({
             ...extras,
             plan: prepared.plan,
+            review: prepared.review,
+            warmupCount: prepared.warmupCount,
             playUtterance: (text, opts) =>
               prepared.audio.playUtterance(text, opts),
             clipFor: (text) => prepared.audio.fileFor(text),

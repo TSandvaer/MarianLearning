@@ -40,6 +40,24 @@
  * and the audioCtx probes. Native audio needs no gesture: the read-aloud
  * starts as soon as the session start settles.
  *
+ * Native-only, same-day review and daily warm-up (spec
+ * `design/native/review-mode-and-warmup-native.md`):
+ * - **Review** (`review`): Emma's opener ("Your flower is sleeping. Let's
+ *   play the ones you know!") plays where problem 1's read would start, over
+ *   an empty stage; the problem and chips mount at its end and fade in
+ *   (200 ms; at once with Reduce Motion), and problem 1's read starts 400 ms
+ *   later. The track opens with a moon. Streaks still chime, but their +1
+ *   grants are off.
+ * - **Warm-up** (`warmupCount`): the first problems of the round are hearts
+ *   on the track; "Remember this one?" plays before each one's read (400 ms
+ *   gap), with the stage up. They earn +1 stardust when right, but never
+ *   touch the score, the streak or the scored per-problem arrays; their
+ *   first-tap results go to `warmupCorrect`.
+ * - **Mixed steps** (`problemNodes`): each problem's chips, chip ceiling and
+ *   multiplication tags follow its own step, the subitising scaffolds never
+ *   run for review or warm-up problems, and the current problem's kind goes
+ *   to App (`onProblemKindChange`) so the frame follows it.
+ *
  * Emma herself is App's hoisted `EmmaStage`; this screen reports her pose
  * through `onPoseChange`. Layers: the garden background (below Emma), the
  * HUD, ribbon, problem and chips (above her).
@@ -89,14 +107,25 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import Animated, { FadeOut } from 'react-native-reanimated'
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  useReducedMotion,
+} from 'react-native-reanimated'
 import {
   audioEngine,
   createSfx,
   recordAudio,
+  SESSION_GUIDE_GAP_MS,
+  SESSION_GUIDE_MANIFEST,
+  sessionGuidePlayer,
   SFX_SOURCES,
+  type SessionGuideLineId,
+  type SessionGuidePlayer,
   type Sfx,
 } from '../../audio'
 import { CaptionRibbon } from '../../components/CaptionRibbon'
@@ -148,6 +177,10 @@ export const CHIP_GATE_FALLBACK_MS = 2000
 export const MATH_EXIT_MS = 250
 /** Multiplication's sign (U+00D7; Fredoka has the glyph). Spec § 3. */
 export const TIMES_GLYPH = '×'
+/** Review spec § 5: the stage fades in over 200 ms after the opener. */
+export const STAGE_FADE_MS = 200
+/** The HUD's ease-out (MathHud `EASE_OUT`). */
+const STAGE_EASE = Easing.bezier(0, 0, 0.58, 1)
 
 /** The four effects, with the web's volumes. Test seam. */
 export interface MathSfx {
@@ -217,6 +250,22 @@ export interface MathProps {
   qaAutoAnswerAfterMs?: number
   /** Test seam: the silent caption walk used without a player. */
   silentPlayer?: SilentMathPlayer
+  /**
+   * A same-day review (review spec D1): the opener over an empty stage, the
+   * moon, no streak +1 grants. Only once its plan has settled.
+   */
+  review?: boolean
+  /** The first `warmupCount` problems of `plan` are the warm-up (0–2). */
+  warmupCount?: number
+  /**
+   * Each problem's source step (review / warm-up); an entry left `null`
+   * or `undefined` (and every entry without the prop) is `focusNode`.
+   */
+  problemNodes?: readonly (SkillNode | null | undefined)[]
+  /** The current problem's kind, for App's frame (review spec § 3.4). */
+  onProblemKindChange?: (kind: ExtendedMathProblem['kind']) => void
+  /** Test seam: the opener / warm-up line player. Default: the app's. */
+  sessionGuide?: SessionGuidePlayer
 }
 
 interface PerProblemState {
@@ -295,8 +344,14 @@ export function MathScreen({
   visibility = appVisibility,
   qaAutoAnswerAfterMs,
   silentPlayer,
+  review = false,
+  warmupCount = 0,
+  problemNodes,
+  onProblemKindChange,
+  sessionGuide,
 }: MathProps) {
   const appHidden = useIsAppHidden(visibility)
+  const reducedMotion = useReducedMotion()
 
   // Same as the web: the plan follows `planProp` (the server plan swaps in
   // for the static one while the problem area still shows "getting ready").
@@ -310,16 +365,30 @@ export function MathScreen({
   const [sfx] = useState<MathSfx>(() => sfxProp ?? createMathSfx())
   const [silent] = useState(() => silentPlayer ?? createSilentMathPlayer())
   const [cancelEmmaLine] = useState(() => cancelLine)
+  const [guide] = useState(() => sessionGuide ?? sessionGuidePlayer())
   const playRef = useRef<PlayMathUtteranceFn>(silent.play)
   useLayoutEffect(() => {
     playRef.current = playUtterance ?? silent.play
   })
   const onSessionCompleteRef = useRef(onSessionComplete)
   const onPoseChangeRef = useRef(onPoseChange)
+  const onProblemKindChangeRef = useRef(onProblemKindChange)
   useLayoutEffect(() => {
     onSessionCompleteRef.current = onSessionComplete
     onPoseChangeRef.current = onPoseChange
+    onProblemKindChangeRef.current = onProblemKindChange
   })
+  // The round's shape, read by the tap handlers (review spec § 7.4).
+  const warmups = Math.min(Math.max(0, warmupCount), plan.problems.length)
+  const warmupsRef = useRef(warmups)
+  const reviewRef = useRef(review)
+  useLayoutEffect(() => {
+    warmupsRef.current = warmups
+    reviewRef.current = review
+  })
+  /** The review opener has played (the stage mounts at its end). */
+  const [openerDone, setOpenerDone] = useState(false)
+  const openerStartedRef = useRef(false)
 
   // ── Persistent + per-session state (web names) ───────────────────────
 
@@ -409,33 +478,28 @@ export function MathScreen({
   const [streakFadingOut, setStreakFadingOut] = useState(false)
   const [guidedActive, setGuidedActive] = useState(false)
 
-  const planMaxAnswer = useMemo(
-    () =>
-      chipMaxAnswerForCorrects(
-        plan.problems
-          .filter((p) => p.kind === 'arithmetic')
-          .map((p) => p.correct),
-      ),
-    [plan],
-  )
-  const multiplyCeiling = useMemo(
-    () =>
-      multiplyChipCeiling(
-        plan.problems
-          .filter((p) => p.kind === 'multiply')
-          .map((p) => p.correct),
-      ),
-    [plan],
-  )
+  // The chips follow each problem's own step (review spec § 7.4): its
+  // distractor rules, and a ceiling from that step's problems only. Without
+  // `problemNodes` every problem is `focusNode`'s, exactly as before.
   const chipOrderWithClass = useMemo<{
     values: readonly number[]
     offeredClass: MathOfferedClass | null
   }>(() => {
     const p = plan.problems[problemIndex]
-    return p.kind === 'arithmetic'
-      ? buildChipOrder(p, planMaxAnswer, focusNode)
-      : buildExtendedChipOrder(p, multiplyCeiling)
-  }, [plan, problemIndex, planMaxAnswer, multiplyCeiling, focusNode])
+    const nodeOf = (i: number) => problemNodes?.[i] ?? focusNode
+    const node = nodeOf(problemIndex)
+    const sameStep = plan.problems.filter((_, j) => nodeOf(j) === node)
+    if (p.kind === 'arithmetic') {
+      const max = chipMaxAnswerForCorrects(
+        sameStep.filter((q) => q.kind === 'arithmetic').map((q) => q.correct),
+      )
+      return buildChipOrder(p, max, node)
+    }
+    const ceiling = multiplyChipCeiling(
+      sameStep.filter((q) => q.kind === 'multiply').map((q) => q.correct),
+    )
+    return buildExtendedChipOrder(p, ceiling)
+  }, [plan, problemIndex, problemNodes, focusNode])
   useEffect(() => {
     perProblemDistractorClassRef.current[problemIndex] =
       chipOrderWithClass.offeredClass
@@ -452,6 +516,8 @@ export function MathScreen({
   const poseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const streakFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const chimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** The gap between a guide line and the read. */
+  const leadInTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const minDwellElapsedRef = useRef(false)
   const correctSpeakResolvedRef = useRef(false)
   const advanceFiredRef = useRef(false)
@@ -473,6 +539,7 @@ export function MathScreen({
       streakFadeTimerRef,
       chimeTimerRef,
       chipGateWatchdogRef,
+      leadInTimerRef,
     ]) {
       if (ref.current !== null) {
         clearTimeout(ref.current)
@@ -488,6 +555,7 @@ export function MathScreen({
       // No audio leak: Emma's line (and a silent caption walk) stop here.
       silent.cancel()
       if (linesInFlightRef.current > 0) cancelEmmaLine()
+      guide.cancelActive()
       sfx.sparkle.unload()
       sfx.poof.unload()
       sfx.plink.unload()
@@ -519,6 +587,8 @@ export function MathScreen({
       isReadAloud = false,
       /** Called with the count of words revealed so far, per word tick. */
       onWords?: (revealed: number) => void,
+      /** Another player for this line (the session guide). */
+      play?: PlayMathUtteranceFn,
     ): Promise<void> => {
       setCaptionText(text)
       setCaptionRevealed(0)
@@ -540,7 +610,7 @@ export function MathScreen({
       const myLine = ++lineGenerationRef.current
       linesInFlightRef.current += 1
       try {
-        await playRef.current(text, opts)
+        await (play ?? playRef.current)(text, opts)
       } catch (err) {
         if (isReadAloud) openChipGate('fallback')
         recordAudio({
@@ -588,35 +658,73 @@ export function MathScreen({
     )
   }, [planLength])
 
+  /** A guide line through the ribbon (never rejects). */
+  const speakGuide = useCallback(
+    (id: SessionGuideLineId) =>
+      speak(SESSION_GUIDE_MANIFEST[id].text, false, undefined, (_text, opts) =>
+        guide.playLine(id, opts),
+      ),
+    [speak, guide],
+  )
+
   useEffect(() => {
     if (guidedActive) return // the guided line owns the audio
     if (audioReady === false) return // session start in flight
     const problem = plan.problems[problemIndex]
     const myProblemIndex = problemIndex
+    const live = () =>
+      !unmountedRef.current && problemIndexRef.current === myProblemIndex
+    // Review spec § 4: the opener where problem 1's read would start; the
+    // warm-up line before each warm-up read. Line end → 400 ms → the read.
+    const lead: SessionGuideLineId | null =
+      review && myProblemIndex === 0 && !openerStartedRef.current
+        ? 'guide.session.review'
+        : myProblemIndex < warmups
+          ? 'guide.session.warmup'
+          : null
     microtask(() => {
-      if (unmountedRef.current) return
-      if (problemIndexRef.current !== myProblemIndex) return
+      if (!live()) return
       if (spokeReadAloudRef.current) return
       spokeReadAloudRef.current = true
       setPose('listening')
-      if (!chipGateOpenRef.current && chipGateWatchdogRef.current === null) {
-        chipGateWatchdogRef.current = setTimeout(() => {
-          chipGateWatchdogRef.current = null
-          if (unmountedRef.current) return
-          if (problemIndexRef.current !== myProblemIndex) return
-          openChipGate('fallback')
-        }, CHIP_GATE_FALLBACK_MS)
-      }
-      void speak(problem.utterances.read, true).then(() => {
-        if (unmountedRef.current) return
-        if (problemIndexRef.current !== myProblemIndex) return
+      void (async () => {
+        if (lead !== null) {
+          if (lead === 'guide.session.review') openerStartedRef.current = true
+          await speakGuide(lead)
+          if (!live()) return
+          if (lead === 'guide.session.review') setOpenerDone(true)
+          await new Promise<void>((resolve) => {
+            leadInTimerRef.current = setTimeout(() => {
+              leadInTimerRef.current = null
+              resolve()
+            }, SESSION_GUIDE_GAP_MS)
+          })
+          if (!live()) return
+        }
+        // The watchdog counts from the read, never from a guide line: no
+        // chip opens during "Remember this one?" or the opener.
+        if (!chipGateOpenRef.current && chipGateWatchdogRef.current === null) {
+          chipGateWatchdogRef.current = setTimeout(() => {
+            chipGateWatchdogRef.current = null
+            if (!live()) return
+            openChipGate('fallback')
+          }, CHIP_GATE_FALLBACK_MS)
+        }
+        await speak(problem.utterances.read, true)
+        if (!live()) return
         readAloudPlayedRef.current = true
         setReadAloudPlayed(true)
         setPose((current) => (current === 'listening' ? 'idle' : current))
-      })
+      })()
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- web parity: re-run on problem / readiness only
   }, [problemIndex, audioReady])
+
+  // The current problem's kind, for App's frame (review spec § 3.4).
+  const currentKind = plan.problems[problemIndex].kind
+  useEffect(() => {
+    onProblemKindChangeRef.current?.(currentKind)
+  }, [currentKind])
 
   // Fallback-path latency anchor (completion) + re-arm per problem.
   useLayoutEffect(() => {
@@ -674,17 +782,22 @@ export function MathScreen({
     } else {
       const finalState = writeStardust(stardustTotalRef.current, storage, now)
       setStardust(finalState)
+      // The per-problem arrays cover the round; the result's cover the 8
+      // scored problems, and the warm-up's first taps go apart (§ 7.4).
+      const w = warmupsRef.current
       onSessionCompleteRef.current?.({
         totalCorrect: totalCorrectRef.current,
         totalStardust: finalState.total,
         finalStreak: streakRef.current,
         earnedThisSession: earnedThisSessionRef.current,
-        perProblemCorrect: perProblemCorrectRef.current.slice(),
-        latencyMs: latencyMsByProblemRef.current.slice(),
-        perProblemAnswerValue: perProblemAnswerValueRef.current.slice(),
-        perProblemDistractorClass: perProblemDistractorClassRef.current.slice(),
+        perProblemCorrect: perProblemCorrectRef.current.slice(w),
+        latencyMs: latencyMsByProblemRef.current.slice(w),
+        perProblemAnswerValue: perProblemAnswerValueRef.current.slice(w),
+        perProblemDistractorClass:
+          perProblemDistractorClassRef.current.slice(w),
         subitisingScaffoldRendered: subitisingScaffoldRenderedRef.current,
         subitisingScaffoldSubRendered: subitisingScaffoldSubRenderedRef.current,
+        warmupCorrect: perProblemCorrectRef.current.slice(0, w),
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` seeds the write only
@@ -805,20 +918,23 @@ export function MathScreen({
       setPose('puzzled-tilt')
       if (poseTimerRef.current !== null) clearTimeout(poseTimerRef.current)
 
-      const wasOnStreak = streak >= 2
-      streakRef.current = 0
-      if (wasOnStreak) {
-        setStreakFadingOut(true)
-        if (streakFadeTimerRef.current !== null) {
-          clearTimeout(streakFadeTimerRef.current)
-        }
-        streakFadeTimerRef.current = setTimeout(() => {
+      // A warm-up problem never touches the streak (review spec § 6).
+      if (problemIndexRef.current >= warmupsRef.current) {
+        const wasOnStreak = streak >= 2
+        streakRef.current = 0
+        if (wasOnStreak) {
+          setStreakFadingOut(true)
+          if (streakFadeTimerRef.current !== null) {
+            clearTimeout(streakFadeTimerRef.current)
+          }
+          streakFadeTimerRef.current = setTimeout(() => {
+            setStreak(0)
+            setStreakFadingOut(false)
+            streakFadeTimerRef.current = null
+          }, STREAK_FADE_OUT_MS)
+        } else {
           setStreak(0)
-          setStreakFadingOut(false)
-          streakFadeTimerRef.current = null
-        }, STREAK_FADE_OUT_MS)
-      } else {
-        setStreak(0)
+        }
       }
 
       const nextWrongCount = wrongCountRef.current + 1
@@ -877,10 +993,13 @@ export function MathScreen({
       }
 
       const isCleanWin = wrongCountRef.current === 0 && !guidedPlayedRef.current
+      // Review spec § 6: a warm-up answer earns its +1 and nothing else; a
+      // review's streak chimes but grants no +1.
+      const warm = problemIndexRef.current < warmupsRef.current
       if (!guidedPlayedRef.current) {
         grantStardust(1)
-        totalCorrectRef.current += 1
-        if (isCleanWin) {
+        if (!warm) totalCorrectRef.current += 1
+        if (isCleanWin && !warm) {
           streakRef.current = streakRef.current + 1
           setStreak(streakRef.current)
           if (
@@ -888,7 +1007,7 @@ export function MathScreen({
               streakRef.current,
             )
           ) {
-            grantStardust(1)
+            if (!reviewRef.current) grantStardust(1)
             if (chimeTimerRef.current !== null) {
               clearTimeout(chimeTimerRef.current)
             }
@@ -1011,7 +1130,9 @@ export function MathScreen({
     if (qaAutoAnswerAfterMs === undefined) return
     if (!chipGateOpen || problemState.resolved) return
     const { correct } = plan.problems[problemIndex]
-    const wrongsWanted = problemIndex === 0 ? 3 : problemIndex === 1 ? 1 : 0
+    // The scored problems' first two, as before; warm-ups answered right.
+    const scored = problemIndex - warmups
+    const wrongsWanted = scored === 0 ? 3 : scored === 1 ? 1 : 0
     const wrong = chipOrderWithClass.values.find((v) => v !== correct)
     const value =
       problemState.wrongCount < wrongsWanted && wrong !== undefined
@@ -1030,6 +1151,7 @@ export function MathScreen({
     problemIndex,
     plan,
     chipOrderWithClass,
+    warmups,
   ])
 
   // ── Scaffolds (core's gates, as on the web) ──────────────────────────
@@ -1039,10 +1161,13 @@ export function MathScreen({
   // never run the subitising scaffolds (spec § 1).
   const arith = currentProblem.kind === 'arithmetic' ? currentProblem : null
   const showStreak = streak >= 2 || streakFadingOut
+  // The subitising scaffolds never run for review or warm-up problems.
+  const scaffoldsAllowed = !review && problemIndex >= warmups
 
   const useScaffoldGate =
     focusNode !== undefined && subitisingScaffoldActive !== undefined
   const dotCardInScope =
+    scaffoldsAllowed &&
     arith !== null &&
     (useScaffoldGate
       ? shouldShowSubitisingScaffold(focusNode, arith, subitisingScaffoldActive)
@@ -1064,7 +1189,7 @@ export function MathScreen({
   const useSubScaffoldGate =
     focusNode !== undefined && subitisingSubScaffoldActive !== undefined
   const subMinuendInScope =
-    arith !== null && useSubScaffoldGate
+    scaffoldsAllowed && arith !== null && useSubScaffoldGate
       ? shouldShowSubitisingSubScaffold(
           focusNode,
           arith,
@@ -1087,6 +1212,8 @@ export function MathScreen({
   // ── Render ───────────────────────────────────────────────────────────
 
   const { problem: area, chips, ribbon, ribbonPadding } = layout
+  // A review's stage waits for its opener (review spec § 3.3).
+  const stageShown = !review || openerDone
   const counting =
     arith !== null && arith.op === '+'
       ? countingMetrics(layout, arith.addendA, arith.addendB, area.width)
@@ -1171,6 +1298,8 @@ export function MathScreen({
           streakFadingOut={streakFadingOut}
           celebrating={celebrating}
           onBack={onRequestExit}
+          review={review}
+          warmupCount={warmups}
         />
 
         {captionVisible && captionText !== '' && (
@@ -1204,8 +1333,8 @@ export function MathScreen({
           >
             <GettingReady testID="math-getting-ready" />
           </View>
-        ) : (
-          <>
+        ) : !stageShown ? null : (
+          <StageLayer review={review} reducedMotion={reducedMotion}>
             <View
               testID="math-problem"
               style={[
@@ -1275,7 +1404,10 @@ export function MathScreen({
                       factorB={multiply.factorB}
                       metrics={groups}
                       width={area.width}
-                      tagsFromReveal={planFocusNode !== 'mult-3-4'}
+                      tagsFromReveal={
+                        (problemNodes?.[problemIndex] ?? planFocusNode) !==
+                        'mult-3-4'
+                      }
                       hintStep={hintStep}
                       litCount={litCount}
                       guided={guidedActive}
@@ -1365,10 +1497,40 @@ export function MathScreen({
                 )
               })}
             </View>
-          </>
+          </StageLayer>
         )}
       </Animated.View>
     </>
+  )
+}
+
+/**
+ * The problem and the chips. A review's stage mounts at its opener's end
+ * and fades in, 200 ms ease-out, or appears at once with Reduce Motion
+ * (review spec § 5); every other session renders them as before.
+ */
+function StageLayer({
+  review,
+  reducedMotion,
+  children,
+}: {
+  review: boolean
+  reducedMotion: boolean
+  children: ReactNode
+}) {
+  if (!review) return <>{children}</>
+  return (
+    <Animated.View
+      testID="math-stage"
+      entering={
+        reducedMotion
+          ? undefined
+          : FadeIn.duration(STAGE_FADE_MS).easing(STAGE_EASE)
+      }
+      style={styles.stageLayer}
+    >
+      {children}
+    </Animated.View>
   )
 }
 
@@ -1383,6 +1545,7 @@ const styles = StyleSheet.create({
       'radial-gradient(circle at 50% 30%, rgba(255, 224, 230, 0.55) 0%, rgba(255, 245, 240, 0) 60%), linear-gradient(180deg, #FFF5F0 0%, #FFF8F2 100%)',
   },
   foreground: { ...FILL, zIndex: 2, pointerEvents: 'box-none' },
+  stageLayer: { ...FILL, pointerEvents: 'box-none' },
   abs: { position: 'absolute' },
   problem: { alignItems: 'center', justifyContent: 'center' },
   equation: { flexDirection: 'row', alignItems: 'center' },

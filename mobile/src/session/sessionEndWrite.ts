@@ -14,11 +14,20 @@
  *      replays. "Play again to get today's flower." is marked as said the
  *      moment it is scheduled.
  *
+ * Native (spec `design/native/review-mode-and-warmup-native.md` § 7.5): a
+ * same-day review (`payload.review`) runs `recordSessionEnd`, then core's
+ * `recordReviewOnSessionEnd` (Leitner + `lastPlayedISO`, no history entry),
+ * then the guidance for the world's current step, which is the practice
+ * day; no Word Song +5. A forward session with a warm-up records the
+ * warm-up's Leitner outcomes first and leaves out any scored problem whose
+ * fact the warm-up already recorded (one outcome per fact per session).
+ *
  * The Word Song graduation split needs the planner's novel-probe word
  * list. The planner's copy lives in the server's `api/` (outside what
  * Metro bundles), so the split reads core's `NOVEL_PROBE_WORDS`, pinned to
  * the planner's by the web suite (`wordRoundParity.test.tsx`).
  */
+import { currentStepOf } from '@marian/core/hub/hubCardModel'
 import { localDateKey, now as progressNow } from '@marian/core/progress/clock'
 import {
   defaultProgress,
@@ -39,6 +48,7 @@ import {
 } from '@marian/core/sessionEnd/notYetNudge'
 import {
   recordProgressOnSessionEnd,
+  recordReviewOnSessionEnd,
   type GraduationSessionSplit,
   type LeitnerOutcome,
   type SessionEndSurface,
@@ -99,6 +109,7 @@ export function writeSessionEnd(
 ): SessionEndResult {
   const clock = opts.clock ?? progressNow
   const p = payload
+  if (p.review === true) return writeReviewEnd(p, clock)
   const dateISO = clock().toISOString()
   if (p.surface === 'word-song') grantWordSongCompletionBonus(undefined, clock)
   recordSessionEnd(p.finalStreak, undefined, clock)
@@ -115,11 +126,7 @@ export function writeSessionEnd(
     opts.novelProbeWords ?? NOVEL_PROBE_WORDS,
   )
   const leitnerOutcomes =
-    p.surface === 'math' &&
-    p.mathFacts !== undefined &&
-    p.perProblemCorrect !== undefined
-      ? buildLeitnerOutcomes(p.mathFacts, p.perProblemCorrect)
-      : undefined
+    p.surface === 'math' ? forwardLeitnerOutcomes(p) : undefined
   const math = p.surface === 'math'
   const after = recordProgressOnSessionEnd({
     surface: p.surface,
@@ -171,6 +178,85 @@ export function writeSessionEnd(
     markNudgeSaid(track, today)
   }
   return { beat, guidance }
+}
+
+/** A review's end: no history, the practice day of the current step. */
+function writeReviewEnd(
+  p: SessionEndPayload,
+  clock: () => Date,
+): SessionEndResult {
+  const dateISO = clock().toISOString()
+  recordSessionEnd(p.finalStreak, undefined, clock)
+  const before = loadProgress() ?? defaultProgress()
+  const track = trackForSurface(p.surface)
+  const leitnerOutcomes =
+    p.surface === 'math' &&
+    p.problemFacts !== undefined &&
+    p.perProblemCorrect !== undefined
+      ? factOutcomes(p.problemFacts, p.perProblemCorrect)
+      : []
+  const after = recordReviewOnSessionEnd({
+    surface: p.surface,
+    dateISO,
+    ...(leitnerOutcomes.length > 0 ? { leitnerOutcomes } : {}),
+  })
+  const node = currentStepOf(before, track)
+  const beat = sessionEndBeat(before, after, node)
+  const today = localDateKey(clock())
+  const guidance = sessionEndGuidance({
+    before,
+    after,
+    node,
+    beat,
+    totalCorrect: p.totalCorrect,
+    today,
+    nudgeSaidToday: nudgeSaidToday(track, today),
+  })
+  // A review that crossed midnight gets the not-yet day, and its nudge.
+  if (guidance.lines.some((l) => l.id === 'guide.end.not-yet.again')) {
+    markNudgeSaid(track, today)
+  }
+  return { beat, guidance }
+}
+
+type Fact = { a: number; b: number; op: '+' | '-' | '*' }
+const factKey = (f: Fact) => `${f.a}${f.op}${f.b}`
+
+/** Facts zipped with first-tap correctness, problems without a fact left out. */
+function factOutcomes(
+  facts: ReadonlyArray<Fact | null>,
+  correct: readonly boolean[],
+): LeitnerOutcome[] {
+  const n = Math.min(facts.length, correct.length)
+  const out: LeitnerOutcome[] = []
+  for (let i = 0; i < n; i++) {
+    const f = facts[i]
+    if (f) out.push({ fact: { a: f.a, b: f.b, op: f.op }, correct: correct[i] })
+  }
+  return out
+}
+
+/**
+ * A forward math session's Leitner outcomes: the warm-up's (non-fact
+ * problems left out), then the scored ones, minus any scored problem whose
+ * fact the warm-up already recorded: the scored repeat came after priming,
+ * so only the warm-up's first tap counts (§ 7.4, Dave 2026-10-14).
+ * `undefined` when there is nothing to record.
+ */
+export function forwardLeitnerOutcomes(
+  p: SessionEndPayload,
+): LeitnerOutcome[] | undefined {
+  const warmup =
+    p.warmupFacts !== undefined && p.warmupCorrect !== undefined
+      ? factOutcomes(p.warmupFacts, p.warmupCorrect)
+      : []
+  const scored =
+    p.mathFacts !== undefined && p.perProblemCorrect !== undefined
+      ? (buildLeitnerOutcomes(p.mathFacts, p.perProblemCorrect) ?? [])
+      : []
+  const primed = new Set(warmup.map((o) => factKey(o.fact)))
+  const out = [...warmup, ...scored.filter((o) => !primed.has(factKey(o.fact)))]
+  return out.length > 0 ? out : undefined
 }
 
 /**

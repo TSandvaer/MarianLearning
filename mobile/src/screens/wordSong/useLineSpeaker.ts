@@ -34,6 +34,8 @@ export interface SpeakHooks {
   onWordTick?: (wordIndex: number) => void
   onTime?: (ms: number) => void
   revealAt?: (ms: number) => number
+  /** Another player for this line (the session guide's lines). */
+  play?: PlayWordSongUtteranceFn
 }
 
 export interface LineSpeaker {
@@ -88,7 +90,7 @@ export function useLineSpeaker(
       linesInFlight.current += 1
       setSpeaking(true)
       try {
-        await playRef.current(text, opts)
+        await (hooks?.play ?? playRef.current)(text, opts)
       } catch (err) {
         recordAudio({
           kind: 'note',

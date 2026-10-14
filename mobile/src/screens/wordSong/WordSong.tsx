@@ -29,6 +29,14 @@
  * hint (it would cut "Yes!" off). Dropped (web-only): the WebKit audio
  * unlock machinery and the audioCtx probes.
  *
+ * Native-only, same-day review and daily warm-up (spec
+ * `design/native/review-mode-and-warmup-native.md`), as Math's: a review's
+ * opener plays over an empty stage, which mounts at its end and fades in;
+ * "Remember this one?" plays before each warm-up problem (the stage up);
+ * line end → 400 ms → the problem's read (after the silent beat on a CVC
+ * card). The HUD shows the moon or the hearts. Warm-up problems never touch
+ * the score or the streak; their first taps go to `warmupCorrect`.
+ *
  * Emma is App's `EmmaStage`; this screen reports her pose (`onPoseChange`).
  */
 import type { EmmaPose } from '@marian/core/character/emmaPose'
@@ -66,9 +74,15 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from 'react'
 import { BackHandler, StyleSheet, View } from 'react-native'
-import Animated, { FadeOut } from 'react-native-reanimated'
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  useReducedMotion,
+} from 'react-native-reanimated'
 import {
   audioEngine,
   blendMarksFor,
@@ -77,9 +91,14 @@ import {
   createTapClipPlayer,
   letterWindow,
   litAt,
+  SESSION_GUIDE_GAP_MS,
+  SESSION_GUIDE_MANIFEST,
+  sessionGuidePlayer,
   SFX_SOURCES,
   wordWindow,
   type Segment,
+  type SessionGuideLineId,
+  type SessionGuidePlayer,
   type Sfx,
   type TapClipPlayer,
 } from '../../audio'
@@ -114,6 +133,9 @@ import { WordStage } from './WordStage'
 export const WORD_SONG_EXIT_MS = 250
 /** A letter tap lights its letter at least this long (web pulse). */
 export const TAP_LIGHT_MIN_MS = 400
+/** Review spec § 5: the stage fades in over 200 ms after the opener. */
+export const STAGE_FADE_MS = 200
+const STAGE_EASE = Easing.bezier(0, 0, 0.58, 1)
 
 /** The three effects, with the web's volumes. Test seam. */
 export interface WordSongSfx {
@@ -176,6 +198,12 @@ export interface WordSongProps {
   qaAutoAnswerAfterMs?: number
   /** Test seam: the silent caption walk used without a player. */
   silentPlayer?: SilentMathPlayer
+  /** A same-day review: the opener over an empty stage, the moon. */
+  review?: boolean
+  /** The first `warmupCount` problems of `plan` are the warm-up (0–2). */
+  warmupCount?: number
+  /** Test seam: the opener / warm-up line player. Default: the app's. */
+  sessionGuide?: SessionGuidePlayer
 }
 
 interface PerProblemState {
@@ -224,8 +252,12 @@ export function WordSong({
   visibility = appVisibility,
   qaAutoAnswerAfterMs,
   silentPlayer,
+  review = false,
+  warmupCount = 0,
+  sessionGuide,
 }: WordSongProps) {
   const appHidden = useIsAppHidden(visibility)
+  const reducedMotion = useReducedMotion()
   // Web: the plan follows `planProp` (the server's swaps in for the static
   // one while the stage still shows "getting ready").
   const plan = useMemo<WordSongSessionPlan>(
@@ -239,6 +271,7 @@ export function WordSong({
   const [silent] = useState(() => silentPlayer ?? createSilentMathPlayer())
   const [tap] = useState(() => tapPlayer ?? createTapClipPlayer(audioEngine))
   const [cancelEmmaLine] = useState(() => cancelLine)
+  const [guide] = useState(() => sessionGuide ?? sessionGuidePlayer())
   const playRef = useRef<PlayWordSongUtteranceFn>(silent.play)
   const clipForRef = useRef(clipFor)
   const onSessionCompleteRef = useRef(onSessionComplete)
@@ -254,6 +287,18 @@ export function WordSong({
   const line = useLineSpeaker(playRef)
   const { caption, speaking, clearCaption, linesInFlight, unmounted } = line
   const speakLine = line.speak
+  // The round's shape, read by the tap handlers (review spec § 7.4).
+  const warmups = Math.min(Math.max(0, warmupCount), plan.problems.length)
+  const warmupsRef = useRef(warmups)
+  useLayoutEffect(() => {
+    warmupsRef.current = warmups
+  })
+  /** The review opener has played (the stage mounts at its end). */
+  const [openerDone, setOpenerDone] = useState(false)
+  const openerStartedRef = useRef(false)
+  /** The problem whose guide line has started (one per problem). */
+  const leadForRef = useRef(-1)
+  const leadInTimerRef = useRef<Timer>(null)
 
   // ── State (web names) ────────────────────────────────────────────────
 
@@ -275,6 +320,8 @@ export function WordSong({
   const perProblemAnswerWordRef = useRef<(string | null)[]>(
     plan.problems.map(() => null),
   )
+  /** Per problem of the round: was the first tap right (the warm-up's result). */
+  const firstTapCorrectRef = useRef<boolean[]>(plan.problems.map(() => false))
   const firstTapRecordedRef = useRef(false)
   /** The read-aloud ENDED: the chips answer (web `readAloudPlayed`). */
   const [readAloudPlayed, setReadAloudPlayed] = useState(false)
@@ -319,6 +366,7 @@ export function WordSong({
       poseTimerRef,
       streakFadeTimerRef,
       litTimerRef,
+      leadInTimerRef,
     ]) {
       if (ref.current !== null) {
         clearTimeout(ref.current)
@@ -337,6 +385,7 @@ export function WordSong({
       // No audio leak: Emma's line, a silent walk and a tap sound stop.
       silent.cancel()
       if (lines.current > 0) cancelEmmaLine()
+      guide.cancelActive()
       tap.release()
       sfx.sparkle.unload()
       sfx.poof.unload()
@@ -396,22 +445,67 @@ export function WordSong({
         setPose((c) => (c === 'listening' ? 'idle' : c))
       })
     }
-    if (round.readAloudDelayMs === 0) {
+    // Review spec § 4: the opener where problem 1's read would start; the
+    // warm-up line before each warm-up read. Line end → 400 ms → the read
+    // (a CVC card's silent beat, then its read).
+    const lead: SessionGuideLineId | null =
+      review && my === 0 && !openerStartedRef.current
+        ? 'guide.session.review'
+        : my < warmups
+          ? 'guide.session.warmup'
+          : null
+    if (lead === null && round.readAloudDelayMs === 0) {
       microtask(dispatch)
       return
     }
-    const beat = startSilentBeat(
-      round.readAloudDelayMs,
-      visibility.getIsHidden(),
-      () => {
-        if (beatRef.current === beat) beatRef.current = null
+    let cancelled = false
+    let beat: SilentBeat | null = null
+    const stale = () =>
+      cancelled || unmounted.current || problemIndexRef.current !== my
+    const read = () => {
+      if (stale()) return
+      if (round.readAloudDelayMs === 0) {
         dispatch()
-      },
-    )
-    beatRef.current = beat
+        return
+      }
+      const b = startSilentBeat(
+        round.readAloudDelayMs,
+        visibility.getIsHidden(),
+        () => {
+          if (beatRef.current === b) beatRef.current = null
+          dispatch()
+        },
+      )
+      beat = b
+      beatRef.current = b
+    }
+    if (lead === null) {
+      read()
+    } else {
+      microtask(() => {
+        if (stale() || leadForRef.current === my) return
+        leadForRef.current = my
+        if (lead === 'guide.session.review') openerStartedRef.current = true
+        setPose('listening')
+        void speak(SESSION_GUIDE_MANIFEST[lead].text, {
+          play: (_text, opts) => guide.playLine(lead, opts),
+        }).then(() => {
+          if (stale()) return
+          if (lead === 'guide.session.review') setOpenerDone(true)
+          setPose((c) => (c === 'listening' ? 'idle' : c))
+          leadInTimerRef.current = setTimeout(() => {
+            leadInTimerRef.current = null
+            read()
+          }, SESSION_GUIDE_GAP_MS)
+        })
+      })
+    }
     return () => {
-      beat.cancel()
-      if (beatRef.current === beat) beatRef.current = null
+      cancelled = true
+      if (beat !== null) {
+        beat.cancel()
+        if (beatRef.current === beat) beatRef.current = null
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- web parity: re-run on problem / readiness only
   }, [problemIndex, audioReady])
@@ -498,6 +592,7 @@ export function WordSong({
       perProblemAnswerWordRef.current,
       null,
     )
+    firstTapCorrectRef.current = resize(firstTapCorrectRef.current, false)
   }, [planLength])
 
   const advanceToNext = useCallback(() => {
@@ -526,15 +621,19 @@ export function WordSong({
     }
     const finalState = writeStardust(stardustTotalRef.current, storage, now)
     setStardust(finalState)
+    // The arrays cover the round; the result's cover the 8 scored
+    // problems, and the warm-up's first taps go apart (§ 7.4).
+    const w = warmupsRef.current
     onSessionCompleteRef.current?.({
       totalCorrect: totalCorrectRef.current,
       totalStardust: finalState.total,
       finalStreak: streakRef.current,
       earnedThisSession: 0,
       surface: 'word-song',
-      perProblemCorrect: perProblemCorrectRef.current.slice(),
-      targetWords: plan.problems.map((p) => p.target.word),
-      perProblemAnswerWord: perProblemAnswerWordRef.current.slice(),
+      perProblemCorrect: perProblemCorrectRef.current.slice(w),
+      targetWords: plan.problems.slice(w).map((p) => p.target.word),
+      perProblemAnswerWord: perProblemAnswerWordRef.current.slice(w),
+      warmupCorrect: firstTapCorrectRef.current.slice(0, w),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` seeds the write only
   }, [problemIndex, plan, storage, clearTimers, clearCaption, tap])
@@ -603,20 +702,23 @@ export function WordSong({
       setPose('puzzled-tilt')
       if (poseTimerRef.current !== null) clearTimeout(poseTimerRef.current)
 
-      const wasOnStreak = streak >= 2
-      streakRef.current = 0
-      if (wasOnStreak) {
-        setStreakFadingOut(true)
-        if (streakFadeTimerRef.current !== null) {
-          clearTimeout(streakFadeTimerRef.current)
-        }
-        streakFadeTimerRef.current = setTimeout(() => {
+      // A warm-up problem never touches the streak (review spec § 6).
+      if (problemIndexRef.current >= warmupsRef.current) {
+        const wasOnStreak = streak >= 2
+        streakRef.current = 0
+        if (wasOnStreak) {
+          setStreakFadingOut(true)
+          if (streakFadeTimerRef.current !== null) {
+            clearTimeout(streakFadeTimerRef.current)
+          }
+          streakFadeTimerRef.current = setTimeout(() => {
+            setStreak(0)
+            setStreakFadingOut(false)
+            streakFadeTimerRef.current = null
+          }, STREAK_FADE_OUT_MS)
+        } else {
           setStreak(0)
-          setStreakFadingOut(false)
-          streakFadeTimerRef.current = null
-        }, STREAK_FADE_OUT_MS)
-      } else {
-        setStreak(0)
+        }
       }
 
       const outcome = wrongTapOutcome({
@@ -675,13 +777,16 @@ export function WordSong({
         wrongCount: wrongCountRef.current,
         guidedPlayed: guidedPlayedRef.current,
       }
+      // The round's index (a forward round's `problem.index - 1`); a
+      // warm-up answer never counts toward the score or the streak.
+      const i = problemIndexRef.current
+      const warm = i < warmupsRef.current
       if (countsAsCorrect(counters)) {
-        totalCorrectRef.current += 1
-        const i = problem.index - 1
         if (i >= 0 && i < perProblemCorrectRef.current.length) {
           perProblemCorrectRef.current[i] = true
         }
-        if (isCleanWin(counters)) {
+        if (!warm) totalCorrectRef.current += 1
+        if (!warm && isCleanWin(counters)) {
           streakRef.current += 1
           setStreak(streakRef.current)
         }
@@ -745,14 +850,17 @@ export function WordSong({
       // Before Emma has read the problem, a tap is not an answer.
       if (!readAloudPlayedRef.current) return
       const problem = plan.problems[problemIndex]!
+      const isCorrect = isCorrectChip(problem, word)
       // Web: the first tap's word, right or wrong, once per problem.
       if (!firstTapRecordedRef.current) {
         firstTapRecordedRef.current = true
         if (problemIndex < perProblemAnswerWordRef.current.length) {
           perProblemAnswerWordRef.current[problemIndex] = word
         }
+        if (problemIndex < firstTapCorrectRef.current.length) {
+          firstTapCorrectRef.current[problemIndex] = isCorrect
+        }
       }
-      const isCorrect = isCorrectChip(problem, word)
       if (guidedActive && !isCorrect) return
       // A chip tap cuts a tap sound in flight (§ 6).
       tapTokenRef.current += 1
@@ -772,7 +880,9 @@ export function WordSong({
     if (qaAutoAnswerAfterMs === undefined) return
     if (!readAloudPlayed || problemState.resolved) return
     const target = plan.problems[problemIndex]!.target.word
-    const wanted = problemIndex === 0 ? 3 : problemIndex === 1 ? 1 : 0
+    // The scored problems' first two, as before; warm-ups answered right.
+    const scored = problemIndex - warmups
+    const wanted = scored === 0 ? 3 : scored === 1 ? 1 : 0
     const wrong = round.chips.find((e) => e.word !== target)?.word
     const word =
       problemState.wrongCount < wanted && wrong !== undefined ? wrong : target
@@ -786,6 +896,7 @@ export function WordSong({
     problemIndex,
     plan,
     round,
+    warmups,
   ])
 
   // Back arrow and Android back: silence, then the Hub (no Session End).
@@ -811,6 +922,8 @@ export function WordSong({
     digraphsThNodeLevel === 'intro' || digraphsThNodeLevel === 'practicing'
   const showThIntro = digraphsThFirstEncounter && audioReady !== true
   const { stage, chips, ribbon, ribbonPadding } = layout
+  // A review's stage waits for its opener (review spec § 3.3).
+  const stageShown = !review || openerDone
   const ribbonLines = Math.max(
     1,
     Math.floor(
@@ -844,6 +957,8 @@ export function WordSong({
           streakFadingOut={streakFadingOut}
           celebrating={celebrating}
           onBack={exit}
+          review={review}
+          warmupCount={warmups}
         />
 
         {caption.visible && caption.text !== '' && (
@@ -881,8 +996,8 @@ export function WordSong({
             )}
             <GettingReady testID="word-song-getting-ready" />
           </View>
-        ) : (
-          <>
+        ) : !stageShown ? null : (
+          <StageLayer review={review} reducedMotion={reducedMotion}>
             <WordStage
               key={`stage-${problemIndex}`}
               round={round}
@@ -932,7 +1047,7 @@ export function WordSong({
                 )
               })}
             </View>
-          </>
+          </StageLayer>
         )}
 
         {showThIntro && layout.tablet && (
@@ -943,6 +1058,36 @@ export function WordSong({
         )}
       </Animated.View>
     </>
+  )
+}
+
+/**
+ * The card and the chips. A review's stage mounts at its opener's end and
+ * fades in, 200 ms ease-out, or appears at once with Reduce Motion (review
+ * spec § 5); every other session renders them as before.
+ */
+function StageLayer({
+  review,
+  reducedMotion,
+  children,
+}: {
+  review: boolean
+  reducedMotion: boolean
+  children: ReactNode
+}) {
+  if (!review) return <>{children}</>
+  return (
+    <Animated.View
+      testID="word-song-stage"
+      entering={
+        reducedMotion
+          ? undefined
+          : FadeIn.duration(STAGE_FADE_MS).easing(STAGE_EASE)
+      }
+      style={styles.stageLayer}
+    >
+      {children}
+    </Animated.View>
   )
 }
 
@@ -957,6 +1102,7 @@ const styles = StyleSheet.create({
       'radial-gradient(circle at 50% 30%, rgba(255, 210, 235, 0.55) 0%, rgba(255, 245, 250, 0) 60%), linear-gradient(180deg, #FFF5FA 0%, #FFF8F8 100%)',
   },
   foreground: { ...FILL, zIndex: 2, pointerEvents: 'box-none' },
+  stageLayer: { ...FILL, pointerEvents: 'box-none' },
   abs: { position: 'absolute' },
   center: { alignItems: 'center', justifyContent: 'center' },
   // Web `.clay-ribbon`: a cream clay speech slab, no outline (Math's).
