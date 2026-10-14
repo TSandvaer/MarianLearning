@@ -260,7 +260,7 @@ Distinct from its siblings:
   - the × sign is used (Thomas);
   - "A times B" reads as B groups of A, rechecked only if Marian's Danish workbook reads it the other way and she stumbles on it.
 
-  Devon built it in #562, with a core and server filter so multiplication facts never reach a non-multiplication session, and answers capped at 99 to match the progress guard. The web is untouched.
+  Devon built it in #562 (merged `5bb6d8f`), with a core and server filter so multiplication facts never reach a non-multiplication session, and answers capped at 99 to match the progress guard. The web is untouched. Thomas checked steps 8–11 on his iPhone; step 1 is covered by the sweep and tests, and the 6 × 2 tag overlap stays as built.
 
 - **Decided by:** Thomas (popups); pedagogy from Dave.
 
