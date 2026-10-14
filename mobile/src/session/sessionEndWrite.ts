@@ -158,6 +158,10 @@ export function writeSessionEnd(
     p.currentTargetVowel !== undefined
       ? { currentTargetVowel: p.currentTargetVowel }
       : {}),
+    // Fast track (spec § 3.2): the secure-day rule reads the first taps.
+    ...(p.firstTapCorrect !== undefined
+      ? { firstTapCorrect: p.firstTapCorrect }
+      : {}),
   })
 
   const beat = sessionEndBeat(before, after, focusNode)

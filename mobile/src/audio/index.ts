@@ -78,6 +78,8 @@ export { isAudioMuted } from './mute'
 export { readAudioLog, recordAudio } from './audioLog'
 export type { AudioLogRow } from './audioLog'
 export {
+  KNEW_GAP_MS,
+  PEEK_CLOSE_GAP_MS,
   sessionGuidePlayer,
   SESSION_GUIDE_GAP_MS,
   SESSION_GUIDE_MANIFEST,

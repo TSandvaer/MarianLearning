@@ -37,6 +37,13 @@ export interface MathSessionResult {
    * covers the 8 scored problems only; `totalCorrect` and the streak too.
    */
   warmupCorrect: readonly boolean[]
+  /**
+   * First-tap correctness of the 8 scored problems (fast-track spec
+   * `design/native/fast-track-native.md` § 3.2): a secure session is 8 ×
+   * `true`. Math's `perProblemCorrect` is already first-tap, so the two
+   * carry the same values; this one is what the secure-day rule reads.
+   */
+  firstTapCorrect: readonly boolean[]
 }
 
 export interface PlayMathUtteranceOptions {

@@ -58,6 +58,22 @@
  *   run for review or warm-up problems, and the current problem's kind goes
  *   to App (`onProblemKindChange`) so the frame follows it.
  *
+ * Native-only, the fast track and the Map peek (spec
+ * `design/native/fast-track-native.md`):
+ * - **First taps** (`firstTapCorrect` in the result): the 8 scored problems'
+ *   first-tap correctness, for the secure-day rule (§ 3.2).
+ * - **"You just knew that one!"** (§ 7): a warm-up heart right on the first
+ *   tap within 5 s of the read's start gets the remark 300 ms after its
+ *   correct line; the advance waits for it. Never on a scored problem, in a
+ *   review or in a peek; the celebration itself is the same for every answer.
+ * - **Peek** (`peek`, § 6.3): 3 problems of a later step from the Map. The
+ *   opener "Let's look at this one!" plays over an empty stage (the review
+ *   opener's behaviour); no stardust pill, no streak, no grant, no scaffold;
+ *   after problem 3's answer (its correct line and the usual dwell), 400 ms
+ *   → the closer → 400 ms → `onPeekEnd`. The back button cuts the line and
+ *   calls `onPeekEnd` at once. Nothing is written: no stardust write, no
+ *   `onSessionComplete`.
+ *
  * Emma herself is App's hoisted `EmmaStage`; this screen reports her pose
  * through `onPoseChange`. Layers: the garden background (below Emma), the
  * HUD, ribbon, problem and chips (above her).
@@ -83,7 +99,10 @@ import {
   shouldShowSubitisingScaffold,
   shouldShowSubitisingSubScaffold,
 } from '@marian/core/math/subitisingScaffold'
-import type { SkillNode } from '@marian/core/progress'
+import {
+  SLOW_FACT_MIN_MEDIAN_LATENCY_MS,
+  type SkillNode,
+} from '@marian/core/progress'
 import {
   ADVANCE_AFTER_CORRECT_MS,
   ADVANCE_HARD_CEILING_MS,
@@ -119,6 +138,8 @@ import Animated, {
 import {
   audioEngine,
   createSfx,
+  KNEW_GAP_MS,
+  PEEK_CLOSE_GAP_MS,
   recordAudio,
   SESSION_GUIDE_GAP_MS,
   SESSION_GUIDE_MANIFEST,
@@ -266,6 +287,13 @@ export interface MathProps {
   onProblemKindChange?: (kind: ExtendedMathProblem['kind']) => void
   /** Test seam: the opener / warm-up line player. Default: the app's. */
   sessionGuide?: SessionGuidePlayer
+  /**
+   * A Map peek (fast-track spec § 6.3): the plan is 3 problems of a later
+   * step; nothing is scored, granted or written. Fixed for the mount.
+   */
+  peek?: boolean
+  /** The peek is over (after the closer, or the back button at once). */
+  onPeekEnd?: () => void
 }
 
 interface PerProblemState {
@@ -349,6 +377,8 @@ export function MathScreen({
   problemNodes,
   onProblemKindChange,
   sessionGuide,
+  peek = false,
+  onPeekEnd,
 }: MathProps) {
   const appHidden = useIsAppHidden(visibility)
   const reducedMotion = useReducedMotion()
@@ -373,11 +403,17 @@ export function MathScreen({
   const onSessionCompleteRef = useRef(onSessionComplete)
   const onPoseChangeRef = useRef(onPoseChange)
   const onProblemKindChangeRef = useRef(onProblemKindChange)
+  const onPeekEndRef = useRef(onPeekEnd)
   useLayoutEffect(() => {
     onSessionCompleteRef.current = onSessionComplete
     onPoseChangeRef.current = onPoseChange
     onProblemKindChangeRef.current = onProblemKindChange
+    onPeekEndRef.current = onPeekEnd
   })
+  /** A peek is fixed for the mount (App mounts a fresh screen per peek). */
+  const [isPeek] = useState(peek)
+  /** `onPeekEnd` fires once. */
+  const peekEndedRef = useRef(false)
   // The round's shape, read by the tap handlers (review spec § 7.4).
   const warmups = Math.min(Math.max(0, warmupCount), plan.problems.length)
   const warmupsRef = useRef(warmups)
@@ -386,7 +422,17 @@ export function MathScreen({
     warmupsRef.current = warmups
     reviewRef.current = review
   })
-  /** The review opener has played (the stage mounts at its end). */
+  /**
+   * The line over the empty stage before problem 1's read: a review's
+   * opener, or a peek's (the same behaviour: review spec § 3.3, fast-track
+   * spec § 6.3). `null` for every other session.
+   */
+  const opener: SessionGuideLineId | null = review
+    ? 'guide.session.review'
+    : isPeek
+      ? 'guide.session.peek-open'
+      : null
+  /** The opener has played (the stage mounts at its end). */
   const [openerDone, setOpenerDone] = useState(false)
   const openerStartedRef = useRef(false)
 
@@ -518,6 +564,10 @@ export function MathScreen({
   const chimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   /** The gap between a guide line and the read. */
   const leadInTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** The gap before "You just knew that one!" (§ 7). */
+  const knewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** A peek's gaps around its closer (§ 6.3). */
+  const closerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const minDwellElapsedRef = useRef(false)
   const correctSpeakResolvedRef = useRef(false)
   const advanceFiredRef = useRef(false)
@@ -540,6 +590,8 @@ export function MathScreen({
       chimeTimerRef,
       chipGateWatchdogRef,
       leadInTimerRef,
+      knewTimerRef,
+      closerTimerRef,
     ]) {
       if (ref.current !== null) {
         clearTimeout(ref.current)
@@ -560,7 +612,8 @@ export function MathScreen({
       sfx.poof.unload()
       sfx.plink.unload()
       sfx.chime.unload()
-      writeStardust(stardustTotalRef.current, storage, now)
+      // A peek writes nothing (fast-track spec § 6.5).
+      if (!isPeek) writeStardust(stardustTotalRef.current, storage, now)
       // Emma is App's: hand her back calm.
       onPoseChangeRef.current?.('idle')
     }
@@ -677,8 +730,8 @@ export function MathScreen({
     // Review spec § 4: the opener where problem 1's read would start; the
     // warm-up line before each warm-up read. Line end → 400 ms → the read.
     const lead: SessionGuideLineId | null =
-      review && myProblemIndex === 0 && !openerStartedRef.current
-        ? 'guide.session.review'
+      opener !== null && myProblemIndex === 0 && !openerStartedRef.current
+        ? opener
         : myProblemIndex < warmups
           ? 'guide.session.warmup'
           : null
@@ -689,10 +742,10 @@ export function MathScreen({
       setPose('listening')
       void (async () => {
         if (lead !== null) {
-          if (lead === 'guide.session.review') openerStartedRef.current = true
+          if (lead === opener) openerStartedRef.current = true
           await speakGuide(lead)
           if (!live()) return
-          if (lead === 'guide.session.review') setOpenerDone(true)
+          if (lead === opener) setOpenerDone(true)
           await new Promise<void>((resolve) => {
             leadInTimerRef.current = setTimeout(() => {
               leadInTimerRef.current = null
@@ -779,6 +832,24 @@ export function MathScreen({
       setCaptionText('')
       setCaptionRevealed(0)
       setCaptionVisible(false)
+    } else if (isPeek) {
+      // Peek § 6.3: 400 ms → the closer → 400 ms → back to the Map. No
+      // Session End, no result, no write.
+      setPose('listening')
+      closerTimerRef.current = setTimeout(() => {
+        closerTimerRef.current = null
+        if (unmountedRef.current) return
+        void speakGuide('guide.session.peek-close').then(() => {
+          if (unmountedRef.current) return
+          setPose('idle')
+          closerTimerRef.current = setTimeout(() => {
+            closerTimerRef.current = null
+            if (unmountedRef.current || peekEndedRef.current) return
+            peekEndedRef.current = true
+            onPeekEndRef.current?.()
+          }, PEEK_CLOSE_GAP_MS)
+        })
+      }, PEEK_CLOSE_GAP_MS)
     } else {
       const finalState = writeStardust(stardustTotalRef.current, storage, now)
       setStardust(finalState)
@@ -798,10 +869,26 @@ export function MathScreen({
         subitisingScaffoldRendered: subitisingScaffoldRenderedRef.current,
         subitisingScaffoldSubRendered: subitisingScaffoldSubRenderedRef.current,
         warmupCorrect: perProblemCorrectRef.current.slice(0, w),
+        // Already first-tap (set once per problem in `onChipTap`).
+        firstTapCorrect: perProblemCorrectRef.current.slice(w),
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` seeds the write only
-  }, [problemIndex, plan.problems.length, storage])
+  }, [problemIndex, plan.problems.length, storage, isPeek, speakGuide])
+
+  /**
+   * Peek § 6.3: the back button, at any time. Emma's line stops, and
+   * `onPeekEnd` fires at once (once).
+   */
+  const endPeekNow = useCallback(() => {
+    if (peekEndedRef.current) return
+    peekEndedRef.current = true
+    clearAllTimers()
+    silent.cancel()
+    cancelEmmaLine()
+    guide.cancelActive()
+    onPeekEndRef.current?.()
+  }, [clearAllTimers, silent, cancelEmmaLine, guide])
 
   // Back from the background: run the advance that waited for it.
   useEffect(() => {
@@ -825,12 +912,14 @@ export function MathScreen({
 
   const grantStardust = useCallback(
     (amount: number) => {
+      // A peek grants nothing (fast-track spec § 6.3, E2).
+      if (isPeek) return
       stardustTotalRef.current += amount
       setStardust(writeStardust(stardustTotalRef.current, storage, now))
       earnedThisSessionRef.current += amount
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` stamps the write only
-    [storage],
+    [storage, isPeek],
   )
 
   // ── The hint ─────────────────────────────────────────────────────────
@@ -918,8 +1007,9 @@ export function MathScreen({
       setPose('puzzled-tilt')
       if (poseTimerRef.current !== null) clearTimeout(poseTimerRef.current)
 
-      // A warm-up problem never touches the streak (review spec § 6).
-      if (problemIndexRef.current >= warmupsRef.current) {
+      // A warm-up problem never touches the streak (review spec § 6); a
+      // peek has none.
+      if (!isPeek && problemIndexRef.current >= warmupsRef.current) {
         const wasOnStreak = streak >= 2
         streakRef.current = 0
         if (wasOnStreak) {
@@ -976,7 +1066,7 @@ export function MathScreen({
         }
       })
     },
-    [sfx, speak, streak, runHintSequence],
+    [sfx, speak, streak, runHintSequence, isPeek],
   )
 
   const handleCorrectTap = useCallback(
@@ -996,10 +1086,22 @@ export function MathScreen({
       // Review spec § 6: a warm-up answer earns its +1 and nothing else; a
       // review's streak chimes but grants no +1.
       const warm = problemIndexRef.current < warmupsRef.current
+      // § 7: a warm-up heart right on the first tap within 5 s of the
+      // read's start (a measured latency: -1 is touch noise or unmeasured).
+      const latency = latencyMsByProblemRef.current[problemIndexRef.current]
+      const knew =
+        warm &&
+        isCleanWin &&
+        !isPeek &&
+        !reviewRef.current &&
+        latency !== undefined &&
+        latency >= 0 &&
+        latency < SLOW_FACT_MIN_MEDIAN_LATENCY_MS
       if (!guidedPlayedRef.current) {
         grantStardust(1)
         if (!warm) totalCorrectRef.current += 1
-        if (isCleanWin && !warm) {
+        // A peek keeps no streak (fast-track spec § 6.3).
+        if (isCleanWin && !warm && !isPeek) {
           streakRef.current = streakRef.current + 1
           setStreak(streakRef.current)
           if (
@@ -1046,13 +1148,53 @@ export function MathScreen({
         advanceToNext()
       }
 
-      void speak(problem.utterances.correct).then(() => {
+      /** The 4 s ceiling: the advance fires even if a line never ends. */
+      const armCeiling = () => {
+        if (advanceCeilingTimerRef.current !== null) {
+          clearTimeout(advanceCeilingTimerRef.current)
+        }
+        advanceCeilingTimerRef.current = setTimeout(() => {
+          advanceCeilingTimerRef.current = null
+          if (advanceFiredRef.current) return
+          if (visibility.getIsHidden()) {
+            pendingAdvanceRef.current = true
+            return
+          }
+          advanceFiredRef.current = true
+          if (advanceTimerRef.current !== null) {
+            clearTimeout(advanceTimerRef.current)
+            advanceTimerRef.current = null
+          }
+          setCelebrating(false)
+          advanceToNext()
+        }, ADVANCE_HARD_CEILING_MS)
+      }
+
+      const myIndex = problemIndexRef.current
+      void speak(problem.utterances.correct).then(async () => {
         if (unmountedRef.current) return
-        correctSpeakResolvedRef.current = true
         poseTimerRef.current = setTimeout(() => {
           setPose('idle')
           poseTimerRef.current = null
         }, 0)
+        if (knew && !advanceFiredRef.current) {
+          // § 7: line end → 300 ms → "You just knew that one!"; the advance
+          // waits for it (the ceiling counts from the remark's gap).
+          armCeiling()
+          await new Promise<void>((resolve) => {
+            knewTimerRef.current = setTimeout(() => {
+              knewTimerRef.current = null
+              resolve()
+            }, KNEW_GAP_MS)
+          })
+          if (unmountedRef.current || problemIndexRef.current !== myIndex)
+            return
+          if (advanceFiredRef.current) return
+          await speakGuide('guide.session.knew')
+          if (unmountedRef.current || problemIndexRef.current !== myIndex)
+            return
+        }
+        correctSpeakResolvedRef.current = true
         tryAdvance()
       })
 
@@ -1064,26 +1206,9 @@ export function MathScreen({
         tryAdvance()
       }, ADVANCE_AFTER_CORRECT_MS)
 
-      if (advanceCeilingTimerRef.current !== null) {
-        clearTimeout(advanceCeilingTimerRef.current)
-      }
-      advanceCeilingTimerRef.current = setTimeout(() => {
-        advanceCeilingTimerRef.current = null
-        if (advanceFiredRef.current) return
-        if (visibility.getIsHidden()) {
-          pendingAdvanceRef.current = true
-          return
-        }
-        advanceFiredRef.current = true
-        if (advanceTimerRef.current !== null) {
-          clearTimeout(advanceTimerRef.current)
-          advanceTimerRef.current = null
-        }
-        setCelebrating(false)
-        advanceToNext()
-      }, ADVANCE_HARD_CEILING_MS)
+      armCeiling()
     },
-    [advanceToNext, grantStardust, sfx, speak, visibility],
+    [advanceToNext, grantStardust, sfx, speak, speakGuide, visibility, isPeek],
   )
 
   const onChipTap = useCallback(
@@ -1161,8 +1286,8 @@ export function MathScreen({
   // never run the subitising scaffolds (spec § 1).
   const arith = currentProblem.kind === 'arithmetic' ? currentProblem : null
   const showStreak = streak >= 2 || streakFadingOut
-  // The subitising scaffolds never run for review or warm-up problems.
-  const scaffoldsAllowed = !review && problemIndex >= warmups
+  // The subitising scaffolds never run for review, warm-up or peek problems.
+  const scaffoldsAllowed = !review && !isPeek && problemIndex >= warmups
 
   const useScaffoldGate =
     focusNode !== undefined && subitisingScaffoldActive !== undefined
@@ -1212,8 +1337,9 @@ export function MathScreen({
   // ── Render ───────────────────────────────────────────────────────────
 
   const { problem: area, chips, ribbon, ribbonPadding } = layout
-  // A review's stage waits for its opener (review spec § 3.3).
-  const stageShown = !review || openerDone
+  // A review's or a peek's stage waits for its opener (review spec § 3.3,
+  // fast-track spec § 6.3).
+  const stageShown = opener === null || openerDone
   const counting =
     arith !== null && arith.op === '+'
       ? countingMetrics(layout, arith.addendA, arith.addendB, area.width)
@@ -1297,9 +1423,10 @@ export function MathScreen({
           showStreak={showStreak}
           streakFadingOut={streakFadingOut}
           celebrating={celebrating}
-          onBack={onRequestExit}
+          onBack={isPeek ? endPeekNow : onRequestExit}
           review={review}
           warmupCount={warmups}
+          peek={isPeek}
         />
 
         {captionVisible && captionText !== '' && (
@@ -1334,7 +1461,10 @@ export function MathScreen({
             <GettingReady testID="math-getting-ready" />
           </View>
         ) : !stageShown ? null : (
-          <StageLayer review={review} reducedMotion={reducedMotion}>
+          <StageLayer
+            fade={opener === null ? null : isPeek ? 'peek' : 'review'}
+            reducedMotion={reducedMotion}
+          >
             <View
               testID="math-problem"
               style={[
@@ -1505,23 +1635,25 @@ export function MathScreen({
 }
 
 /**
- * The problem and the chips. A review's stage mounts at its opener's end
- * and fades in, 200 ms ease-out, or appears at once with Reduce Motion
- * (review spec § 5); every other session renders them as before.
+ * The problem and the chips. A review's or a peek's stage mounts at its
+ * opener's end and fades in, 200 ms ease-out, or appears at once with
+ * Reduce Motion (review spec § 5, fast-track spec § 9); every other
+ * session renders them as before.
  */
 function StageLayer({
-  review,
+  fade,
   reducedMotion,
   children,
 }: {
-  review: boolean
+  /** Which opener the stage waited for; `null` = none. */
+  fade: 'review' | 'peek' | null
   reducedMotion: boolean
   children: ReactNode
 }) {
-  if (!review) return <>{children}</>
+  if (fade === null) return <>{children}</>
   return (
     <Animated.View
-      testID="math-review-stage"
+      testID={`math-${fade}-stage`}
       entering={
         reducedMotion
           ? undefined

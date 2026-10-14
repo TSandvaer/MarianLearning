@@ -37,6 +37,16 @@
  * card). The HUD shows the moon or the hearts. Warm-up problems never touch
  * the score or the streak; their first taps go to `warmupCorrect`.
  *
+ * Native-only, the fast track and the Map peek (spec
+ * `design/native/fast-track-native.md`): the result carries the 8 scored
+ * problems' first taps (`firstTapCorrect`, § 3.2; a problem solved after a
+ * wrong tap is `false` there and `true` in `perProblemCorrect`). A peek
+ * (`peek`, § 6.3) plays 3 problems of a later step: the opener "Let's look
+ * at this one!" over an empty stage, no stardust pill and no streak, and
+ * after problem 3 400 ms → the closer → 400 ms → `onPeekEnd`; the back
+ * arrow (and Android back) cuts the line and calls `onPeekEnd` at once. A
+ * peek writes nothing and hands no result over.
+ *
  * Emma is App's `EmmaStage`; this screen reports her pose (`onPoseChange`).
  */
 import type { EmmaPose } from '@marian/core/character/emmaPose'
@@ -86,6 +96,7 @@ import Animated, {
 import {
   audioEngine,
   blendMarksFor,
+  PEEK_CLOSE_GAP_MS,
   blendRevealAt,
   createSfx,
   createTapClipPlayer,
@@ -204,6 +215,13 @@ export interface WordSongProps {
   warmupCount?: number
   /** Test seam: the opener / warm-up line player. Default: the app's. */
   sessionGuide?: SessionGuidePlayer
+  /**
+   * A Map peek (fast-track spec § 6.3): 3 problems of a later step,
+   * nothing scored or written. Fixed for the mount.
+   */
+  peek?: boolean
+  /** The peek is over (after the closer, or the back arrow at once). */
+  onPeekEnd?: () => void
 }
 
 interface PerProblemState {
@@ -255,6 +273,8 @@ export function WordSong({
   review = false,
   warmupCount = 0,
   sessionGuide,
+  peek = false,
+  onPeekEnd,
 }: WordSongProps) {
   const appHidden = useIsAppHidden(visibility)
   const reducedMotion = useReducedMotion()
@@ -277,13 +297,19 @@ export function WordSong({
   const onSessionCompleteRef = useRef(onSessionComplete)
   const onPoseChangeRef = useRef(onPoseChange)
   const onRequestExitRef = useRef(onRequestExit)
+  const onPeekEndRef = useRef(onPeekEnd)
   useLayoutEffect(() => {
     playRef.current = playUtterance ?? silent.play
     clipForRef.current = clipFor
     onSessionCompleteRef.current = onSessionComplete
     onPoseChangeRef.current = onPoseChange
     onRequestExitRef.current = onRequestExit
+    onPeekEndRef.current = onPeekEnd
   })
+  /** A peek is fixed for the mount (App mounts a fresh screen per peek). */
+  const [isPeek] = useState(peek)
+  /** `onPeekEnd` fires once. */
+  const peekEndedRef = useRef(false)
   const line = useLineSpeaker(playRef)
   const { caption, speaking, clearCaption, linesInFlight, unmounted } = line
   const speakLine = line.speak
@@ -293,12 +319,23 @@ export function WordSong({
   useLayoutEffect(() => {
     warmupsRef.current = warmups
   })
-  /** The review opener has played (the stage mounts at its end). */
+  /**
+   * The line over the empty stage before problem 1's read: a review's
+   * opener or a peek's (same behaviour). `null` for every other session.
+   */
+  const opener: SessionGuideLineId | null = review
+    ? 'guide.session.review'
+    : isPeek
+      ? 'guide.session.peek-open'
+      : null
+  /** The opener has played (the stage mounts at its end). */
   const [openerDone, setOpenerDone] = useState(false)
   const openerStartedRef = useRef(false)
   /** The problem whose guide line has started (one per problem). */
   const leadForRef = useRef(-1)
   const leadInTimerRef = useRef<Timer>(null)
+  /** A peek's gaps around its closer (§ 6.3). */
+  const closerTimerRef = useRef<Timer>(null)
 
   // ── State (web names) ────────────────────────────────────────────────
 
@@ -367,6 +404,7 @@ export function WordSong({
       streakFadeTimerRef,
       litTimerRef,
       leadInTimerRef,
+      closerTimerRef,
     ]) {
       if (ref.current !== null) {
         clearTimeout(ref.current)
@@ -449,8 +487,8 @@ export function WordSong({
     // warm-up line before each warm-up read. Line end → 400 ms → the read
     // (a CVC card's silent beat, then its read).
     const lead: SessionGuideLineId | null =
-      review && my === 0 && !openerStartedRef.current
-        ? 'guide.session.review'
+      opener !== null && my === 0 && !openerStartedRef.current
+        ? opener
         : my < warmups
           ? 'guide.session.warmup'
           : null
@@ -485,13 +523,13 @@ export function WordSong({
       microtask(() => {
         if (stale() || leadForRef.current === my) return
         leadForRef.current = my
-        if (lead === 'guide.session.review') openerStartedRef.current = true
+        if (lead === opener) openerStartedRef.current = true
         setPose('listening')
         void speak(SESSION_GUIDE_MANIFEST[lead].text, {
           play: (_text, opts) => guide.playLine(lead, opts),
         }).then(() => {
           if (stale()) return
-          if (lead === 'guide.session.review') setOpenerDone(true)
+          if (lead === opener) setOpenerDone(true)
           setPose((c) => (c === 'listening' ? 'idle' : c))
           leadInTimerRef.current = setTimeout(() => {
             leadInTimerRef.current = null
@@ -619,6 +657,29 @@ export function WordSong({
       clearCaption()
       return
     }
+    if (isPeek) {
+      // Peek § 6.3: 400 ms → the closer → 400 ms → back to the Map. No
+      // Session End, no result, no write.
+      setPose('listening')
+      closerTimerRef.current = setTimeout(() => {
+        closerTimerRef.current = null
+        if (unmounted.current) return
+        void speak(SESSION_GUIDE_MANIFEST['guide.session.peek-close'].text, {
+          play: (_text, opts) =>
+            guide.playLine('guide.session.peek-close', opts),
+        }).then(() => {
+          if (unmounted.current) return
+          setPose('idle')
+          closerTimerRef.current = setTimeout(() => {
+            closerTimerRef.current = null
+            if (unmounted.current || peekEndedRef.current) return
+            peekEndedRef.current = true
+            onPeekEndRef.current?.()
+          }, PEEK_CLOSE_GAP_MS)
+        })
+      }, PEEK_CLOSE_GAP_MS)
+      return
+    }
     const finalState = writeStardust(stardustTotalRef.current, storage, now)
     setStardust(finalState)
     // The arrays cover the round; the result's cover the 8 scored
@@ -634,9 +695,10 @@ export function WordSong({
       targetWords: plan.problems.slice(w).map((p) => p.target.word),
       perProblemAnswerWord: perProblemAnswerWordRef.current.slice(w),
       warmupCorrect: firstTapCorrectRef.current.slice(0, w),
+      firstTapCorrect: firstTapCorrectRef.current.slice(w),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` seeds the write only
-  }, [problemIndex, plan, storage, clearTimers, clearCaption, tap])
+  }, [problemIndex, plan, storage, clearTimers, clearCaption, tap, isPeek])
 
   // Back from the background: run the advance that waited for it.
   useEffect(() => {
@@ -702,8 +764,9 @@ export function WordSong({
       setPose('puzzled-tilt')
       if (poseTimerRef.current !== null) clearTimeout(poseTimerRef.current)
 
-      // A warm-up problem never touches the streak (review spec § 6).
-      if (problemIndexRef.current >= warmupsRef.current) {
+      // A warm-up problem never touches the streak (review spec § 6); a
+      // peek has none.
+      if (!isPeek && problemIndexRef.current >= warmupsRef.current) {
         const wasOnStreak = streak >= 2
         streakRef.current = 0
         if (wasOnStreak) {
@@ -757,7 +820,7 @@ export function WordSong({
         }
       })
     },
-    [sfx, speak, streak, unmounted, backToIdleSoon, playSecondWrong],
+    [sfx, speak, streak, unmounted, backToIdleSoon, playSecondWrong, isPeek],
   )
 
   const handleCorrectTap = useCallback(
@@ -786,7 +849,7 @@ export function WordSong({
           perProblemCorrectRef.current[i] = true
         }
         if (!warm) totalCorrectRef.current += 1
-        if (!warm && isCleanWin(counters)) {
+        if (!warm && !isPeek && isCleanWin(counters)) {
           streakRef.current += 1
           setStreak(streakRef.current)
         }
@@ -841,7 +904,7 @@ export function WordSong({
         fire()
       }, ADVANCE_HARD_CEILING_MS)
     },
-    [sfx, speak, advanceToNext, visibility, unmounted, backToIdleSoon],
+    [sfx, speak, advanceToNext, visibility, unmounted, backToIdleSoon, isPeek],
   )
 
   const onChipTap = useCallback(
@@ -899,13 +962,23 @@ export function WordSong({
     warmups,
   ])
 
-  // Back arrow and Android back: silence, then the Hub (no Session End).
+  // Back arrow and Android back: silence, then the Hub (no Session End);
+  // in a peek, `onPeekEnd` at once (§ 6.3).
   const exit = useCallback(() => {
     tapTokenRef.current += 1
     tap.cut()
     cancelEmmaLine()
+    if (isPeek) {
+      if (peekEndedRef.current) return
+      peekEndedRef.current = true
+      clearTimers()
+      silent.cancel()
+      guide.cancelActive()
+      onPeekEndRef.current?.()
+      return
+    }
     onRequestExitRef.current()
-  }, [tap, cancelEmmaLine])
+  }, [tap, cancelEmmaLine, isPeek, clearTimers, silent, guide])
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       exit()
@@ -922,8 +995,9 @@ export function WordSong({
     digraphsThNodeLevel === 'intro' || digraphsThNodeLevel === 'practicing'
   const showThIntro = digraphsThFirstEncounter && audioReady !== true
   const { stage, chips, ribbon, ribbonPadding } = layout
-  // A review's stage waits for its opener (review spec § 3.3).
-  const stageShown = !review || openerDone
+  // A review's or a peek's stage waits for its opener (review spec § 3.3,
+  // fast-track spec § 6.3).
+  const stageShown = opener === null || openerDone
   const ribbonLines = Math.max(
     1,
     Math.floor(
@@ -959,6 +1033,7 @@ export function WordSong({
           onBack={exit}
           review={review}
           warmupCount={warmups}
+          peek={isPeek}
         />
 
         {caption.visible && caption.text !== '' && (
@@ -997,7 +1072,10 @@ export function WordSong({
             <GettingReady testID="word-song-getting-ready" />
           </View>
         ) : !stageShown ? null : (
-          <StageLayer review={review} reducedMotion={reducedMotion}>
+          <StageLayer
+            fade={opener === null ? null : isPeek ? 'peek' : 'review'}
+            reducedMotion={reducedMotion}
+          >
             <WordStage
               key={`stage-${problemIndex}`}
               round={round}
@@ -1062,23 +1140,25 @@ export function WordSong({
 }
 
 /**
- * The card and the chips. A review's stage mounts at its opener's end and
- * fades in, 200 ms ease-out, or appears at once with Reduce Motion (review
- * spec § 5); every other session renders them as before.
+ * The card and the chips. A review's or a peek's stage mounts at its
+ * opener's end and fades in, 200 ms ease-out, or appears at once with
+ * Reduce Motion (review spec § 5, fast-track spec § 9); every other session
+ * renders them as before.
  */
 function StageLayer({
-  review,
+  fade,
   reducedMotion,
   children,
 }: {
-  review: boolean
+  /** Which opener the stage waited for; `null` = none. */
+  fade: 'review' | 'peek' | null
   reducedMotion: boolean
   children: ReactNode
 }) {
-  if (!review) return <>{children}</>
+  if (fade === null) return <>{children}</>
   return (
     <Animated.View
-      testID="word-song-review-stage"
+      testID={`word-song-${fade}-stage`}
       entering={
         reducedMotion
           ? undefined
