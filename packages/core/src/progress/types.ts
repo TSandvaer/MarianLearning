@@ -749,6 +749,23 @@ export interface Progress {
    * so a blob that predates the marker never replays old unlocks.
    */
   unlocksCelebrated?: SkillNode[]
+  /**
+   * Secure days (native fast-track spec `design/native/fast-track-native.md`
+   * § 3.1): per step (or letter-sounds vowel), the sorted local days on
+   * which the FIRST finished session on it was all 8 right on the first
+   * tap. Two of them finish the step (`fastTrack.ts`). Only ever added,
+   * capped oldest-first at `MAX_GOOD_DAYS_PER_STEP`; recorded at session
+   * end from `firstTapCorrect`, so it is never seeded from history.
+   * Optional + additive — no `schemaVersion` bump. Absent = none.
+   */
+  secureDays?: GoodDays
+  /**
+   * Pace guard (fast-track spec § 5): steps whose day score was ≤ 5/8 on
+   * the last two days she played them. While a step here is not mastered
+   * the fast track is off for it (and its vowels); nothing else changes.
+   * Add-only. Optional + additive — no `schemaVersion` bump.
+   */
+  paceHold?: SkillNode[]
 }
 
 /**

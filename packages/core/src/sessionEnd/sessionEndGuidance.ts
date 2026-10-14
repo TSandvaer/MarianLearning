@@ -107,6 +107,12 @@ export interface SessionEndGuidance {
   slotsAfter: FlowerSlot[]
   /** Slot the new flower flies into; null when no flower today. */
   newSlot: number | null
+  /**
+   * Fast track (native spec `design/native/fast-track-native.md` § 4.1):
+   * the slots after `newSlot` that grow in place on a fast-track day
+   * (`row.was + 1 … row.now − 1`). Empty on every other day.
+   */
+  bonusSlots: number[]
   /** "2 of 3" / "3 of 3!" once the flower lands; null without one. */
   countText: string | null
   /** Emma's lines, in order. */
@@ -226,15 +232,25 @@ export function sessionEndGuidance(
         : full && lastStep && input.after.skillLevels[input.node] === 'mastered'
           ? 'world-done'
           : 'good-day'
-    const newSlot = row.now - 1
+    // Today's flower flies into the first empty slot; on a fast-track day
+    // (2 secure days, § 4.1) the rest of the row grows in place after it.
+    // With one flower the two agree with the old `row.now − 1`.
+    const newSlot = row.was
+    const bonusSlots = Array.from(
+      { length: Math.max(0, row.now - row.was - 1) },
+      (_, i) => row.was + 1 + i,
+    )
     // The flower that fills the row is the climax: it lands grown. Any
     // other new flower sleeps until tomorrow (with the separate-days rule
     // on — without it there is no "tomorrow" to wait for).
-    const sleeping = !full && crossDay ? newSlot : null
+    const sleeping = !full && crossDay ? row.now - 1 : null
     const counted = row.required === 3 && row.now <= 3
     const lines: EndLine[] = [
       praiseFor(input.totalCorrect),
-      line('guide.end.flower', 'flower')!,
+      line(
+        bonusSlots.length > 0 ? 'guide.end.fast-track' : 'guide.end.flower',
+        'flower',
+      )!,
     ]
     if (counted) lines.push(line(`guide.end.count.${row.now}`, 'count')!)
     if (day === 'unlock') lines.push(line('guide.end.path-opens', 'next')!)
@@ -247,6 +263,7 @@ export function sessionEndGuidance(
       slotsBefore: tray(row.required, row.was, null),
       slotsAfter: tray(row.required, row.now, sleeping),
       newSlot,
+      bonusSlots,
       countText: `${row.now} of ${row.required}${full ? '!' : ''}`,
       lines,
     }
@@ -268,6 +285,7 @@ export function sessionEndGuidance(
       slotsBefore: slots,
       slotsAfter: slots,
       newSlot: null,
+      bonusSlots: [],
       countText: null,
       lines: [praise],
     }
@@ -282,6 +300,7 @@ export function sessionEndGuidance(
     slotsBefore: slots,
     slotsAfter: slots,
     newSlot: null,
+    bonusSlots: [],
     countText: null,
     lines: input.nudgeSaidToday
       ? [praise]

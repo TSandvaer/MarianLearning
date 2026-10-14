@@ -1,7 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { GUIDANCE_LINES, guidanceLine } from './guidanceLines'
+import {
+  GUIDANCE_LINES,
+  GUIDANCE_LINES_AWAITING_RENDER,
+  guidanceLine,
+} from './guidanceLines'
 import { PATH_LINES } from './pathLines'
 
 const read = (rel: string) => readFileSync(join(process.cwd(), rel), 'utf8')
@@ -26,13 +30,17 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'end-not-yet-praise': 1,
       'end-not-yet-again': 1,
       'end-world-done': 1,
+      'end-fast-track': 1,
       'session-review': 1,
       'session-warmup': 1,
+      'session-knew': 1,
+      'session-peek-open': 1,
+      'session-peek-close': 1,
     })
-    expect(GUIDANCE_LINES).toHaveLength(21)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(21)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(21)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(21)
+    expect(GUIDANCE_LINES).toHaveLength(25)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(25)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(25)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(25)
   })
 
   it('bakes each world and count variant', () => {
@@ -82,16 +90,36 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     )
   })
 
-  it('has a bundled MP3 for every line', () => {
+  it('bakes the fast-track spec § 8 lines with their exact approved texts (AC 11)', () => {
+    expect(guidanceLine('guide.end.fast-track')?.text).toBe(
+      'You know this! All your flowers grew!',
+    )
+    expect(guidanceLine('guide.session.knew')?.text).toBe(
+      'You just knew that one!',
+    )
+    expect(guidanceLine('guide.session.peek-open')?.text).toBe(
+      "Let's look at this one!",
+    )
+    expect(guidanceLine('guide.session.peek-close')?.text).toBe(
+      'This one is for later. You will learn it!',
+    )
+    expect(guidanceLine('guide.session.peek-close')?.src).toBe(
+      '/assets/audio/path/guide-session-peek-close.mp3',
+    )
+  })
+
+  it('has a bundled MP3 for every line but the ones awaiting their render', () => {
     const missing = GUIDANCE_LINES.filter(
       (l) => !existsSync(join(process.cwd(), 'public', l.src)),
-    ).map((l) => l.src)
-    expect(missing).toEqual([])
+    ).map((l) => l.id)
+    // Exactly the awaiting list: the render commit adds the clips AND
+    // empties `GUIDANCE_LINES_AWAITING_RENDER`.
+    expect(missing).toEqual([...GUIDANCE_LINES_AWAITING_RENDER])
     expect(
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(21)
+    ).toHaveLength(25)
   })
 
   it('repeats no Emma’s Path line', () => {

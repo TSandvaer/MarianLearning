@@ -79,6 +79,22 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
 
+/**
+ * A per-step day counter (`goodDays`, `secureDays`): an object of string
+ * arrays (local-day keys). Keys are NOT checked against SKILL_NODES: an
+ * entry for a renamed/removed step is inert, and rejecting it would
+ * discard the whole blob.
+ */
+function isDayCounter(v: unknown): boolean {
+  if (!isObject(v)) return false
+  for (const days of Object.values(v)) {
+    if (days === undefined) continue
+    if (!Array.isArray(days)) return false
+    if (!days.every((day) => typeof day === 'string')) return false
+  }
+  return true
+}
+
 function isSkillLevels(v: unknown): v is SkillLevels {
   if (!isObject(v)) return false
   for (const node of SKILL_NODES) {
@@ -447,12 +463,18 @@ export function isProgressV1(v: unknown): v is Progress {
   // inert, and rejecting it would discard the whole blob. Absent is the
   // pre-counter state; `storage.ts:withSeededGoodDays` seeds it on load.
   if ('goodDays' in v && v.goodDays !== undefined) {
-    if (!isObject(v.goodDays) || Array.isArray(v.goodDays)) return false
-    for (const days of Object.values(v.goodDays)) {
-      if (days === undefined) continue
-      if (!Array.isArray(days)) return false
-      if (!days.every((day) => typeof day === 'string')) return false
-    }
+    if (!isDayCounter(v.goodDays)) return false
+  }
+  // secureDays is optional (native fast-track spec § 3.5; additive, no
+  // schemaVersion bump): the same shape and rules as goodDays.
+  if ('secureDays' in v && v.secureDays !== undefined) {
+    if (!isDayCounter(v.secureDays)) return false
+  }
+  // paceHold is optional (fast-track spec § 5): an array of strings. A
+  // name that is not a current step is inert, as for unlocksCelebrated.
+  if ('paceHold' in v && v.paceHold !== undefined) {
+    if (!Array.isArray(v.paceHold)) return false
+    if (!v.paceHold.every((n) => typeof n === 'string')) return false
   }
   // unlocksCelebrated is optional (Emma's Path 9/10 — ticket 123jpnbc3dt;
   // additive, no schemaVersion bump). When present it must be an array of

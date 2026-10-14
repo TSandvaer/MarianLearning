@@ -697,6 +697,72 @@ describe('reconcileWithCloud', () => {
     expect(isProgressV1(installed[0]!)).toBe(true)
   })
 
+  it('fast track AC10: a newer cloud blob unions secureDays and paceHold with the local ones (fast-track-native § 3.5)', async () => {
+    const seed = defaultProgress()
+    const local: Progress = {
+      ...seed,
+      secureDays: { 'add-to-10': ['2026-06-10'], '/o/': ['2026-06-09'] },
+      paceHold: ['sub-to-10'],
+    }
+    const cloudBlob: Progress = {
+      ...seed,
+      profile: { ...seed.profile, lastPlayedISO: '2026-06-15T10:00:00.000Z' },
+      secureDays: { 'add-to-10': ['2026-06-12'] },
+      paceHold: ['add-to-20'],
+    }
+    const installed: Progress[] = []
+    const outcome = await reconcileWithCloud(VALID_UUID, local, {
+      fetchImpl: makeFetchReturning({
+        kind: 'found',
+        blob: cloudBlob,
+        lastModifiedISO: '2026-06-15T10:00:00.000Z',
+      }),
+      authSecret: SECRET,
+      installLocally: (p) => installed.push(p),
+      pushImpl: vi.fn(async () => 'sent' as const),
+    })
+    expect(outcome.kind).toBe('installed-from-cloud')
+    expect(installed).toHaveLength(1)
+    expect(installed[0]!.secureDays).toEqual({
+      'add-to-10': ['2026-06-10', '2026-06-12'],
+      '/o/': ['2026-06-09'],
+    })
+    expect(installed[0]!.paceHold).toEqual(['add-to-20', 'sub-to-10'])
+    expect(isProgressV1(installed[0]!)).toBe(true)
+  })
+
+  it('fast track AC10: a cloud blob without the fields keeps the local ones; neither side has them → absent', async () => {
+    const seed = defaultProgress()
+    const cloudBlob: Progress = {
+      ...seed,
+      profile: { ...seed.profile, lastPlayedISO: '2026-06-15T10:00:00.000Z' },
+    }
+    const run = async (local: Progress) => {
+      const installed: Progress[] = []
+      await reconcileWithCloud(VALID_UUID, local, {
+        fetchImpl: makeFetchReturning({
+          kind: 'found',
+          blob: cloudBlob,
+          lastModifiedISO: '2026-06-15T10:00:00.000Z',
+        }),
+        authSecret: SECRET,
+        installLocally: (p) => installed.push(p),
+        pushImpl: vi.fn(async () => 'sent' as const),
+      })
+      return installed[0]!
+    }
+    const kept = await run({
+      ...seed,
+      secureDays: { 'blending-cv': ['2026-06-01'] },
+      paceHold: ['cvc-words'],
+    })
+    expect(kept.secureDays).toEqual({ 'blending-cv': ['2026-06-01'] })
+    expect(kept.paceHold).toEqual(['cvc-words'])
+    const none = await run(seed)
+    expect('secureDays' in none).toBe(false)
+    expect('paceHold' in none).toBe(false)
+  })
+
   it('cvcGraduationSessionFired parity — cloud blob with the latch true preserves it verbatim across install', async () => {
     // Round-trip pin: a cloud blob that already fired the graduation
     // review (latch true) must NOT have it reset to false by the

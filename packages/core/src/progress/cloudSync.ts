@@ -474,6 +474,8 @@ export async function reconcileWithCloud(
       currentLocal?.history,
       currentLocal?.goodDays,
       currentLocal?.unlocksCelebrated,
+      currentLocal?.secureDays,
+      currentLocal?.paceHold,
     )
     if (validated === null) {
       return { kind: 'cloud-blob-rejected' }
@@ -525,6 +527,8 @@ function installCloudBlob(
   localHistory?: SessionHistoryEntry[],
   localGoodDays?: GoodDays,
   localUnlocksCelebrated?: SkillNode[],
+  localSecureDays?: GoodDays,
+  localPaceHold?: SkillNode[],
 ): Progress | null {
   // Pre-guard defaulters, in the SAME order as storage.ts:loadProgress —
   // skill-level floor first, then the W9.2 per-vowel letter-sounds
@@ -616,9 +620,31 @@ function installCloudBlob(
     withGoodDays.unlocksCelebrated,
     localUnlocksCelebrated,
   )
-  return unlocksCelebrated === withGoodDays.unlocksCelebrated
-    ? withGoodDays
-    : { ...withGoodDays, unlocksCelebrated }
+  const withUnlocks: Progress =
+    unlocksCelebrated === withGoodDays.unlocksCelebrated
+      ? withGoodDays
+      : { ...withGoodDays, unlocksCelebrated }
+
+  // Fast track (native spec design/native/fast-track-native.md § 3.5): the
+  // secure days and the pace hold are unioned like the good days and the
+  // seen-marker, so nothing banked locally is dropped. No seeder (P7).
+  const secureDays =
+    localSecureDays === undefined
+      ? withUnlocks.secureDays
+      : unionGoodDays(withUnlocks.secureDays, localSecureDays)
+  // `mergeUnlocksCelebrated` is the add-only union of two step lists.
+  const paceHold = mergeUnlocksCelebrated(withUnlocks.paceHold, localPaceHold)
+  if (
+    secureDays === withUnlocks.secureDays &&
+    paceHold === withUnlocks.paceHold
+  ) {
+    return withUnlocks
+  }
+  return {
+    ...withUnlocks,
+    ...(secureDays !== undefined ? { secureDays } : {}),
+    ...(paceHold !== undefined ? { paceHold } : {}),
+  }
 }
 
 /**

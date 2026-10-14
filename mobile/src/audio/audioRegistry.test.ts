@@ -1,7 +1,10 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { BAKED_PATH_LINES } from '@marian/core/emmasPath/pathLines'
-import { GUIDANCE_LINES } from '@marian/core/emmasPath/guidanceLines'
+import {
+  GUIDANCE_LINES,
+  GUIDANCE_LINES_AWAITING_RENDER,
+} from '@marian/core/emmasPath/guidanceLines'
 import { HUB_LINES } from '@marian/core/hub/hubLines'
 import { WEB_AUDIO_MODULES } from './audioRegistry'
 import { GREET_LINE_SOURCES } from './greetAudio'
@@ -28,11 +31,21 @@ describe('bundled audio registry (npm run export-audio)', () => {
       ...Object.values(GREET_LINE_SOURCES),
       ...Object.values(HUB_LINES).map((l) => l.src),
       ...BAKED_PATH_LINES.map((l) => l.src),
-      ...GUIDANCE_LINES.map((l) => l.src),
+      ...GUIDANCE_LINES.filter(
+        (l) => !GUIDANCE_LINES_AWAITING_RENDER.includes(l.id),
+      ).map((l) => l.src),
       ...Object.values(SFX_SOURCES),
     ]
     const missing = wanted.filter((p) => !registryPaths.includes(p))
     expect(missing).toEqual([])
+  })
+
+  it('has no copy of a line still awaiting its render (the render commit empties that list)', () => {
+    const awaiting = GUIDANCE_LINES.filter((l) =>
+      GUIDANCE_LINES_AWAITING_RENDER.includes(l.id),
+    ).map((l) => l.src)
+    expect(awaiting).toHaveLength(GUIDANCE_LINES_AWAITING_RENDER.length)
+    expect(awaiting.filter((p) => registryPaths.includes(p))).toEqual([])
   })
 
   it('covers every web MP3 in the bundled directories', () => {

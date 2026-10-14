@@ -38,8 +38,12 @@ export type GuidanceLineKind =
   | 'end-not-yet-praise'
   | 'end-not-yet-again'
   | 'end-world-done'
+  | 'end-fast-track'
   | 'session-review'
   | 'session-warmup'
+  | 'session-knew'
+  | 'session-peek-open'
+  | 'session-peek-close'
 
 export interface GuidanceLine {
   /** Dotted id, e.g. `guide.hub.suggest.math`. */
@@ -128,6 +132,14 @@ function buildLines(): GuidanceLine[] {
   )
   // The flower that finishes a world's last step.
   add('guide.end.world-done', 'end-world-done', 'You grew your whole garden!')
+  // The fast-track day, in place of "You got a flower!" (native spec
+  // design/native/fast-track-native.md § 8, text approved by Thomas
+  // 2026-10-14, T1).
+  add(
+    'guide.end.fast-track',
+    'end-fast-track',
+    'You know this! All your flowers grew!',
+  )
 
   // In session (native spec design/native/review-mode-and-warmup-native.md
   // § 4, text approved by Thomas 2026-10-14): a review's opener, and the
@@ -138,11 +150,34 @@ function buildLines(): GuidanceLine[] {
     "Your flower is sleeping. Let's play the ones you know!",
   )
   add('guide.session.warmup', 'session-warmup', 'Remember this one?')
+  // Fast-track spec § 8 (T1, approved as written 2026-10-14): a quick
+  // warm-up answer (§ 7), and the Map peek's opener and closer (§ 6.3).
+  add('guide.session.knew', 'session-knew', 'You just knew that one!')
+  add('guide.session.peek-open', 'session-peek-open', "Let's look at this one!")
+  add(
+    'guide.session.peek-close',
+    'session-peek-close',
+    'This one is for later. You will learn it!',
+  )
   return lines
 }
 
 /** Every guidance line: Hub, then session end, then in session. */
 export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
+
+/**
+ * Lines whose MP3 is not rendered yet. Until the render commit adds their
+ * clips (`scripts/renderGuidanceLinesLily.ts`, then `npm run export-audio`
+ * in `mobile/`), the players walk their captions silently, and the
+ * bundled-MP3 tests expect exactly these to be missing. The render commit
+ * empties this list (the tests fail while a listed clip exists).
+ */
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
+  'guide.end.fast-track',
+  'guide.session.knew',
+  'guide.session.peek-open',
+  'guide.session.peek-close',
+]
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 
