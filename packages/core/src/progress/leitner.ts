@@ -9,6 +9,7 @@
  * double invocations.
  */
 
+import { leitnerFactAllowedForFocus } from '../wire/leitnerFocus'
 import type { LeitnerBox, LeitnerBoxIndex, LeitnerItem } from './types'
 
 /** Max box index. Mirrors the type union bound. */
@@ -220,6 +221,32 @@ export const LEITNER_HINT_MAX_ITEMS = 60
  * tuning pass can raise one without disturbing the other.
  */
 export const LEITNER_DUE_PER_SESSION_CAP = 3
+
+/**
+ * The box narrowed to the facts a session on `focusNode` may be hinted
+ * with: a multiplication fact (`op: '*'`) only on a multiplication step.
+ * Addition and subtraction facts pass for every step, as before.
+ *
+ * The rule is `wire/leitnerFocus.ts`'s, which the server applies to every
+ * request too (the frozen web sends the whole due box). Native applies it
+ * BEFORE {@link buildLeitnerSessionHint}: the per-session cap is 3, and a
+ * `*` fact must not take an addition fact's slot.
+ */
+export function leitnerBoxForFocus<T extends { op: '+' | '-' | '*' }>(
+  box: LeitnerBox<T>,
+  focusNode: string | undefined,
+): LeitnerBox<T> {
+  if (
+    box.items.every((e) => leitnerFactAllowedForFocus(e.item.op, focusNode))
+  ) {
+    return box
+  }
+  return {
+    items: box.items.filter((e) =>
+      leitnerFactAllowedForFocus(e.item.op, focusNode),
+    ),
+  }
+}
 
 /**
  * Flatten a `LeitnerBox<MathFact>` into the wire-shape hint, sorted

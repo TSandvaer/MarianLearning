@@ -561,3 +561,419 @@ export function countingMetrics(
     height: maxRows * size + (maxRows - 1) * PHONE_DOT_GAP,
   }
 }
+
+// ── Number Garden 1 and 8–11 (number recognition, skip counting,
+//    multiplication) ────────────────────────────────────────────────────
+//
+// `design/native/math-skip-counting-multiplication-native.md` § 2, § 3,
+// § 6 and § 10; `mathLayout.test.ts` pins its § 6 table.
+
+/** Problem kinds the layout tells apart (core's `ExtendedMathProblemKind`). */
+export type MathLayoutKind =
+  | 'arithmetic'
+  | 'recognize'
+  | 'skip-count'
+  | 'multiply'
+
+export interface ExtendedMathLayout extends MathLayout {
+  /** The chips' row (Math's) or the right-edge column (Word Song's L). */
+  chipsAxis: 'row' | 'column'
+  /** The ribbon's line cap (`CaptionRibbon` `maxLines`); `undefined`: none. */
+  ribbonLines: number | undefined
+}
+
+/** Phone landscape's chip column (Word Song's L): chips clamp(88, …, 104). */
+const COLUMN_CHIP_MIN = 88
+const COLUMN_CHIP_MAX = 104
+const COLUMN_CHIP_GAP = 16
+
+/**
+ * Math's layout for a plan of `kind` (spec § 6):
+ *
+ * - arithmetic, number recognition, and every tablet form: `mathLayout`.
+ * - Phone portrait, skip / multiply: Math's P frame; the ribbon is capped at
+ *   4 lines (they end at 253 pt on the 375×667 floor, above the problem's
+ *   top at 259).
+ * - Phone landscape, skip / multiply: Word Song's L frame
+ *   (`wordSongLayout.ts`, mirrored here: importing it would be a require
+ *   cycle): Math's Emma column and back arrow, the HUD row, the ribbon at
+ *   safe y + 60 in a 2-line (skip) or 1-line (multiply) slot, the chip column
+ *   clamp(88, ⌊(safe h − 56) / 3⌋, 104) on the right, and the stage between
+ *   as the problem rect.
+ */
+export function extendedMathLayout(
+  v: Viewport,
+  kind: MathLayoutKind,
+): ExtendedMathLayout {
+  const m = mathLayout(v)
+  if (kind === 'arithmetic' || kind === 'recognize' || m.tablet) {
+    return { ...m, chipsAxis: 'row', ribbonLines: undefined }
+  }
+  if (m.form === 'phone-portrait') {
+    return { ...m, chipsAxis: 'row', ribbonLines: 4 }
+  }
+  const s = safeRect(v)
+  const pad = 16
+  const column = clamp(120, Math.round(s.width * 0.24), 200)
+  const chip = clamp(
+    COLUMN_CHIP_MIN,
+    Math.floor((s.height - 56) / 3),
+    COLUMN_CHIP_MAX,
+  )
+  const chipX = s.x + s.width - pad - chip
+  const chipsH = 3 * chip + 2 * COLUMN_CHIP_GAP
+  const paneX = s.x + column
+  const paneW = chipX - 16 - paneX
+  const hudRow = { x: paneX, y: s.y + 8, width: paneW, height: 44 }
+  const ribbonLines = kind === 'skip-count' ? 2 : 1
+  const ribbonH = ribbonSlot(
+    PHONE_CAPTION_PT,
+    PHONE_RIBBON_PADDING,
+    ribbonLines,
+  )
+  const ribbonY = s.y + 60
+  const stageTop = ribbonY + ribbonH + 8
+  return {
+    ...m,
+    content: { x: paneX, y: hudRow.y, width: paneW, height: s.height },
+    hud: {
+      kind: 'split',
+      back: { x: s.x + pad, y: s.y + 8, width: PHONE_BACK, height: PHONE_BACK },
+      beads: hudRow,
+      status: hudRow,
+    },
+    ribbon: { x: paneX, y: ribbonY, width: paneW, maxHeight: ribbonH },
+    problem: {
+      x: paneX,
+      y: stageTop,
+      width: paneW,
+      height: Math.max(0, s.y + s.height - 16 - stageTop),
+    },
+    problemGap: 8,
+    chips: {
+      rect: {
+        x: chipX,
+        y: s.y + s.height - 16 - chipsH,
+        width: chip,
+        height: chipsH,
+      },
+      size: chip,
+      gap: COLUMN_CHIP_GAP,
+      ...chipMetrics(chip, false),
+    },
+    chipsAxis: 'column',
+    ribbonLines,
+  }
+}
+
+/**
+ * Fredoka 700 advance widths (em) of the glyphs the new problem visuals
+ * draw, read from `Fredoka_700Bold.ttf`'s `hmtx` table (unitsPerEm 1000).
+ * "10" at 22 pt measures 20.77 pt, as the spec's § 10 says (20.8).
+ */
+const FREDOKA_BOLD_ADVANCE: Record<string, number> = {
+  '0': 0.565,
+  '1': 0.379,
+  '2': 0.566,
+  '3': 0.565,
+  '4': 0.551,
+  '5': 0.493,
+  '6': 0.521,
+  '7': 0.522,
+  '8': 0.541,
+  '9': 0.521,
+  '?': 0.476,
+  '+': 0.49,
+}
+
+/** Width of `text` (digits, "?", "+") in Fredoka 700 at `size`. */
+export function fredokaBoldWidth(text: string, size: number): number {
+  let em = 0
+  for (const ch of text) em += FREDOKA_BOLD_ADVANCE[ch] ?? 0.6
+  return em * size
+}
+
+// ── Skip counting: the stepping-stone track (spec § 2) ──────────────────
+
+/** At most this many terms are drawn (the last ones); then the "?". */
+export const SKIP_MAX_TERMS = 8
+/** Up to this many cells take one row; more take two balanced rows. */
+export const SKIP_ONE_ROW_MAX = 5
+
+export interface SkipTrackMetrics {
+  /** Stone diameter D. */
+  stone: number
+  /** Between stones in a row (G). */
+  gap: number
+  /** Between the two rows. */
+  rowGap: number
+  /** Above each row, for its hops. */
+  hopZone: number
+  /** The numerals (and "?"), one size for the session. */
+  numeralFont: number
+  hopStroke: number
+  /** The hop's apex, above the stone tops. */
+  hopApex: number
+  hopLabelFont: number
+  hopArrow: number
+}
+
+export interface SkipTrackCell {
+  /** Top-left of the stone, in the track's own box. */
+  x: number
+  y: number
+  row: 0 | 1
+}
+
+export interface SkipTrackGeometry {
+  cells: SkipTrackCell[]
+  width: number
+  height: number
+}
+
+/** The cells of a problem: its last {@link SKIP_MAX_TERMS} terms + "?". */
+export function skipTrackCellCount(termCount: number): number {
+  return Math.min(termCount, SKIP_MAX_TERMS) + 1
+}
+
+function skipTrackSize(
+  n: number,
+  d: number,
+  g: number,
+  hop: number,
+  rowGap: number,
+): { width: number; height: number } {
+  if (n <= SKIP_ONE_ROW_MAX) {
+    return { width: n * d + (n - 1) * g, height: hop + d }
+  }
+  const c1 = Math.ceil(n / 2)
+  const c2 = n - c1
+  return {
+    width: Math.max(c1 * d + (c1 - 1) * g, (d + g) / 2 + c2 * d + (c2 - 1) * g),
+    height: 2 * (hop + d) + rowGap,
+  }
+}
+
+/**
+ * The track's sizes for a plan (spec § 2, decision 10: one stone size for
+ * the session). D is the largest value ≤ 64 (tablet 88) at which the plan's
+ * longest sequence fits the problem rect; the numerals start at round(D / 2)
+ * and step down 2 pt until the widest one (terms and answers) fits D − 12.
+ */
+export function skipTrackMetrics(
+  layout: Pick<MathLayout, 'tablet' | 'problem'>,
+  problems: readonly { sequence: readonly number[]; correct: number }[],
+): SkipTrackMetrics {
+  const tablet = layout.tablet
+  const gap = tablet ? 24 : 16
+  const rowGap = 8
+  const hopZone = tablet ? 40 : 30
+  const n = Math.max(
+    2,
+    ...problems.map((p) => skipTrackCellCount(p.sequence.length)),
+  )
+  let stone = tablet ? 88 : 64
+  while (stone > 1) {
+    const size = skipTrackSize(n, stone, gap, hopZone, rowGap)
+    if (
+      size.width <= layout.problem.width &&
+      size.height <= layout.problem.height
+    ) {
+      break
+    }
+    stone -= 1
+  }
+  const numerals = problems.flatMap((p) => [
+    ...p.sequence.slice(-SKIP_MAX_TERMS),
+    p.correct,
+  ])
+  const widest = numerals.reduce(
+    (w, n) => Math.max(w, fredokaBoldWidth(String(n), 1)),
+    fredokaBoldWidth('?', 1),
+  )
+  let numeralFont = Math.round(stone / 2)
+  while (numeralFont > 2 && widest * numeralFont > stone - 12) {
+    numeralFont -= 2
+  }
+  return {
+    stone,
+    gap,
+    rowGap,
+    hopZone,
+    numeralFont,
+    hopStroke: tablet ? 4 : 3,
+    hopApex: tablet ? 16 : 12,
+    hopLabelFont: tablet ? 22 : 16,
+    hopArrow: 6,
+  }
+}
+
+/** Where a problem's `cellCount` stones sit (row 2 indented by (D + G) / 2). */
+export function skipTrackGeometry(
+  m: SkipTrackMetrics,
+  cellCount: number,
+): SkipTrackGeometry {
+  const { stone: d, gap: g, hopZone, rowGap } = m
+  const twoRows = cellCount > SKIP_ONE_ROW_MAX
+  const c1 = twoRows ? Math.ceil(cellCount / 2) : cellCount
+  const cells: SkipTrackCell[] = []
+  for (let i = 0; i < cellCount; i++) {
+    if (i < c1) {
+      cells.push({ x: i * (d + g), y: hopZone, row: 0 })
+    } else {
+      cells.push({
+        x: (d + g) / 2 + (i - c1) * (d + g),
+        y: 2 * hopZone + d + rowGap,
+        row: 1,
+      })
+    }
+  }
+  return { cells, ...skipTrackSize(cellCount, d, g, hopZone, rowGap) }
+}
+
+// ── Multiplication: the groups row (spec § 3) ───────────────────────────
+
+/** Groups are drawn for `factorA` 1..10 and `factorB` 1..5 (spec § 1). */
+export const MAX_GROUP_SIZE = 10
+export const MAX_GROUPS = 5
+/** Flowers fill columns of this many, top to bottom. */
+export const GROUP_COLUMN = 5
+
+export interface GroupsMetrics {
+  flower: number
+  flowerGap: number
+  /** Inside the plate's edge, its 2 pt border included. */
+  pad: number
+  border: number
+  radius: number
+  tagHeight: number
+  tagFont: number
+  plusFont: number
+  gapMin: number
+  gapMax: number
+  /** Reserved for the session: half a tag + the plan's tallest plate. */
+  slot: number
+}
+
+export function groupsAreDrawn(factorA: number, factorB: number): boolean {
+  return (
+    Number.isInteger(factorA) &&
+    Number.isInteger(factorB) &&
+    factorA >= 1 &&
+    factorA <= MAX_GROUP_SIZE &&
+    factorB >= 1 &&
+    factorB <= MAX_GROUPS
+  )
+}
+
+function plateFor(
+  flower: number,
+  flowerGap: number,
+  pad: number,
+  factorA: number,
+): { width: number; height: number } {
+  const cols = Math.ceil(factorA / GROUP_COLUMN)
+  const rows = Math.min(factorA, GROUP_COLUMN)
+  return {
+    width: cols * flower + (cols - 1) * flowerGap + 2 * pad,
+    height: rows * flower + (rows - 1) * flowerGap + 2 * pad,
+  }
+}
+
+/** The groups' sizes for a plan of multiply problems. */
+export function groupsMetrics(
+  layout: Pick<MathLayout, 'tablet'>,
+  problems: readonly { factorA: number; factorB: number }[],
+): GroupsMetrics {
+  const tablet = layout.tablet
+  const flower = tablet ? 24 : 20
+  const flowerGap = tablet ? 6 : 4
+  const pad = tablet ? 8 : 6
+  const tagHeight = tablet ? 32 : 28
+  const drawn = problems.filter((p) => groupsAreDrawn(p.factorA, p.factorB))
+  const tallest = drawn.reduce(
+    (h, p) => Math.max(h, plateFor(flower, flowerGap, pad, p.factorA).height),
+    0,
+  )
+  return {
+    flower,
+    flowerGap,
+    pad,
+    border: 2,
+    radius: tablet ? 16 : 12,
+    tagHeight,
+    tagFont: tablet ? 24 : 20,
+    plusFont: tablet ? 20 : 16,
+    gapMin: tablet ? 16 : 12,
+    gapMax: tablet ? 32 : 24,
+    slot: drawn.length === 0 ? 0 : tagHeight / 2 + tallest,
+  }
+}
+
+export function plateSize(
+  m: GroupsMetrics,
+  factorA: number,
+): { width: number; height: number } {
+  return plateFor(m.flower, m.flowerGap, m.pad, factorA)
+}
+
+/** The row of `factorB` plates of `factorA` in `width`: the gap between
+ *  plates (clamp(12, fit, 24), tablet clamp(16, fit, 32)) and the row's
+ *  width. */
+export function groupsRow(
+  m: GroupsMetrics,
+  factorA: number,
+  factorB: number,
+  width: number,
+): { gap: number; width: number; plate: { width: number; height: number } } {
+  const plate = plateSize(m, factorA)
+  const fit =
+    factorB <= 1
+      ? m.gapMax
+      : Math.floor((width - factorB * plate.width) / (factorB - 1))
+  const gap = clamp(m.gapMin, fit, m.gapMax)
+  return {
+    gap,
+    width: factorB * plate.width + (factorB - 1) * gap,
+    plate,
+  }
+}
+
+/** The multiply block: equation, `problemGap`, the groups slot. */
+export function multiplyBlockHeight(
+  layout: Pick<MathLayout, 'equationLineHeight' | 'problemGap'>,
+  m: GroupsMetrics,
+): number {
+  return m.slot === 0
+    ? layout.equationLineHeight
+    : layout.equationLineHeight + layout.problemGap + m.slot
+}
+
+// ── Number recognition: the 1–10 strip (spec § 10) ──────────────────────
+
+export interface NumberStripMetrics {
+  cell: number
+  height: number
+  font: number
+  radius: number
+  border: number
+  divider: number
+  dot: number
+  ring: number
+}
+
+export function numberStripMetrics(
+  layout: Pick<MathLayout, 'tablet' | 'problem'>,
+): NumberStripMetrics {
+  const tablet = layout.tablet
+  return {
+    cell: Math.min(Math.floor(layout.problem.width / 10), tablet ? 72 : 48),
+    height: tablet ? 64 : 48,
+    font: tablet ? 32 : 22,
+    radius: 12,
+    border: 2,
+    divider: 1,
+    dot: 6,
+    ring: 4,
+  }
+}

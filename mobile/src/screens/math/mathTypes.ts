@@ -3,7 +3,7 @@
  * (the source of truth). Same field names and semantics, so App hands
  * SessionEnd exactly what the web hands it.
  */
-import type { OfferedDistractorClass } from './chipOrder'
+import type { MathOfferedClass } from './extendedChipOrder'
 
 /** What the screen hands App when problem 8 finishes (web `MathSessionResult`). */
 export interface MathSessionResult {
@@ -30,7 +30,7 @@ export interface MathSessionResult {
   /** Per problem: the value of the first chip tapped, `null` if none. */
   perProblemAnswerValue: readonly (number | null)[]
   /** Per problem: the distractor class offered (`null` for P1–P3). */
-  perProblemDistractorClass: readonly (OfferedDistractorClass | null)[]
+  perProblemDistractorClass: readonly (MathOfferedClass | null)[]
 }
 
 export interface PlayMathUtteranceOptions {

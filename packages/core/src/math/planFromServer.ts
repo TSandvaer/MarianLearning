@@ -50,11 +50,25 @@
  * them — the bucket for problem 1 will be missing a slot and we throw
  * the clearer `missing slot "<slot>"` error.
  *
+ * Extended kinds (opt-in, native only)
+ * ------------------------------------
+ * `{ extendedKinds: true }` also reads the number-recognition ("Tap the
+ * seven."), skip-count ("Two, four, six, eight. What is next?") and
+ * multiplication ("Two times three. How many?") read lines and returns an
+ * `ExtendedMathSessionPlan` (see `extendedProblems.ts`). Without the option (the frozen web app's call) the
+ * output is exactly what it was before: arithmetic only, and those read
+ * lines throw.
+ *
  * Pure module: no React, no I/O, no side effects. All inputs validated;
  * throws `PlanFromServerError` on any structural issue so the caller's
  * fallback path fires cleanly.
  */
 
+import {
+  EXTENDED_ANSWER_MAX,
+  type ExtendedMathProblem,
+  type ExtendedMathSessionPlan,
+} from './extendedProblems'
 import {
   type MathProblem,
   type MathProblemUtterances,
@@ -199,15 +213,38 @@ export class PlanFromServerError extends Error {
   }
 }
 
+/** Options for {@link mathSessionPlanFromServer}. */
+export interface MathPlanFromServerOptions {
+  /** Also read the number-recognition, skip-count and multiplication read
+   *  lines, and return an `ExtendedMathSessionPlan` whose problems carry a
+   *  `kind`. Default
+   *  `false`: arithmetic only, the web app's behaviour. */
+  readonly extendedKinds?: boolean
+}
+
 /**
  * Build a `MathSessionPlan` from a server-returned plan blob.
+ *
+ * With `{ extendedKinds: true }`, build an `ExtendedMathSessionPlan` instead:
+ * every problem carries a `kind`, and number-recognition, skip-count and
+ * multiplication read lines parse too.
  *
  * @throws {PlanFromServerError} if the blob isn't shaped right or any
  *   `read` text fails to parse against the template.
  */
+export function mathSessionPlanFromServer(serverPlan: unknown): MathSessionPlan
 export function mathSessionPlanFromServer(
   serverPlan: unknown,
-): MathSessionPlan {
+  options: MathPlanFromServerOptions & { readonly extendedKinds: true },
+): ExtendedMathSessionPlan
+export function mathSessionPlanFromServer(
+  serverPlan: unknown,
+  options?: MathPlanFromServerOptions,
+): MathSessionPlan | ExtendedMathSessionPlan
+export function mathSessionPlanFromServer(
+  serverPlan: unknown,
+  options?: MathPlanFromServerOptions,
+): MathSessionPlan | ExtendedMathSessionPlan {
   if (!isServerPlan(serverPlan)) {
     throw new PlanFromServerError(
       'server plan did not match { id, label, utterances:[{id,text}] }',
@@ -232,7 +269,12 @@ export function mathSessionPlanFromServer(
   }
 
   // Build problems 1..8 in order. Throw if any problem or slot is missing.
+  // One list per mode: the default (web) path builds exactly the
+  // arithmetic-only `MathProblem[]` it always has; only the opt-in path
+  // tags problems with a `kind` and reads the extended templates.
+  const extended = options?.extendedKinds === true
   const problems: MathProblem[] = []
+  const extendedProblems: ExtendedMathProblem[] = []
   for (let index = 1; index <= 8; index++) {
     const bucket = byProblem.get(index)
     if (!bucket) {
@@ -249,23 +291,101 @@ export function mathSessionPlanFromServer(
     }
     assertHintShape(bucket, index)
     const utterances = bucket as MathProblemUtterances
-    const { addendA, addendB, op } = parseReadOperands(utterances.read)
-    const correct = op === '-' ? addendA - addendB : addendA + addendB
-    problems.push({
-      index,
-      addendA,
-      addendB,
-      correct,
-      op,
-      utterances,
-    })
+    if (extended) {
+      extendedProblems.push(extendedProblemFromRead(index, utterances))
+    } else {
+      problems.push(
+        arithmeticProblem(
+          index,
+          parseReadOperands(utterances.read),
+          utterances,
+        ),
+      )
+    }
   }
 
+  if (extended) {
+    return {
+      id: serverPlan.id,
+      label: serverPlan.label,
+      problems: extendedProblems,
+    }
+  }
   return {
     id: serverPlan.id,
     label: serverPlan.label,
     problems,
   }
+}
+
+/** The arithmetic problem for parsed operands; the answer is derived here. */
+function arithmeticProblem(
+  index: number,
+  { addendA, addendB, op }: { addendA: number; addendB: number; op: '+' | '-' },
+  utterances: MathProblemUtterances,
+): MathProblem {
+  const correct = op === '-' ? addendA - addendB : addendA + addendB
+  return {
+    index,
+    addendA,
+    addendB,
+    correct,
+    op,
+    utterances,
+  }
+}
+
+/** One problem of an extended plan, dispatched on the read line's template.
+ *  The templates are disjoint ("Tap the", comma list + "What is next?",
+ *  "times", "plus" / "minus" / "take away"), so the order only decides which
+ *  error a near-miss gets. */
+function extendedProblemFromRead(
+  index: number,
+  utterances: MathProblemUtterances,
+): ExtendedMathProblem {
+  const { read } = utterances
+  const recognize = matchRecognizeRead(read)
+  if (recognize !== null) {
+    return { kind: 'recognize', index, correct: recognize, utterances }
+  }
+  const skipCount = matchSkipCountRead(read)
+  if (skipCount) {
+    return {
+      kind: 'skip-count',
+      index,
+      sequence: skipCount.sequence,
+      step: skipCount.step,
+      correct: skipCount.next,
+      utterances,
+    }
+  }
+  const multiply = matchMultiplyRead(read)
+  if (multiply) {
+    assertRecordableAnswer(read, multiply.factorA * multiply.factorB)
+    return {
+      kind: 'multiply',
+      index,
+      factorA: multiply.factorA,
+      factorB: multiply.factorB,
+      correct: multiply.factorA * multiply.factorB,
+      utterances,
+    }
+  }
+  const operands = matchReadOperands(read)
+  if (operands) {
+    return {
+      kind: 'arithmetic',
+      ...arithmeticProblem(index, operands, utterances),
+    }
+  }
+  throw new PlanFromServerError(
+    `math read line "${read}" did not match any known math read template ` +
+      `(addition "<W> plus <W>. How many?"; subtraction "<W> minus <W>. ` +
+      `How many are left?"; subtraction first-session "<W> take away <W>. ` +
+      `How many are left?"; number recognition "Tap the <W>."; skip-count ` +
+      `"<W>, <W>, <W>. What is next?"; multiplication "<W> times <W>. How ` +
+      `many?")`,
+  )
 }
 
 /** Extract `{addendA, addendB, op}` from a `read` line.
@@ -291,6 +411,24 @@ export function parseReadOperands(read: string): {
   addendB: number
   op: '+' | '-'
 } {
+  const operands = matchReadOperands(read)
+  if (operands) return operands
+  throw new PlanFromServerError(
+    `math read line "${read}" did not match any known math read template ` +
+      `(addition "<W> plus <W>. How many?"; subtraction "<W> minus <W>. ` +
+      `How many are left?"; subtraction first-session "<W> take away <W>. ` +
+      `How many are left?")`,
+  )
+}
+
+/** The arithmetic templates of {@link parseReadOperands}: `null` when the
+ *  line matches none of them; throws when it matches one but a number word
+ *  is unknown. */
+function matchReadOperands(read: string): {
+  addendA: number
+  addendB: number
+  op: '+' | '-'
+} | null {
   // Addition template — anchored to "plus" between two number words.
   // "Three plus two. How many?" / "Thirty-one plus four. How many?" —
   // case-insensitive. Operand character class `[a-z-]` accepts the
@@ -321,12 +459,171 @@ export function parseReadOperands(read: string): {
   if (subTakeAwayMatch) {
     return decodeOperands(subTakeAwayMatch[1]!, subTakeAwayMatch[2]!, '-', read)
   }
+  return null
+}
+
+/** Extract the target number from a number-recognition `read` line.
+ *
+ *  Template (canon and planner, `api/_planner.ts` number-recog):
+ *  `"Tap the <number-word>."`, e.g. `"Tap the seven."` → 7.
+ *
+ *  The word must be a number word in 1..10 (the planner's hint-2 table
+ *  covers only those): "Tap the <word>." is also Word Song's blending read
+ *  line, so a non-number word is not a recognition problem. Throws on a
+ *  miss or a number outside 1..10.
+ *
+ *  Opt-in kind: only `mathSessionPlanFromServer(plan, { extendedKinds: true
+ *  })` reads this template. */
+export function parseRecognizeRead(read: string): number {
+  const target = matchRecognizeRead(read)
+  if (target !== null) return target
   throw new PlanFromServerError(
-    `math read line "${read}" did not match any known math read template ` +
-      `(addition "<W> plus <W>. How many?"; subtraction "<W> minus <W>. ` +
-      `How many are left?"; subtraction first-session "<W> take away <W>. ` +
-      `How many are left?")`,
+    `math read line "${read}" did not match the number-recognition read ` +
+      `template "Tap the <W>." with a number word`,
   )
+}
+
+/** Extract the sequence, step and next term from a skip-count `read` line.
+ *
+ *  Templates: the committed canon's, which is the planner's generic-tier
+ *  hint template `"<sequence-terms>. What is next?"`, and the example form
+ *  on the planner's skip-counting line, "... what's next?" (the live planner
+ *  writes plans whenever Leitner items are due):
+ *
+ *   - `"Two, four, six, eight. What is next?"` → sequence [2, 4, 6, 8],
+ *     step 2, next 10
+ *   - `"Two, four, six. What's next?"` → sequence [2, 4, 6], step 2, next 8
+ *
+ *  Case-insensitive; hyphenated terms ("twenty-five") decode through
+ *  {@link wordToNumber}. Throws unless the line has at least three terms
+ *  that all decode and share one positive step: a two-term line is not a
+ *  pattern, and an irregular one has no single next term to tap.
+ *
+ *  Opt-in kind: only `mathSessionPlanFromServer(plan, { extendedKinds: true
+ *  })` reads this template. */
+export function parseSkipCountRead(read: string): {
+  sequence: number[]
+  step: number
+  next: number
+} {
+  const skipCount = matchSkipCountRead(read)
+  if (skipCount) return skipCount
+  throw new PlanFromServerError(
+    `math read line "${read}" did not match the skip-count read template ` +
+      `"<W>, <W>, <W>. What is next?" (or "What's next?")`,
+  )
+}
+
+/** Extract the two factors from a multiplication `read` line.
+ *
+ *  Template (canon and planner): `"<A> times <B>. How many?"`, e.g.
+ *  `"Two times three. How many?"` → factorA 2, factorB 3. `factorB` is the
+ *  number of copies of `factorA` (canon hint: "Two, then two, then two.").
+ *
+ *  Case-insensitive; throws on any drift or an unknown number word.
+ *
+ *  Opt-in kind: only `mathSessionPlanFromServer(plan, { extendedKinds: true
+ *  })` reads this template. */
+export function parseMultiplyRead(read: string): {
+  factorA: number
+  factorB: number
+} {
+  const multiply = matchMultiplyRead(read)
+  if (multiply) return multiply
+  throw new PlanFromServerError(
+    `math read line "${read}" did not match the multiplication read ` +
+      `template "<W> times <W>. How many?"`,
+  )
+}
+
+/** {@link parseRecognizeRead}'s template: `null` when the line is not
+ *  "Tap the <word>." or the word is not a number word (Word Song's blending
+ *  line has the same shape); throws when the number is outside 1..10. */
+function matchRecognizeRead(read: string): number | null {
+  const match = read.match(/^\s*tap\s+the\s+([a-z-]+)\s*\.\s*$/i)
+  if (!match) return null
+  const target = wordToNumber(match[1]!.toLowerCase())
+  if (target === undefined) return null
+  if (target < 1 || target > 10) {
+    throw new PlanFromServerError(
+      `math read line "${read}" asks for ${target}; number recognition ` +
+        `covers 1..10`,
+    )
+  }
+  return target
+}
+
+/** {@link parseSkipCountRead}'s template: `null` when the line is not a
+ *  comma-separated list of words followed by "What is next?" / "What's
+ *  next?"; throws when it is one but the terms don't form a skip-count
+ *  sequence. */
+function matchSkipCountRead(
+  read: string,
+): { sequence: number[]; step: number; next: number } | null {
+  const match = read.match(
+    /^\s*([a-z-]+(?:\s*,\s*[a-z-]+)+)\s*\.\s*what(?:\s+is|['’]s)\s+next\s*\?\s*$/i,
+  )
+  if (!match) return null
+  const sequence: number[] = []
+  for (const word of match[1]!.split(',')) {
+    const n = wordToNumber(word.trim().toLowerCase())
+    if (n === undefined) {
+      throw new PlanFromServerError(
+        `math read line "${read}" had unrecognised number word(s)`,
+      )
+    }
+    sequence.push(n)
+  }
+  if (sequence.length < 3) {
+    throw new PlanFromServerError(
+      `math read line "${read}" is a skip-count read with fewer than three terms`,
+    )
+  }
+  const step = sequence[1]! - sequence[0]!
+  const regular = sequence.every(
+    (n, i) => i === 0 || n - sequence[i - 1]! === step,
+  )
+  if (step <= 0 || !regular) {
+    throw new PlanFromServerError(
+      `math read line "${read}" is not a skip-count sequence ` +
+        `(the terms must go up by the same step)`,
+    )
+  }
+  const next = sequence[sequence.length - 1]! + step
+  assertRecordableAnswer(read, next)
+  return { sequence, step, next }
+}
+
+/** Throws when an extended problem's answer can't be recorded: the
+ *  progress guard holds answers up to {@link EXTENDED_ANSWER_MAX} (99), and
+ *  the session falls back rather than lose the progress doc. */
+function assertRecordableAnswer(read: string, answer: number): void {
+  if (answer > EXTENDED_ANSWER_MAX) {
+    throw new PlanFromServerError(
+      `math read line "${read}" has the answer ${answer}, above ` +
+        `${EXTENDED_ANSWER_MAX} (the progress record holds answers up to ` +
+        `${EXTENDED_ANSWER_MAX})`,
+    )
+  }
+}
+
+/** {@link parseMultiplyRead}'s template: `null` on a miss; throws on an
+ *  unknown number word. */
+function matchMultiplyRead(
+  read: string,
+): { factorA: number; factorB: number } | null {
+  const match = read.match(
+    /^\s*([a-z-]+)\s+times\s+([a-z-]+)\s*\.\s*how\s+many\s*\?\s*$/i,
+  )
+  if (!match) return null
+  const factorA = wordToNumber(match[1]!.toLowerCase())
+  const factorB = wordToNumber(match[2]!.toLowerCase())
+  if (factorA === undefined || factorB === undefined) {
+    throw new PlanFromServerError(
+      `math read line "${read}" had unrecognised number word(s)`,
+    )
+  }
+  return { factorA, factorB }
 }
 
 /** Backwards-compat shim — exported so existing callers / tests that

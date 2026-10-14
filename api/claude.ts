@@ -101,6 +101,7 @@ import {
 } from './_sessionCache.js'
 import { getCanonEntry } from './_canon.js'
 import { applyFirstEncounterGate } from './_firstEncounterGate.js'
+import { leitnerFactAllowedForFocus } from '../packages/core/src/wire/leitnerFocus.js'
 
 /**
  * Cold-start runtime assertion. Throws at module load if the function is
@@ -670,6 +671,29 @@ function defaultFocusNodeForTrack(track: PlannerTrack): string {
 }
 
 /**
+ * The payload with its Leitner hint narrowed to the facts its focus step
+ * may carry: a multiplication fact (`op: '*'`) only on a multiplication
+ * step (core `wire/leitnerFocus.ts`; the native app filters before it sends,
+ * the frozen web sends the whole due box). An emptied hint is dropped, so a
+ * `*`-only hint neither reaches the planner's add-to-10 Leitner directive
+ * nor bypasses the canon.
+ */
+function withLeitnerForFocus(
+  payload: TrackPayload | null,
+): TrackPayload | null {
+  if (payload === null || payload.leitner === undefined) return payload
+  const focus = payload.focusNode ?? defaultFocusNodeForTrack(payload.track)
+  const leitner = payload.leitner.filter((item) =>
+    leitnerFactAllowedForFocus(item.op, focus),
+  )
+  if (leitner.length === payload.leitner.length) return payload
+  const out: TrackPayload = { ...payload }
+  if (leitner.length > 0) out.leitner = leitner
+  else delete out.leitner
+  return out
+}
+
+/**
  * The actual request handler. Exported as a named symbol so tests can
  * import it directly; the Vercel entrypoint is the `default` export
  * below, which wraps this in a `{ fetch }` object so Vercel routes the
@@ -777,7 +801,7 @@ export async function handler(
 
     // Track-based branch: try the pre-baked canon first; fall through
     // to Haiku + Azure on a miss.
-    const trackPayload = extractTrackPayload(body.payload)
+    const trackPayload = withLeitnerForFocus(extractTrackPayload(body.payload))
     if (trackPayload !== null) {
       // Canon hit (ticket 86c9kwhbc, D — pre-baked session canon). We
       // pre-render every active (track, level, focusNode) combo at
