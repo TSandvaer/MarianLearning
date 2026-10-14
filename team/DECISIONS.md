@@ -233,3 +233,44 @@ Distinct from its siblings:
 - **Context:** Thomas can enroll in the Apple Developer Program only in a few days, and approval takes longer, so TestFlight (Phase 5) is blocked. Main's Mobile check had gone red on expo-doctor after Expo shipped SDK 57 patches; #549 (`7c11a56`) bumped them (Thomas's popup).
 - **Decided:** (1) Start Phase 4 now, since it needs no Apple account: Kevin builds the Maestro harness and the plan's four critical-path flows, run locally; Jessica sorts the 67 Playwright specs into invariants to port and web-only mechanics to drop. Adding a CI workflow for Maestro is Thomas's call (macOS runner minutes). (2) Close the two parked native parity gaps in one PR: the Hub pick records the world played today, and native gets the web's launch-time cloud reconcile. Thomas device-checks them.
 - **Decided by:** Thomas (popups).
+
+## 2026-10-13 — Native test tooling: Maestro CI, step picker, every-step sweep
+
+- **Context:** While Phase 4 ran, Thomas could test a step only by playing up to it, and seeds covered only 2 math steps. GitHub's standard macOS runners are free because the repo is public.
+- **Decided:**
+  1. The four Maestro critical-path flows run in CI on PRs touching `mobile/` or `packages/core` (#555). The job proved two consecutive green runs after it got a re-tap guard and one whole-flow retry, reported as `PASS (retry)` so flakes stay visible. It joins fast gate, e2e and Mobile in the merge convention for mobile PRs.
+  2. A debug-only step picker in Parent Settings and a `qaStep` launch flag (#557).
+  3. An on-demand sweep of all 24 steps (#560), run against a local canon-only `/api/claude` that has no credentials and no outbound network access.
+- **Decided by:** Thomas (popups).
+
+## 2026-10-13 — Native departures from the web: Last synced, and late cloud installs
+
+- **Decided:**
+  1. Native Parent Settings' "Last synced" shows the last successful cloud sync on this device (#556), stored under its own device-local key outside the Progress blob. The frozen web still shows the last-played time, which Thomas had read as a bug.
+  2. A cloud install that lands after the Hub is on screen appears on the next Hub entry rather than redrawing it (#552), so Emma is never cut off mid-line.
+- **Decided by:** Thomas (popups).
+
+## 2026-10-13 — Number Garden steps 1 and 8–11 built natively
+
+- **Context:** The step picker showed that number recognition, skip counting and the three multiplication tiers had canon but no client support in either app: their read lines matched no template, so they silently fell back to sums-to-10 with no voice.
+- **Decided:** Kyle's spec (#559), with Dave's pedagogy review:
+  - the ± chip alternates by position so the answer isn't always the biggest;
+  - the ×6–9 tags show from the start;
+  - number-strip numerals appear from hint 1;
+  - the × sign is used (Thomas);
+  - "A times B" reads as B groups of A, rechecked only if Marian's Danish workbook reads it the other way and she stumbles on it.
+
+  Devon built it in #562 (merged `5bb6d8f`), with a core and server filter so multiplication facts never reach a non-multiplication session, and answers capped at 99 to match the progress guard. The web is untouched. Thomas checked steps 8–11 on his iPhone; step 1 is covered by the sweep and tests, and the 6 × 2 tag overlap stays as built.
+
+- **Decided by:** Thomas (popups); pedagogy from Dave.
+
+## 2026-10-13/14 — Phase 5 starts: Emma's Path on TestFlight
+
+- **Context:** Thomas's Apple Developer membership activated on 2026-10-13. His Mac has only Xcode 27, which Expo SDK 57 doesn't support.
+- **Decided:**
+  1. The app is named **Emma's Path**. The store name is "Emma's Path: Math & Reading" and the bundle ID is `dk.sandvaer.emmaspath`. The EAS slug stays `marian-tutor`, which users never see.
+  2. Store builds run on EAS's free cloud plan, pinned to the SDK 57 image (Xcode 26.6), with remote build numbers (#561, #563).
+  3. Marian tests on Thomas's iPad, because the TestFlight terms don't permit under-13 accounts and her own iPad uses a child account.
+  4. Nothing goes to the public App Store; that is Phase 6, a separate decision.
+- **Outcome:** build 0.1.0 (2) was installed through the internal group "Family" on 2026-10-14. All of Thomas's checks passed.
+- **Decided by:** Thomas (popups and messages).

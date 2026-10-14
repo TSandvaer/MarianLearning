@@ -105,7 +105,7 @@ The biggest pieces are Math (4,562 `.tsx` lines) and WordSong (3,350).
 
 ### Phase 5: Parity and rollout to Marian
 
-- TestFlight internal testing on her iPad and phone. Internal testers don't go through App Review.
+- TestFlight internal testing. Internal testers don't go through App Review. Marian plays on **Thomas's iPad**: the TestFlight terms don't permit under-13 accounts, so her own child-account iPad can't run it (decided 2026-10-13; an EAS ad hoc build is the route if her own iPad is needed). The app ships as **Emma's Path** (`dk.sandvaer.emmaspath`); the first build, 0.1.0 (2), was installed 2026-10-14 (`mobile/docs/testflight.md`).
 - Android through Play internal testing or an APK.
 - The native app gets a new `deviceId`, which means fresh progress. That's acceptable while Marian isn't using the app yet.
 - Retire the PWA once Marian is on the native app (decided 2026-10-12, `team/DECISIONS.md`). The Vercel backend (`/api/claude`, `/api/progress` and its Upstash store) stays as the app's API server.
