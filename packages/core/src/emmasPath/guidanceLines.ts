@@ -38,6 +38,8 @@ export type GuidanceLineKind =
   | 'end-not-yet-praise'
   | 'end-not-yet-again'
   | 'end-world-done'
+  | 'session-review'
+  | 'session-warmup'
 
 export interface GuidanceLine {
   /** Dotted id, e.g. `guide.hub.suggest.math`. */
@@ -126,10 +128,20 @@ function buildLines(): GuidanceLine[] {
   )
   // The flower that finishes a world's last step.
   add('guide.end.world-done', 'end-world-done', 'You grew your whole garden!')
+
+  // In session (native spec design/native/review-mode-and-warmup-native.md
+  // § 4, text approved by Thomas 2026-10-14): a review's opener, and the
+  // line before each warm-up problem.
+  add(
+    'guide.session.review',
+    'session-review',
+    "Your flower is sleeping. Let's play the ones you know!",
+  )
+  add('guide.session.warmup', 'session-warmup', 'Remember this one?')
   return lines
 }
 
-/** Every guidance line, Hub first, then session end. */
+/** Every guidance line: Hub, then session end, then in session. */
 export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))

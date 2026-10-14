@@ -456,6 +456,42 @@ export function recordProgressOnSessionEnd(
   return promoted
 }
 
+export interface RecordReviewInput {
+  surface: SessionEndSurface
+  /** ISO 8601 timestamp of the session end (the progress clock). */
+  dateISO: string
+  /** Math only: the review's per-problem outcomes, non-fact problems left out. */
+  leitnerOutcomes?: readonly LeitnerOutcome[]
+}
+
+/**
+ * Session End's write for a same-day mixed review (native spec
+ * `design/native/review-mode-and-warmup-native.md` § 7.5, D7): the Leitner
+ * outcomes (math) and `profile.lastPlayedISO` (cloud conflict resolution
+ * keys on it), one save, one cloud push. Nothing else: no history entry,
+ * so no rule can count a review toward a good day, a flower or mastery; no
+ * first encounters, scaffold counters, CVC latch or unlock seed.
+ */
+export function recordReviewOnSessionEnd(input: RecordReviewInput): Progress {
+  const existing = loadProgress() ?? defaultProgress()
+  const mathFactsLeitner =
+    input.surface === 'math' && input.leitnerOutcomes !== undefined
+      ? applyLeitnerOutcomes(
+          existing.mathFactsLeitner,
+          input.leitnerOutcomes,
+          new Date(input.dateISO).getTime(),
+        )
+      : existing.mathFactsLeitner
+  const next: Progress = {
+    ...existing,
+    profile: { ...existing.profile, lastPlayedISO: input.dateISO },
+    mathFactsLeitner,
+  }
+  saveProgress(next)
+  void pushProgressToCloud(getOrCreateDeviceId(), next)
+  return next
+}
+
 /**
  * Construct the SessionHistoryEntry from the input shape, branching on
  * whether a graduation split was supplied (ticket 86c9m3aec).

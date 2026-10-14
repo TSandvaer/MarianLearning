@@ -96,6 +96,32 @@ export interface SessionStartResponse {
   currentTargetVowel?: '/o/' | '/u/' | '/i/' | '/e/'
 }
 
+// --- Review and warm-up blocks --------------------------------------------
+//
+// Native spec `design/native/review-mode-and-warmup-native.md` § 7.4. Core's
+// picker (`progress/reviewPlan.ts`) chooses canon problems; the session-start
+// track payload names them, and the server copies those blocks out of the
+// canon files with their baked audio (`api/_review.ts`): no planner, no TTS.
+
+/** One canon problem: problem `problem` (1..8) of step `node`'s canon file. */
+export interface CanonBlockRef {
+  node: string
+  problem: number
+}
+
+/** `payload.review.blocks` carries exactly this many refs. */
+export const REVIEW_BLOCK_COUNT = 8
+
+/** `payload.warmup.blocks` carries 1..this many refs. */
+export const WARMUP_BLOCK_MAX = 3
+
+/**
+ * A review response's `plan.id` starts with this. The client accepts a
+ * review only when it does: an older server ignores `payload.review` and
+ * answers with a forward plan, which must not pass for a review.
+ */
+export const REVIEW_PLAN_ID_PREFIX = 'review-'
+
 /** Error response shape. `error` is a stable machine-readable code; `message`
  *  is optional human-readable detail (never echoes the request body, never
  *  leaks env state). */
@@ -116,6 +142,11 @@ export interface ClaudeErrorResponse {
      *  track). Distinct from `tts-failed` so logs can attribute correctly.
      *  Added ticket 86c9jdh39. */
     | 'planner-failed'
+    /** A `payload.review` that names a block the server can't serve: not
+     *  exactly 8 refs, a step of another track, a problem outside 1..8, or a
+     *  missing canon entry (native spec review-mode-and-warmup-native.md
+     *  § 7.4). */
+    | 'invalid-request'
   message?: string
 }
 

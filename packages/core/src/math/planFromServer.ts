@@ -318,6 +318,59 @@ export function mathSessionPlanFromServer(
   }
 }
 
+/** One warm-up block of a server response: `math.w<block>.<slot>`. */
+export interface MathWarmupProblem {
+  /** The `w` number (1..3): the warm-up ref the block answers, in order. */
+  block: number
+  problem: ExtendedMathProblem
+}
+
+/**
+ * The warm-up blocks the server appended to a forward response as
+ * `math.w<N>.<slot>` (native spec
+ * `design/native/review-mode-and-warmup-native.md` § 7.4), read with the
+ * `p` blocks' slot set and per-problem builder (extended kinds), in `N`
+ * order. A block with a missing slot or a read line no template matches is
+ * dropped, and a plan that is not a server plan gives none: the warm-up
+ * never fails the session. The `p` parser above skips `w` ids (its regex
+ * is anchored on `p<N>`), so the forward plan reads exactly as before.
+ */
+export function mathWarmupFromServer(serverPlan: unknown): MathWarmupProblem[] {
+  if (!isServerPlan(serverPlan)) return []
+  const byBlock = new Map<number, Partial<MathProblemUtterances>>()
+  for (const u of serverPlan.utterances) {
+    const parsedId = parseUtteranceId(u.id, 'w')
+    if (parsedId === null) continue
+    const bucket = byBlock.get(parsedId.index) ?? {}
+    bucket[parsedId.slot] = u.text
+    byBlock.set(parsedId.index, bucket)
+  }
+  const out: MathWarmupProblem[] = []
+  for (const block of [...byBlock.keys()].sort((a, b) => a - b)) {
+    const bucket = byBlock.get(block)!
+    try {
+      for (const slot of NON_HINT_SLOTS) {
+        if (typeof bucket[slot] !== 'string') {
+          throw new PlanFromServerError(
+            `warm-up block ${block} missing "${slot}"`,
+          )
+        }
+      }
+      assertHintShape(bucket, block)
+      out.push({
+        block,
+        problem: extendedProblemFromRead(
+          block,
+          bucket as MathProblemUtterances,
+        ),
+      })
+    } catch (err) {
+      if (!(err instanceof PlanFromServerError)) throw err
+    }
+  }
+  return out
+}
+
 /** The arithmetic problem for parsed operands; the answer is derived here. */
 function arithmeticProblem(
   index: number,
@@ -718,17 +771,21 @@ function assertHintShape(
  *  never the prefix of `math.pN.hint1`. */
 function parseUtteranceId(
   id: string,
+  block: 'p' | 'w' = 'p',
 ): { index: number; slot: MathUtteranceSlot } | null {
   // Anchored to the canonical template; rejects nested dots / extra
-  // segments / empty slot names.
-  const match = id.match(
-    /^math\.p(\d+)\.(read|correct|reprompt|hint|hint1|hint2|hint3|giveAnswer)$/,
-  )
+  // segments / empty slot names. `w` reads the warm-up blocks instead.
+  const match = (block === 'p' ? PROBLEM_ID : WARMUP_ID).exec(id)
   if (!match) return null
   const index = Number.parseInt(match[1]!, 10)
   if (!Number.isInteger(index) || index < 1) return null
   return { index, slot: match[2] as MathUtteranceSlot }
 }
+
+const PROBLEM_ID =
+  /^math\.p(\d+)\.(read|correct|reprompt|hint|hint1|hint2|hint3|giveAnswer)$/
+const WARMUP_ID =
+  /^math\.w(\d+)\.(read|correct|reprompt|hint|hint1|hint2|hint3|giveAnswer)$/
 
 function isServerPlan(value: unknown): value is ServerPlan {
   if (typeof value !== 'object' || value === null) return false

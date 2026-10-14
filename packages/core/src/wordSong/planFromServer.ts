@@ -384,43 +384,7 @@ export function wordSongSessionPlanFromServer(
         `server plan missing problem index ${index}`,
       )
     }
-    for (const slot of ALL_SLOTS) {
-      if (typeof bucket[slot] !== 'string') {
-        throw new PlanFromServerError(
-          `server plan problem ${index} missing slot "${slot}"`,
-        )
-      }
-    }
-    const utterances = bucket as WordSongProblemUtterances
-
-    // Simple-sentence tier (Wave 13) breaks the read-only target pattern:
-    // the read gaps the answer, so the target comes from `correct` and the
-    // frame + sceneId are derived from the read. Route to the dedicated
-    // path before the generic `parseReadLine` (Kyle spec §1.2).
-    if (isSimpleSentenceRead(utterances.read)) {
-      const { entry, sentenceFrame, sceneId } = parseSimpleSentenceProblem(
-        utterances.read,
-        utterances.correct,
-        index,
-      )
-      problems.push({
-        index,
-        target: entry,
-        utterances,
-        contentType: 'simple-sentence',
-        sentenceFrame,
-        sceneId,
-      })
-      continue
-    }
-
-    const { entry: target, contentType } = parseReadLine(utterances.read)
-    problems.push({
-      index,
-      target,
-      utterances,
-      contentType,
-    })
+    problems.push(problemFromBucket(index, bucket))
   }
 
   return {
@@ -428,6 +392,87 @@ export function wordSongSessionPlanFromServer(
     label: serverPlan.label,
     problems,
   }
+}
+
+/** One problem from its slot bucket; throws on a missing slot or a read
+ *  line no template matches. */
+function problemFromBucket(
+  index: number,
+  bucket: Partial<WordSongProblemUtterances>,
+): WordSongProblem {
+  for (const slot of ALL_SLOTS) {
+    if (typeof bucket[slot] !== 'string') {
+      throw new PlanFromServerError(
+        `server plan problem ${index} missing slot "${slot}"`,
+      )
+    }
+  }
+  const utterances = bucket as WordSongProblemUtterances
+
+  // Simple-sentence tier (Wave 13) breaks the read-only target pattern:
+  // the read gaps the answer, so the target comes from `correct` and the
+  // frame + sceneId are derived from the read. Route to the dedicated
+  // path before the generic `parseReadLine` (Kyle spec §1.2).
+  if (isSimpleSentenceRead(utterances.read)) {
+    const { entry, sentenceFrame, sceneId } = parseSimpleSentenceProblem(
+      utterances.read,
+      utterances.correct,
+      index,
+    )
+    return {
+      index,
+      target: entry,
+      utterances,
+      contentType: 'simple-sentence',
+      sentenceFrame,
+      sceneId,
+    }
+  }
+
+  const { entry: target, contentType } = parseReadLine(utterances.read)
+  return { index, target, utterances, contentType }
+}
+
+/** One warm-up block of a server response: `word.w<block>.<slot>`. */
+export interface WordSongWarmupProblem {
+  /** The `w` number (1..3): the warm-up ref the block answers, in order. */
+  block: number
+  problem: WordSongProblem
+}
+
+/**
+ * The warm-up blocks the server appended to a forward response as
+ * `word.w<N>.<slot>` (native spec
+ * `design/native/review-mode-and-warmup-native.md` § 7.4), read with the
+ * `p` blocks' slot set and per-problem builder, in `N` order. A block that
+ * fails to parse is dropped, and a plan that is not a server plan gives
+ * none: the warm-up never fails the session. The `p` parser above skips
+ * `w` ids, so the forward plan reads exactly as before.
+ */
+export function wordSongWarmupFromServer(
+  serverPlan: unknown,
+): WordSongWarmupProblem[] {
+  if (!isServerPlan(serverPlan)) return []
+  const byBlock = new Map<number, Partial<WordSongProblemUtterances>>()
+  for (const u of serverPlan.utterances) {
+    const parsedId = parseUtteranceId(u.id, 'w')
+    if (parsedId === null) continue
+    const bucket = byBlock.get(parsedId.index) ?? {}
+    bucket[parsedId.slot] = u.text
+    byBlock.set(parsedId.index, bucket)
+  }
+  const out: WordSongWarmupProblem[] = []
+  for (const block of [...byBlock.keys()].sort((a, b) => a - b)) {
+    try {
+      out.push({
+        block,
+        problem: problemFromBucket(block, byBlock.get(block)!),
+      })
+    } catch (err) {
+      if (!(err instanceof PlanFromServerError)) throw err
+    }
+  }
+  return out
 }
 
 /**
@@ -669,15 +714,19 @@ export function parseReadTarget(read: string): WordEntry {
  *  cleanly; the 2nd-wrong beat graceful-skips to the existing `hint`. */
 function parseUtteranceId(
   id: string,
+  block: 'p' | 'w' = 'p',
 ): { index: number; slot: WordSongUtteranceSlot } | null {
-  const match = id.match(
-    /^word\.p(\d+)\.(read|correct|reprompt|hint|giveAnswer|blend)$/,
-  )
+  const match = (block === 'p' ? PROBLEM_ID : WARMUP_ID).exec(id)
   if (!match) return null
   const index = Number.parseInt(match[1]!, 10)
   if (!Number.isInteger(index) || index < 1) return null
   return { index, slot: match[2] as WordSongUtteranceSlot }
 }
+
+const PROBLEM_ID =
+  /^word\.p(\d+)\.(read|correct|reprompt|hint|giveAnswer|blend)$/
+const WARMUP_ID =
+  /^word\.w(\d+)\.(read|correct|reprompt|hint|giveAnswer|blend)$/
 
 function isServerPlan(value: unknown): value is ServerPlan {
   if (typeof value !== 'object' || value === null) return false
