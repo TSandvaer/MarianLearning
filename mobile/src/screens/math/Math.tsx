@@ -66,11 +66,12 @@
  *   tap within 5 s of the read's start gets the remark 300 ms after its
  *   correct line; the advance waits for it. Never on a scored problem, in a
  *   review or in a peek; the celebration itself is the same for every answer.
- * - **Peek** (`peek`, § 6.3): 3 problems of a later step from the Map. The
- *   opener "Let's look at this one!" plays over an empty stage (the review
- *   opener's behaviour); no stardust pill, no streak, no grant, no scaffold;
+ * - **Peek** (`peek` = the step, § 6.3): 3 problems of a later step from
+ *   the Map. The opener "Let's look at <name>!" plays over an empty stage
+ *   (the review opener's behaviour); no stardust pill, no streak, no grant, no scaffold;
  *   after problem 3's answer (its correct line and the usual dwell), 400 ms
- *   → the closer → 400 ms → `onPeekEnd`. The back button cuts the line and
+ *   → the closer "<Name> is for later. You will learn it!" → 400 ms →
+ *   `onPeekEnd`. The back button cuts the line and
  *   calls `onPeekEnd` at once. Nothing is written: no stardust write, no
  *   `onSessionComplete`.
  *
@@ -140,9 +141,10 @@ import {
   createSfx,
   KNEW_GAP_MS,
   PEEK_CLOSE_GAP_MS,
+  peekGuideLines,
   recordAudio,
   SESSION_GUIDE_GAP_MS,
-  SESSION_GUIDE_MANIFEST,
+  sessionGuideLine,
   sessionGuidePlayer,
   SFX_SOURCES,
   type SessionGuideLineId,
@@ -288,10 +290,10 @@ export interface MathProps {
   /** Test seam: the opener / warm-up line player. Default: the app's. */
   sessionGuide?: SessionGuidePlayer
   /**
-   * A Map peek (fast-track spec § 6.3): the plan is 3 problems of a later
-   * step; nothing is scored, granted or written. Fixed for the mount.
+   * A Map peek on this step (fast-track spec § 6.3): the plan is 3 of its
+   * problems; nothing is scored, granted or written. Fixed for the mount.
    */
-  peek?: boolean
+  peek?: SkillNode
   /** The peek is over (after the closer, or the back button at once). */
   onPeekEnd?: () => void
 }
@@ -377,7 +379,7 @@ export function MathScreen({
   problemNodes,
   onProblemKindChange,
   sessionGuide,
-  peek = false,
+  peek,
   onPeekEnd,
 }: MathProps) {
   const appHidden = useIsAppHidden(visibility)
@@ -411,7 +413,12 @@ export function MathScreen({
     onPeekEndRef.current = onPeekEnd
   })
   /** A peek is fixed for the mount (App mounts a fresh screen per peek). */
-  const [isPeek] = useState(peek)
+  const [peekNode] = useState(peek)
+  const isPeek = peekNode !== undefined
+  /** The step's opener and closer (§ 8); none for a step without lines. */
+  const [peekLines] = useState(() =>
+    peekNode === undefined ? null : peekGuideLines(peekNode),
+  )
   /** `onPeekEnd` fires once. */
   const peekEndedRef = useRef(false)
   // The round's shape, read by the tap handlers (review spec § 7.4).
@@ -429,9 +436,7 @@ export function MathScreen({
    */
   const opener: SessionGuideLineId | null = review
     ? 'guide.session.review'
-    : isPeek
-      ? 'guide.session.peek-open'
-      : null
+    : (peekLines?.open ?? null)
   /** The opener has played (the stage mounts at its end). */
   const [openerDone, setOpenerDone] = useState(false)
   const openerStartedRef = useRef(false)
@@ -714,7 +719,7 @@ export function MathScreen({
   /** A guide line through the ribbon (never rejects). */
   const speakGuide = useCallback(
     (id: SessionGuideLineId) =>
-      speak(SESSION_GUIDE_MANIFEST[id].text, false, undefined, (_text, opts) =>
+      speak(sessionGuideLine(id).text, false, undefined, (_text, opts) =>
         guide.playLine(id, opts),
       ),
     [speak, guide],
@@ -836,10 +841,13 @@ export function MathScreen({
       // Peek § 6.3: 400 ms → the closer → 400 ms → back to the Map. No
       // Session End, no result, no write.
       setPose('listening')
+      const closer = peekLines?.close
       closerTimerRef.current = setTimeout(() => {
         closerTimerRef.current = null
         if (unmountedRef.current) return
-        void speakGuide('guide.session.peek-close').then(() => {
+        const said =
+          closer === undefined ? Promise.resolve() : speakGuide(closer)
+        void said.then(() => {
           if (unmountedRef.current) return
           setPose('idle')
           closerTimerRef.current = setTimeout(() => {
@@ -874,7 +882,14 @@ export function MathScreen({
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` seeds the write only
-  }, [problemIndex, plan.problems.length, storage, isPeek, speakGuide])
+  }, [
+    problemIndex,
+    plan.problems.length,
+    storage,
+    isPeek,
+    peekLines,
+    speakGuide,
+  ])
 
   /**
    * Peek § 6.3: the back button, at any time. Emma's line stops, and

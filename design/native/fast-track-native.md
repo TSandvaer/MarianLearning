@@ -65,6 +65,7 @@ Each half can change or ship without the other. Build order: progress first, exp
   2. "You just knew that one!" (a quick warm-up answer; Dave)
   3. "Let's look at this one!" (peek opener; Dave proposed "Let's peek at this one!")
   4. "This one is for later. You will learn it!" (peek closer; Dave)
+  - Lines 3 and 4 were replaced by per-step lines after Thomas's device check on 2026-10-15 (§ 8).
 - **T2. Parent Settings:** no fast-track switch. Both threshold descriptions get one more sentence: "Two days with every answer right on the first try also count." Team recommendation: yes. Without it, "How many sessions … Marian needs" stops being true.
 
 ## 2. Secure sessions (progress)
@@ -227,13 +228,13 @@ bonus grows    [ ✿  ✿  ✿ ]  3 of 3!   grows in place, sparkle, then the ba
 Math or Word Song gets `peek: true`, with `problemNodes = [node, node, node]`.
 
 - **HUD:** the back button and a 3-bead track (the usual beads show her place, not a countdown). No stardust pill and no streak.
-- **Opener:** `guide.session.peek-open` plays where problem 1's read would start. The stage stays empty during it and fades in at its end, the #565 § 3.3 / § 5 review-opener behaviour reused. 400 ms later the problem 1 read starts. Emma is `listening`.
+- **Opener:** `guide.session.peek-open.<step>` ("Let's look at <name>!", § 8) plays where problem 1's read would start. The stage stays empty during it and fades in at its end, the #565 § 3.3 / § 5 review-opener behaviour reused. 400 ms later the problem 1 read starts. Emma is `listening`.
 - **Problems** run as usual:
   - Read line, then the chips open on the read line's `onPlay`.
   - Right: sparkle, plink, `celebration` and the correct line.
   - Wrong: poof, shake, `puzzled-tilt`, "Hmm... try again?"; the hint comes at 2 wrongs and the given answer at 3, so she always reaches the answer. Never a red X.
   - No stardust grant and no streak. Subitising scaffolds and Word Song cross-vowel are off.
-- **Close:** when problem 3 resolves, 400 ms → `guide.session.peek-close` → 400 ms after it ends → back to the Map. There is no Session End.
+- **Close:** when problem 3 resolves, 400 ms → `guide.session.peek-close.<step>` ("<Name> is for later. You will learn it!", § 8) → 400 ms after it ends → back to the Map. There is no Session End.
 - **Back button:** any time. It cuts the line and returns to the Map at once.
 
 ### 6.4 Back on the Map
@@ -261,18 +262,24 @@ The Map remounts in the peek's world with `returnFromPeek: true`.
 
 ## 8. Copy / TTS script
 
-All four lines are pending T1. Each one goes in `GUIDANCE_LINES` (`packages/core/src/emmasPath/guidanceLines.ts`) and plays from `pathLineSrc(id)`.
+Thomas approved the lines in T1 (2026-10-14). After his device check on #568 (2026-10-15) the peek's opener and closer name the step. Each line goes in `GUIDANCE_LINES` (`packages/core/src/emmasPath/guidanceLines.ts`) and plays from `pathLineSrc(id)`.
 
-| ID                         | Kind                 | Text                                        | When                                                    |
-| -------------------------- | -------------------- | ------------------------------------------- | ------------------------------------------------------- |
-| `guide.end.fast-track`     | `end-fast-track`     | "You know this! All your flowers grew!"     | Fast-track Session End, in place of "You got a flower!" |
-| `guide.session.knew`       | `session-knew`       | "You just knew that one!"                   | § 7                                                     |
-| `guide.session.peek-open`  | `session-peek-open`  | "Let's look at this one!"                   | Peek opener (§ 6.3)                                     |
-| `guide.session.peek-close` | `session-peek-close` | "This one is for later. You will learn it!" | Peek closer (§ 6.3)                                     |
+| ID                                | Kind                 | Text                                      | When                                                    |
+| --------------------------------- | -------------------- | ----------------------------------------- | ------------------------------------------------------- |
+| `guide.end.fast-track`            | `end-fast-track`     | "You know this! All your flowers grew!"   | Fast-track Session End, in place of "You got a flower!" |
+| `guide.session.knew`              | `session-knew`       | "You just knew that one!"                 | § 7                                                     |
+| `guide.session.peek-open.<step>`  | `session-peek-open`  | "Let's look at <name>!"                   | Peek opener (§ 6.3)                                     |
+| `guide.session.peek-close.<step>` | `session-peek-close` | "<Name> is for later. You will learn it!" | Peek closer (§ 6.3)                                     |
+
+- **The peek lines, per step (Thomas, device check 2026-10-15):**
+  - He asked for "Let's look at [step name]" in place of "Let's look at this one!", and "[step name] is for later, you will learn it" in place of "This one is for later. You will learn it!".
+  - `<name>` is the spoken step name the path lines already use (`STAGE_SPOKEN_NAMES`; `path.stop.<step>` says it, capitalised). No new name is invented.
+  - There is one opener and one closer for each step a peek can reach: every step but a world's first, 10 in Number Garden and 12 in Word Song. That makes 44 lines, for example "Let's look at taking away to ten!" and "Taking away to ten is for later. You will learn it!".
+  - The two step-agnostic lines are retired from the catalogue, the registry and the voice-QA page.
 
 - **Vocabulary:** I scanned the texts of `GUIDANCE_LINES`, `PATH_LINES` and `public/canon/*/level-1/*.json` on 2026-10-14.
-  - Lines 1 and 3 add no new word. "look" is in "A new path opens. Look!", and "this one" is in "Remember this one?".
-  - Line 2 adds **just** and **knew**. Line 4 adds **later**, **will** and **learn**. All five are everyday words.
+  - Line 1 adds no new word. The opener adds none either: "look" is in "A new path opens. Look!", and the step names are the path lines'.
+  - Line 2 adds **just** and **knew**. The closer adds **later**, **will** and **learn**. All five are everyday words.
 - **Why "look" over "peek":** "peek" would be a new word used in this one line only. "look" says the same thing to her.
 - **Framing:** no line mentions speed, counting, fingers or "not yet". The closer names the future ("You will learn it!"), never a lack. Emma never asks her to keep playing or to come back.
 - **Peek player:** the session-guide player from #565 (`createManifestLinePlayer('session-guide', …)`). Without a clip it walks the caption at 165 wpm. Emma is `listening` during the opener and closer.
@@ -333,10 +340,10 @@ Dave: "explore counts toward NOTHING", and this boundary holds as written.
 
 ## 12. Assets required
 
-- **New:** the 4 lines in § 8 (124 characters), rendered by `scripts/renderGuidanceLinesLily.ts` once T1 is approved.
+- **New:** the lines in § 8, rendered by `scripts/renderGuidanceLinesLily.ts`. The fast-track line and "knew" are rendered in #568. The 44 per-step peek lines (1648 characters) await their render.
   - Export with `npm run export-audio` in `mobile/` (it regenerates `audioRegistry.ts`) and add them to the guide list in `public/voice-qa.html`. Thomas ear-tests them there before the native build ships.
   - Add the ffprobe length of `guide.end.fast-track` to `END_CLIP_SECONDS`.
-  - **Prediction for the soak:** fast-track line ~3.1 s, closer ~3.3 s, opener and "knew" ~1.6 s each. The closer may trip the renderer's 3.5 s flag.
+  - **Prediction for the soak:** fast-track line ~3.1 s, "knew" ~1.6 s. Per-step openers run ~1.7–2.6 s and closers ~3–4 s. Several closers, the longest being "Groups of two, five and ten is for later. You will learn it!", will likely trip the renderer's 3.5 s flag.
 - **Removed from use:** the map's locked-tap poof, wiggle and badge tilt, and the `path.locked.next` / `path.locked.later` requirement lines. The lines stay in the catalogue but are no longer played.
 - **Reused:** open-bud art, the hole pop, `sfx.sparkle`, `NewFlower`, `CountBadge`, the review-opener stage fade and all canon problem audio. No new pose, background, icon or SFX.
 
@@ -367,7 +374,7 @@ Dave: "explore counts toward NOTHING", and this boundary holds as written.
    - After that, 2 secure days don't master it, and 3 good days (banked ones included) do.
    - Day scores 4/8 then 6/8 add nothing.
 10. `isProgressV1` accepts `secureDays` and `paceHold` and rejects malformed values. A cloud install unions local and cloud for both fields.
-11. `pickPeekBlocks('add-to-20')` returns problems 1–3 of `add-to-20`. `GUIDANCE_LINES` holds the 4 lines of § 8 with their exact texts.
+11. `pickPeekBlocks('add-to-20')` returns problems 1–3 of `add-to-20`. `GUIDANCE_LINES` holds the lines of § 8 with their exact texts, including an opener and a closer naming each step a peek can reach.
 
 **Server (vitest):**
 
@@ -395,7 +402,7 @@ Dave: "explore counts toward NOTHING", and this boundary holds as written.
     - Emma says the four § 4.1 lines, "3 of 3!" never shows over an empty hole, and All done → the map plays the add-to-20 unlock.
 21. **Word Song** (`EXPO_PUBLIC_QA_STEP=blending-cv`): 8/8 on the first tap on day 1 and on day +1 gives § 4. On another run, day +1 has one wrong first tap in the first session and a perfect replay, and no bonus ever appears.
 22. **Map peek in each world:**
-    - Tap a locked stop two lands ahead → Emma: "Let's look at this one!" → 3 of that step's problems with their own visuals and chips.
+    - Tap a locked stop two lands ahead → Emma: "Let's look at <its name>!" → 3 of that step's problems with their own visuals and chips.
     - Get one wrong three times → the given answer.
     - Closer → back on the Map with no line and nothing changed (the same current stop and trays). Then back to the Hub, where the card and its tray are unchanged.
 23. At 375×667 portrait, 667×375 landscape and on a tablet, the peek's opener and closer captions are never clipped and never cover the chips. The fast-track bonus hole and the count badge don't overlap.

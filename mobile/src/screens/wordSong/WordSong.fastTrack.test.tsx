@@ -115,7 +115,7 @@ it('AC 17 peek: 3 beads, no stardust, no streak; opener → card → read; close
   const onPeekEnd = jest.fn()
   const h = await renderWordSong({
     plan: PEEK,
-    peek: true,
+    peek: 'blending-cv',
     onPeekEnd,
     sessionGuide: guide.player,
   })
@@ -123,7 +123,7 @@ it('AC 17 peek: 3 beads, no stardust, no streak; opener → card → read; close
     3,
   )
   expect(screen.queryByTestId('word-song-stardust')).toBeNull()
-  expect(guide.ids()).toEqual(['guide.session.peek-open'])
+  expect(guide.ids()).toEqual(['guide.session.peek-open.blending-cv'])
   expect(screen.queryByTestId('word-song-chips')).toBeNull()
   await endGuide(guide.lines[0]!)
   expect(screen.getAllByTestId('word-song-peek-stage')).toHaveLength(1)
@@ -133,11 +133,11 @@ it('AC 17 peek: 3 beads, no stardust, no streak; opener → card → read; close
     await advance(ADVANCE_AFTER_CORRECT_MS)
   }
   expect(screen.queryByTestId('word-song-streak')).toBeNull()
-  expect(guide.ids()).toEqual(['guide.session.peek-open'])
+  expect(guide.ids()).toEqual(['guide.session.peek-open.blending-cv'])
   await advance(PEEK_CLOSE_GAP_MS)
   expect(guide.ids()).toEqual([
-    'guide.session.peek-open',
-    'guide.session.peek-close',
+    'guide.session.peek-open.blending-cv',
+    'guide.session.peek-close.blending-cv',
   ])
   await endGuide(guide.lines[1]!)
   expect(onPeekEnd).not.toHaveBeenCalled()
@@ -152,7 +152,7 @@ it('AC 17 peek: the back arrow cuts the line and fires onPeekEnd at once', async
   const onPeekEnd = jest.fn()
   const h = await renderWordSong({
     plan: PEEK,
-    peek: true,
+    peek: 'blending-cv',
     onPeekEnd,
     sessionGuide: guide.player,
   })

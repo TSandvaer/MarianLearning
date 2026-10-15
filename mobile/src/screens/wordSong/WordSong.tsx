@@ -41,16 +41,17 @@
  * `design/native/fast-track-native.md`): the result carries the 8 scored
  * problems' first taps (`firstTapCorrect`, § 3.2; a problem solved after a
  * wrong tap is `false` there and `true` in `perProblemCorrect`). A peek
- * (`peek`, § 6.3) plays 3 problems of a later step: the opener "Let's look
- * at this one!" over an empty stage, no stardust pill and no streak, and
- * after problem 3 400 ms → the closer → 400 ms → `onPeekEnd`; the back
+ * (`peek` = the step, § 6.3) plays 3 of its problems: the opener "Let's look
+ * at <name>!" over an empty stage, no stardust pill and no streak, and
+ * after problem 3 400 ms → the closer "<Name> is for later. You will learn
+ * it!" → 400 ms → `onPeekEnd`; the back
  * arrow (and Android back) cuts the line and calls `onPeekEnd` at once. A
  * peek writes nothing and hands no result over.
  *
  * Emma is App's `EmmaStage`; this screen reports her pose (`onPoseChange`).
  */
 import type { EmmaPose } from '@marian/core/character/emmaPose'
-import type { SkillLevel } from '@marian/core/progress'
+import type { SkillLevel, SkillNode } from '@marian/core/progress'
 import {
   ADVANCE_AFTER_CORRECT_MS,
   ADVANCE_HARD_CEILING_MS,
@@ -102,8 +103,9 @@ import {
   letterWindow,
   litAt,
   PEEK_CLOSE_GAP_MS,
+  peekGuideLines,
   SESSION_GUIDE_GAP_MS,
-  SESSION_GUIDE_MANIFEST,
+  sessionGuideLine,
   sessionGuidePlayer,
   SFX_SOURCES,
   wordWindow,
@@ -216,10 +218,10 @@ export interface WordSongProps {
   /** Test seam: the opener / warm-up line player. Default: the app's. */
   sessionGuide?: SessionGuidePlayer
   /**
-   * A Map peek (fast-track spec § 6.3): 3 problems of a later step,
+   * A Map peek on this step (fast-track spec § 6.3): 3 of its problems,
    * nothing scored or written. Fixed for the mount.
    */
-  peek?: boolean
+  peek?: SkillNode
   /** The peek is over (after the closer, or the back arrow at once). */
   onPeekEnd?: () => void
 }
@@ -273,7 +275,7 @@ export function WordSong({
   review = false,
   warmupCount = 0,
   sessionGuide,
-  peek = false,
+  peek,
   onPeekEnd,
 }: WordSongProps) {
   const appHidden = useIsAppHidden(visibility)
@@ -307,7 +309,12 @@ export function WordSong({
     onPeekEndRef.current = onPeekEnd
   })
   /** A peek is fixed for the mount (App mounts a fresh screen per peek). */
-  const [isPeek] = useState(peek)
+  const [peekNode] = useState(peek)
+  const isPeek = peekNode !== undefined
+  /** The step's opener and closer (§ 8); none for a step without lines. */
+  const [peekLines] = useState(() =>
+    peekNode === undefined ? null : peekGuideLines(peekNode),
+  )
   /** `onPeekEnd` fires once. */
   const peekEndedRef = useRef(false)
   const line = useLineSpeaker(playRef)
@@ -325,9 +332,7 @@ export function WordSong({
    */
   const opener: SessionGuideLineId | null = review
     ? 'guide.session.review'
-    : isPeek
-      ? 'guide.session.peek-open'
-      : null
+    : (peekLines?.open ?? null)
   /** The opener has played (the stage mounts at its end). */
   const [openerDone, setOpenerDone] = useState(false)
   const openerStartedRef = useRef(false)
@@ -525,7 +530,7 @@ export function WordSong({
         leadForRef.current = my
         if (lead === opener) openerStartedRef.current = true
         setPose('listening')
-        void speak(SESSION_GUIDE_MANIFEST[lead].text, {
+        void speak(sessionGuideLine(lead).text, {
           play: (_text, opts) => guide.playLine(lead, opts),
         }).then(() => {
           if (stale()) return
@@ -661,13 +666,17 @@ export function WordSong({
       // Peek § 6.3: 400 ms → the closer → 400 ms → back to the Map. No
       // Session End, no result, no write.
       setPose('listening')
+      const closer = peekLines?.close
       closerTimerRef.current = setTimeout(() => {
         closerTimerRef.current = null
         if (unmounted.current) return
-        void speak(SESSION_GUIDE_MANIFEST['guide.session.peek-close'].text, {
-          play: (_text, opts) =>
-            guide.playLine('guide.session.peek-close', opts),
-        }).then(() => {
+        const said =
+          closer === undefined
+            ? Promise.resolve()
+            : speak(sessionGuideLine(closer).text, {
+                play: (_text, opts) => guide.playLine(closer, opts),
+              })
+        void said.then(() => {
           if (unmounted.current) return
           setPose('idle')
           closerTimerRef.current = setTimeout(() => {
@@ -706,6 +715,7 @@ export function WordSong({
     clearCaption,
     tap,
     isPeek,
+    peekLines,
     speak,
     guide,
   ])

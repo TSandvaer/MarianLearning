@@ -628,7 +628,7 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               focusNode={mathPeek.node}
               planFocusNode={mathPeek.node}
               problemNodes={mathPeek.plan.problems.map(() => mathPeek.node)}
-              peek
+              peek={mathPeek.node}
               onPeekEnd={onPeekEnd}
               onRequestExit={onPeekEnd}
               onProblemKindChange={onPeekProblemKind}
@@ -645,7 +645,7 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               }
               clipFor={(text) => wordPeek.audio.fileFor(text)}
               audioReady
-              peek
+              peek={wordPeek.node}
               onPeekEnd={onPeekEnd}
               onRequestExit={onPeekEnd}
               onPoseChange={setPeekPose}

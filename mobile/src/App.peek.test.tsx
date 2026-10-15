@@ -8,9 +8,11 @@
  *
  * The peek's session start is stubbed (`requestPeek`): its plan is the
  * committed canon's sub-to-10 problems 1–3, its audio a fake that starts
- * and ends each line at once. Emma's opener and closer play their bundled
- * clips on the fake expo-audio players; the test starts and ends each one
- * (`finishGuideLine`), as App.test.tsx's `finishLine()` does for Greet.
+ * and ends each line at once. Emma's opener and closer name the step
+ * (fast-track spec § 8). With a bundled clip they play on the fake
+ * expo-audio players, and the test starts and ends each one
+ * (`finishGuideLine`, as App.test.tsx's `finishLine()` does for Greet);
+ * while a clip awaits its render, the line walks its caption instead.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -96,6 +98,10 @@ async function finishGuideLine(): Promise<void> {
     await flush()
   })
 }
+
+/** Emma's line on Math's ribbon. */
+const ribbon = () =>
+  screen.getByTestId('math-ribbon').props.accessibilityLabel as string
 
 /** sub-to-10's problems 1–3, as the server's peek answer carries them. */
 function peekPlan(): ExtendedMathSessionPlan {
@@ -197,18 +203,20 @@ it('AC 18: a full peek writes nothing — progress JSON and session history byte
     }),
   ).toHaveLength(3)
   expect(screen.queryByTestId('math-stardust')).toBeNull()
-  // The opener plays; the stage waits for it.
+  // The opener names the step (§ 8); the stage waits for it.
   expect(screen.queryByTestId('math-chips')).toBeNull()
   await finishGuideLine()
+  expect(ribbon()).toBe("Let's look at taking away to ten!")
   await settle(3000)
 
   for (const problem of plan.problems) {
     await fireEvent.press(screen.getByTestId(`math-chip-${problem.correct}`))
     await settle(2000)
   }
-  // The closer plays, then the map comes back.
+  // The closer names the step too, then the map comes back.
   await settle(1000)
   await finishGuideLine()
+  expect(ribbon()).toBe('Taking away to ten is for later. You will learn it!')
   await settle(5000)
   expect(screen.getByTestId('map-math-beat-none')).toBeOnTheScreen()
   expect(screen.queryByTestId('map-ribbon')).toBeNull()

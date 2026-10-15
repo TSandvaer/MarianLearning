@@ -110,8 +110,6 @@ export const WEB_AUDIO_MODULES: Readonly<Record<string, number>> = {
   '/assets/audio/path/guide-hub-woke-one.mp3': require('../../assets/audio/path/guide-hub-woke-one.mp3'),
   '/assets/audio/path/guide-hub-woke.mp3': require('../../assets/audio/path/guide-hub-woke.mp3'),
   '/assets/audio/path/guide-session-knew.mp3': require('../../assets/audio/path/guide-session-knew.mp3'),
-  '/assets/audio/path/guide-session-peek-close.mp3': require('../../assets/audio/path/guide-session-peek-close.mp3'),
-  '/assets/audio/path/guide-session-peek-open.mp3': require('../../assets/audio/path/guide-session-peek-open.mp3'),
   '/assets/audio/path/guide-session-review.mp3': require('../../assets/audio/path/guide-session-review.mp3'),
   '/assets/audio/path/guide-session-warmup.mp3': require('../../assets/audio/path/guide-session-warmup.mp3'),
   '/assets/audio/path/path-land-math-1.mp3': require('../../assets/audio/path/path-land-math-1.mp3'),

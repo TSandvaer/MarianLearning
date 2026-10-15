@@ -217,11 +217,11 @@ afterEach(() => jest.useRealTimers())
 
 describe('peek (AC 17, 18)', () => {
   it('3 beads, no stardust pill, no streak; the opener over an empty stage, the read 400 ms after it', async () => {
-    const h = await setup({ plan: PEEK_PLAN, peek: true })
+    const h = await setup({ plan: PEEK_PLAN, peek: 'add-to-20' })
     expect(screen.getAllByTestId(/^math-problem-dot-/, HIDDEN)).toHaveLength(3)
     expect(screen.queryByTestId('math-stardust')).toBeNull()
     expect(screen.queryByTestId('math-streak')).toBeNull()
-    expect(h.guide.ids()).toEqual(['guide.session.peek-open'])
+    expect(h.guide.ids()).toEqual(['guide.session.peek-open.add-to-20'])
     expect(h.voice.lines).toHaveLength(0)
     expect(screen.queryByTestId('math-chips')).toBeNull()
     await startAndEnd(h.guide.lines[0]!)
@@ -234,7 +234,7 @@ describe('peek (AC 17, 18)', () => {
   })
 
   it('a third wrong tap gives the answer; right answers grant nothing; after problem 3: 400 ms → the closer → 400 ms → onPeekEnd; nothing written', async () => {
-    const h = await setup({ plan: PEEK_PLAN, peek: true })
+    const h = await setup({ plan: PEEK_PLAN, peek: 'add-to-20' })
     await startAndEnd(h.guide.lines[0]!)
     await advance(SESSION_GUIDE_GAP_MS)
 
@@ -263,15 +263,15 @@ describe('peek (AC 17, 18)', () => {
     }
     expect(h.sfx.sparkle.play).toHaveBeenCalledTimes(3)
     expect(h.sfx.chime.play).not.toHaveBeenCalled()
-    expect(h.guide.ids()).toEqual(['guide.session.peek-open'])
+    expect(h.guide.ids()).toEqual(['guide.session.peek-open.add-to-20'])
 
     // Problem 3's dwell ends → 400 ms → the closer.
     await advance(ADVANCE_AFTER_CORRECT_MS)
-    expect(h.guide.ids()).toEqual(['guide.session.peek-open'])
+    expect(h.guide.ids()).toEqual(['guide.session.peek-open.add-to-20'])
     await advance(PEEK_CLOSE_GAP_MS)
     expect(h.guide.ids()).toEqual([
-      'guide.session.peek-open',
-      'guide.session.peek-close',
+      'guide.session.peek-open.add-to-20',
+      'guide.session.peek-close.add-to-20',
     ])
     expect(h.onPeekEnd).not.toHaveBeenCalled()
     await startAndEnd(h.guide.lines[1]!)
@@ -285,8 +285,24 @@ describe('peek (AC 17, 18)', () => {
     expect(h.storage.setItem).not.toHaveBeenCalled()
   })
 
+  it('a step without peek lines (a world’s first): no opener, no closer, still back to the Map', async () => {
+    const h = await setup({ plan: PEEK_PLAN, peek: 'number-recog' })
+    expect(h.guide.ids()).toEqual([])
+    expect(screen.getAllByTestId('math-chips')).toHaveLength(1)
+    for (const p of PEEK_PLAN.problems) {
+      await answer(h, p, [p.correct])
+      await advance(ADVANCE_AFTER_CORRECT_MS)
+    }
+    // 400 ms → (no closer) → 400 ms → back.
+    await advance(PEEK_CLOSE_GAP_MS)
+    expect(h.onPeekEnd).not.toHaveBeenCalled()
+    await advance(PEEK_CLOSE_GAP_MS)
+    expect(h.guide.ids()).toEqual([])
+    expect(h.onPeekEnd).toHaveBeenCalledTimes(1)
+  })
+
   it('the back button cuts the line and fires onPeekEnd at once (never onRequestExit)', async () => {
-    const h = await setup({ plan: PEEK_PLAN, peek: true })
+    const h = await setup({ plan: PEEK_PLAN, peek: 'add-to-20' })
     await fireEvent.press(screen.getByTestId('math-back-to-hub'))
     expect(h.onPeekEnd).toHaveBeenCalledTimes(1)
     expect(h.onRequestExit).not.toHaveBeenCalled()

@@ -1,10 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { LITERACY_TREE, MATH_TREE } from '../progress/mastery'
 import {
   GUIDANCE_LINES,
   GUIDANCE_LINES_AWAITING_RENDER,
   guidanceLine,
+  peekLines,
 } from './guidanceLines'
 import { PATH_LINES } from './pathLines'
 
@@ -34,13 +36,13 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'session-review': 1,
       'session-warmup': 1,
       'session-knew': 1,
-      'session-peek-open': 1,
-      'session-peek-close': 1,
+      'session-peek-open': 22,
+      'session-peek-close': 22,
     })
-    expect(GUIDANCE_LINES).toHaveLength(25)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(25)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(25)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(25)
+    expect(GUIDANCE_LINES).toHaveLength(67)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(67)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(67)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(67)
   })
 
   it('bakes each world and count variant', () => {
@@ -97,15 +99,47 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     expect(guidanceLine('guide.session.knew')?.text).toBe(
       'You just knew that one!',
     )
-    expect(guidanceLine('guide.session.peek-open')?.text).toBe(
-      "Let's look at this one!",
+    // The generic peek lines are retired: every peek names its step.
+    expect(guidanceLine('guide.session.peek-open')).toBeUndefined()
+    expect(guidanceLine('guide.session.peek-close')).toBeUndefined()
+  })
+
+  it('names the step in the peek opener and closer (Thomas 2026-10-15), with the path lines’ spoken names', () => {
+    expect(peekLines('sub-to-10')).toMatchObject({
+      open: {
+        id: 'guide.session.peek-open.sub-to-10',
+        world: 'math',
+        text: "Let's look at taking away to ten!",
+        src: '/assets/audio/path/guide-session-peek-open-sub-to-10.mp3',
+      },
+      close: {
+        id: 'guide.session.peek-close.sub-to-10',
+        text: 'Taking away to ten is for later. You will learn it!',
+      },
+    })
+    expect(peekLines('digraphs-sh')?.open.text).toBe(
+      "Let's look at ship words!",
     )
-    expect(guidanceLine('guide.session.peek-close')?.text).toBe(
-      'This one is for later. You will learn it!',
+    expect(peekLines('mult-2-5-10')?.close.text).toBe(
+      'Groups of two, five and ten is for later. You will learn it!',
     )
-    expect(guidanceLine('guide.session.peek-close')?.src).toBe(
-      '/assets/audio/path/guide-session-peek-close.mp3',
-    )
+    // Every step but a world's first (a peek never reaches it) has both.
+    for (const tree of [MATH_TREE, LITERACY_TREE]) {
+      expect(peekLines(tree[0]!)).toBeNull()
+      for (const node of tree.slice(1)) {
+        const lines = peekLines(node)
+        expect(lines).not.toBeNull()
+        // The name is the path stop line's ("Taking away to ten.").
+        const stop = PATH_LINES.find((l) => l.id === `path.stop.${node}`)!
+        const name = stop.text.replace(/\.$/, '')
+        expect(lines!.close.text).toBe(
+          `${name} is for later. You will learn it!`,
+        )
+        expect(lines!.open.text).toBe(
+          `Let's look at ${name.charAt(0).toLowerCase()}${name.slice(1)}!`,
+        )
+      }
+    }
   })
 
   it('has a bundled MP3 for every line but the ones awaiting their render', () => {
@@ -119,7 +153,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(25)
+    ).toHaveLength(67)
   })
 
   it('repeats no Emma’s Path line', () => {
