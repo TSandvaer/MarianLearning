@@ -138,6 +138,13 @@ export interface SessionAudioDeps {
   now?: () => number
   /** Yield to the JS thread, then run `fn` (default `setTimeout(fn, 0)`). */
   yieldThen?: (fn: () => void) => void
+  /**
+   * Load beside the current session instead of replacing it: the current
+   * one is not unloaded and this one does not become current. The Map peek
+   * (fast-track spec `design/native/fast-track-native.md` § 6.5): a peek
+   * leaves the Hub's prefetched session alone. Its owner unloads it.
+   */
+  alongside?: boolean
 }
 
 let defaultFiles: SessionFileStore | null = null
@@ -161,7 +168,9 @@ export function loadSessionAudio(
   const files = filesOrDefault(deps.files)
   const now = deps.now ?? Date.now
   const yieldThen = deps.yieldThen ?? ((fn: () => void) => setTimeout(fn, 0))
-  if (current && current.sessionId !== sessionId) current.unload()
+  if (!deps.alongside && current && current.sessionId !== sessionId) {
+    current.unload()
+  }
 
   const keyPrefix = `session:${safeName(sessionId)}:`
   /** id → its text; text → the first id with that text (the file's id). */
@@ -341,7 +350,7 @@ export function loadSessionAudio(
       if (current === session) current = null
     },
   }
-  current = session
+  if (!deps.alongside) current = session
   return session
 }
 

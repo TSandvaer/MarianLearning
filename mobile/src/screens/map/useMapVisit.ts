@@ -22,13 +22,24 @@
  *   AnimatePresence "wait" ordered it the other way). Unmount stamps it
  *   too, and releases the map's clips and effects.
  *
+ * Native-only, the Map peek (fast-track spec
+ * `design/native/fast-track-native.md` § 6): a tap on a stop after the
+ * current one that is not mastered (locked ones included) cuts the line in
+ * flight and asks App for a peek (`peek`); stop and gate taps wait while
+ * it is out, and Home aborts it. It replaces the locked response (poof,
+ * wiggle, pointing, requirement line). On failure Emma says the stop's
+ * name and taps resume; on success App leaves for the peek. Back from a
+ * peek (`returnFromPeek`) the map plays no open line and shows no caption:
+ * Emma has just spoken.
+ *
  * Web-only parts not ported: the gesture → audio-unlock calls (native
  * audio needs no unlock, hub-native § 5).
  */
 import type { EmmaPose } from '@marian/core/character/emmaPose'
 import type { PathLine } from '@marian/core/emmasPath/pathLines'
-import { gateLine, stopLine } from '@marian/core/map/mapLines'
+import { gateLine, stopLine, stopNameLine } from '@marian/core/map/mapLines'
 import type { MapLand, MapStop } from '@marian/core/map/mapModel'
+import { isPeekableStop } from '@marian/core/map/peek'
 import {
   LOCKED_TAP_SFX,
   mapBeatView,
@@ -48,6 +59,7 @@ import {
   loadProgress,
   type MasteryTrack,
   type Progress,
+  type SkillNode,
 } from '@marian/core/progress'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Sfx } from '../../audio'
@@ -70,6 +82,14 @@ export interface MapVisitOptions {
   /** Stamps the Hub's rapid-remount clock on leave. */
   markLeft?: (nowMs: number) => void
   wallClock?: () => number
+  /**
+   * Fast-track spec § 6.1: start a peek on a later stop. Resolves `true`
+   * once App has opened it, `false` on any failure; `signal` aborts when
+   * the map is left. Without it a locked stop keeps the old response.
+   */
+  peek?: (node: SkillNode, signal: AbortSignal) => Promise<boolean>
+  /** Back from a peek (§ 6.4): no open line, an empty caption slot. */
+  returnFromPeek?: boolean
 }
 
 export interface MapVisitState {
@@ -104,11 +124,17 @@ export function useMapVisit({
   markUnlockCelebrated = persistUnlockCelebrated,
   markLeft = markMapLeft,
   wallClock = Date.now,
+  peek,
+  returnFromPeek = false,
 }: MapVisitOptions): MapVisitState {
   const [visit] = useState(() => planMapVisit(readProgress(), world))
   const [player] = useState<MapLinePlayer>(() => createPlayer())
   const [phase, setPhase] = useState<UnlockPhase | null>(visit.phase)
-  const [caption, setCaption] = useState<PathLine | null>(visit.caption)
+  // Back from a peek: no open line, so no caption either (§ 6.4).
+  const [quietReturn] = useState(returnFromPeek && visit.unlock === null)
+  const [caption, setCaption] = useState<PathLine | null>(
+    quietReturn ? null : visit.caption,
+  )
   const [pose, setPose] = useState<EmmaPose>(visit.restPose)
   const [wiggles, setWiggles] = useState<Partial<Record<string, number>>>({})
   const view = useMemo(() => mapBeatView(visit, phase), [visit, phase])
@@ -118,6 +144,8 @@ export function useMapVisit({
   const poseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const markedRef = useRef(false)
   const leftRef = useRef(false)
+  /** The peek request in flight (§ 6.1); taps wait while it is set. */
+  const peekRef = useRef<AbortController | null>(null)
 
   const effect = (sfx: Parameters<CreateMapSfx>[0]): Sfx => {
     const s = createSfx(sfx)
@@ -129,7 +157,8 @@ export function useMapVisit({
   useEffect(() => {
     const { unlock } = visit
     if (unlock === null) {
-      if (visit.caption !== null) void player.play(visit.caption)
+      if (visit.caption !== null && !quietReturn)
+        void player.play(visit.caption)
       return
     }
     if (!markedRef.current) {
@@ -167,6 +196,8 @@ export function useMapVisit({
   useEffect(
     () => () => {
       leftRef.current = true
+      peekRef.current?.abort()
+      peekRef.current = null
       player.unload()
       sfxRef.current.forEach((s) => s.unload())
       sfxRef.current = []
@@ -180,6 +211,9 @@ export function useMapVisit({
   )
 
   const leave = () => {
+    // Home cancels a peek request in flight (§ 6.1).
+    peekRef.current?.abort()
+    peekRef.current = null
     player.cancel()
     markLeft(wallClock())
   }
@@ -189,8 +223,28 @@ export function useMapVisit({
     void player.play(line)
   }
 
+  /** § 6.1: the line in flight is cut, the request goes out, taps wait. */
+  const startPeek = (stop: MapStop, open: NonNullable<typeof peek>) => {
+    player.cancel()
+    const controller = new AbortController()
+    peekRef.current = controller
+    void open(stop.node, controller.signal)
+      .catch(() => false)
+      .then((opened) => {
+        if (peekRef.current !== controller) return
+        peekRef.current = null
+        if (opened || leftRef.current || controller.signal.aborted) return
+        // Failure: the stop's name, and taps resume.
+        speak(stopNameLine(stop))
+      })
+  }
+
   const tapStop = (stop: MapStop) => {
-    if (view.tapsWait) return
+    if (view.tapsWait || peekRef.current !== null) return
+    if (peek !== undefined && isPeekableStop(view.model, stop)) {
+      startPeek(stop, peek)
+      return
+    }
     if (stop.state === 'locked') {
       poofRef.current ??= effect(LOCKED_TAP_SFX)
       poofRef.current.play()
@@ -206,7 +260,7 @@ export function useMapVisit({
   }
 
   const tapGate = (land: MapLand) => {
-    if (view.tapsWait) return
+    if (view.tapsWait || peekRef.current !== null) return
     speak(gateLine(view.model, land))
   }
 

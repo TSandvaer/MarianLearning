@@ -45,6 +45,14 @@ export function stopLine(model: MapModel, stop: MapStop): PathLine {
   )
 }
 
+/**
+ * A stop's name line (`path.stop.<node>`), locked or not: what a failed
+ * Map peek says (native fast-track spec § 6.1).
+ */
+export function stopNameLine(stop: MapStop): PathLine {
+  return line(`path.stop.${stop.node}`)
+}
+
 /** Tap a gate: open → "Land {n}: {land name}."; closed → requirement. */
 export function gateLine(model: MapModel, land: MapLand): PathLine {
   const landId = `path.land.${model.world}.${land.number}`

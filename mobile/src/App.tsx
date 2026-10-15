@@ -65,6 +65,14 @@
  * CURRENT problem's kind, so a mixed round's frame follows each problem
  * (§ 3.4; only phone landscape differs).
  *
+ * The Map peek (native spec `design/native/fast-track-native.md` § 6): a
+ * tap on a later stop asks App for a peek (`./session/peekSession.ts`, its
+ * audio loaded beside the Hub's prefetch). Once the server answered, the
+ * route goes to `peek`, where Math or Word Song plays the step's 3 problems
+ * in peek mode; the closer (or the back button) returns to the map, which
+ * remounts quiet (`returnFromPeek`). A peek writes nothing: no Session End,
+ * no session controller, no stardust, no history, no cloud push.
+ *
  * `@marian/core` is wired to the device before this module loads
  * (`./platform/boot.ts`, imported first by `index.ts`).
  */
@@ -80,7 +88,11 @@ import {
 import type { ExtendedMathProblem } from '@marian/core/math/extendedProblems'
 import { pickStaticSessionPlan } from '@marian/core/math/sessionPlans'
 import { pickStaticWordSongPlan } from '@marian/core/wordSong/wordSessionPlans'
-import { loadProgress, type MasteryTrack } from '@marian/core/progress'
+import {
+  loadProgress,
+  type MasteryTrack,
+  type SkillNode,
+} from '@marian/core/progress'
 import { now as progressNow } from '@marian/core/progress/clock'
 import { pendingUnlock } from '@marian/core/progress/pathBeats'
 import { nextAfterSplash } from '@marian/core/router/nextAfterSplash'
@@ -152,6 +164,7 @@ import {
   wordSongSessionEndPayload,
   type SessionEndPayload,
 } from './session/sessionEndPayload'
+import { requestPeek, type PreparedPeek } from './session/peekSession'
 import { createWordSongSessionController } from './session/wordSongSession'
 import { colors } from './theme'
 
@@ -280,6 +293,11 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
   const [sessionEndPose, setSessionEndPose] = useState<EmmaPose>('idle')
   // The map's handoff: set by the two ways in, cleared on the way out.
   const [mapEntry, setMapEntry] = useState<MapEntry | null>(null)
+  // The Map peek on screen (its plan and audio); set when the route goes
+  // to `peek`, unloaded and cleared on the way out.
+  const [peek, setPeek] = useState<PreparedPeek | null>(null)
+  const peekRef = useRef<PreparedPeek | null>(null)
+  const [peekPose, setPeekPose] = useState<EmmaPose>('idle')
 
   // The web's tear-downs (`handleBackToHub`, `handleSessionEndAllDone` /
   // `…Again`, the leave-effect) run BEFORE the route flips: leaving
@@ -296,7 +314,13 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
         mathSession.tearDown()
       }
       // The next Math reports its own first problem.
-      if (from === 'math') setReportedKind(null)
+      if (from === 'math' || from === 'peek') setReportedKind(null)
+      // A peek's audio goes with it (it never became the session audio).
+      if (from === 'peek') {
+        peekRef.current?.audio.unload()
+        peekRef.current = null
+        setPeek(null)
+      }
       // Word Song's session likewise (a request in flight is aborted: it
       // must not outlive the screen).
       if (from === 'session-end' || !WORD_SONG_AUDIO_ROUTES.has(next)) {
@@ -449,6 +473,43 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
   // map stamps the Hub's rapid-remount clock, so the Hub stays quiet).
   const onHubMap = openMap
   const onMapHome = useCallback(() => navigate('hub'), [navigate])
+  // Fast-track spec § 6.1: a later stop's tap. The map waits (taps held)
+  // until this settles; `true` = the peek opened. Home aborts `signal`.
+  const mapWorld = mapEntry?.world
+  const onMapPeek = useCallback(
+    async (node: SkillNode, signal: AbortSignal): Promise<boolean> => {
+      if (mapWorld === undefined) return false
+      let prepared: PreparedPeek
+      try {
+        prepared = await requestPeek({ world: mapWorld, node, signal })
+      } catch {
+        return false
+      }
+      if (signal.aborted || routeRef.current !== 'map') {
+        prepared.audio.unload()
+        return false
+      }
+      peekRef.current = prepared
+      setPeek(prepared)
+      setPeekPose('idle')
+      navigate('peek')
+      return true
+    },
+    [mapWorld, navigate],
+  )
+  // § 6.3: the closer's end, or the back button: back to the same map,
+  // which opens quiet (§ 6.4).
+  const onPeekEnd = useCallback(() => {
+    const current = peekRef.current
+    if (current === null || routeRef.current !== 'peek') return
+    setMapEntry({ world: current.world, returnFromPeek: true })
+    navigate('map')
+  }, [navigate])
+  const onPeekProblemKind = useCallback(
+    (kind: ExtendedMathProblem['kind']) =>
+      setReportedKind({ plan: peekRef.current?.plan ?? null, kind }),
+    [],
+  )
   const onHubParent = useCallback(() => navigate('parent-settings'), [navigate])
   // Web `handleParentSettingsExit`.
   const onParentSettingsExit = useCallback(() => navigate('hub'), [navigate])
@@ -480,6 +541,19 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
       : (mathState.plan?.problems[0]?.kind ?? 'arithmetic')
   const math = route === 'math' ? extendedMathLayout(viewport, mathKind) : null
   const wordSong = route === 'literacy' ? wordSongLayout(viewport) : null
+  // The peek's screen: its world's frames; Math's follow the problem kind.
+  const mathPeek = route === 'peek' && peek?.world === 'math' ? peek : null
+  const wordPeek = route === 'peek' && peek?.world === 'word-song' ? peek : null
+  const peekMath =
+    mathPeek !== null
+      ? extendedMathLayout(
+          viewport,
+          reportedKind !== null && reportedKind.plan === mathPeek.plan
+            ? reportedKind.kind
+            : (mathPeek.plan.problems[0]?.kind ?? 'arithmetic'),
+        )
+      : null
+  const peekWord = wordPeek !== null ? wordSongLayout(viewport) : null
   // Session End needs a finished session; without one (the QA route, or
   // a later arrival after it consumed its payload) the placeholder renders
   // and nothing is written.
@@ -498,7 +572,9 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
   const layout =
     greet ??
     math ??
+    peekMath ??
     wordSong ??
+    peekWord ??
     end ??
     hub ??
     map ??
@@ -540,6 +616,41 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               onPoseChange={setMathPose}
               qaAutoAnswerAfterMs={qaAutoTapMs}
             />
+          ) : peekMath && mathPeek ? (
+            <MathScreen
+              key={`peek-${mathPeek.audio.sessionId}`}
+              layout={peekMath}
+              plan={mathPeek.plan}
+              playUtterance={(text, opts) =>
+                mathPeek.audio.playUtterance(text, opts)
+              }
+              audioReady
+              focusNode={mathPeek.node}
+              planFocusNode={mathPeek.node}
+              problemNodes={mathPeek.plan.problems.map(() => mathPeek.node)}
+              peek
+              onPeekEnd={onPeekEnd}
+              onRequestExit={onPeekEnd}
+              onProblemKindChange={onPeekProblemKind}
+              onPoseChange={setPeekPose}
+              qaAutoAnswerAfterMs={qaAutoTapMs}
+            />
+          ) : peekWord && wordPeek ? (
+            <WordSong
+              key={`peek-${wordPeek.audio.sessionId}`}
+              layout={peekWord}
+              plan={wordPeek.plan}
+              playUtterance={(text, opts) =>
+                wordPeek.audio.playUtterance(text, opts)
+              }
+              clipFor={(text) => wordPeek.audio.fileFor(text)}
+              audioReady
+              peek
+              onPeekEnd={onPeekEnd}
+              onRequestExit={onPeekEnd}
+              onPoseChange={setPeekPose}
+              qaAutoAnswerAfterMs={qaAutoTapMs}
+            />
           ) : wordSong ? (
             <WordSong
               layout={wordSong}
@@ -570,6 +681,8 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               layout={map}
               world={mapEntry.world}
               onHome={onMapHome}
+              onPeek={onMapPeek}
+              returnFromPeek={mapEntry.returnFromPeek === true}
             />
           ) : parent ? (
             <ParentSettings
@@ -605,11 +718,13 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               pose={
                 route === 'math'
                   ? mathPose
-                  : wordSong
-                    ? wordSongPose
-                    : end
-                      ? sessionEndPose
-                      : 'idle'
+                  : route === 'peek'
+                    ? peekPose
+                    : wordSong
+                      ? wordSongPose
+                      : end
+                        ? sessionEndPose
+                        : 'idle'
               }
               // The web's Session End Emma is a still image (no breath).
               breath={route === 'greet' ? GREET_BREATH : end ? null : BREATH}

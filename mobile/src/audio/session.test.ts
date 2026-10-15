@@ -369,6 +369,28 @@ describe('session audio: eager files, lazy players', () => {
     expect(currentSessionAudio()?.sessionId).toBe('s2')
   })
 
+  it('alongside (the Map peek): the current session stays loaded and current; the peek unloads alone', async () => {
+    const hub = loadSessionAudio('hub-prefetch', UTTERANCES, {
+      engine,
+      files,
+      yieldThen: sync,
+    })
+    const peek = loadSessionAudio('peek-add-to-20', UTTERANCES.slice(0, 1), {
+      engine,
+      files,
+      yieldThen: sync,
+      alongside: true,
+    })
+    expect(Array.from(files.dirs.keys()).sort()).toEqual([
+      'hub-prefetch',
+      'peek-add-to-20',
+    ])
+    expect(currentSessionAudio()).toBe(hub)
+    peek.unload()
+    expect(Array.from(files.dirs.keys())).toEqual(['hub-prefetch'])
+    expect(currentSessionAudio()).toBe(hub)
+  })
+
   it('the boot sweep deletes directories a killed app left, keeping the loaded session', () => {
     files.write('stale-a', 'x', 'AA==')
     files.write('stale-b', 'x', 'AA==')

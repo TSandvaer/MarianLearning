@@ -24,6 +24,9 @@ export { FIRST_ROUTE, type Route }
  * - session-end → hub | map       `handleSessionEndAllDone` (map: pending unlock)
  * - session-end → math | literacy `handleSessionEndAgain`
  * - map → hub                     `handleMapBack`
+ * - map → peek                    native only: a later stop's peek
+ *                                 (fast-track spec § 6.1)
+ * - peek → map                    the closer's end, or the back button
  * - parent-settings → hub         `handleParentSettingsExit`
  * - reward → hub                  the web renders no screen for `reward`
  *                                 (a legacy route); the shell gives its
@@ -38,7 +41,8 @@ export const ROUTE_EXITS: Readonly<Record<Route, readonly Route[]>> = {
   'session-end': ['hub', 'map', 'math', 'literacy'],
   reward: ['hub'],
   'parent-settings': ['hub'],
-  map: ['hub'],
+  map: ['hub', 'peek'],
+  peek: ['map'],
 }
 
 /** Every route, in `ROUTE_EXITS` order. */
@@ -55,6 +59,7 @@ export const ROUTE_LABELS: Readonly<Record<Route, string>> = {
   reward: 'Reward',
   'parent-settings': 'Parent Settings',
   map: "Emma's Path",
+  peek: 'Peek',
 }
 
 /**
