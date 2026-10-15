@@ -220,6 +220,13 @@ export interface MathPlanFromServerOptions {
    *  `kind`. Default
    *  `false`: arithmetic only, the web app's behaviour. */
   readonly extendedKinds?: boolean
+  /**
+   * Build problems 1..`problemCount` instead of 1..8, and reject a plan
+   * with a problem numbered past it: the Map peek reads exactly 3 (native
+   * spec `design/native/fast-track-native.md` § 6.2). Default: 8, with
+   * later numbers ignored (the web app's behaviour).
+   */
+  readonly problemCount?: number
 }
 
 /**
@@ -273,9 +280,18 @@ export function mathSessionPlanFromServer(
   // arithmetic-only `MathProblem[]` it always has; only the opt-in path
   // tags problems with a `kind` and reads the extended templates.
   const extended = options?.extendedKinds === true
+  const count = options?.problemCount ?? 8
+  if (options?.problemCount !== undefined) {
+    const extra = [...byProblem.keys()].find((i) => i > count)
+    if (extra !== undefined) {
+      throw new PlanFromServerError(
+        `server plan has problem ${extra}; expected exactly ${count}`,
+      )
+    }
+  }
   const problems: MathProblem[] = []
   const extendedProblems: ExtendedMathProblem[] = []
-  for (let index = 1; index <= 8; index++) {
+  for (let index = 1; index <= count; index++) {
     const bucket = byProblem.get(index)
     if (!bucket) {
       throw new PlanFromServerError(

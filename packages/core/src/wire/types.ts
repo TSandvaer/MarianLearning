@@ -122,6 +122,25 @@ export const WARMUP_BLOCK_MAX = 3
  */
 export const REVIEW_PLAN_ID_PREFIX = 'review-'
 
+// --- Map peek ---------------------------------------------------------------
+//
+// Native spec `design/native/fast-track-native.md` § 6.2. The session-start
+// track payload may carry `peek: { blocks: CanonBlockRef[] }`: exactly
+// `PEEK_BLOCK_COUNT` refs, all one step of `track` (core `pickPeekBlocks`:
+// that step's problems 1–3). The server answers it like a review (step 0,
+// canon blocks copied with their baked audio, renamed `<ns>.p1..p3.`), with a
+// plan id starting `PEEK_PLAN_ID_PREFIX`. A peek counts toward nothing.
+
+/** `payload.peek.blocks` carries exactly this many refs. */
+export const PEEK_BLOCK_COUNT = 3
+
+/**
+ * A peek response's `plan.id` starts with this. An older server ignores
+ * `payload.peek` and answers with a forward plan, which the client must
+ * take as the peek's failure path.
+ */
+export const PEEK_PLAN_ID_PREFIX = 'peek-'
+
 /** Error response shape. `error` is a stable machine-readable code; `message`
  *  is optional human-readable detail (never echoes the request body, never
  *  leaks env state). */
@@ -145,7 +164,8 @@ export interface ClaudeErrorResponse {
     /** A `payload.review` that names a block the server can't serve: not
      *  exactly 8 refs, a step of another track, a problem outside 1..8, or a
      *  missing canon entry (native spec review-mode-and-warmup-native.md
-     *  § 7.4). */
+     *  § 7.4). Likewise a `payload.peek` that is not exactly 3 refs of one
+     *  step of the track (fast-track-native.md § 6.2). */
     | 'invalid-request'
   message?: string
 }

@@ -23,6 +23,10 @@
  * states, fills and 200 ms ease as the circle beads), then a double gap.
  * In phone landscape a track too wide for the pane's row next to the
  * status cluster closes its gaps to 4 pt (`../../layout/beadTrack.ts`).
+ *
+ * A Map peek (fast-track spec `design/native/fast-track-native.md` § 6.3)
+ * wears only the back disc and its 3 beads (her place, not a countdown):
+ * no stardust pill and no streak.
  */
 import {
   STREAK_BONUS_THRESHOLDS,
@@ -360,6 +364,8 @@ export interface MathHudProps {
   review?: boolean
   /** The first `warmupCount` of the `problemCount` beads are hearts. */
   warmupCount?: number
+  /** A Map peek: no stardust pill, no streak (§ 6.3). */
+  peek?: boolean
 }
 
 export function MathHud({ world = MATH_HUD, ...props }: MathHudProps) {
@@ -384,6 +390,7 @@ function HudBody({
   onBack,
   review = false,
   warmupCount = 0,
+  peek = false,
 }: Omit<MathHudProps, 'world'>) {
   const hudId = `${useContext(World).idPrefix}-hud`
   const gap = trackBeadGap(m, hud, landscape, {
@@ -391,15 +398,18 @@ function HudBody({
     warmups: warmupCount,
     review,
   })
-  const streakEl = showStreak ? (
-    <Streak
-      streak={streak}
-      fadingOut={streakFadingOut}
-      celebrating={celebrating}
-      m={m}
-    />
-  ) : null
-  const pill = <StardustPill total={stardust} celebrating={celebrating} m={m} />
+  const streakEl =
+    showStreak && !peek ? (
+      <Streak
+        streak={streak}
+        fadingOut={streakFadingOut}
+        celebrating={celebrating}
+        m={m}
+      />
+    ) : null
+  const pill = peek ? null : (
+    <StardustPill total={stardust} celebrating={celebrating} m={m} />
+  )
   const beads = (
     <Beads
       count={problemCount}

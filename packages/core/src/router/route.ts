@@ -44,5 +44,13 @@ export type Route =
    * Source-of-truth: `design/emmas-path/emmas-path-spec.md` §3.
    */
   | 'map'
+  /**
+   * Native only: a Map peek, 3 problems of a later step (fast-track spec
+   * `design/native/fast-track-native.md` § 6.3). Reached from a stop tap
+   * on the map once the peek's session start answered; it always returns
+   * to the map. The world and step live in App state, not in the route.
+   * The web never routes here.
+   */
+  | 'peek'
 
 export const FIRST_ROUTE: Route = 'splash'

@@ -14,11 +14,17 @@
  * (`guide-*.mp3`) and are rendered by `scripts/renderGuidanceLinesLily.ts`
  * from `GUIDANCE_LINES`, so text and audio cannot drift. Wiring the lines
  * into the Hub and session-end screens is G1/G2's job; this module is data
- * only (its one runtime import is `pathLines.ts`, itself loadable by the
- * node-typed render scripts).
+ * only (its runtime imports are `pathLines.ts` and the spoken step names it
+ * already uses, both loadable by the node-typed render scripts).
  */
 import type { Land } from '../progress/lands'
-import { pathLineSrc } from './pathLines'
+import type { SkillNode } from '../progress/types'
+import {
+  STAGE_SPOKEN_NAME_VERBS,
+  STAGE_SPOKEN_NAMES,
+  capitalizeSpokenName,
+} from '../sessionEnd/friendlyNodeName'
+import { pathLineSrc, pathStepsOf } from './pathLines'
 
 /** A world (`'math'` | `'word-song'`). */
 type World = Land['world']
@@ -38,8 +44,12 @@ export type GuidanceLineKind =
   | 'end-not-yet-praise'
   | 'end-not-yet-again'
   | 'end-world-done'
+  | 'end-fast-track'
   | 'session-review'
   | 'session-warmup'
+  | 'session-knew'
+  | 'session-peek-open'
+  | 'session-peek-close'
 
 export interface GuidanceLine {
   /** Dotted id, e.g. `guide.hub.suggest.math`. */
@@ -128,6 +138,14 @@ function buildLines(): GuidanceLine[] {
   )
   // The flower that finishes a world's last step.
   add('guide.end.world-done', 'end-world-done', 'You grew your whole garden!')
+  // The fast-track day, in place of "You got a flower!" (native spec
+  // design/native/fast-track-native.md § 8, text approved by Thomas
+  // 2026-10-14, T1).
+  add(
+    'guide.end.fast-track',
+    'end-fast-track',
+    'You know this! All your flowers grew!',
+  )
 
   // In session (native spec design/native/review-mode-and-warmup-native.md
   // § 4, text approved by Thomas 2026-10-14): a review's opener, and the
@@ -138,15 +156,72 @@ function buildLines(): GuidanceLine[] {
     "Your flower is sleeping. Let's play the ones you know!",
   )
   add('guide.session.warmup', 'session-warmup', 'Remember this one?')
+  // Fast-track spec § 8 (T1, approved as written 2026-10-14): a quick
+  // warm-up answer (§ 7).
+  add('guide.session.knew', 'session-knew', 'You just knew that one!')
+  // The Map peek's opener and closer name the step (§ 6.3, § 8; Thomas's
+  // device check 2026-10-15): "Let's look at <name>!" / "<Name> is (are)
+  // for later. You will learn it!", with the spoken step names the path
+  // lines use and each name's own verb ("Cat words are …", "Adding to ten
+  // is …"). One pair per step a peek can reach: every step but a world's
+  // first (a peek is a stop after the current one).
+  for (const w of WORLDS)
+    for (const n of peekableSteps(w))
+      add(
+        peekOpenId(n),
+        'session-peek-open',
+        `Let's look at ${STAGE_SPOKEN_NAMES[n]}!`,
+        w,
+      )
+  for (const w of WORLDS)
+    for (const n of peekableSteps(w))
+      add(
+        peekCloseId(n),
+        'session-peek-close',
+        `${capitalizeSpokenName(STAGE_SPOKEN_NAMES[n])} ${STAGE_SPOKEN_NAME_VERBS[n]} for later. You will learn it!`,
+        w,
+      )
   return lines
 }
 
+/** The steps a Map peek can reach in `world`: all but its first, in order. */
+function peekableSteps(world: World): SkillNode[] {
+  return pathStepsOf(world).slice(1)
+}
+
+const peekOpenId = (n: SkillNode) => `guide.session.peek-open.${n}`
+const peekCloseId = (n: SkillNode) => `guide.session.peek-close.${n}`
+
 /** Every guidance line: Hub, then session end, then in session. */
 export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
+
+/**
+ * Lines whose MP3 is not rendered yet. Until the render commit adds their
+ * clips (`scripts/renderGuidanceLinesLily.ts`, then `npm run export-audio`
+ * in `mobile/`), the players walk their captions silently, and the
+ * bundled-MP3 tests expect exactly these to be missing. The render commit
+ * sets this list to `[]` (the tests fail while a listed clip exists).
+ *
+ * Now: the 44 per-step peek lines (22 openers, 22 closers).
+ */
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 
 /** Line for an id, or undefined for an id the catalogue does not define. */
 export function guidanceLine(id: string): GuidanceLine | undefined {
   return BY_ID.get(id)
+}
+
+/**
+ * The Map peek's opener and closer for `node` (fast-track spec § 8), or
+ * `null` for a step with none (a world's first step, which a peek never
+ * reaches).
+ */
+export function peekLines(
+  node: SkillNode,
+): { open: GuidanceLine; close: GuidanceLine } | null {
+  const open = BY_ID.get(peekOpenId(node))
+  const close = BY_ID.get(peekCloseId(node))
+  return open !== undefined && close !== undefined ? { open, close } : null
 }

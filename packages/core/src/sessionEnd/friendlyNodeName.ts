@@ -156,6 +156,43 @@ export const STAGE_SPOKEN_NAMES: Record<SkillNode, string> = {
   'simple-sentences': 'reading sentences',
 }
 
+/**
+ * The verb each spoken stage name takes as a subject ("Cat words are …",
+ * "Adding to ten is …"): `are` for a plural noun phrase, `is` for an
+ * activity (gerund) name. Set per name, never guessed from a trailing "s"
+ * ("blending sounds" is the activity). Used by the Map peek's closer
+ * (native spec `design/native/fast-track-native.md` § 8).
+ */
+export const STAGE_SPOKEN_NAME_VERBS: Record<SkillNode, 'is' | 'are'> = {
+  // ── Number Garden (math) ──────────────────────────────────────────────
+  'number-recog': 'are',
+  'add-to-10': 'is',
+  'add-to-20': 'is',
+  'sub-to-10': 'is',
+  'sub-to-20': 'is',
+  'two-digit-addsub-no-regroup': 'are',
+  'two-digit-addsub-with-regroup': 'is',
+  'skip-counting': 'is',
+  'mult-2-5-10': 'are',
+  'mult-3-4': 'are',
+  'mult-6-9': 'are',
+
+  // ── Word Song (literacy) ──────────────────────────────────────────────
+  'letter-names': 'are',
+  'letter-sounds': 'are',
+  'blending-cv': 'is',
+  'cvc-words': 'are',
+  'cvc-words-short-o': 'are',
+  'cvc-words-short-u': 'are',
+  'cvc-words-short-i': 'are',
+  'cvc-words-short-e': 'are',
+  'digraphs-sh': 'are',
+  'digraphs-ch': 'are',
+  'digraphs-th-voiceless': 'are',
+  'sight-words': 'are',
+  'simple-sentences': 'is',
+}
+
 /** "adding to ten" → "Adding to ten" (sentence-start form). */
 export function capitalizeSpokenName(name: string): string {
   return name.charAt(0).toUpperCase() + name.slice(1)

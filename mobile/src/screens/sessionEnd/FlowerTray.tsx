@@ -110,7 +110,7 @@ interface HoleProps {
   slot: FlowerSlot
   rect: Rect
   flower: PanelContent['holeFlower']
-  /** Today's flower just landed here: it pops in. */
+  /** A flower just grew here (today's, or a fast-track bonus): it pops in. */
   pop: boolean
   reducedMotion: boolean
 }
@@ -173,8 +173,12 @@ export interface FlowerTrayProps {
   world: MasteryTrack
   slots: readonly FlowerSlot[]
   inner: PanelContent
-  /** The slot today's flower just landed in, or null. */
-  popSlot: number | null
+  /**
+   * Slots whose flower pops in as its view mounts: today's slot once it
+   * landed, plus the fast track's bonus slots (each pops the moment it
+   * turns grown, § 4.2). Empty before the landing.
+   */
+  popSlots: readonly number[]
   reducedMotion: boolean
 }
 
@@ -182,7 +186,7 @@ export function FlowerTray({
   world,
   slots,
   inner,
-  popSlot,
+  popSlots,
   reducedMotion,
 }: FlowerTrayProps) {
   const { rect, radius } = inner.tray
@@ -212,7 +216,7 @@ export function FlowerTray({
           slot={slot}
           rect={holes[i]!}
           flower={inner.holeFlower}
-          pop={i === popSlot}
+          pop={popSlots.includes(i)}
           reducedMotion={reducedMotion}
         />
       ))}

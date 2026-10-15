@@ -17,6 +17,7 @@ const RESULT: MathSessionResult = {
   subitisingScaffoldSubRendered: false,
   perProblemAnswerValue: [5, 4, 7, 9, 3, 8, 6, 10],
   warmupCorrect: [],
+  firstTapCorrect: [true, true, false, true, true, true, true, true],
   perProblemDistractorClass: [
     null,
     null,
@@ -50,6 +51,7 @@ it('builds the web handleMathComplete payload', () => {
     })),
     perProblemAnswerValue: RESULT.perProblemAnswerValue,
     perProblemDistractorClass: RESULT.perProblemDistractorClass,
+    firstTapCorrect: RESULT.firstTapCorrect,
     sessionFocus: { node: 'add-to-10', mode: 'forward' },
   })
 })

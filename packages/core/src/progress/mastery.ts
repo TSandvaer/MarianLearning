@@ -47,6 +47,7 @@
  */
 
 import { LETTER_SOUNDS_VOWELS } from './defaults'
+import { fastTrackQualifies, fastTrackSecureDays } from './fastTrack'
 import { getSettings } from './parentSettings'
 import type {
   GoodDayKey,
@@ -423,6 +424,7 @@ export function applyMasteryRule(progress: Progress): Progress {
           trackThreshold,
           settings,
           goodDays[node],
+          fastTrackSecureDays(progress, node),
         )
       ) {
         continue
@@ -602,7 +604,13 @@ function scanPerVowelSubMastery(
     // same-call-traversal property as the node-level scan).
     if (level === 'practicing') {
       if (
-        hasEnoughGoodDays(vowelHistory, threshold, settings, goodDays[vowel])
+        hasEnoughGoodDays(
+          vowelHistory,
+          threshold,
+          settings,
+          goodDays[vowel],
+          fastTrackSecureDays(progress, vowel),
+        )
       ) {
         level = 'mastered'
       }
@@ -637,7 +645,8 @@ export function trackOf(node: SkillNode): MasteryTrack | null {
  *
  * `threshold` is the per-track value (math vs word-song); `settings`
  * still carries the rule-level toggles (`crossDayEnforcement`).
- * `banked` is the node's entry in `progress.goodDays`.
+ * `banked` is the node's entry in `progress.goodDays`; `secure` its
+ * fast-track secure days (`fastTrackSecureDays`).
  */
 function qualifies(
   history: readonly SessionHistoryEntry[],
@@ -645,9 +654,10 @@ function qualifies(
   threshold: MasteryThreshold,
   settings: ParentSettings,
   banked: readonly string[] | undefined,
+  secure?: readonly string[],
 ): boolean {
   const focused = history.filter((entry) => entry.skillFocus.includes(node))
-  return hasEnoughGoodDays(focused, threshold, settings, banked)
+  return hasEnoughGoodDays(focused, threshold, settings, banked, secure)
 }
 
 /**
@@ -661,9 +671,11 @@ export function hasEnoughGoodDays(
   threshold: MasteryThreshold,
   settings: ParentSettings,
   banked: readonly string[] | undefined,
+  secure?: readonly string[],
 ): boolean {
   return (
-    goodDayCount(focused, threshold, settings, banked) >= threshold.sessions
+    goodDayCount(focused, threshold, settings, banked, secure) >=
+    threshold.sessions
   )
 }
 
@@ -677,8 +689,26 @@ export function hasEnoughGoodDays(
  * With `crossDayEnforcement === false` the parent has opted out of the
  * separate-days requirement, so good SESSIONS in history count one each
  * (the banked day list is still a floor).
+ *
+ * Fast track (native spec `design/native/fast-track-native.md` § 3.3):
+ * with 2 secure days on separate days in `secure` (the step's
+ * `fastTrackSecureDays`), the count is floored at `threshold.sessions`,
+ * whatever `crossDayEnforcement` says (P5).
  */
 export function goodDayCount(
+  focused: readonly SessionHistoryEntry[],
+  threshold: MasteryThreshold,
+  settings: ParentSettings,
+  banked: readonly string[] | undefined,
+  secure?: readonly string[],
+): number {
+  const count = rawGoodDayCount(focused, threshold, settings, banked)
+  return fastTrackQualifies(secure)
+    ? Math.max(count, threshold.sessions)
+    : count
+}
+
+function rawGoodDayCount(
   focused: readonly SessionHistoryEntry[],
   threshold: MasteryThreshold,
   settings: ParentSettings,
@@ -869,8 +899,11 @@ function dedupeByCalendarDay(
  * filter then treats the malformed entry as its own day key, which
  * keeps it visible and prevents one bad row from collapsing the
  * surrounding good rows.
+ *
+ * Exported so the fast track's secure days and pace guard key a session
+ * exactly as good days do (fast-track spec § 3.2).
  */
-function localDayKey(dateISO: string): string {
+export function localDayKey(dateISO: string): string {
   const ms = Date.parse(dateISO)
   if (Number.isNaN(ms)) return dateISO
   const d = new Date(ms)
@@ -1104,9 +1137,16 @@ export function isGraduationSessionPending(
   const focused = progress.history.filter((entry) =>
     entry.skillFocus.includes(node),
   )
-  // The good days must be banked (any order — ticket 123jpnbc3dm) ...
+  // The good days must be banked (any order — ticket 123jpnbc3dm), or
+  // the step fast-tracked (2 secure days, fast-track spec P6) ...
   if (
-    !hasEnoughGoodDays(focused, threshold, settings, progress.goodDays?.[node])
+    !hasEnoughGoodDays(
+      focused,
+      threshold,
+      settings,
+      progress.goodDays?.[node],
+      fastTrackSecureDays(progress, node),
+    )
   ) {
     return false
   }

@@ -1,7 +1,13 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { GUIDANCE_LINES, guidanceLine } from './guidanceLines'
+import { LITERACY_TREE, MATH_TREE } from '../progress/mastery'
+import {
+  GUIDANCE_LINES,
+  GUIDANCE_LINES_AWAITING_RENDER,
+  guidanceLine,
+  peekLines,
+} from './guidanceLines'
 import { PATH_LINES } from './pathLines'
 
 const read = (rel: string) => readFileSync(join(process.cwd(), rel), 'utf8')
@@ -26,13 +32,17 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'end-not-yet-praise': 1,
       'end-not-yet-again': 1,
       'end-world-done': 1,
+      'end-fast-track': 1,
       'session-review': 1,
       'session-warmup': 1,
+      'session-knew': 1,
+      'session-peek-open': 22,
+      'session-peek-close': 22,
     })
-    expect(GUIDANCE_LINES).toHaveLength(21)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(21)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(21)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(21)
+    expect(GUIDANCE_LINES).toHaveLength(67)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(67)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(67)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(67)
   })
 
   it('bakes each world and count variant', () => {
@@ -82,16 +92,93 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     )
   })
 
-  it('has a bundled MP3 for every line', () => {
+  it('bakes the fast-track spec § 8 lines with their exact approved texts (AC 11)', () => {
+    expect(guidanceLine('guide.end.fast-track')?.text).toBe(
+      'You know this! All your flowers grew!',
+    )
+    expect(guidanceLine('guide.session.knew')?.text).toBe(
+      'You just knew that one!',
+    )
+    // The generic peek lines are retired: every peek names its step.
+    expect(guidanceLine('guide.session.peek-open')).toBeUndefined()
+    expect(guidanceLine('guide.session.peek-close')).toBeUndefined()
+  })
+
+  it('names the step in the peek opener and closer (Thomas 2026-10-15), with the path lines’ spoken names and their verb', () => {
+    expect(peekLines('sub-to-10')).toMatchObject({
+      open: {
+        id: 'guide.session.peek-open.sub-to-10',
+        world: 'math',
+        text: "Let's look at taking away to ten!",
+        src: '/assets/audio/path/guide-session-peek-open-sub-to-10.mp3',
+      },
+      close: {
+        id: 'guide.session.peek-close.sub-to-10',
+        text: 'Taking away to ten is for later. You will learn it!',
+      },
+    })
+    expect(peekLines('digraphs-sh')?.open.text).toBe(
+      "Let's look at ship words!",
+    )
+    expect(peekLines('mult-2-5-10')?.close.text).toBe(
+      'Groups of two, five and ten are for later. You will learn it!',
+    )
+    expect(peekLines('cvc-words')?.close.text).toBe(
+      'Cat words are for later. You will learn it!',
+    )
+    // "blending sounds" is the activity: "is", though it ends in "s".
+    expect(peekLines('blending-cv')?.close.text).toBe(
+      'Blending sounds is for later. You will learn it!',
+    )
+    // Plural noun phrases take "are"; activity (gerund) names take "is".
+    const ARE = new Set([
+      'two-digit-addsub-no-regroup',
+      'mult-2-5-10',
+      'mult-3-4',
+      'mult-6-9',
+      'letter-sounds',
+      'cvc-words',
+      'cvc-words-short-o',
+      'cvc-words-short-u',
+      'cvc-words-short-i',
+      'cvc-words-short-e',
+      'digraphs-sh',
+      'digraphs-ch',
+      'digraphs-th-voiceless',
+      'sight-words',
+    ])
+    // Every step but a world's first (a peek never reaches it) has both.
+    for (const tree of [MATH_TREE, LITERACY_TREE]) {
+      expect(peekLines(tree[0]!)).toBeNull()
+      for (const node of tree.slice(1)) {
+        const lines = peekLines(node)
+        expect(lines).not.toBeNull()
+        // The name is the path stop line's ("Taking away to ten.").
+        const stop = PATH_LINES.find((l) => l.id === `path.stop.${node}`)!
+        const name = stop.text.replace(/\.$/, '')
+        const verb = ARE.has(node) ? 'are' : 'is'
+        expect(lines!.close.text).toBe(
+          `${name} ${verb} for later. You will learn it!`,
+        )
+        expect(lines!.open.text).toBe(
+          `Let's look at ${name.charAt(0).toLowerCase()}${name.slice(1)}!`,
+        )
+      }
+    }
+  })
+
+  it('has a bundled MP3 for every line but the ones awaiting their render', () => {
     const missing = GUIDANCE_LINES.filter(
       (l) => !existsSync(join(process.cwd(), 'public', l.src)),
-    ).map((l) => l.src)
-    expect(missing).toEqual([])
+    ).map((l) => l.id)
+    // Exactly the awaiting list: the render commit adds the clips AND
+    // empties `GUIDANCE_LINES_AWAITING_RENDER`.
+    expect(missing).toEqual([...GUIDANCE_LINES_AWAITING_RENDER])
     expect(
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(21)
+    ).toHaveLength(67)
   })
 
   it('repeats no Emma’s Path line', () => {

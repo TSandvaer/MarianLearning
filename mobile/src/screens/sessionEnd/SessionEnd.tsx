@@ -27,6 +27,12 @@
  * no `onAllDone` is wired, i.e. in unit tests; App always wires it), the
  * deprecated `playUtteranceFn` prop and the `data-*` QA attributes.
  *
+ * Native-only, the fast-track day (spec `design/native/fast-track-native.md`
+ * §§ 4, 9): today's flower flies and lands as always, then each bonus slot
+ * grows in place 500 ms apart with the sparkle (Reduce Motion: today's
+ * flower at 300 ms, each bonus fading in 400 ms apart, no sparkle), and the
+ * count badge waits for the last one.
+ *
  * Emma is App's hoisted `EmmaStage`; this screen reports her pose
  * (`cheering` on a flower day, else `idle`) through `onPoseChange`.
  */
@@ -77,6 +83,10 @@ export const FLOWER_FLY_AT_MS = 650
 export const FLOWER_LAND_AT_MS = 1450
 /** Reduce Motion: no flight, the flower is in its slot this soon. */
 export const FLOWER_REDUCED_LAND_MS = 300
+/** Fast track (§ 9): bonus k grows this long after the one before it. */
+export const BONUS_FLOWER_GAP_MS = 500
+/** Fast track, Reduce Motion: bonus k fades in this long after the one before. */
+export const BONUS_REDUCED_GAP_MS = 400
 /** The buttons appear at the latest this long after mount. */
 export const FALLBACK_CTA_MS = 20_000
 /** A button tap leaves this long after the chime. */
@@ -141,6 +151,8 @@ export function SessionEnd({
   const [flower, setFlower] = useState<FlowerStage | 'hidden' | 'landed'>(
     'hidden',
   )
+  /** Fast track: how many bonus slots have grown (0 … bonusSlots.length). */
+  const [bonusLanded, setBonusLanded] = useState(0)
   const leavingRef = useRef(false)
   // The beats run once, so `phase` only feeds the view's test id.
 
@@ -230,6 +242,24 @@ export function SessionEnd({
               sfx.sparkle.play()
             }, FLOWER_LAND_AT_MS)
           }
+          // The fast track's bonus slots grow in place after today's
+          // flower lands, one by one (§ 9); no flight.
+          g.bonusSlots.forEach((_, k) => {
+            if (reducedMotion) {
+              addTimer(
+                () => setBonusLanded(k + 1),
+                FLOWER_REDUCED_LAND_MS + BONUS_REDUCED_GAP_MS * (k + 1),
+              )
+            } else {
+              addTimer(
+                () => {
+                  setBonusLanded(k + 1)
+                  sfx.sparkle.play()
+                },
+                FLOWER_LAND_AT_MS + BONUS_FLOWER_GAP_MS * (k + 1),
+              )
+            }
+          })
         }
         await speak(line)
       }
@@ -297,6 +327,7 @@ export function SessionEnd({
           showCta={showCta}
           flower={flower === 'pop' || flower === 'fly' ? flower : null}
           landed={flower === 'landed'}
+          bonusLanded={bonusLanded}
           flight={
             g !== null && g.newSlot !== null
               ? flowerFlight(layout.inner, g.newSlot, g.slotsAfter.length)

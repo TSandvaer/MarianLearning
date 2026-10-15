@@ -11,9 +11,11 @@ export const NATIVE_COPY = {
   /**
    * Both threshold rows. Core counts good days (or good sessions with
    * fresh-day mastery off) in any order; the web's "in-a-row" is wrong.
+   * The last sentence is the fast track (fast-track spec T2, Thomas
+   * 2026-10-14): two secure days also finish a step.
    */
   masteryDescription:
-    "How many sessions at this success rate Marian needs before a skill counts as mastered. They don't have to be in a row.",
+    "How many sessions at this success rate Marian needs before a skill counts as mastered. They don't have to be in a row. Two days with every answer right on the first try also count.",
   share: 'Share…',
   /** The web's line points at the textarea, which native doesn't have. */
   copyFailedUseShare: "Couldn't copy — use Share instead.",

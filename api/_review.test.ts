@@ -18,12 +18,18 @@ vi.mock('./_session.js', () => ({
   extractUtteranceTexts: vi.fn(),
 }))
 
+import { mathSessionPlanFromServer } from '../packages/core/src/math/planFromServer.js'
+import { wordSongSessionPlanFromServer } from '../packages/core/src/wordSong/planFromServer.js'
 import { handler } from './claude.js'
 import { renderSessionAudio } from './_session.js'
 import { getCanonEntry } from './_canon.js'
 import { createRateLimiter, type RateLimiter } from './_rateLimit.js'
 import { createSessionCache } from './_sessionCache.js'
-import type { PlannerAnthropicClient } from './_planner.js'
+import {
+  VALID_MATH_FOCUS_NODES,
+  VALID_WORD_SONG_FOCUS_NODES,
+  type PlannerAnthropicClient,
+} from './_planner.js'
 import type { SessionStartResponse } from './_types.js'
 
 const mockedRender = vi.mocked(renderSessionAudio)
@@ -330,5 +336,134 @@ describe('warm-up (payload.warmup)', () => {
       const b = (await r.json()) as SessionStartResponse
       expect(b.utterances.some((u) => /^math\.w/.test(u.id))).toBe(false)
     }
+  })
+})
+
+describe('Map peek (payload.peek, fast-track-native § 6.2)', () => {
+  const PEEK_REFS = [
+    { node: 'add-to-20', problem: 1 },
+    { node: 'add-to-20', problem: 2 },
+    { node: 'add-to-20', problem: 3 },
+  ]
+
+  it('AC12: 3 refs → peek-math, math.p1–p3 copied from the canon blocks; no Anthropic, no TTS, no limiter', async () => {
+    const anthropicClient = anthropicSpy()
+    const rateLimiter = limiterSpy()
+    const res = await handler(
+      request({
+        ...base,
+        // Every other hint is ignored.
+        progress: {
+          focusNode: 'add-to-10',
+          leitner: [{ a: 1, b: 2, op: '+', box: 1 }],
+        },
+        peek: { blocks: PEEK_REFS },
+      }),
+      {
+        anthropicClient,
+        rateLimiter,
+        sessionCache: createSessionCache({ ttlMs: 60_000 }),
+      },
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as SessionStartResponse
+    expect((body.plan as { id: string }).id).toBe('peek-math')
+    expect((body.plan as { label: string }).label).toBe('Peek')
+    PEEK_REFS.forEach((ref, i) => {
+      const want = block(ref.node, ref.problem)
+      expect(want.plan.length).toBeGreaterThanOrEqual(5)
+      expect(blockOf(body, `p${i + 1}`)).toEqual(want)
+    })
+    expect(body.utterances.every((u) => /^math\.p[1-3]\./.test(u.id))).toBe(
+      true,
+    )
+    expect(body.utterances).toHaveLength(
+      PEEK_REFS.reduce((n, r) => n + block(r.node, r.problem).audio.length, 0),
+    )
+    expect(anthropicClient.messages.create).not.toHaveBeenCalled()
+    expect(mockedRender).not.toHaveBeenCalled()
+    expect(rateLimiter.check).not.toHaveBeenCalled()
+  })
+
+  it('AC13: 2 refs, a ref of the other track, problem 9, refs of two steps or 4 refs → 400 invalid-request', async () => {
+    for (const blocks of [
+      PEEK_REFS.slice(0, 2),
+      [...PEEK_REFS.slice(0, 2), { node: 'cvc-words', problem: 3 }],
+      [...PEEK_REFS.slice(0, 2), { node: 'add-to-20', problem: 9 }],
+      [...PEEK_REFS.slice(0, 2), { node: 'add-to-10', problem: 3 }],
+      [...PEEK_REFS, { node: 'add-to-20', problem: 4 }],
+    ]) {
+      const res = await handler(request({ ...base, peek: { blocks } }), {
+        anthropicClient: anthropicSpy(),
+      })
+      expect(res.status).toBe(400)
+      expect(await res.json()).toMatchObject({ error: 'invalid-request' })
+    }
+  })
+
+  it('every step of both worlds has a level-1 canon file a peek can be served from', async () => {
+    const worlds = [
+      ['math', VALID_MATH_FOCUS_NODES],
+      ['word-song', VALID_WORD_SONG_FOCUS_NODES],
+    ] as const
+    const failed: string[] = []
+    for (const [track, steps] of worlds) {
+      for (const node of steps) {
+        const res = await handler(
+          request({
+            track,
+            level: 1,
+            childName: 'Marian',
+            peek: {
+              blocks: [1, 2, 3].map((problem) => ({ node, problem })),
+            },
+          }),
+          { anthropicClient: anthropicSpy() },
+        )
+        if (res.status !== 200) {
+          failed.push(`${track}/${node} ${res.status}`)
+          continue
+        }
+        // ...and the app's parser reads exactly 3 problems from it.
+        const { plan } = (await res.json()) as SessionStartResponse
+        try {
+          const problems =
+            track === 'math'
+              ? mathSessionPlanFromServer(plan, {
+                  extendedKinds: true,
+                  problemCount: 3,
+                }).problems
+              : wordSongSessionPlanFromServer(plan, { problemCount: 3 })
+                  .problems
+          if (problems.length !== 3) failed.push(`${track}/${node} parse`)
+        } catch (err) {
+          failed.push(`${track}/${node} ${String(err)}`)
+        }
+      }
+    }
+    expect(failed).toEqual([])
+  })
+
+  it('a Word Song peek of a locked later step copies its word.p1–p3 blocks', async () => {
+    const res = await handler(
+      request({
+        track: 'word-song',
+        level: 1,
+        childName: 'Marian',
+        peek: {
+          blocks: [1, 2, 3].map((problem) => ({
+            node: 'digraphs-sh',
+            problem,
+          })),
+        },
+      }),
+      { anthropicClient: anthropicSpy() },
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as SessionStartResponse
+    expect((body.plan as { id: string }).id).toBe('peek-word-song')
+    expect(new Set(planLines(body).map((u) => u.id.split('.')[1]))).toEqual(
+      new Set(['p1', 'p2', 'p3']),
+    )
   })
 })

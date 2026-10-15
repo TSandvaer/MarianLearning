@@ -4,7 +4,10 @@ import { seedUnlocksCelebrated, sessionEndBeat } from '../progress/pathBeats'
 import type { Progress, SkillNode } from '../progress'
 import { END_CLIP_SECONDS, sessionEndGuidance } from './sessionEndGuidance'
 import { markNudgeSaid, nudgeSaidToday } from './notYetNudge'
-import { GUIDANCE_LINES } from '../emmasPath/guidanceLines'
+import {
+  GUIDANCE_LINES,
+  GUIDANCE_LINES_AWAITING_RENDER,
+} from '../emmasPath/guidanceLines'
 
 const TODAY = '2026-10-06'
 
@@ -179,7 +182,13 @@ describe('sessionEndGuidance (Guidance G2)', () => {
   })
 
   it('every session-end guidance line has its real clip length; nothing counts stars', () => {
-    const endIds = GUIDANCE_LINES.filter((l) => l.id.startsWith('guide.end.'))
+    // A line still awaiting its render has no clip yet: the render commit
+    // adds its ffprobe length here and takes it off the awaiting list.
+    const endIds = GUIDANCE_LINES.filter(
+      (l) =>
+        l.id.startsWith('guide.end.') &&
+        !GUIDANCE_LINES_AWAITING_RENDER.includes(l.id),
+    )
     expect(endIds.map((l) => l.id).sort()).toEqual(
       Object.keys(END_CLIP_SECONDS).sort(),
     )

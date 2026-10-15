@@ -15,6 +15,11 @@
  * map button or Session End's "All done"); the seen-marker write is the
  * map's only mount-time write. App's Emma stage is hidden here: her badge
  * is the map's Emma (§ 3). Home and Android back → Hub, at any time (§ 7).
+ *
+ * Native-only, the Map peek (fast-track spec
+ * `design/native/fast-track-native.md` § 6): a later stop's tap asks App
+ * for a peek (`onPeek`); a map remounted after one (`returnFromPeek`)
+ * opens quiet. See `useMapVisit`.
  */
 import type { MasteryTrack } from '@marian/core/progress'
 import { useEffect, useRef } from 'react'
@@ -37,18 +42,31 @@ export const MAP_EXIT_MS = 200
 /** The handoff that opens the map (App clears it when the map is left). */
 export interface MapEntry {
   world: MasteryTrack
+  /** Back from a peek (fast-track spec § 6.4). */
+  returnFromPeek?: true
 }
 
-export interface MapScreenProps extends Omit<MapVisitOptions, 'world'> {
+export interface MapScreenProps extends Omit<
+  MapVisitOptions,
+  'world' | 'peek'
+> {
   layout: MapScreenLayout
   world: MasteryTrack
   /** Home button / Android back → the Hub. */
   onHome: () => void
+  /** A later stop was tapped: start its peek (`useMapVisit`'s `peek`). */
+  onPeek?: MapVisitOptions['peek']
 }
 
-export function MapScreen({ layout, world, onHome, ...seams }: MapScreenProps) {
+export function MapScreen({
+  layout,
+  world,
+  onHome,
+  onPeek,
+  ...seams
+}: MapScreenProps) {
   const reducedMotion = useReducedMotion()
-  const state = useMapVisit({ world, ...seams })
+  const state = useMapVisit({ world, peek: onPeek, ...seams })
   const leavingRef = useRef(false)
   const { leave } = state
   const home = () => {

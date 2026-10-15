@@ -7,7 +7,7 @@ describe('route shell', () => {
   })
 
   it('has a label and an exit for every route', () => {
-    expect(ROUTES).toHaveLength(9)
+    expect(ROUTES).toHaveLength(10)
     for (const route of ROUTES) {
       expect(ROUTE_LABELS[route]).toBeTruthy()
       expect(ROUTE_EXITS[route].length).toBeGreaterThan(0)

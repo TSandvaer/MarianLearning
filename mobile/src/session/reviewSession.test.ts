@@ -316,6 +316,7 @@ describe('warm-up round and its Leitner outcomes (AC 14)', () => {
       perProblemAnswerValue: Array(8).fill(null),
       perProblemDistractorClass: Array(8).fill(null),
       warmupCorrect: [false, true],
+      firstTapCorrect: [true, true, false, true, true, true, true, true],
     }
     const payload = mathSessionEndPayload(
       result,

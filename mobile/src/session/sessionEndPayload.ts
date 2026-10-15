@@ -50,6 +50,11 @@ export interface SessionEndPayload {
   warmupFacts?: readonly (MathFact | null)[]
   /** The warm-up problems' first-tap correctness, in order. */
   warmupCorrect?: readonly boolean[]
+  /**
+   * The 8 scored problems' first-tap correctness (fast-track spec
+   * `design/native/fast-track-native.md` § 3.2), for the secure-day rule.
+   */
+  firstTapCorrect?: readonly boolean[]
 }
 
 type MathFact = { a: number; b: number; op: '+' | '-' | '*' }
@@ -127,6 +132,7 @@ export function mathSessionEndPayload(
       : {}),
     perProblemAnswerValue: result.perProblemAnswerValue,
     perProblemDistractorClass: result.perProblemDistractorClass,
+    firstTapCorrect: result.firstTapCorrect,
     ...(sessionFocus !== null ? { sessionFocus } : {}),
     ...(round.review
       ? { review: true as const, problemFacts: scored.map(problemFact) }
@@ -161,6 +167,7 @@ export function wordSongSessionEndPayload(
     perProblemCorrect: result.perProblemCorrect,
     targetWords: result.targetWords,
     perProblemAnswerWord: result.perProblemAnswerWord,
+    firstTapCorrect: result.firstTapCorrect,
     ...(currentTargetVowel !== null ? { currentTargetVowel } : {}),
     ...(sessionFocus !== null ? { sessionFocus } : {}),
     ...(round.review ? { review: true as const } : {}),

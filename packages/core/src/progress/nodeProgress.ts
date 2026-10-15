@@ -8,10 +8,13 @@
  * `graduationGateClears`, `nextNode`, ...), so the display cannot drift
  * from the rule. Good days come from the cumulative `progress.goodDays`
  * counter plus whatever `history` shows (ticket 123jpnbc3dm), exactly
- * as `applyMasteryRule` counts them.
+ * as `applyMasteryRule` counts them, floored by the fast track's secure
+ * days (native spec `design/native/fast-track-native.md` § 3.4: a
+ * fast-tracked step not yet mastered reports `goodDays === requiredDays`).
  */
 
 import { LETTER_SOUNDS_VOWELS } from './defaults'
+import { fastTrackSecureDays } from './fastTrack'
 import {
   goodDayCount,
   graduationGateClears,
@@ -100,6 +103,7 @@ export function nodeProgress(
                   threshold,
                   settings,
                   progress.goodDays?.[vowel],
+                  fastTrackSecureDays(progress, vowel),
                 ),
               ),
         requiredDays: threshold.sessions,
@@ -121,6 +125,7 @@ export function nodeProgress(
     threshold,
     settings,
     progress.goodDays?.[node],
+    fastTrackSecureDays(progress, node),
   )
   const goodDays =
     level === 'mastered'

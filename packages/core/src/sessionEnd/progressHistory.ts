@@ -62,6 +62,7 @@ import {
   type SkillNode,
   type WordSongNode,
 } from '../progress'
+import { withPaceHold, withSecureDay } from '../progress/fastTrackRecord'
 import { seedUnlocksCelebrated } from '../progress/pathBeats'
 import {
   SCAFFOLD_FOCUS_NODE,
@@ -309,6 +310,16 @@ export interface RecordProgressInput {
    * except letter-sounds) leave the persisted entry's field absent.
    */
   currentTargetVowel?: LetterSoundsVowel
+  /**
+   * First-tap correctness of the session's 8 scored problems, warm-ups
+   * left out (native fast-track spec `design/native/fast-track-native.md`
+   * § 3.2). Unlike `totalCorrect` (any solve without the given answer,
+   * retries included) this is the first tap only. When it is 8 × `true`
+   * and this is the first session finished on the step today, today joins
+   * `progress.secureDays` (`withSecureDay`). Not persisted on the history
+   * entry. The web never sends it, so it never records a secure day.
+   */
+  firstTapCorrect?: readonly boolean[]
 }
 
 /**
@@ -399,7 +410,14 @@ export function recordProgressOnSessionEnd(
       : existing.cvcGraduationSessionFired
 
   const next: Progress = {
-    ...existing,
+    // Fast track (§ 3.2): today's secure day, judged against the history
+    // BEFORE this session's entry (only the first session of a day counts).
+    ...withSecureDay(existing, {
+      focusNode: input.focusNode,
+      currentTargetVowel: input.currentTargetVowel,
+      dateISO: input.dateISO,
+      firstTapCorrect: input.firstTapCorrect,
+    }),
     profile: {
       ...existing.profile,
       lastPlayedISO: input.dateISO,
@@ -441,7 +459,12 @@ export function recordProgressOnSessionEnd(
   // single `saveProgress(promoted)` so the persisted blob always reflects
   // the post-promotion shape — there's no observable mid-state in
   // localStorage and no double IO.
-  const promoted = applyMasteryRule(withFirstEncounter)
+  // Pace guard (fast-track spec § 5): after the write, a step whose last
+  // two days played both scored ≤ 5/8 can no longer fast-track.
+  const promoted = withPaceHold(
+    applyMasteryRule(withFirstEncounter),
+    input.focusNode,
+  )
   saveProgress(promoted)
 
   // T2 cloud-sync (ticket 86c9pkfyu) — fire-and-forget POST so a future

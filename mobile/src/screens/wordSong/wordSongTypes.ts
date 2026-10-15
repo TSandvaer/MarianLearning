@@ -28,6 +28,13 @@ export interface WordSongSessionResult {
    * cover the 8 scored problems only; `totalCorrect` and the streak too.
    */
   warmupCorrect: readonly boolean[]
+  /**
+   * First-tap correctness of the 8 scored problems (fast-track spec
+   * `design/native/fast-track-native.md` § 3.2). Unlike `perProblemCorrect`
+   * (counts a retry that ends right), a problem solved after a wrong tap
+   * is `false` here.
+   */
+  firstTapCorrect: readonly boolean[]
 }
 
 export interface PlayWordSongUtteranceOptions {
