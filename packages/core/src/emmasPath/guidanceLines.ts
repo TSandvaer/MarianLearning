@@ -20,6 +20,7 @@
 import type { Land } from '../progress/lands'
 import type { SkillNode } from '../progress/types'
 import {
+  STAGE_SPOKEN_NAME_VERBS,
   STAGE_SPOKEN_NAMES,
   capitalizeSpokenName,
 } from '../sessionEnd/friendlyNodeName'
@@ -159,10 +160,11 @@ function buildLines(): GuidanceLine[] {
   // warm-up answer (§ 7).
   add('guide.session.knew', 'session-knew', 'You just knew that one!')
   // The Map peek's opener and closer name the step (§ 6.3, § 8; Thomas's
-  // device check 2026-10-15): "Let's look at <name>!" / "<Name> is for
-  // later. You will learn it!", with the spoken step names the path lines
-  // use. One pair per step a peek can reach: every step but a world's first
-  // (a peek is a stop after the current one).
+  // device check 2026-10-15): "Let's look at <name>!" / "<Name> is (are)
+  // for later. You will learn it!", with the spoken step names the path
+  // lines use and each name's own verb ("Cat words are …", "Adding to ten
+  // is …"). One pair per step a peek can reach: every step but a world's
+  // first (a peek is a stop after the current one).
   for (const w of WORLDS)
     for (const n of peekableSteps(w))
       add(
@@ -176,7 +178,7 @@ function buildLines(): GuidanceLine[] {
       add(
         peekCloseId(n),
         'session-peek-close',
-        `${capitalizeSpokenName(STAGE_SPOKEN_NAMES[n])} is for later. You will learn it!`,
+        `${capitalizeSpokenName(STAGE_SPOKEN_NAMES[n])} ${STAGE_SPOKEN_NAME_VERBS[n]} for later. You will learn it!`,
         w,
       )
   return lines

@@ -234,7 +234,7 @@ Math or Word Song gets `peek: true`, with `problemNodes = [node, node, node]`.
   - Right: sparkle, plink, `celebration` and the correct line.
   - Wrong: poof, shake, `puzzled-tilt`, "Hmm... try again?"; the hint comes at 2 wrongs and the given answer at 3, so she always reaches the answer. Never a red X.
   - No stardust grant and no streak. Subitising scaffolds and Word Song cross-vowel are off.
-- **Close:** when problem 3 resolves, 400 ms → `guide.session.peek-close.<step>` ("<Name> is for later. You will learn it!", § 8) → 400 ms after it ends → back to the Map. There is no Session End.
+- **Close:** when problem 3 resolves, 400 ms → `guide.session.peek-close.<step>` ("<Name> is/are for later. You will learn it!", § 8) → 400 ms after it ends → back to the Map. There is no Session End.
 - **Back button:** any time. It cuts the line and returns to the Map at once.
 
 ### 6.4 Back on the Map
@@ -264,17 +264,20 @@ The Map remounts in the peek's world with `returnFromPeek: true`.
 
 Thomas approved the lines in T1 (2026-10-14). After his device check on #568 (2026-10-15) the peek's opener and closer name the step. Each line goes in `GUIDANCE_LINES` (`packages/core/src/emmasPath/guidanceLines.ts`) and plays from `pathLineSrc(id)`.
 
-| ID                                | Kind                 | Text                                      | When                                                    |
-| --------------------------------- | -------------------- | ----------------------------------------- | ------------------------------------------------------- |
-| `guide.end.fast-track`            | `end-fast-track`     | "You know this! All your flowers grew!"   | Fast-track Session End, in place of "You got a flower!" |
-| `guide.session.knew`              | `session-knew`       | "You just knew that one!"                 | § 7                                                     |
-| `guide.session.peek-open.<step>`  | `session-peek-open`  | "Let's look at <name>!"                   | Peek opener (§ 6.3)                                     |
-| `guide.session.peek-close.<step>` | `session-peek-close` | "<Name> is for later. You will learn it!" | Peek closer (§ 6.3)                                     |
+| ID                                | Kind                 | Text                                          | When                                                    |
+| --------------------------------- | -------------------- | --------------------------------------------- | ------------------------------------------------------- |
+| `guide.end.fast-track`            | `end-fast-track`     | "You know this! All your flowers grew!"       | Fast-track Session End, in place of "You got a flower!" |
+| `guide.session.knew`              | `session-knew`       | "You just knew that one!"                     | § 7                                                     |
+| `guide.session.peek-open.<step>`  | `session-peek-open`  | "Let's look at <name>!"                       | Peek opener (§ 6.3)                                     |
+| `guide.session.peek-close.<step>` | `session-peek-close` | "<Name> is/are for later. You will learn it!" | Peek closer (§ 6.3)                                     |
 
 - **The peek lines, per step (Thomas, device check 2026-10-15):**
   - He asked for "Let's look at [step name]" in place of "Let's look at this one!", and "[step name] is for later, you will learn it" in place of "This one is for later. You will learn it!".
   - `<name>` is the spoken step name the path lines already use (`STAGE_SPOKEN_NAMES`; `path.stop.<step>` says it, capitalised). No new name is invented.
   - There is one opener and one closer for each step a peek can reach: every step but a world's first, 10 in Number Garden and 12 in Word Song. That makes 44 lines, for example "Let's look at taking away to ten!" and "Taking away to ten is for later. You will learn it!".
+  - **Verb agreement:** each name carries its own verb in `STAGE_SPOKEN_NAME_VERBS` (`packages/core/src/sessionEnd/friendlyNodeName.ts`). The verb is set per name, never guessed from a trailing "s". "You will learn it!" stays exactly as approved.
+    - **"are"** for plural noun phrases: big numbers, letter sounds, the cat, dog, sun, pig, bed, ship, chick, thumb and star words, big groups, groups of two, five and ten, and groups of three and four. Example: "Cat words are for later. You will learn it!"
+    - **"is"** for activity (gerund) names: adding to ten / twenty, taking away to ten / twenty, making tens, skip counting, blending sounds and reading sentences.
   - The two step-agnostic lines are retired from the catalogue, the registry and the voice-QA page.
 
 - **Vocabulary:** I scanned the texts of `GUIDANCE_LINES`, `PATH_LINES` and `public/canon/*/level-1/*.json` on 2026-10-14.
@@ -340,10 +343,10 @@ Dave: "explore counts toward NOTHING", and this boundary holds as written.
 
 ## 12. Assets required
 
-- **New:** the lines in § 8, rendered by `scripts/renderGuidanceLinesLily.ts`. The fast-track line and "knew" are rendered in #568. The 44 per-step peek lines (1648 characters) await their render.
+- **New:** the lines in § 8, rendered by `scripts/renderGuidanceLinesLily.ts`. The fast-track line and "knew" are rendered in #568. The 44 per-step peek lines (1662 characters) await their render.
   - Export with `npm run export-audio` in `mobile/` (it regenerates `audioRegistry.ts`) and add them to the guide list in `public/voice-qa.html`. Thomas ear-tests them there before the native build ships.
   - Add the ffprobe length of `guide.end.fast-track` to `END_CLIP_SECONDS`.
-  - **Prediction for the soak:** fast-track line ~3.1 s, "knew" ~1.6 s. Per-step openers run ~1.7–2.6 s and closers ~3–4 s. Several closers, the longest being "Groups of two, five and ten is for later. You will learn it!", will likely trip the renderer's 3.5 s flag.
+  - **Prediction for the soak:** fast-track line ~3.1 s, "knew" ~1.6 s. Per-step openers run ~1.7–2.6 s and closers ~3–4 s. Several closers, the longest being "Groups of two, five and ten are for later. You will learn it!", will likely trip the renderer's 3.5 s flag.
 - **Removed from use:** the map's locked-tap poof, wiggle and badge tilt, and the `path.locked.next` / `path.locked.later` requirement lines. The lines stay in the catalogue but are no longer played.
 - **Reused:** open-bud art, the hole pop, `sfx.sparkle`, `NewFlower`, `CountBadge`, the review-opener stage fade and all canon problem audio. No new pose, background, icon or SFX.
 

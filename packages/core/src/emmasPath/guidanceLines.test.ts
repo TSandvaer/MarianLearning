@@ -104,7 +104,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     expect(guidanceLine('guide.session.peek-close')).toBeUndefined()
   })
 
-  it('names the step in the peek opener and closer (Thomas 2026-10-15), with the path lines’ spoken names', () => {
+  it('names the step in the peek opener and closer (Thomas 2026-10-15), with the path lines’ spoken names and their verb', () => {
     expect(peekLines('sub-to-10')).toMatchObject({
       open: {
         id: 'guide.session.peek-open.sub-to-10',
@@ -121,8 +121,32 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       "Let's look at ship words!",
     )
     expect(peekLines('mult-2-5-10')?.close.text).toBe(
-      'Groups of two, five and ten is for later. You will learn it!',
+      'Groups of two, five and ten are for later. You will learn it!',
     )
+    expect(peekLines('cvc-words')?.close.text).toBe(
+      'Cat words are for later. You will learn it!',
+    )
+    // "blending sounds" is the activity: "is", though it ends in "s".
+    expect(peekLines('blending-cv')?.close.text).toBe(
+      'Blending sounds is for later. You will learn it!',
+    )
+    // Plural noun phrases take "are"; activity (gerund) names take "is".
+    const ARE = new Set([
+      'two-digit-addsub-no-regroup',
+      'mult-2-5-10',
+      'mult-3-4',
+      'mult-6-9',
+      'letter-sounds',
+      'cvc-words',
+      'cvc-words-short-o',
+      'cvc-words-short-u',
+      'cvc-words-short-i',
+      'cvc-words-short-e',
+      'digraphs-sh',
+      'digraphs-ch',
+      'digraphs-th-voiceless',
+      'sight-words',
+    ])
     // Every step but a world's first (a peek never reaches it) has both.
     for (const tree of [MATH_TREE, LITERACY_TREE]) {
       expect(peekLines(tree[0]!)).toBeNull()
@@ -132,8 +156,9 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
         // The name is the path stop line's ("Taking away to ten.").
         const stop = PATH_LINES.find((l) => l.id === `path.stop.${node}`)!
         const name = stop.text.replace(/\.$/, '')
+        const verb = ARE.has(node) ? 'are' : 'is'
         expect(lines!.close.text).toBe(
-          `${name} is for later. You will learn it!`,
+          `${name} ${verb} for later. You will learn it!`,
         )
         expect(lines!.open.text).toBe(
           `Let's look at ${name.charAt(0).toLowerCase()}${name.slice(1)}!`,
