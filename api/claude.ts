@@ -102,7 +102,9 @@ import {
 import { getCanonEntry } from './_canon.js'
 import { applyFirstEncounterGate } from './_firstEncounterGate.js'
 import {
+  buildPeekResponse,
   buildReviewResponse,
+  hasPeekRequest,
   hasReviewRequest,
   withWarmupBlocks,
 } from './_review.js'
@@ -830,6 +832,27 @@ export async function handler(
           )
         }
         return jsonResponse(review, 200, headers)
+      }
+      // Map peek (native spec fast-track-native.md § 6.2): the review's
+      // step 0, for 3 canon blocks of one step. Free, and it counts toward
+      // nothing.
+      if (hasPeekRequest(body.payload)) {
+        const peek = buildPeekResponse(
+          body.payload,
+          trackPayload.track,
+          canonResolver,
+        )
+        if (peek === null) {
+          return jsonResponse(
+            {
+              error: 'invalid-request',
+              message: 'peek must name 3 canon blocks of one step of the track',
+            },
+            400,
+            headers,
+          )
+        }
+        return jsonResponse(peek, 200, headers)
       }
       // Warm-up (§ 7.4): whichever branch answers the forward request, a
       // `payload.warmup`'s canon blocks are appended to a copy of its

@@ -26,6 +26,12 @@
 //   cached canon entry is never mutated and the appended response is never
 //   cached. The forward parsers skip `w` ids (their regexes are anchored on
 //   `p<N>`), so an older client is unaffected.
+// - `payload.peek = { blocks }` (exactly 3 refs, all one step: the Map peek,
+//   native spec design/native/fast-track-native.md § 6.2): the review
+//   responder generalised. `buildPeekResponse` answers with the 3 blocks
+//   renamed `<ns>.p1..p3.<slot>` and a plan id starting `peek-` (label
+//   `Peek`); same place in the handler, same 400 on a bad ref. A peek counts
+//   toward nothing; the server never sees what the child does with it.
 
 import {
   VALID_MATH_FOCUS_NODES,
@@ -33,6 +39,8 @@ import {
 } from './_planner.js'
 import type { PlannerTrack } from './_planner.js'
 import {
+  PEEK_BLOCK_COUNT,
+  PEEK_PLAN_ID_PREFIX,
   REVIEW_BLOCK_COUNT,
   REVIEW_PLAN_ID_PREFIX,
   WARMUP_BLOCK_MAX,
@@ -126,13 +134,50 @@ function copyBlock(
   }
 }
 
-/** Does the payload ask for a review (`payload.review` present)? */
-export function hasReviewRequest(payload: unknown): boolean {
+/** A request answered with copied canon blocks only: a review or a peek. */
+interface BlockSession {
+  /** The payload field naming the blocks. */
+  field: 'review' | 'peek'
+  /** Exactly this many refs. */
+  count: number
+  /** Every ref names the same step (the peek). */
+  oneStep: boolean
+  idPrefix: string
+  label: string
+}
+
+const REVIEW: BlockSession = {
+  field: 'review',
+  count: REVIEW_BLOCK_COUNT,
+  oneStep: false,
+  idPrefix: REVIEW_PLAN_ID_PREFIX,
+  label: 'Review',
+}
+
+const PEEK: BlockSession = {
+  field: 'peek',
+  count: PEEK_BLOCK_COUNT,
+  oneStep: true,
+  idPrefix: PEEK_PLAN_ID_PREFIX,
+  label: 'Peek',
+}
+
+function hasField(payload: unknown, field: string): boolean {
   return (
     typeof payload === 'object' &&
     payload !== null &&
-    (payload as Record<string, unknown>).review !== undefined
+    (payload as Record<string, unknown>)[field] !== undefined
   )
+}
+
+/** Does the payload ask for a review (`payload.review` present)? */
+export function hasReviewRequest(payload: unknown): boolean {
+  return hasField(payload, REVIEW.field)
+}
+
+/** Does the payload ask for a Map peek (`payload.peek` present)? */
+export function hasPeekRequest(payload: unknown): boolean {
+  return hasField(payload, PEEK.field)
 }
 
 /**
@@ -146,14 +191,34 @@ export function buildReviewResponse(
   track: PlannerTrack,
   resolve: CanonResolver,
 ): SessionStartResponse | null {
-  const review = (payload as Record<string, unknown>).review
-  const refs = parseBlocks(
-    review,
-    track,
-    REVIEW_BLOCK_COUNT,
-    REVIEW_BLOCK_COUNT,
-  )
+  return buildBlockSession(REVIEW, payload, track, resolve)
+}
+
+/**
+ * The Map peek's response for `payload.peek` (fast-track spec § 6.2), or
+ * `null` when the request is invalid (not exactly 3 refs, refs of two
+ * steps, a step of another track, a problem outside 1..8, a missing canon
+ * entry): the handler answers 400 `invalid-request`. Every other progress
+ * hint is ignored.
+ */
+export function buildPeekResponse(
+  payload: unknown,
+  track: PlannerTrack,
+  resolve: CanonResolver,
+): SessionStartResponse | null {
+  return buildBlockSession(PEEK, payload, track, resolve)
+}
+
+function buildBlockSession(
+  kind: BlockSession,
+  payload: unknown,
+  track: PlannerTrack,
+  resolve: CanonResolver,
+): SessionStartResponse | null {
+  const raw = (payload as Record<string, unknown>)[kind.field]
+  const refs = parseBlocks(raw, track, kind.count, kind.count)
   if (refs === null) return null
+  if (kind.oneStep && refs.some((r) => r.node !== refs[0]!.node)) return null
   const ns = namespaceOf(track)
   const plan: PlanLine[] = []
   const utterances: Utterance[] = []
@@ -170,8 +235,8 @@ export function buildReviewResponse(
     ok: true,
     kind: 'session-start',
     plan: {
-      id: `${REVIEW_PLAN_ID_PREFIX}${track}`,
-      label: 'Review',
+      id: `${kind.idPrefix}${track}`,
+      label: kind.label,
       utterances: plan,
     },
     utterances,

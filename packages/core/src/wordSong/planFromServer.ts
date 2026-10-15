@@ -345,6 +345,17 @@ export class PlanFromServerError extends Error {
   }
 }
 
+/** Options for {@link wordSongSessionPlanFromServer}. */
+export interface WordSongPlanFromServerOptions {
+  /**
+   * Build problems 1..`problemCount` instead of 1..8, and reject a plan
+   * with a problem numbered past it: the Map peek reads exactly 3 (native
+   * spec `design/native/fast-track-native.md` § 6.2). Default: 8, with
+   * later numbers ignored (the web app's behaviour).
+   */
+  readonly problemCount?: number
+}
+
 /**
  * Build a `WordSongSessionPlan` from a server-returned plan blob.
  *
@@ -353,6 +364,7 @@ export class PlanFromServerError extends Error {
  */
 export function wordSongSessionPlanFromServer(
   serverPlan: unknown,
+  options?: WordSongPlanFromServerOptions,
 ): WordSongSessionPlan {
   if (!isServerPlan(serverPlan)) {
     throw new PlanFromServerError(
@@ -376,8 +388,17 @@ export function wordSongSessionPlanFromServer(
     bucket[slot] = u.text
   }
 
+  const count = options?.problemCount ?? 8
+  if (options?.problemCount !== undefined) {
+    const extra = [...byProblem.keys()].find((i) => i > count)
+    if (extra !== undefined) {
+      throw new PlanFromServerError(
+        `server plan has problem ${extra}; expected exactly ${count}`,
+      )
+    }
+  }
   const problems: WordSongProblem[] = []
-  for (let index = 1; index <= 8; index++) {
+  for (let index = 1; index <= count; index++) {
     const bucket = byProblem.get(index)
     if (!bucket) {
       throw new PlanFromServerError(
