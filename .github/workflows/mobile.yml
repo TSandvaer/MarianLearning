@@ -29,4 +29,25 @@ jobs:
       - run: npm run typecheck
       - run: npm test -- --ci
       - run: npm run check:bundle
-      - run: npx expo-doctor
+      # Every expo-doctor check blocks except the SDK dependency-version check,
+      # which the env var below skips (and only that check). Expo ships patch
+      # releases every few days; each one used to turn this job red (#549,
+      # #568, #570). Decision 2026-10-15: version drift warns, and Expo is
+      # bumped before each TestFlight build.
+      - name: expo-doctor (dependency-version check runs below, warn-only)
+        run: npx expo-doctor
+        env:
+          EXPO_DOCTOR_SKIP_DEPENDENCY_VERSION_CHECK: '1'
+      # The same check expo-doctor runs internally (`expo install --check`).
+      # Drift becomes a ::warning:: annotation; this step always exits 0.
+      - name: Expo SDK dependency versions (warn only)
+        run: |
+          if out=$(npx expo install --check 2>&1); then
+            echo "$out"
+          else
+            echo "$out"
+            out="${out//'%'/'%25'}"
+            out="${out//$'\r'/'%0D'}"
+            out="${out//$'\n'/'%0A'}"
+            echo "::warning title=Expo dependency drift (non-blocking)::${out}"
+          fi
