@@ -8,8 +8,9 @@
  *
  * The peek's session start is stubbed (`requestPeek`): its plan is the
  * committed canon's sub-to-10 problems 1–3, its audio a fake that starts
- * and ends each line at once. Emma's guide lines have no clip yet (they
- * await their render), so they walk their captions.
+ * and ends each line at once. Emma's opener and closer play their bundled
+ * clips on the fake expo-audio players; the test starts and ends each one
+ * (`finishGuideLine`), as App.test.tsx's `finishLine()` does for Greet.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -20,7 +21,7 @@ import { SESSION_HISTORY_KEY } from '@marian/core/sessionEnd/sessionHistory'
 import { loadStardust } from '@marian/core/shared/stardust'
 import { WARM_CAP_MS } from '@marian/core/splash/splashTiming'
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
-import { flush, resetFakePlayers } from '../test/fakeAudio'
+import { fakePlayers, flush, resetFakePlayers } from '../test/fakeAudio'
 import { REPO_ROOT } from '../test/webSource'
 import App from './App'
 import { sessionPrefetcher, type LoadedSessionAudio } from './audio'
@@ -76,6 +77,24 @@ async function settle(total: number) {
       await flush()
     })
   }
+}
+
+/**
+ * The guide line in flight plays its bundled clip: start it and end it.
+ * The newest playing player: an earlier one also sits in `play` here.
+ */
+async function finishGuideLine(): Promise<void> {
+  const p = [...fakePlayers]
+    .reverse()
+    .find(
+      (f) => f.calls.at(-1) === 'play' && !f.released && f.listenerCount > 0,
+    )
+  if (!p) return
+  await act(async () => {
+    p.start(1.5)
+    p.finish()
+    await flush()
+  })
 }
 
 /** sub-to-10's problems 1–3, as the server's peek answer carries them. */
@@ -178,15 +197,18 @@ it('AC 18: a full peek writes nothing — progress JSON and session history byte
     }),
   ).toHaveLength(3)
   expect(screen.queryByTestId('math-stardust')).toBeNull()
-  // The opener walks its caption; the stage waits for it.
+  // The opener plays; the stage waits for it.
   expect(screen.queryByTestId('math-chips')).toBeNull()
+  await finishGuideLine()
   await settle(3000)
 
   for (const problem of plan.problems) {
     await fireEvent.press(screen.getByTestId(`math-chip-${problem.correct}`))
     await settle(2000)
   }
-  // The closer walks, then the map comes back.
+  // The closer plays, then the map comes back.
+  await settle(1000)
+  await finishGuideLine()
   await settle(5000)
   expect(screen.getByTestId('map-math-beat-none')).toBeOnTheScreen()
   expect(screen.queryByTestId('map-ribbon')).toBeNull()
