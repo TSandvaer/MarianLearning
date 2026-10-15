@@ -96,12 +96,12 @@ import Animated, {
 import {
   audioEngine,
   blendMarksFor,
-  PEEK_CLOSE_GAP_MS,
   blendRevealAt,
   createSfx,
   createTapClipPlayer,
   letterWindow,
   litAt,
+  PEEK_CLOSE_GAP_MS,
   SESSION_GUIDE_GAP_MS,
   SESSION_GUIDE_MANIFEST,
   sessionGuidePlayer,
@@ -698,7 +698,17 @@ export function WordSong({
       firstTapCorrect: firstTapCorrectRef.current.slice(w),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` seeds the write only
-  }, [problemIndex, plan, storage, clearTimers, clearCaption, tap, isPeek])
+  }, [
+    problemIndex,
+    plan,
+    storage,
+    clearTimers,
+    clearCaption,
+    tap,
+    isPeek,
+    speak,
+    guide,
+  ])
 
   // Back from the background: run the advance that waited for it.
   useEffect(() => {
