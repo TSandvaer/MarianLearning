@@ -18,6 +18,8 @@ vi.mock('./_session.js', () => ({
   extractUtteranceTexts: vi.fn(),
 }))
 
+import { mathSessionPlanFromServer } from '../packages/core/src/math/planFromServer.js'
+import { wordSongSessionPlanFromServer } from '../packages/core/src/wordSong/planFromServer.js'
 import { handler } from './claude.js'
 import { renderSessionAudio } from './_session.js'
 import { getCanonEntry } from './_canon.js'
@@ -418,7 +420,25 @@ describe('Map peek (payload.peek, fast-track-native § 6.2)', () => {
           }),
           { anthropicClient: anthropicSpy() },
         )
-        if (res.status !== 200) failed.push(`${track}/${node} ${res.status}`)
+        if (res.status !== 200) {
+          failed.push(`${track}/${node} ${res.status}`)
+          continue
+        }
+        // ...and the app's parser reads exactly 3 problems from it.
+        const { plan } = (await res.json()) as SessionStartResponse
+        try {
+          const problems =
+            track === 'math'
+              ? mathSessionPlanFromServer(plan, {
+                  extendedKinds: true,
+                  problemCount: 3,
+                }).problems
+              : wordSongSessionPlanFromServer(plan, { problemCount: 3 })
+                  .problems
+          if (problems.length !== 3) failed.push(`${track}/${node} parse`)
+        } catch (err) {
+          failed.push(`${track}/${node} ${String(err)}`)
+        }
       }
     }
     expect(failed).toEqual([])
