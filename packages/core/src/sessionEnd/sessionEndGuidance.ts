@@ -77,6 +77,8 @@ export const END_CLIP_SECONDS: Readonly<Record<string, number>> = {
   'guide.end.not-yet.again': 2.48,
   // PR #514's render run (ffprobe 2.400 s).
   'guide.end.world-done': 2.4,
+  // PR #568's render run (ffprobe 3.120 s).
+  'guide.end.fast-track': 3.12,
 }
 
 /** Caption-only lines read at ~165 wpm plus a breath. */
