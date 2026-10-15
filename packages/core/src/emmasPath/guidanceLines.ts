@@ -204,10 +204,7 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  *
  * Now: the 44 per-step peek lines (22 openers, 22 closers).
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] =
-  GUIDANCE_LINES.filter(
-    (l) => l.kind === 'session-peek-open' || l.kind === 'session-peek-close',
-  ).map((l) => l.id)
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 
