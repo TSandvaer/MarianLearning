@@ -16,7 +16,7 @@
   "dependencies": {
     "@expo-google-fonts/fredoka": "^0.4.1",
     "@marian/core": "file:../packages/core",
-    "expo": "~57.0.29",
+    "expo": "~57.0.30",
     "expo-asset": "~57.0.20",
     "expo-audio": "~57.0.5",
     "expo-clipboard": "~57.0.2",

@@ -85,8 +85,6 @@ import {
   shouldShowDotCard,
   subMinuendFromProblem,
 } from '@marian/core/math/dotCard'
-import { chipMaxAnswerForCorrects } from '@marian/core/math/distractors'
-import { multiplyChipCeiling } from '@marian/core/math/extendedDistractors'
 import type {
   ExtendedMathProblem,
   ExtendedMathSessionPlan,
@@ -168,16 +166,13 @@ import {
 } from '../../lifecycle/appVisibility'
 import { colors, FILL, fonts } from '../../theme'
 import { AnswerChip } from './AnswerChip'
-import { buildChipOrder } from './chipOrder'
 import { CountingRow } from './CountingRow'
-import {
-  buildExtendedChipOrder,
-  type MathOfferedClass,
-} from './extendedChipOrder'
+import type { MathOfferedClass } from './extendedChipOrder'
 import { GettingReady } from './GettingReady'
 import { countSpokenFactor } from './extendedHints'
 import { GroupsRow } from './GroupsRow'
 import { MathHud } from './MathHud'
+import { problemChips, type ProblemChips } from './problemChips'
 import type {
   MathSessionResult,
   PlayMathUtteranceFn,
@@ -529,28 +524,12 @@ export function MathScreen({
   const [streakFadingOut, setStreakFadingOut] = useState(false)
   const [guidedActive, setGuidedActive] = useState(false)
 
-  // The chips follow each problem's own step (review spec § 7.4): its
-  // distractor rules, and a ceiling from that step's problems only. Without
-  // `problemNodes` every problem is `focusNode`'s, exactly as before.
-  const chipOrderWithClass = useMemo<{
-    values: readonly number[]
-    offeredClass: MathOfferedClass | null
-  }>(() => {
-    const p = plan.problems[problemIndex]
-    const nodeOf = (i: number) => problemNodes?.[i] ?? focusNode
-    const node = nodeOf(problemIndex)
-    const sameStep = plan.problems.filter((_, j) => nodeOf(j) === node)
-    if (p.kind === 'arithmetic') {
-      const max = chipMaxAnswerForCorrects(
-        sameStep.filter((q) => q.kind === 'arithmetic').map((q) => q.correct),
-      )
-      return buildChipOrder(p, max, node)
-    }
-    const ceiling = multiplyChipCeiling(
-      sameStep.filter((q) => q.kind === 'multiply').map((q) => q.correct),
-    )
-    return buildExtendedChipOrder(p, ceiling)
-  }, [plan, problemIndex, problemNodes, focusNode])
+  // The chips follow each problem's own step (review spec § 7.4); see
+  // `problemChips.ts`.
+  const chipOrderWithClass = useMemo<ProblemChips>(
+    () => problemChips(plan.problems, problemIndex, focusNode, problemNodes),
+    [plan, problemIndex, problemNodes, focusNode],
+  )
   useEffect(() => {
     perProblemDistractorClassRef.current[problemIndex] =
       chipOrderWithClass.offeredClass
