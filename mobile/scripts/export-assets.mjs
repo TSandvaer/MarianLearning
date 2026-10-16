@@ -14,7 +14,8 @@
  * - `assets/emma/idle-shadow.webp` the Hub's baked shadow under idle Emma
  * - `assets/pictures/<key>.webp`   every `public/assets/pictures/picture-*.svg`,
  *                                  and the 4 novel-probe pictures the web
- *                                  draws inline (`renderProbePictures.ts`)
+ *                                  draws inline (`renderProbePictures.ts`),
+ *                                  unless a pack picture exists for them
  * - `src/audio/blendMarks.generated.ts` the sound segments of every baked
  *                                  Word Song blend clip (needs `ffmpeg`)
  * - `assets/scenes/<id>.webp`      every `public/assets/scenes/scene-*.svg`
@@ -37,6 +38,7 @@
 import { createRequire } from 'node:module'
 import {
   copyFileSync,
+  existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -181,6 +183,10 @@ for (const name of sorted(join(webAssets, 'pictures'), /^picture-.+\.svg$/)) {
 // as inline SVG (`wordPictures.tsx`), so render that markup through the
 // root `tsx` and bake it at 500 px like the pack (word-song-native.md § 7).
 // Native-only (no web URL): keyed under /native/pictures/.
+// The inline bake is only a fallback: once a real picture is picked for a
+// probe word (scripts/generatePackPictures.ts --pick, then embed-pictures),
+// its `picture-<key>.svg` was exported above under the same `<key>.webp`.
+// Skip the bake then, or it would overwrite that file with the old picture.
 {
   const markup = JSON.parse(
     execFileSync(
@@ -194,6 +200,7 @@ for (const name of sorted(join(webAssets, 'pictures'), /^picture-.+\.svg$/)) {
     ),
   )
   for (const [key, svg] of Object.entries(markup)) {
+    if (existsSync(join(webAssets, 'pictures', `picture-${key}.svg`))) continue
     const sized = svg
       .replace(/ style="[^"]*"/, '')
       .replace('<svg ', '<svg width="500" height="500" ')
