@@ -181,6 +181,7 @@ describe('the session start', () => {
       review: false,
       warmupCount: 0,
       problemNodes: null,
+      intro: null,
     })
     expect(session.sessionFocus).toEqual({ node: 'add-to-10', mode: 'forward' })
   })
@@ -199,6 +200,7 @@ describe('the session start', () => {
       review: false,
       warmupCount: 0,
       problemNodes: null,
+      intro: null,
     })
   })
 
@@ -228,6 +230,7 @@ describe('the session start', () => {
       review: false,
       warmupCount: 0,
       problemNodes: null,
+      intro: null,
     })
   })
 

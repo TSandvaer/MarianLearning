@@ -26,6 +26,7 @@ import {
   mathRoundFromServer,
   readMathProgressHints,
 } from './mathSession'
+import { sessionIntroFor } from './reviewSession'
 import { mathSessionEndPayload } from './sessionEndPayload'
 import { forwardLeitnerOutcomes } from './sessionEndWrite'
 import {
@@ -373,5 +374,17 @@ describe('Word Song review / warm-up requests', () => {
     ).blocks
     expect(blocks).toHaveLength(2)
     expect(blocks.every((b) => b.node === 'cvc-words')).toBe(true)
+  })
+})
+
+describe('the step intro lead line (content wave 1 § 6.1)', () => {
+  const FWD = { kind: 'forward' as const, warmup: [] }
+  it('a step without an intro, a review and a missing focus get none', () => {
+    const p = defaultProgress()
+    expect(sessionIntroFor(p, 'add-to-10', FWD)).toBeNull()
+    expect(sessionIntroFor(p, undefined, FWD)).toBeNull()
+    expect(
+      sessionIntroFor(p, 'add-to-10', { kind: 'review', blocks: [] }),
+    ).toBeNull()
   })
 })

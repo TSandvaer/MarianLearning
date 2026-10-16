@@ -7,6 +7,7 @@ import {
   GUIDANCE_LINES_AWAITING_RENDER,
   guidanceLine,
   peekLines,
+  sessionIntroLine,
 } from './guidanceLines'
 import { PATH_LINES } from './pathLines'
 
@@ -38,11 +39,12 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'session-knew': 1,
       'session-peek-open': 22,
       'session-peek-close': 22,
+      'session-hiding': 1,
     })
-    expect(GUIDANCE_LINES).toHaveLength(67)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(67)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(67)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(67)
+    expect(GUIDANCE_LINES).toHaveLength(68)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(68)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(68)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(68)
   })
 
   it('bakes each world and count variant', () => {
@@ -102,6 +104,27 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     // The generic peek lines are retired: every peek names its step.
     expect(guidanceLine('guide.session.peek-open')).toBeUndefined()
     expect(guidanceLine('guide.session.peek-close')).toBeUndefined()
+  })
+
+  it('bakes the lead lines of content wave 1 § 6.1 with their exact approved texts (AC 6)', () => {
+    expect(guidanceLine('guide.session.hiding')).toMatchObject({
+      kind: 'session-hiding',
+      world: 'math',
+      text: 'Some flowers are hiding!',
+      src: '/assets/audio/path/guide-session-hiding.mp3',
+    })
+    // Every intro line is `guide.session.intro.<step>`, kind
+    // `session-intro`, with its step's world.
+    for (const l of GUIDANCE_LINES.filter((x) => x.kind === 'session-intro')) {
+      const node = l.id.slice('guide.session.intro.'.length)
+      expect(sessionIntroLine(node as never)).toBe(l)
+      const tree = l.world === 'math' ? MATH_TREE : LITERACY_TREE
+      expect(tree as readonly string[]).toContain(node)
+    }
+    // A step with no intro text has no line.
+    expect(sessionIntroLine('add-to-10')).toBeUndefined()
+    // Awaiting their Lily render (the render commit empties the list).
+    expect(GUIDANCE_LINES_AWAITING_RENDER).toContain('guide.session.hiding')
   })
 
   it('names the step in the peek opener and closer (Thomas 2026-10-15), with the path lines’ spoken names and their verb', () => {
@@ -178,7 +201,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(67)
+    ).toHaveLength(68)
   })
 
   it('repeats no Emma’s Path line', () => {

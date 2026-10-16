@@ -138,6 +138,7 @@ import {
   audioEngine,
   createSfx,
   KNEW_GAP_MS,
+  leadLinesForRound,
   PEEK_CLOSE_GAP_MS,
   peekGuideLines,
   recordAudio,
@@ -291,6 +292,12 @@ export interface MathProps {
   peek?: SkillNode
   /** The peek is over (after the closer, or the back button at once). */
   onPeekEnd?: () => void
+  /**
+   * The focus step's intro lead line (content wave 1 § 6.1), before the
+   * scored problem 1's read; `null` / unset = none. The session start
+   * decides (a forward session on a step that is not mastered).
+   */
+  sessionIntro?: SessionGuideLineId | null
 }
 
 interface PerProblemState {
@@ -376,6 +383,7 @@ export function MathScreen({
   sessionGuide,
   peek,
   onPeekEnd,
+  sessionIntro = null,
 }: MathProps) {
   const appHidden = useIsAppHidden(visibility)
   const reducedMotion = useReducedMotion()
@@ -435,6 +443,22 @@ export function MathScreen({
   /** The opener has played (the stage mounts at its end). */
   const [openerDone, setOpenerDone] = useState(false)
   const openerStartedRef = useRef(false)
+  /**
+   * The line before each problem's read (content wave 1 § 6.1): the
+   * opener, a warm-up heart's line, the step intro, the hiding line; at
+   * most one per problem. Missing-number problems join with their kind.
+   */
+  const leads = useMemo(
+    () =>
+      leadLinesForRound(plan.problems.length, {
+        opener,
+        warmupCount: warmups,
+        intro: sessionIntro,
+        hiding: plan.problems.map(() => false),
+        peek: isPeek,
+      }),
+    [plan, opener, warmups, sessionIntro, isPeek],
+  )
 
   // ── Persistent + per-session state (web names) ───────────────────────
 
@@ -712,13 +736,13 @@ export function MathScreen({
     const live = () =>
       !unmountedRef.current && problemIndexRef.current === myProblemIndex
     // Review spec § 4: the opener where problem 1's read would start; the
-    // warm-up line before each warm-up read. Line end → 400 ms → the read.
+    // warm-up line before each warm-up read; content wave 1 § 6.1: the step
+    // intro and the hiding line. Line end → 400 ms → the read.
+    const planned = leads[myProblemIndex] ?? null
     const lead: SessionGuideLineId | null =
-      opener !== null && myProblemIndex === 0 && !openerStartedRef.current
-        ? opener
-        : myProblemIndex < warmups
-          ? 'guide.session.warmup'
-          : null
+      planned !== null && planned === opener && openerStartedRef.current
+        ? null
+        : planned
     microtask(() => {
       if (!live()) return
       if (spokeReadAloudRef.current) return

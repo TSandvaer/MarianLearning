@@ -50,6 +50,8 @@ export type GuidanceLineKind =
   | 'session-knew'
   | 'session-peek-open'
   | 'session-peek-close'
+  | 'session-intro'
+  | 'session-hiding'
 
 export interface GuidanceLine {
   /** Dotted id, e.g. `guide.hub.suggest.math`. */
@@ -181,8 +183,30 @@ function buildLines(): GuidanceLine[] {
         `${capitalizeSpokenName(STAGE_SPOKEN_NAMES[n])} ${STAGE_SPOKEN_NAME_VERBS[n]} for later. You will learn it!`,
         w,
       )
+  // Lead lines (content wave 1 § 6.1, texts approved by Thomas 2026-10-16):
+  // one short line before a problem's read that introduces a new thing. A
+  // step's intro plays before the scored problem 1 of its forward sessions
+  // until it is mastered; the hiding line before a round's first
+  // missing-number problem. The screens decide which problem gets which
+  // (`leadLinesForRound` in the native app's `audio/sessionGuide.ts`).
+  for (const w of WORLDS)
+    for (const n of pathStepsOf(w)) {
+      const text = SESSION_INTRO_TEXTS[n]
+      if (text !== undefined) add(sessionIntroId(n), 'session-intro', text, w)
+    }
+  add(SESSION_HIDING_ID, 'session-hiding', 'Some flowers are hiding!', 'math')
   return lines
 }
+
+/**
+ * The intro lead line of each new step (§ 6.1). A step without an entry has
+ * no intro. Each text is the step's own, not a template: "Two letters, one
+ * sound!" names duck words' idea, not their name.
+ */
+const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {}
+
+const sessionIntroId = (n: SkillNode) => `guide.session.intro.${n}`
+const SESSION_HIDING_ID = 'guide.session.hiding'
 
 /** The steps a Map peek can reach in `world`: all but its first, in order. */
 function peekableSteps(world: World): SkillNode[] {
@@ -202,15 +226,27 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: the 44 per-step peek lines (22 openers, 22 closers).
+ * Now: content wave 1's lead lines (§ 6.1).
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
+  SESSION_HIDING_ID,
+]
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 
 /** Line for an id, or undefined for an id the catalogue does not define. */
 export function guidanceLine(id: string): GuidanceLine | undefined {
   return BY_ID.get(id)
+}
+
+/** The intro lead line of `node` (§ 6.1), or undefined for a step with none. */
+export function sessionIntroLine(node: SkillNode): GuidanceLine | undefined {
+  return BY_ID.get(sessionIntroId(node))
+}
+
+/** "Some flowers are hiding!" (§ 6.1): before a round's first missing number. */
+export function sessionHidingLine(): GuidanceLine {
+  return BY_ID.get(SESSION_HIDING_ID)!
 }
 
 /**
