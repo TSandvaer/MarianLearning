@@ -1,14 +1,17 @@
 #!/usr/bin/env tsx
 /**
  * Pre-bake every active (track, level, focusNode) session-start combo
- * to a static JSON+base64-audio blob under `public/canon/`.
+ * to a static JSON blob under `public/canon/`. TEXT ONLY: this script
+ * never calls a TTS provider (no Azure, no ElevenLabs).
  *
- * Ticket 86c9kwhbc (D — pre-baked session canon).
+ * Ticket 86c9kwhbc (D — pre-baked session canon). Text-only since
+ * 2026-10-16 (Thomas: Lily is the only voice; the Azure pass this script
+ * used to make was thrown away by the Lily re-voice every time).
  *
  * Why
  * ---
  * Cold-start /api/claude session-start was 10–12s on prod (Anthropic
- * Haiku call + 40-59 Azure TTS renders, sequential because the planner
+ * Haiku call + 40-59 TTS renders, sequential because the planner
  * blocks on the model response). For the active set of curriculum
  * combos, the content is deterministic enough that we can pre-render
  * everything offline and ship the blobs in the function bundle. The
@@ -16,15 +19,26 @@
  * a sync filesystem read + JSON.parse + Response.json — well under
  * 500ms even on a cold instance.
  *
+ * The bake is two steps
+ * ---------------------
+ * 1. THIS script: Haiku writes the text. Every utterance gets an empty
+ *    audio slot, `{ kind: 'inline', base64: '', mime: 'audio/mpeg' }`.
+ * 2. `npx tsx scripts/revoiceCanonLily.ts --unrendered`: renders exactly
+ *    the empty slots in Lily (ElevenLabs) and leaves every other clip's
+ *    bytes alone. Then ear-test and commit the JSON.
+ * A canon file is never committed between the two steps: an empty slot
+ * plays as a silent line.
+ *
  * What this script does
  * ---------------------
- * 1. Loads ANTHROPIC_API_KEY + AZURE_SPEECH_KEY/REGION from .env.local
- *    or process.env (matching the convention render-greet-mp3s.mjs uses).
+ * 1. Loads ANTHROPIC_API_KEY from .env.local or process.env (matching the
+ *    convention render-greet-mp3s.mjs uses). No TTS key is read.
  * 2. Iterates the cross-product of MATH_TREE × {level: 1} +
  *    LITERACY_TREE × {level: 1} × {childName: "Marian"}.
  * 3. For each combo, calls `generateSessionStartResponse` (the same
- *    callable the live HTTP handler uses) to produce the full
- *    SessionStartResponse.
+ *    callable the live HTTP handler uses) with a no-audio synth, so the
+ *    planner, its post-passes and the response assembly are exactly the
+ *    live ones; only the audio is left empty.
  * 4. Writes one JSON file per combo at
  *    `public/canon/<track>/level-<n>/<focusNode>.json`.
  *
@@ -33,8 +47,7 @@
  * Haiku is a generative model — we don't get bit-identical output across
  * runs. What we DO get is "a curriculum-correct 8-problem session" each
  * time, which is what canon's job is. If the prompt changes (curriculum
- * tweak, new utterance slot, voice config edit), regenerate the canon by
- * passing `--force`. Otherwise the script skips combos whose blobs
+ * tweak, new utterance slot), regenerate the canon by passing `--force`. Otherwise the script skips combos whose blobs
  * already exist on disk so a partial run can be resumed.
  *
  * Wordsong scope
@@ -65,8 +78,10 @@
  *   npx tsx scripts/generateSessionCanon.ts --dry-run       # plan only
  *   npx tsx scripts/generateSessionCanon.ts --lint-warn     # warn-only lint
  *
- * Run from the repo root, with .env.local providing both ANTHROPIC and
- * Azure keys (or with the same keys exported into the shell).
+ * Run from the repo root, with .env.local providing ANTHROPIC_API_KEY (or
+ * with it exported into the shell). Then run the Lily render (step 2
+ * above). Nothing runs this script automatically: there is no `prebuild`
+ * hook, because a build cannot do step 2.
  *
  * Bake-time lint
  * --------------
@@ -80,11 +95,10 @@
  *
  * Cost
  * ----
- * 11 combos × (1 Haiku call + ~59 Azure TTS calls). Haiku is cents per
- * full canon regen; Azure TTS S0 is well within budget. The script
- * sleeps 250ms between combos to stay polite against any future Azure
- * rate ceiling — the wall time is dominated by Azure latency anyway,
- * so the sleep is comparatively cheap.
+ * One Haiku call per combo baked: cents for a full `--force` regen. No
+ * TTS characters: the Lily render (step 2) bills only the lines that are
+ * new or changed (its `--dry-run` prints the character total first). The
+ * script sleeps 250ms between combos to stay polite to the Anthropic API.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -99,7 +113,6 @@ import {
   type PlannerTrack,
 } from '../api/_planner.js'
 import { canonFilePath } from '../api/_canon.js'
-import { synthesizeUtterance } from '../api/_tts.js'
 import {
   CanonLintError,
   formatLintReport,
@@ -281,9 +294,8 @@ const MATH_FOCUS_NODES: readonly string[] = [
 // tier-aware extension of `PHONEME_OVERRIDES` in `api/_tts.ts`
 // (Amendment 1 of this PR). The canon bake produces
 // `public/canon/word-song/level-1/letter-sounds.json` whose utterance
-// text is plain mnemonic ("mmm", "buh", "o", etc.) and whose audio
-// payload is the phoneme-wrapped MP3 (the substitution table fires
-// during the bake-time Azure render call).
+// text is plain mnemonic ("mmm", "buh", "o", etc.); the Lily render maps
+// the mnemonics to IPA (`renderElevenLabsText`).
 // Wave 11 (ticket 86ca7xmr8) added `sight-words` as the FIRST
 // whole-word-RECOGNITION tier — see
 // `design/research/sight-words-sequence-marian.md` (Dave, W11-01) +
@@ -396,7 +408,24 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
 }
 
-async function bakeOne(
+/**
+ * The bake's synth: renders nothing. Zero bytes encode to `base64: ''`, the
+ * empty slot `revoiceCanonLily.ts --unrendered` fills. Injected through the
+ * planner's own render seam so the response is assembled exactly as live
+ * (ids, order, duplicates) and no TTS provider is reachable from the bake.
+ */
+const noAudio = async (): Promise<{ audio: Uint8Array }> => ({
+  audio: new Uint8Array(0),
+})
+
+/** Env vars a bake needs. Text only: no Azure or ElevenLabs key. */
+export function missingBakeKeys(
+  env: Readonly<Record<string, string | undefined>>,
+): string[] {
+  return env.ANTHROPIC_API_KEY ? [] : ['ANTHROPIC_API_KEY']
+}
+
+export async function bakeOne(
   combo: Combo,
   client: PlannerAnthropicClient,
   childName: string,
@@ -413,18 +442,12 @@ async function bakeOne(
     // planner phrases this as "no data yet — pick a balanced mix".
     recentSuccessRate: null,
     renderOptions: {
-      // Use the same Azure synth the production handler uses. The
-      // module-singleton retry/backoff logic inside synthesizeUtterance
-      // handles transient 429s.
-      synth: synthesizeUtterance,
-      // Pass-5: the canon BAKE opts the CVC `blend` slot into the full
-      // per-class fidelity render (fricative nested-prosody onset, stop
-      // release, /h/ fric-rel, voiced-onset whole-word floor). The bake
-      // resource (local westeurope creds) ACCEPTS the nested onset; the
-      // production RUNTIME resource 400s it, which is why the runtime path
-      // (api/_session.ts cache-miss / graduation live-render) does NOT set
-      // this flag and falls back to the resource-safe whole-word floor.
-      synthOptions: { blendFullFidelity: true },
+      // Text only: every utterance gets an empty audio slot for the Lily
+      // render (`revoiceCanonLily.ts --unrendered`). An explicit empty
+      // `canonAudio` keeps the slots empty regardless of TTS_PROVIDER (the
+      // live default would copy matching lines from the canon on disk).
+      synth: noAudio,
+      canonAudio: new Map(),
     },
   })
 
@@ -692,20 +715,15 @@ async function main(): Promise<void> {
   //     `yarn canon:regen`, etc.). The flag is opt-in so a missing key
   //     never silently degrades to "no canon" in those flows.
   //   - default: soft-fail (exit 0 with a warning) when keys are
-  //     missing. This is the Vercel-build path: if the project owner
-  //     hasn't provisioned ANTHROPIC_API_KEY in the build environment,
-  //     the function still ships and falls through to the live planner.
-  //     Slow session-start, but the app doesn't break on deploy.
+  //     missing, so a run in a fresh clone without secrets is a no-op.
   //
-  // `--require-keys` is the safer default for human-driven runs; the
-  // npm `prebuild` script omits it so a fresh clone of the repo can
-  // build without requiring secrets.
+  // The npm `prebuild` hook that used to run this script on every build
+  // is gone (2026-10-16): the bake is text-only and needs the Lily render
+  // after it, which a build cannot do. Only humans run this script now.
   const requireKeys = process.argv.includes('--require-keys')
 
   if (!args.dryRun && combosToBake.length > 0) {
-    const missing: string[] = []
-    if (!process.env.ANTHROPIC_API_KEY) missing.push('ANTHROPIC_API_KEY')
-    if (!process.env.AZURE_SPEECH_KEY) missing.push('AZURE_SPEECH_KEY')
+    const missing = missingBakeKeys(process.env)
     if (missing.length > 0) {
       const msg = `MISSING ENV: ${missing.join(', ')}.`
       if (requireKeys) {
@@ -715,11 +733,11 @@ async function main(): Promise<void> {
       console.warn(
         `\n[canon-generator] WARNING: ${msg}\n` +
           `Skipping canon generation. The function will fall through to\n` +
-          `the live Haiku + Azure pipeline on every session-start until\n` +
+          `the live Haiku + Lily pipeline on every session-start until\n` +
           `the canon is generated. To generate locally:\n` +
-          `  - Set both keys in .env.local (vercel env pull will populate)\n` +
-          `  - Run \`yarn canon:generate\`\n` +
-          `Or set them as Vercel build-environment variables and redeploy.\n`,
+          `  - Set ANTHROPIC_API_KEY in .env.local\n` +
+          `  - Run \`yarn canon:generate\`, then the Lily render:\n` +
+          `    npx tsx scripts/revoiceCanonLily.ts --unrendered\n`,
       )
       return
     }
@@ -736,7 +754,7 @@ async function main(): Promise<void> {
   )
   console.log('mode       :', args.force ? 'force regen' : 'incremental')
   console.log('lint       :', args.lintWarn ? 'warn-only' : 'fail-fast')
-  if (args.dryRun) console.log('(--dry-run — no Anthropic / Azure calls)')
+  if (args.dryRun) console.log('(--dry-run — no Anthropic calls)')
   console.log('')
 
   if (combosToBake.length === 0 && !args.dryRun) {
@@ -806,9 +824,7 @@ async function main(): Promise<void> {
       }
     }
 
-    // Polite delay between combos. Wall time is dominated by Azure
-    // latency anyway; 250ms is well within the per-second ceiling for
-    // any plausible Azure tier.
+    // Polite delay between combos (Anthropic API).
     await sleep(250)
   }
 
@@ -816,6 +832,14 @@ async function main(): Promise<void> {
   console.log(
     `summary: ${written} written, ${skipped} skipped, ${failed} failed, ${(totalBytes / 1024 / 1024).toFixed(2)}MB total`,
   )
+  if (written > 0) {
+    console.log(
+      `\nText only: ${written} file(s) have empty audio slots. Render them ` +
+        `in Lily before committing:\n` +
+        `  npx tsx scripts/revoiceCanonLily.ts --unrendered --dry-run\n` +
+        `  npx tsx scripts/revoiceCanonLily.ts --unrendered`,
+    )
+  }
   if (failed > 0) {
     process.exitCode = 1
   }

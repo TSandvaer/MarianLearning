@@ -58,6 +58,9 @@ dev-dist
 # `public/assets/pictures/` instead. The PNGs are large (~3.9 MB combined)
 # and have no runtime use; keep them out of the bundle.
 design/references/picture-pack/**/*.png
+# OpenAI pack-picture generator output (scripts/generatePackPictures.ts):
+# batch PNGs, contact sheets and the local spend ledger. Local only.
+design/references/picture-pack/openai/
 
 # Security: env files with credentials must never be tracked.
 # Covers .env.local, .env.production.local, .env.dev.local, etc.

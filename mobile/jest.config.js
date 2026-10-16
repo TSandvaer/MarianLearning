@@ -4,6 +4,9 @@
 // node_modules once Jest follows the symlink).
 module.exports = {
   preset: 'jest-expo',
+  // Capped like Vitest's: an uncapped run beside it exhausted memory
+  // (2026-10-16).
+  maxWorkers: 4,
   roots: ['<rootDir>/src', '<rootDir>/test'],
   setupFiles: ['<rootDir>/test/setup.ts'],
   testPathIgnorePatterns: ['/node_modules/', '/ios/', '/android/'],

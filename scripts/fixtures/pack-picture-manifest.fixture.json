@@ -1,0 +1,50 @@
+[
+  {
+    "word": "cat",
+    "tier": "short-a",
+    "batch": 1,
+    "subject": "A small orange tabby cat sitting, seen from the front, with pointed ears and a long curled tail.",
+    "avoid": ["a dog", "a fox"],
+    "distinctFrom": ["dog", "fox"]
+  },
+  {
+    "word": "hat",
+    "tier": "short-a",
+    "batch": 1,
+    "subject": "A round blue sun hat with a wide brim all the way around.",
+    "avoid": ["a peak at the front only, like a baseball cap"],
+    "distinctFrom": ["cap"]
+  },
+  {
+    "word": "pig",
+    "tier": "short-i",
+    "batch": 1,
+    "subject": "A pink pig standing, seen from the side, with a curly tail and a round snout.",
+    "avoid": [],
+    "distinctFrom": []
+  },
+  {
+    "word": "sack",
+    "tier": "duck-words",
+    "batch": 1,
+    "subject": "One plump burlap sack tied shut at the top with a rope, with a lumpy round bottom and no handles.",
+    "avoid": ["handles, like a bag", "a pot"],
+    "distinctFrom": ["bag"]
+  },
+  {
+    "word": "bus",
+    "tier": "short-u",
+    "batch": 2,
+    "subject": "A yellow school bus seen from the side, with round wheels and a row of windows.",
+    "avoid": ["a van"],
+    "distinctFrom": ["van"]
+  },
+  {
+    "word": "sun",
+    "tier": "short-u",
+    "batch": 2,
+    "subject": "A bright yellow sun, a round disc with short straight rays.",
+    "avoid": ["a flower"],
+    "distinctFrom": []
+  }
+]
