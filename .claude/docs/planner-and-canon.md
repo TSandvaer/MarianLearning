@@ -319,6 +319,8 @@ Haiku 4.5 wraps JSON in ```json fences despite the prompt forbidding it. `stripM
 
 ## TTS rendering — Azure Speech REST
 
+**Provider (2026-10-16): ElevenLabs Lily is the only voice.** `ttsProvider(env)` in [api/\_tts.ts](MarianLearning/api/_tts.ts) resolves to `'elevenlabs'` for an unset, empty or unknown `TTS_PROVIDER`; `'azure'` only for the exact opt-in `TTS_PROVIDER=azure`. `synthesizeUtterance` and `_session.renderSessionAudio`'s defaults (3 workers, canon-audio reuse) both read it. There is **no Azure fallback**: an ElevenLabs failure rejects, and `renderSessionAudio` soft-fails that one utterance (caption without voice, see § Session render orchestration). Everything below describes the opt-in Azure path, kept for the legacy SSML audition/rebake scripts.
+
 [api/\_tts.ts](MarianLearning/api/_tts.ts) is the Azure Speech REST client.
 
 ### History
@@ -423,7 +425,7 @@ Lets Vercel logs correlate "client played silently" iPad capture with the SSML t
 `renderSessionAudio(plan, opts?)` ([\_session.ts:112](MarianLearning/api/_session.ts#L112)):
 
 1. `extractUtteranceTexts(plan)` ([\_session.ts:77](MarianLearning/api/_session.ts#L77)) — pulls `{ id, text }` from `plan.utterances`. Plan stays opaque to this module otherwise.
-2. Concurrency-limited fan-out (default 6 workers) — workers pull from a shared index. No `p-limit` dependency; the inline pool is small enough.
+2. Concurrency-limited fan-out (default 3 workers: ElevenLabs Starter's cap; 6 only under `TTS_PROVIDER=azure`) — workers pull from a shared index. No `p-limit` dependency; the inline pool is small enough.
 3. Per-utterance synth via `synth(req, opts)` defaulting to `synthesizeUtterance` from `_tts.ts`.
 4. Each successful render: `{ id, text, audio: { kind: 'inline', base64, mime: 'audio/mpeg' } }`.
 5. Failed renders: recorded in a `failures` array (logged as `[api/_session] tts-utterance-failed`) and SKIPPED. The slot in the result array is left empty.
@@ -510,19 +512,21 @@ Vercel includes `public/` in the function bundle by default for the Node runtime
 
 ### Generator script
 
+**Text only (2026-10-16).** The bake never calls a TTS provider. Every utterance is written with an empty audio slot, `{ kind: 'inline', base64: '', mime: 'audio/mpeg' }`; then `npx tsx scripts/revoiceCanonLily.ts --unrendered` renders exactly those slots in Lily and leaves every other clip's bytes alone. Never commit canon between the two steps (an empty slot plays as a silent line). Before this, the bake rendered every line through Azure and the Lily re-voice threw all of it away (the PR #575 bake: 2,188 Azure characters).
+
 Run via `npm run canon:regen` (or `npx tsx scripts/generateSessionCanon.ts`). Iterates `activeCombos()` ([generateSessionCanon.ts:199](MarianLearning/scripts/generateSessionCanon.ts#L199)) — same MATH_FOCUS_NODES + WORD_SONG_FOCUS_NODES lists pinned by `scripts/generateSessionCanon.test.ts` against the planner constants.
 
 Flags:
 
 - `--force` — regen even if file exists (default is incremental)
-- `--dry-run` — plan only, no Anthropic / Azure calls
+- `--dry-run` — plan only, no Anthropic calls
 - `--child Marian` — defaults to "Marian"; AC #3 of the ticket bakes the name into utterance text
 - `--out public/canon` — defaults; multi-child support would write to `public/canon-<name>`
-- `--require-keys` — hard-fail on missing `ANTHROPIC_API_KEY`/`AZURE_SPEECH_KEY` (manual regen flow). Default is soft-fail with warning (Vercel build path, so a fresh clone builds without secrets).
+- `--require-keys` — hard-fail on missing `ANTHROPIC_API_KEY` (the only key the bake reads). Default is soft-fail with a warning.
 
-Calls `generateSessionStartResponse` ([\_planner.ts:410](MarianLearning/api/_planner.ts#L410)) — the same callable the live HTTP handler uses, so live and canon share one code path. 250 ms sleep between combos to be polite against Azure rate ceilings.
+Calls `generateSessionStartResponse` ([\_planner.ts:410](MarianLearning/api/_planner.ts#L410)) — the same callable the live HTTP handler uses, so live and canon share one code path — with a no-audio `synth` and an empty `canonAudio` map. 250 ms sleep between combos.
 
-Cost: 13 combos × (1 Haiku call + ~59 Azure TTS calls) per regen. Cents per full regen.
+Cost: one Haiku call per combo baked (cents per full regen); the Lily render bills only new or changed lines (`revoiceCanonLily.ts --unrendered --dry-run` prints the character total first).
 
 **Anthropic 529 overload — bake-attempt counting is not equivalent to directive-quality measurement (Kevin NOF on PR #292, 2026-05-22).** The Anthropic API can return sustained `overloaded_error` (HTTP 529) for ~25 minutes — well past the SDK's built-in retry budget. During such windows, a single bake invocation looks like it "failed" even though the directive is fine and the same directive would have succeeded on attempt 1 against a healthy upstream. This matters when counting bake attempts for `[[feedback_haiku_directive_sharpening]]` Patterns 1-6 calibration: 4+ "attempts" caused by 529s ≠ 4+ directive-quality failures. Diagnostic: if the script error is `upstream-error` or HTTP 529 (not a `composition-lint` violation or a `PlannerError('invalid-response')`), the bake never reached Haiku — retry the command verbatim after waiting; do NOT re-tighten the directive. Verified empirically on PR #292: ~7-8 retries at increasing backoff over ~25 min, then a clean attempt-1 bake the moment Anthropic recovered. **Future hardening candidate:** a `--retry-bake N` flag on `generateSessionCanon.ts` that catches `upstream-error` (separate from the SDK's per-request retry) and waits N seconds before retrying the bake pipeline.
 
@@ -531,7 +535,7 @@ Cost: 13 combos × (1 Haiku call + ~59 Azure TTS calls) per regen. Cents per ful
 **Only regen when prompts/word-list change.** The canon JSON is committed to the repo (PR #136, 2026-05-02). Production runtime serves canon from CDN; it does not depend on a successful prebuild against Anthropic/Azure. Workflow:
 
 1. Edit prompt copy in `_planner.ts`, word list in `_plannerWordList.ts`, or voice config in `_session.ts`
-2. `npm run canon:regen` locally (requires `.env.local` with both keys)
+2. `npm run canon:regen` locally (requires `ANTHROPIC_API_KEY` in `.env.local`), then `npx tsx scripts/revoiceCanonLily.ts --unrendered` (requires `ELEVENLABS_API_KEY`)
 3. Commit the JSON diff in the same PR as the source change
 
 **Worktree canon-bake prerequisites.** Fresh git worktrees do NOT inherit the main workspace's `.env.local` or `node_modules/` — they share the git object store only. Before running `canon:regen` (or `npx tsx scripts/generateSessionCanon.ts --require-keys`) in a worktree, two steps are mandatory: (a) `yarn install --frozen-lockfile`, and (b) copy `.env.local` from the main workspace root into the worktree root. Missing the copy produces a misleading `config-missing: ANTHROPIC_API_KEY not set` runtime error — not a file-not-found — because the script reads env vars at runtime. Always include both steps in any dispatch brief that asks a sub-agent to bake canon from a worktree.
@@ -781,7 +785,7 @@ After D (canon-first), this cache only catches canon-misses that recur within a 
 
 Pre-paid, no auto-reload. When the balance hits zero:
 
-- **All builds fail** — the `prebuild` step runs `scripts/generateSessionCanon.ts`. Without Anthropic credit, the script either soft-fails with a warning (default, build still ships without canon) or hard-fails (`--require-keys`). Today the npm `prebuild` script omits `--require-keys` so a fresh clone of the repo can build without secrets.
+- **Builds are unaffected** — there is no `prebuild` hook since 2026-10-16 (the bake is text-only and needs the Lily render after it). An empty balance only blocks a local re-bake.
 - **Production runtime survives** — canon is on CDN. As long as the committed JSON files cover the active focus nodes, session-start serves from canon and bills nothing on Anthropic. The fallback live-pipeline code path also bills nothing if the request never hits it.
 - **New focus nodes / prompt changes** — these require a fresh `canon:regen` run (which requires Anthropic balance). The `[api/claude] canon-miss` log line ([api/claude.ts:619](MarianLearning/api/claude.ts#L619)) surfaces uncovered combos; if production shows misses for combos we expected to bake, the generator needs a re-run or the combo set needs extending.
 

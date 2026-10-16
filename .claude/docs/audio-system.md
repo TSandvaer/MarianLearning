@@ -7,7 +7,7 @@ What this doc covers: the runtime audio stack on the browser side — Howler ini
 Audio is "Howler + MP3s, never `speechSynthesis`":
 
 - **Bundled MP3s** — Greet's 4 fixed lines and 18 Hub welcome variants ship in `public/assets/audio/`. Howler plays them as static assets.
-- **Per-session MP3s** — Math + Word Song problem audio is rendered by Azure TTS on the server at session-start, base64-embedded in the JSON response, decoded into Blob URLs in the browser, and played by Howler.
+- **Per-session MP3s** — Math + Word Song problem audio is base64-embedded in the session-start JSON (canon audio, or rendered live in Lily via ElevenLabs on a canon miss; never Azure since 2026-10-16), decoded into Blob URLs in the browser, and played by Howler.
 - **Howler is the single audio engine.** Web Speech (`speechSynthesis`) was retired in PR #25 after five rounds of iPad first-speak failures (see `MarianLearning/design/audio-architecture.md` for the journey).
 - **Voice config** — `en-GB-OliviaNeural`, rate `-10%`, pitch `+0Hz`, volume `+0%`. Swapped from `en-US-EmmaMultilingualNeural` in PR #356 (2026-06-07) after the US voice mangled isolated short-vowel phonemes. Defined server-side in [api/\_session.ts:66](MarianLearning/api/_session.ts#L66) (`EMMA_VOICE_CONFIG`); the browser never sees the config — it consumes already-rendered bytes. Changing it re-renders TWO surfaces — see "Two-surface rule" under §Asset pipeline.
 
@@ -51,10 +51,12 @@ iPad WebKit's `speechSynthesis.speak()` silently drops the first utterance on mo
 
 Emma's voice has two **independent** render surfaces:
 
-| Surface     | Files                                                                                    | Render tooling                                                                  |
-| ----------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Baked canon | 23 JSON files under `public/canon/`                                                      | `scripts/revoiceCanon.ts` (full) / `scripts/revoiceCanonTargeted.ts` (targeted) |
-| Static MP3s | 4 Greet + 18 Hub files under `public/assets/audio/greet/` and `public/assets/audio/hub/` | `scripts/render-greet-mp3s.mjs`, `scripts/render-hub-mp3s.mjs`                  |
+| Surface     | Files                                                                                    | Render tooling                                                                                                     |
+| ----------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Baked canon | 23 JSON files under `public/canon/`                                                      | `scripts/generateSessionCanon.ts` (Haiku text, empty audio) then `scripts/revoiceCanonLily.ts --unrendered` (Lily) |
+| Static MP3s | 4 Greet + 18 Hub files under `public/assets/audio/greet/` and `public/assets/audio/hub/` | `scripts/revoiceCanonLily.ts` (full run; line lists from `render-greet-mp3s.mjs` / `render-hub-mp3s.mjs`)          |
+
+Since 2026-10-16 Lily (ElevenLabs) is the only voice. The Azure-era scripts are legacy: the `renderSessionAudio`-based ones (`revoiceCanon*.ts`, `bake*.ts`, `rebake*.ts`) now render Lily unless `TTS_PROVIDER=azure`; `render-*-mp3s.mjs`, `tts-prosody-samples.mjs` and the audition scripts call Azure directly when run by hand.
 
 **Rule: any PR claiming "voice swap complete" must enumerate both surfaces in its ACs and ship both artifact sets.** The `revoiceCanon*` path touches only canon JSON — it silently leaves the static MP3s on the old voice. This bit for real: PR #356's en-GB-OliviaNeural rollout re-voiced baked canon only; voice-QA round-2 (issue #377, 2026-06-11) found all 22 static greet/hub files still on the old voice (HASH-SAME verdicts after PR #373's cache-bust proved live bytes were being ear-tested). Re-render tracked in ticket `86ca7y0gw`.
 

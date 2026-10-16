@@ -17,6 +17,9 @@
  *  - `--only <substring>` restricts to canon files whose path contains it.
  *  - `--retake <utterance-text>` (repeatable) drops that line's cache entry
  *    first, so the next render is a fresh take.
+ *  - `--unrendered` renders only the canon lines whose audio is still empty
+ *    (new lines a splice added, e.g. `scripts/spliceContentWave1Canon.ts`)
+ *    and leaves every other clip's bytes as they are; no bundled clips.
  *
  * Run: npx tsx scripts/revoiceCanonLily.ts [--dry-run] [--only x] [--retake "text"]
  * Reads ELEVENLABS_API_KEY from .env.local.
@@ -48,6 +51,10 @@ const ONLY = args.includes('--only')
   ? args[args.indexOf('--only') + 1]
   : undefined
 const RETAKES = args.flatMap((a, i) => (a === '--retake' ? [args[i + 1]] : []))
+const UNRENDERED = args.includes('--unrendered')
+/** Is this line one the run renders (all of them, or only the empty ones)? */
+const inScope = (u: { audio: { base64: string } }) =>
+  !UNRENDERED || u.audio.base64 === ''
 
 for (const line of readFileSync(join(ROOT, '.env.local'), 'utf8').split(
   /\r?\n/,
@@ -118,23 +125,25 @@ async function main() {
     rel: relative(ROOT, f),
     doc: JSON.parse(readFileSync(f, 'utf8')),
   }))
-  const bundles = ONLY
-    ? []
-    : [
-        ...bundleLines('render-greet-mp3s.mjs').map((l) => ({
-          ...l,
-          dir: 'greet',
-        })),
-        ...bundleLines('render-hub-mp3s.mjs').map((l) => ({
-          ...l,
-          dir: 'hub',
-        })),
-      ]
+  const bundles =
+    ONLY || UNRENDERED
+      ? []
+      : [
+          ...bundleLines('render-greet-mp3s.mjs').map((l) => ({
+            ...l,
+            dir: 'greet',
+          })),
+          ...bundleLines('render-hub-mp3s.mjs').map((l) => ({
+            ...l,
+            dir: 'hub',
+          })),
+        ]
 
   const jobs = new Map<string, Job>()
   for (const { rel, doc } of docs) {
     const tier = tierFor(rel)
     for (const u of doc.utterances) {
+      if (!inScope(u)) continue
       const input = renderElevenLabsText(u.text, tier)
       jobs.set(input, { input, text: u.text, tier })
     }
@@ -174,6 +183,7 @@ async function main() {
   for (const { f, rel, doc } of docs) {
     const tier = tierFor(rel)
     for (const u of doc.utterances) {
+      if (!inScope(u)) continue
       const audio = await render(jobs.get(renderElevenLabsText(u.text, tier))!)
       u.audio = {
         kind: 'inline',

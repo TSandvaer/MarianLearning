@@ -948,17 +948,18 @@ The hook does NOT run `vitest` or e2e — those are author/dispatcher responsibi
 
 **The canon is committed to the repo** (PR #136, 2026-05-02). When a prompt template or word list changes:
 
-1. Run `npm run canon:regen` locally — calls `tsx scripts/generateSessionCanon.ts --force`. Charges the user's Anthropic balance.
-2. Commit the JSON diff in `public/canon/` in the same PR as the prompt change.
+1. Run `npm run canon:regen` locally — calls `tsx scripts/generateSessionCanon.ts --force`. Charges the user's Anthropic balance. Writes text only (empty audio slots).
+2. Run `npx tsx scripts/revoiceCanonLily.ts --unrendered` — renders the empty slots in Lily (ElevenLabs credits).
+3. Commit the JSON diff in `public/canon/` in the same PR as the prompt change.
 
-Tests should NEVER regenerate canon ad-hoc. They read from the committed `public/canon/*.json` files. The `prebuild` hook in `package.json` runs `tsx scripts/generateSessionCanon.ts` (without `--force`) — this is a sanity check that doesn't re-render unchanged content; it doesn't drain Anthropic credits on every CI build.
+Tests should NEVER regenerate canon ad-hoc. They read from the committed `public/canon/*.json` files. There is no `prebuild` hook (removed 2026-10-16), so `yarn build` in CI never runs the bake.
 
 Why this matters for tests:
 
 - **Real Azure-rendered MP3s decode cleanly** in headless Chromium / WebKit. A hand-rolled silent-base64 MP3 decodes flakily; Howler's `loaderror` fires before `play`, `prepareWordSongPathA` rejects, and the App falls back to the static plan ("Tap the X."). That MASKS the very regression the spec exists to catch.
 - The cvc-words specs use real canon bytes via the specialised mocks — see §4.2.
 
-Memory: `project_canon_commit_strategy.md` and `project_anthropic_billing_constraint.md`. The latter notes that when the Anthropic balance is empty, ALL builds fail at the `prebuild` step (canon prebuild) BUT production runtime survives via the CDN-cached canon. Manual top-up is required to unstick CI; production users see no impact during the outage.
+Memory: `project_canon_commit_strategy.md` and `project_anthropic_billing_constraint.md`. The latter predates the `prebuild` removal (2026-10-16): an empty Anthropic balance no longer touches builds; it only blocks a local re-bake. Production runtime survives via the committed canon.
 
 ### Composition drift-guard tests — POOL identity (PR #246) and RULE identity (PR #256)
 

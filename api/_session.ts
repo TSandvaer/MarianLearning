@@ -25,6 +25,7 @@
 // bundler-resolution; the `.js` suffix breaks neither environment.
 import {
   synthesizeUtterance,
+  ttsProvider,
   uint8ToBase64,
   type SynthesizeOptions,
   type TtsRequest,
@@ -137,9 +138,9 @@ export interface RenderSessionOptions {
   tierFilter?: string
   /**
    * Approved canon audio keyed by ElevenLabs request text. Lines found here
-   * are reused instead of synthesised. Defaults to the canon index when
-   * TTS_PROVIDER=elevenlabs (canon audio is Lily), otherwise none. Tests
-   * pass a Map.
+   * are reused instead of synthesised. Defaults to the canon index when the
+   * provider is ElevenLabs (the default; canon audio is Lily), and to none
+   * under the opt-in TTS_PROVIDER=azure. Tests pass a Map.
    */
   canonAudio?: ReadonlyMap<string, string>
 }
@@ -153,19 +154,20 @@ export async function renderSessionAudio(
   opts: RenderSessionOptions = {},
 ): Promise<SessionStartResponse> {
   const synth = opts.synth ?? synthesizeUtterance
+  // Same provider resolution as `synthesizeUtterance` (ElevenLabs unless
+  // TTS_PROVIDER=azure), so the defaults below can never disagree with the
+  // backend that actually renders.
+  const lily = ttsProvider(process.env) === 'elevenlabs'
   // ElevenLabs Starter allows 3 concurrent requests; a 4th returns 429
-  // concurrent_limit_exceeded (measured 2026-10-04: 6 parallel -> 3 x 429),
-  // which made 4/68 live graduation lines fall back to Azure.
-  const defaultConcurrency = process.env.TTS_PROVIDER === 'elevenlabs' ? 3 : 6
+  // concurrent_limit_exceeded (measured 2026-10-04: 6 parallel -> 3 x 429).
+  // With no Azure fallback, a 429 past the retries is a silent line.
+  const defaultConcurrency = lily ? 3 : 6
   const concurrency = Math.max(1, opts.concurrency ?? defaultConcurrency)
   const sources = extractUtteranceTexts(plan)
   // Reuse approved canon audio for any line already baked (see
   // getCanonAudioIndex), and never render the same line twice per session.
   const canonAudio =
-    opts.canonAudio ??
-    (process.env.TTS_PROVIDER === 'elevenlabs'
-      ? getCanonAudioIndex()
-      : undefined)
+    opts.canonAudio ?? (lily ? getCanonAudioIndex() : undefined)
   const sessionRendered = new Map<string, string>()
 
   // Concurrency-limited fan-out. Promise.all without limit would open one

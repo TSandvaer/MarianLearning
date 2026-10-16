@@ -143,15 +143,15 @@ The full devDeps + script wiring is in [`MarianLearning/package.json`](MarianLea
 From [`MarianLearning/package.json`](MarianLearning/package.json#L6-L25):
 
 ```
-prebuild → tsx scripts/generateSessionCanon.ts
 build    → tsc -b && vite build
 ```
 
-`prebuild` runs the canon-baker [`MarianLearning/scripts/generateSessionCanon.ts`](MarianLearning/scripts/generateSessionCanon.ts). The committed canon JSON lives in the repo so Vercel builds never need to call Anthropic — see auto-memory `project_canon_commit_strategy.md` (PR #136, 2026-05-02). Re-bake locally with `npm run canon:regen` only when prompts change; commit the JSON diff alongside.
+There is no `prebuild` hook (removed 2026-10-16): the canon bake is text-only and needs a Lily render after it, which a build cannot do. The committed canon JSON lives in the repo so Vercel builds never call Anthropic or a TTS provider — see auto-memory `project_canon_commit_strategy.md` (PR #136, 2026-05-02). Re-bake locally only when prompts change (Haiku text with [`generateSessionCanon.ts`](MarianLearning/scripts/generateSessionCanon.ts), then `scripts/revoiceCanonLily.ts --unrendered`); commit the JSON diff alongside.
 
 Auxiliary scripts in [`MarianLearning/scripts/`](MarianLearning/scripts/):
 
-- `generateSessionCanon.ts` — bakes the canon JSON for both tracks.
+- `generateSessionCanon.ts` — bakes the canon JSON TEXT for both tracks (empty audio slots; no TTS call).
+- `revoiceCanonLily.ts` — renders Emma's audio in Lily (ElevenLabs): `--unrendered` fills only the empty slots.
 - `render-greet-mp3s.mjs` — renders the 4 Greet lines via Azure Speech REST.
 - `render-hub-mp3s.mjs` — renders the 18-line Hub welcome-back manifest.
 - `render-sfx-mp3s.mjs` — renders SFX (chime, sparkle, plink, poof).
