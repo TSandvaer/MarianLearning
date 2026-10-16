@@ -29,6 +29,7 @@ import {
 } from './cloudSync'
 import { defaultProgress } from './defaults'
 import { isProgressV1 } from './guards'
+import { STORAGE_KEY, loadProgress } from './storage'
 import type { Progress, SessionHistoryEntry, SkillLevels } from './types'
 import { pendingUnlock, seedUnlocksCelebrated } from './pathBeats'
 
@@ -452,6 +453,49 @@ describe('reconcileWithCloud', () => {
     // The result remains a valid v1 doc.
     expect(isProgressV1(installed[0]!)).toBe(true)
   })
+
+  // The cloud install shares storage.ts:withDefaultedSkillLevels, so the
+  // retired-step remaps apply to a cloud blob exactly as to a local load.
+  // A private cloudSync mirror without the remaps installed a legacy key
+  // with its level dropped (the new step floor-filled to 'locked').
+  it.each([
+    ['digraphs', 'digraphs-sh', 'mastered'],
+    ['two-digit-addsub', 'two-digit-addsub-no-regroup', 'practicing'],
+  ] as const)(
+    'withDefaultedSkillLevels parity — a legacy %s key installs its level onto %s, matching a local load',
+    async (legacy, renamed, level) => {
+      const seed = defaultProgress()
+      const skillLevels: Record<string, unknown> = { ...seed.skillLevels }
+      delete skillLevels[renamed]
+      skillLevels[legacy] = level
+      const cloudBlob = {
+        ...seed,
+        profile: { ...seed.profile, lastPlayedISO: '2026-07-06T11:00:00.000Z' },
+        skillLevels,
+      }
+      const installed: Progress[] = []
+      const outcome = await reconcileWithCloud(VALID_UUID, defaultProgress(), {
+        fetchImpl: makeFetchReturning({
+          kind: 'found',
+          blob: cloudBlob,
+          lastModifiedISO: '2026-07-06T11:00:00.000Z',
+        }),
+        authSecret: SECRET,
+        installLocally: (p) => installed.push(p),
+        pushImpl: vi.fn(async () => 'sent' as const),
+      })
+      expect(outcome.kind).toBe('installed-from-cloud')
+      expect(installed).toHaveLength(1)
+      expect(installed[0]!.skillLevels[renamed]).toBe(level)
+      expect(
+        (installed[0]!.skillLevels as Record<string, unknown>)[legacy],
+      ).toBeUndefined()
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudBlob))
+      const loaded = loadProgress()
+      expect(loaded).not.toBeNull()
+      expect(installed[0]!.skillLevels).toEqual(loaded!.skillLevels)
+    },
+  )
 
   it('cloud blob without lifetimeFirstEncounters (pre-86c9q9ben device) → field inferred at install time', async () => {
     // T1 parity for the lifetimeFirstEncounters defaulter (ticket

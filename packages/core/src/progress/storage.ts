@@ -166,8 +166,11 @@ export function withKnownPendingPromotion(p: Progress): Progress {
  *
  * Input is `unknown` because this runs BEFORE `isProgressV1`. We
  * downcast defensively and only touch the `skillLevels` field.
+ *
+ * Exported for `cloudSync.ts:installCloudBlob`, so the local load and the
+ * cloud install run this one function, remaps included.
  */
-function withDefaultedSkillLevels(parsed: unknown): unknown {
+export function withDefaultedSkillLevels(parsed: unknown): unknown {
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     return parsed
   }
@@ -220,10 +223,10 @@ function withDefaultedSkillLevels(parsed: unknown): unknown {
   // explicitly per Dave's research deliverable, ticket epic 86c9xwjtr).
   // Marian's `defaultProgress` had `two-digit-addsub: 'locked'`, so
   // for production users the remap is a no-op. The branch covers the
-  // QA hand-edit case + any session-history records (note: history
-  // entries carry SkillNode strings on `skillFocus`, but the storage
-  // guard tolerates unknown SkillNode strings inside history strings
-  // — see `isHistoryEntry` — only `skillLevels` keys are floor-checked).
+  // QA hand-edit case. History entries keep the legacy literal in
+  // `skillFocus` (the remap rewrites skillLevels keys only); the guard
+  // tolerates it — see `isHistoryEntry` — only `skillLevels` keys are
+  // floor-checked.
   // When both legacy and new keys are present (post-PR-B QA edits),
   // the new key wins; the legacy literal is stripped so the strict
   // guard's downstream check doesn't see an unrecognised key.
@@ -251,11 +254,11 @@ function withDefaultedSkillLevels(parsed: unknown): unknown {
       mutated = true
     }
   }
-  // Preserve any additional keys the parsed blob carried (forward-
-  // compat: if a future schema added keys we don't know about yet,
-  // leaving them in lets the guard surface them as a real error
-  // rather than silently dropping them). This is parallel to how
-  // `withDefaultedSettings` is non-destructive.
+  // Preserve any additional keys the parsed blob carried (forward
+  // compatibility: a step a newer build added keeps its level here, the
+  // guard lets it through, and a save hands it back to that build
+  // intact). This is parallel to how `withDefaultedSettings` is
+  // non-destructive.
   for (const key of Object.keys(withRemap)) {
     if (!(key in floor)) {
       ;(filled as Record<string, unknown>)[key] = withRemap[key]
