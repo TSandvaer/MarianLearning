@@ -497,6 +497,43 @@ describe('reconcileWithCloud', () => {
     },
   )
 
+  // Content wave 1 § 5.3 (K13): a step the cloud blob lacks opens when its
+  // predecessor is stored mastered, at install as at a local load.
+  it.each([
+    ['mastered', 'intro'],
+    ['practicing', 'locked'],
+  ] as const)(
+    'K13 parity — no mult-6-9 key and mult-3-4 %s installs mult-6-9 %s, matching a local load',
+    async (before, expected) => {
+      const seed = defaultProgress()
+      const skillLevels: Record<string, unknown> = {
+        ...seed.skillLevels,
+        'mult-3-4': before,
+      }
+      delete skillLevels['mult-6-9']
+      const cloudBlob = {
+        ...seed,
+        profile: { ...seed.profile, lastPlayedISO: '2026-10-16T11:00:00.000Z' },
+        skillLevels,
+      }
+      const installed: Progress[] = []
+      const outcome = await reconcileWithCloud(VALID_UUID, defaultProgress(), {
+        fetchImpl: makeFetchReturning({
+          kind: 'found',
+          blob: cloudBlob,
+          lastModifiedISO: '2026-10-16T11:00:00.000Z',
+        }),
+        authSecret: SECRET,
+        installLocally: (p) => installed.push(p),
+        pushImpl: vi.fn(async () => 'sent' as const),
+      })
+      expect(outcome.kind).toBe('installed-from-cloud')
+      expect(installed[0]!.skillLevels['mult-6-9']).toBe(expected)
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudBlob))
+      expect(loadProgress()!.skillLevels).toEqual(installed[0]!.skillLevels)
+    },
+  )
+
   it('cloud blob without lifetimeFirstEncounters (pre-86c9q9ben device) → field inferred at install time', async () => {
     // T1 parity for the lifetimeFirstEncounters defaulter (ticket
     // 86c9q9ben — AC9e). A cloud blob written by a device on an

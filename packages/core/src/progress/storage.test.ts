@@ -559,3 +559,75 @@ describe('loadProgress — cvcGraduationSessionFired defaulter (ticket 86c9qa6n3
     expect(loadProgress()).toBeNull()
   })
 })
+
+describe('loadProgress — a missing step whose predecessor is mastered opens (content wave 1 § 5.3, K13)', () => {
+  beforeEach(() => window.localStorage.clear())
+  afterEach(() => window.localStorage.clear())
+
+  /** Marian's baseline with `missing` deleted and `levels` set. */
+  function load(
+    missing: SkillNode,
+    levels: Partial<Record<SkillNode, string>>,
+  ): Progress | null {
+    const seed = defaultProgress('Marian')
+    const skillLevels: Record<string, unknown> = {
+      ...seed.skillLevels,
+      ...levels,
+    }
+    delete skillLevels[missing]
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...seed, skillLevels }),
+    )
+    return loadProgress()
+  }
+
+  it("fills 'intro' when the tree predecessor's stored level is mastered", () => {
+    const loaded = load('mult-6-9', { 'mult-3-4': 'mastered' })
+    expect(loaded?.skillLevels['mult-6-9']).toBe('intro')
+    expect(isProgressV1(loaded)).toBe(true)
+  })
+
+  it("fills 'locked' when the predecessor is not mastered", () => {
+    expect(
+      load('mult-6-9', { 'mult-3-4': 'practicing' })?.skillLevels['mult-6-9'],
+    ).toBe('locked')
+  })
+
+  it('never touches a stored key, even when its predecessor is mastered', () => {
+    const seed = defaultProgress('Marian')
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...seed,
+        skillLevels: {
+          ...seed.skillLevels,
+          'mult-3-4': 'mastered',
+          'mult-6-9': 'locked',
+        },
+      }),
+    )
+    expect(loadProgress()?.skillLevels['mult-6-9']).toBe('locked')
+  })
+
+  it("two new steps in a row: only the first opens (the second's predecessor is not stored mastered)", () => {
+    const seed = defaultProgress('Marian')
+    const skillLevels: Record<string, unknown> = {
+      ...seed.skillLevels,
+      'mult-2-5-10': 'mastered',
+    }
+    delete skillLevels['mult-3-4']
+    delete skillLevels['mult-6-9']
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...seed, skillLevels }),
+    )
+    const loaded = loadProgress()
+    expect(loaded?.skillLevels['mult-3-4']).toBe('intro')
+    expect(loaded?.skillLevels['mult-6-9']).toBe('locked')
+  })
+
+  it("a world's first step has no predecessor: 'locked'", () => {
+    expect(load('letter-names', {})?.skillLevels['letter-names']).toBe('locked')
+  })
+})
