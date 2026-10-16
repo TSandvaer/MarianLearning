@@ -15,6 +15,14 @@
 // in claude.test.ts that asserts every model-generated word is in this
 // list. If the client adds a 15th target word, this file gets a
 // corresponding edit; the smoke test fails until both move together.
+//
+// Exception (content wave 1): the two land-6 steps read their words from
+// `packages/core/src/wordSong/bigWordsSteps.ts`, an import-free data module
+// in @marian/core that `wordPack.ts` builds from too, so a pedagogy swap is
+// one edit. The path is relative with a `.js` extension for the same reason
+// as `api/_types.ts` (the deployed function runs it as plain Node ESM).
+
+import { bigWordsOf } from '../packages/core/src/wordSong/bigWordsSteps.js'
 
 /** The 14 target words available for word-song level 1. Formatted for
  *  embedding directly inside a Markdown-list-style prompt block. */
@@ -390,6 +398,22 @@ export const WORD_SONG_TARGET_WORDS_DIGRAPHS_TH_HYBRID: readonly string[] = [
  */
 export const WORD_SONG_TARGET_WORDS_SIGHT =
   'the, a, i, is, it, in, to, go, no, do, was, see, said, he, she, we, for, on, not, can'
+
+/**
+ * Duck words (`duck-words`, land 6 "Big words", content wave 1 —
+ * `design/native/content-wave-1.md` § 3): ck and ng at the end of a
+ * short-vowel word. Exactly 8 words, IN CANON ORDER (problem 1 → 8), the
+ * same every session (K9). Picture words: the client `wordPack.ts` builds
+ * their entries and distractor rows from the same `bigWordsSteps.ts` table.
+ */
+export const WORD_SONG_TARGET_WORDS_DUCK = bigWordsOf('duck-words').join(', ')
+
+/**
+ * Crab words (`crab-words`, land 6, content wave 1 — § 4): start blends,
+ * short vowels only (every word keeps its short vowel in British English).
+ * Exactly 8 words, IN CANON ORDER. Same source as duck words.
+ */
+export const WORD_SONG_TARGET_WORDS_CRAB = bigWordsOf('crab-words').join(', ')
 
 /** Hint shown to the model so it knows the broader pack — even though it
  *  isn't authoring distractors, knowing the rhyme families helps it order

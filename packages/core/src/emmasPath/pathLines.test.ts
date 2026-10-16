@@ -19,16 +19,16 @@ const SPEC_VOCAB = new Set(
   learned now can do land first then this not yet numbers adding taking away to
   ten twenty big making tens skip counting groups two three four five and letter
   letters names sounds blending words reading sentences cat dog sun pig bed ship
-  chick thumb star sound pairs the`.split(/\s+/),
+  chick thumb star sound pairs the duck crab`.split(/\s+/),
 )
-const NUMERALS = new Set(['1', '2', '3', '4', '5'])
+const NUMERALS = new Set(['1', '2', '3', '4', '5', '6'])
 
 describe('STAGE_SPOKEN_NAMES (spec §4.3)', () => {
-  it('gives all 25 stages a name and no two the same', () => {
+  it('gives all 27 stages a name and no two the same', () => {
     const nodes = [...MATH_TREE, ...LITERACY_TREE]
-    expect(nodes).toHaveLength(25)
+    expect(nodes).toHaveLength(27)
     const names = nodes.map((n) => STAGE_SPOKEN_NAMES[n])
-    expect(new Set(names).size).toBe(25)
+    expect(new Set(names).size).toBe(27)
   })
 })
 
@@ -54,17 +54,17 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
     const counts: Record<string, number> = {}
     for (const l of PATH_LINES) counts[l.kind] = (counts[l.kind] ?? 0) + 1
     expect(counts).toEqual({
-      open: 25,
+      open: 27,
       'open-done': 2,
-      stop: 25,
-      land: 9,
-      'locked-next': 23,
-      'locked-later': 121,
-      'gate-locked': 38,
-      'end-bud': 25,
-      'end-unlock': 23,
-      'end-land': 7,
-      'end-land-no-number': 7,
+      stop: 27,
+      land: 10,
+      'locked-next': 25,
+      'locked-later': 146,
+      'gate-locked': 51,
+      'end-bud': 27,
+      'end-unlock': 25,
+      'end-land': 8,
+      'end-land-no-number': 8,
     })
     expect(new Set(PATH_LINES.map((l) => l.id)).size).toBe(PATH_LINES.length)
   })
@@ -92,13 +92,47 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
     expect(pathLine('end.land.word-song.5.no-number')?.text).toBe(
       'A new land: Sentences!',
     )
+    // Content wave 1 (design/native/content-wave-1.md § 6.2 rows 16-28).
+    expect(
+      [
+        'path.open.duck-words',
+        'path.stop.duck-words',
+        'path.locked.next.duck-words',
+        'end.bud.duck-words',
+        'end.unlock.duck-words',
+        'path.open.crab-words',
+        'path.stop.crab-words',
+        'path.locked.next.crab-words',
+        'end.bud.crab-words',
+        'end.unlock.crab-words',
+        'path.land.word-song.6',
+        'end.land.word-song.6',
+        'end.land.word-song.6.no-number',
+      ].map((id) => pathLine(id)?.text),
+    ).toEqual([
+      'Here is your path! You are on duck words.',
+      'Duck words.',
+      'Duck words! First, reading sentences. Then this!',
+      'Look! A new flower for duck words!',
+      'You learned reading sentences! Now you can do duck words!',
+      'Here is your path! You are on crab words.',
+      'Crab words.',
+      'Crab words! First, duck words. Then this!',
+      'Look! A new flower for crab words!',
+      'You learned duck words! Now you can do crab words!',
+      'Land 6: Big words.',
+      'A new land! Land 6: Big words!',
+      'A new land: Big words!',
+    ])
   })
 
   it('bakes every non-deferred line and none of the deferred ones', () => {
     for (const l of PATH_LINES)
       expect(l.src === null).toBe(DEFERRED_PATH_LINE_KINDS.has(l.kind))
-    expect(BAKED_PATH_LINES).toHaveLength(146)
-    expect(new Set(BAKED_PATH_LINES.map((l) => l.text)).size).toBe(145)
+    // Content wave 1: + 5 (all the groups) + 13 (duck words, crab words,
+    // land 6) = 159, the spec's § 6.2 count.
+    expect(BAKED_PATH_LINES).toHaveLength(159)
+    expect(new Set(BAKED_PATH_LINES.map((l) => l.text)).size).toBe(158)
   })
 
   it('has a bundled MP3 for every baked line', () => {

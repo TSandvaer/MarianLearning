@@ -65,14 +65,17 @@ afterEach(() => {
 })
 
 describe('the picker', () => {
-  it('lists both worlds in tree order: 12 Number Garden steps, then 13 Word Song steps', async () => {
+  it('lists both worlds in tree order: 12 Number Garden steps, then 15 Word Song steps', async () => {
     await renderPicker()
     expect(listed('math')).toEqual([...MATH_TREE])
     expect(listed('word-song')).toEqual([...LITERACY_TREE])
-    expect(listed()).toHaveLength(25)
+    expect(listed()).toHaveLength(27)
     expect(screen.getByText('11. Big groups')).toBeOnTheScreen()
     expect(screen.getByText('12. All the groups')).toBeOnTheScreen()
     expect(screen.getByText('13. Reading sentences')).toBeOnTheScreen()
+    expect(screen.getByText('14. Duck words')).toBeOnTheScreen()
+    expect(screen.getByText('15. Crab words')).toBeOnTheScreen()
+    expect(screen.getByText('Land 6 · crab-words')).toBeOnTheScreen()
     expect(screen.getByText('Land 3 · cvc-words-short-o')).toBeOnTheScreen()
   })
 
@@ -125,7 +128,7 @@ describe('the picker', () => {
     expect(h.jump.mock.calls.map(([n]) => n)).toEqual(
       QA_STEPS.map((s) => s.node),
     )
-    expect(h.onJumped).toHaveBeenCalledTimes(25)
+    expect(h.onJumped).toHaveBeenCalledTimes(27)
   })
 
   it("Back to Marian's real start asks, then resets once", async () => {
@@ -171,7 +174,7 @@ describe('in Parent Settings', () => {
 
     await fireEvent.press(screen.getByTestId('parent-settings-qa-step-row'))
     expect(screen.getByTestId('qa-step-picker')).toBeOnTheScreen()
-    expect(listed()).toHaveLength(25)
+    expect(listed()).toHaveLength(27)
     // Opening writes nothing and jumps nowhere.
     expect(h.saved).toEqual([])
     expect(onQaJump).not.toHaveBeenCalled()

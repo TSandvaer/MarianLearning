@@ -205,6 +205,9 @@ function buildLines(): GuidanceLine[] {
  */
 const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {
   'mult-mix': "Let's play all the groups!",
+  // Word Song land 6 (content wave 1 § 3.3, § 4.3).
+  'duck-words': 'Two letters, one sound!',
+  'crab-words': 'Read all the letters!',
 }
 
 const sessionIntroId = (n: SkillNode) => `guide.session.intro.${n}`

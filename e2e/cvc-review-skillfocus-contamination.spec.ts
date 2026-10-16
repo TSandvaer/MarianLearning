@@ -123,7 +123,8 @@ test.setTimeout(120_000)
 const PERIODIC_REVIEW_SESSION_COUNT = 10
 const EXPECTED_REVIEW_TIER = 'cvc-words-short-u'
 /** The wrong node the BUG records on base (forward fallback, last node). */
-const FORWARD_FALLBACK_NODE = 'simple-sentences'
+// The LAST word-song node (content wave 1 moved it from simple-sentences).
+const FORWARD_FALLBACK_NODE = 'crab-words'
 
 const CVC_WORDS_SHORT_U_CANON_PATH = resolve(
   process.cwd(),
@@ -221,7 +222,7 @@ interface ReadbackProgress {
 }
 
 test.describe('periodic CVC-review must not contaminate forward-node mastery (ticket 86ca9atqh) — FAILING-FIRST, RED on main until Kevin threads sessionCount into the session-end pick', () => {
-  test('1. a high-scoring periodic CVC-review session records skillFocus on the REVIEW tier (cvc-words-short-u), NOT the forward fallback (simple-sentences)', async ({
+  test('1. a high-scoring periodic CVC-review session records skillFocus on the REVIEW tier (cvc-words-short-u), NOT the forward fallback (crab-words)', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
@@ -256,6 +257,9 @@ test.describe('periodic CVC-review must not contaminate forward-node mastery (ti
         'digraphs-th-voiceless': 'mastered',
         'sight-words': 'mastered',
         'simple-sentences': 'mastered',
+        // Content wave 1 (land 6): the tree's last two steps.
+        'duck-words': 'mastered',
+        'crab-words': 'mastered',
       },
       // Post-graduation Marian — the one-shot graduation review has
       // already fired, so the PERIODIC round-robin is the branch under

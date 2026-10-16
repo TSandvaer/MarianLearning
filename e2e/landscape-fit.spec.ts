@@ -373,7 +373,10 @@ async function expectMapClear(page: Page): Promise<void> {
   expect.soft(e.r, 'badge right').toBeLessThanOrEqual(found.vw)
   expect.soft(e.b, 'badge bottom').toBeLessThanOrEqual(found.vh)
   const c = circle[0]!
-  expect.soft(c.r - c.l, 'badge diameter').toBeGreaterThanOrEqual(56)
+  // 48, not 56 (Kyle's call on PR #575, option (a); the same bar as core
+  // `mapModel.test.ts`): with Word Song's 6th land the badge measures 51-52
+  // px at these landscape sizes. Native phone landscape ships 41.4 pt.
+  expect.soft(c.r - c.l, 'badge diameter').toBeGreaterThanOrEqual(48)
   check(trays, [...stops, ...gates])
   check(ribbons, [...stops, ...gates, ...trays, ...emma])
   expect.soft(clashes, 'map pieces overlapping').toEqual([])
@@ -461,7 +464,7 @@ for (const vp of VIEWPORTS) {
     const maps = [
       // Thomas's screenshot: current stop on land 2.
       { world: 'math', current: 1, name: 'map-math' },
-      // Five lands, current stop on the bottom land (bud tray below it).
+      // Six lands, current stop on the bottom land (bud tray below it).
       { world: 'word-song', current: 1, name: 'map-word-song' },
       // Current stop on the top land (Emma's badge above it).
       { world: 'math', current: MATH.length - 1, name: 'map-math-top' },

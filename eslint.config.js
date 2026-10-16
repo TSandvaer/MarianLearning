@@ -78,8 +78,13 @@ export default defineConfig([
   // that motivated this rule.
   {
     // packages/core/src/wire is loaded by the deployed functions as plain
-    // Node ESM too (through api/_types.ts), so the same rule applies.
-    files: ['api/**/*.ts', 'packages/core/src/wire/**/*.ts'],
+    // Node ESM too (through api/_types.ts), so the same rule applies. So is
+    // the land-6 word table (through api/_plannerWordList.ts, content wave 1).
+    files: [
+      'api/**/*.ts',
+      'packages/core/src/wire/**/*.ts',
+      'packages/core/src/wordSong/bigWordsSteps.ts',
+    ],
     plugins: {
       'marian-api': {
         rules: {

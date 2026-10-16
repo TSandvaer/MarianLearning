@@ -129,6 +129,10 @@ import {
   assertTwoDigitAddsubCompositionClean,
   assertTwoDigitAddsubWithRegroupCompositionClean,
 } from './compositionLint.ts'
+import {
+  bigWordsCanonViolations,
+  isBigWordsStep,
+} from './bigWordsCanonCheck.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = join(__dirname, '..')
@@ -329,19 +333,27 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'digraphs-th-voiceless',
   'sight-words',
   'simple-sentences',
+  // Content wave 1 (design/native/content-wave-1.md § 3–§ 4): land 6. Fixed
+  // 8-word sessions, held to the spec by `bigWordsCanonCheck.ts` below.
+  'duck-words',
+  'crab-words',
 ]
 
 /**
- * Combos an ordinary run never bakes (content wave 1). Neither a local
- * `yarn canon:generate` nor the Vercel `prebuild` (which runs the
- * incremental bake with the build env's keys) may spend Haiku / TTS credit
- * on them by the way, and `--force` must not re-draw them.
+ * Combos an ordinary run never bakes (content wave 1). An ordinary
+ * `yarn canon:generate` may not spend Haiku credit on them by the way, and
+ * `--force` must not re-draw them. (Before #581 the Vercel `prebuild` ran
+ * this script on every preview build and baked duck-words and crab-words
+ * three times.)
  *
  * - add-to-10, add-to-20, mult-mix: written by
  *   `scripts/spliceContentWave1Canon.ts` (problems kept byte-for-byte from
  *   main, the § 1.8 / § 2.2 lines), never Haiku-baked; their new lines are
  *   rendered by `scripts/revoiceCanonLily.ts --unrendered`. A Haiku bake
  *   would re-draw the kept problems.
+ * - duck-words, crab-words: a deliberate bake (Thomas OKs the credit use),
+ *   held to the spec by `bigWordsCanonCheck.ts`, then the Lily render and
+ *   the ear test. Their committed files are hand-checked.
  *
  * The deliberate render runs `npx tsx scripts/generateSessionCanon.ts
  * --include-pending`; an existing file is still skipped without `--force`.
@@ -350,6 +362,8 @@ export const PENDING_CANON_NODES: ReadonlySet<string> = new Set([
   'add-to-10',
   'add-to-20',
   'mult-mix',
+  'duck-words',
+  'crab-words',
 ])
 
 /** The combos a run bakes: missing (or all, with `--force`), minus pending. */
@@ -682,6 +696,21 @@ export async function bakeOne(
       } else {
         throw err
       }
+    }
+  }
+
+  // Land-6 steps (duck words, crab words): the bake must land the spec's
+  // 8 words in order with their fixed lines and no blend slot.
+  if (combo.track === 'word-song' && isBigWordsStep(combo.focusNode)) {
+    const drift = bigWordsCanonViolations(combo.focusNode, response.utterances)
+    if (drift.length > 0) {
+      const message =
+        `[big-words] ${combo.focusNode}: ${drift.length} line(s) off the ` +
+        `spec:\n` +
+        drift.map((d) => `  - ${d}`).join('\n')
+      if (lintWarn)
+        console.warn(`\n${message}\n(writing anyway: --lint-warn)\n`)
+      else throw new Error(message)
     }
   }
 

@@ -622,10 +622,18 @@
         'other',
       ]
 
-      // Canon files — 11 math + 14 word-song. Iterated in alphabetical
+      // Canon files — 11 math + 16 word-song. Iterated in alphabetical
       // (group, file-stem) order so the dedup canonical-member choice is
-      // deterministic across runs. word-song order also matches
-      // WORD_SONG_NODES_IN_ORDER (sight-words then simple-sentences last).
+      // deterministic across runs. A stem whose file is not baked yet
+      // (404) is skipped with a console note, so a new step can be listed
+      // before its render lands (content wave 1: duck-words, crab-words).
+      // Unique canon renders (deduped by audio hash) the committed canon
+      // should produce. 760 before content wave 1; the Number Garden half
+      // (#576: missing numbers, mult-mix) adds 33 and duck-words +
+      // crab-words add 64 (design/native/content-wave-1.md § 10). Computed
+      // from the committed files, not by hand. Every PR that adds or
+      // re-voices canon updates this number.
+      const EXPECTED_CANON_UNIQUE = 857
       const CANON_FILES = [
         // math/level-1
         ['math', 'add-to-10'],
@@ -642,6 +650,7 @@
         ['math', 'two-digit-addsub-with-regroup'],
         // word-song/level-1
         ['word-song', 'blending-cv'],
+        ['word-song', 'crab-words'],
         ['word-song', 'cvc-words'],
         ['word-song', 'cvc-words-short-e'],
         ['word-song', 'cvc-words-short-i'],
@@ -650,6 +659,7 @@
         ['word-song', 'digraphs-ch'],
         ['word-song', 'digraphs-sh'],
         ['word-song', 'digraphs-th-voiceless'],
+        ['word-song', 'duck-words'],
         ['word-song', 'letter-names'],
         ['word-song', 'letter-sounds'],
         ['word-song', 'letter-sounds-audit'],
@@ -811,6 +821,14 @@
               'path-open-simple-sentences.mp3',
               'Here is your path! You are on reading sentences.',
             ],
+            [
+              'path-open-duck-words.mp3',
+              'Here is your path! You are on duck words.',
+            ],
+            [
+              'path-open-crab-words.mp3',
+              'Here is your path! You are on crab words.',
+            ],
           ],
         ],
         [
@@ -841,6 +859,8 @@
             ['path-stop-digraphs-th-voiceless.mp3', 'Thumb words.'],
             ['path-stop-sight-words.mp3', 'Star words.'],
             ['path-stop-simple-sentences.mp3', 'Reading sentences.'],
+            ['path-stop-duck-words.mp3', 'Duck words.'],
+            ['path-stop-crab-words.mp3', 'Crab words.'],
           ],
         ],
         [
@@ -855,6 +875,7 @@
             ['path-land-word-song-3.mp3', 'Land 3: Words.'],
             ['path-land-word-song-4.mp3', 'Land 4: Sound pairs.'],
             ['path-land-word-song-5.mp3', 'Land 5: Sentences.'],
+            ['path-land-word-song-6.mp3', 'Land 6: Big words.'],
           ],
         ],
         [
@@ -952,6 +973,14 @@
               'path-locked-next-simple-sentences.mp3',
               'Reading sentences! First, star words. Then this!',
             ],
+            [
+              'path-locked-next-duck-words.mp3',
+              'Duck words! First, reading sentences. Then this!',
+            ],
+            [
+              'path-locked-next-crab-words.mp3',
+              'Crab words! First, duck words. Then this!',
+            ],
           ],
         ],
         [
@@ -1033,6 +1062,8 @@
               'end-bud-simple-sentences.mp3',
               'Look! A new flower for reading sentences!',
             ],
+            ['end-bud-duck-words.mp3', 'Look! A new flower for duck words!'],
+            ['end-bud-crab-words.mp3', 'Look! A new flower for crab words!'],
           ],
         ],
         [
@@ -1130,6 +1161,14 @@
               'end-unlock-simple-sentences.mp3',
               'You learned star words! Now you can do reading sentences!',
             ],
+            [
+              'end-unlock-duck-words.mp3',
+              'You learned reading sentences! Now you can do duck words!',
+            ],
+            [
+              'end-unlock-crab-words.mp3',
+              'You learned duck words! Now you can do crab words!',
+            ],
           ],
         ],
         [
@@ -1145,6 +1184,7 @@
             ['end-land-word-song-3.mp3', 'A new land! Land 3: Words!'],
             ['end-land-word-song-4.mp3', 'A new land! Land 4: Sound pairs!'],
             ['end-land-word-song-5.mp3', 'A new land! Land 5: Sentences!'],
+            ['end-land-word-song-6.mp3', 'A new land! Land 6: Big words!'],
           ],
         ],
         [
@@ -1160,6 +1200,7 @@
             ['end-land-word-song-3-no-number.mp3', 'A new land: Words!'],
             ['end-land-word-song-4-no-number.mp3', 'A new land: Sound pairs!'],
             ['end-land-word-song-5-no-number.mp3', 'A new land: Sentences!'],
+            ['end-land-word-song-6-no-number.mp3', 'A new land: Big words!'],
           ],
         ],
       ]
@@ -1299,6 +1340,8 @@
           'guide-session-peek-open-simple-sentences.mp3',
           "Let's look at reading sentences!",
         ],
+        ['guide-session-peek-open-duck-words.mp3', "Let's look at duck words!"],
+        ['guide-session-peek-open-crab-words.mp3', "Let's look at crab words!"],
         [
           'guide-session-peek-close-add-to-10.mp3',
           'Adding to ten is for later. You will learn it!',
@@ -1391,6 +1434,16 @@
           'guide-session-peek-close-simple-sentences.mp3',
           'Reading sentences is for later. You will learn it!',
         ],
+        [
+          'guide-session-peek-close-duck-words.mp3',
+          'Duck words are for later. You will learn it!',
+        ],
+        [
+          'guide-session-peek-close-crab-words.mp3',
+          'Crab words are for later. You will learn it!',
+        ],
+        ['guide-session-intro-duck-words.mp3', 'Two letters, one sound!'],
+        ['guide-session-intro-crab-words.mp3', 'Read all the letters!'],
         ['guide-session-intro-mult-mix.mp3', "Let's play all the groups!"],
         ['guide-session-hiding.mp3', 'Some flowers are hiding!'],
       ]
@@ -2101,6 +2154,11 @@
             // these JSONs; an SW that predates a canon re-render (VQA-FIX.1)
             // would otherwise serve stale bytes and hash a phantom verdict.
             const res = await fetch(url, { cache: 'no-store' })
+            if (res.status === 404) {
+              console.warn('[voice-qa] canon not baked yet, skipped: ' + url)
+              onProgress(fi + 1, totalFiles, byHash.size)
+              continue
+            }
             if (!res.ok) throw new Error(stem + ' ' + res.status)
             canon = await res.json()
           } catch (e) {
@@ -2259,7 +2317,7 @@
         pathCount,
         guideCount,
       ) {
-        const expected = 760
+        const expected = EXPECTED_CANON_UNIQUE
         const ok = canonUnique === expected
         const total =
           canonUnique + greetCount + hubCount + pathCount + guideCount
@@ -2285,10 +2343,14 @@
           guideCount +
           ' guidance. ' +
           (ok
-            ? 'Computed unique canon count matches expected <code>760</code>. ✓'
+            ? 'Computed unique canon count matches expected <code>' +
+              expected +
+              '</code>. ✓'
             : '<strong style="color:#a94442">Computed unique canon count = ' +
               canonUnique +
-              ', expected 760 — DISCREPANCY.</strong>') +
+              ', expected ' +
+              expected +
+              ' — DISCREPANCY.</strong>') +
           ' &nbsp;·&nbsp; <code>itemId</code> = canonical member <code>&lt;file-stem&gt;#&lt;utteranceId&gt;</code>.'
       }
 
@@ -2356,8 +2418,12 @@
           setFilter(initialFilterOf(location.search, newCount))
 
           const mismatch =
-            canonUnique !== 760
-              ? ' ⚠ canon unique = ' + canonUnique + ' (expected 760)'
+            canonUnique !== EXPECTED_CANON_UNIQUE
+              ? ' ⚠ canon unique = ' +
+                canonUnique +
+                ' (expected ' +
+                EXPECTED_CANON_UNIQUE +
+                ')'
               : ''
           const newNote = baseline
             ? ' ' + newCount + ' new or changed since the baseline.'

@@ -57,6 +57,8 @@ const SKILL_NODES: ReadonlySet<SkillNode> = new Set<SkillNode>([
   'digraphs-th-voiceless',
   'sight-words',
   'simple-sentences',
+  'duck-words',
+  'crab-words',
 ])
 
 const SKILL_LEVELS: ReadonlySet<SkillLevel> = new Set<SkillLevel>([

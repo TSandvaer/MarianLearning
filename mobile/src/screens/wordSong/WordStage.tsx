@@ -110,6 +110,8 @@ export interface WordStageProps {
   layout: WordSongLayout
   /** The lit letter (`length` = all), null = none. */
   lit: number | null
+  /** A step intro's letter spotlight (`./introSpotlight.ts`); null = none. */
+  spotlight?: readonly (number | null)[] | null
   revealedCount: number
   resolved: boolean
   showThCue: boolean
@@ -125,6 +127,7 @@ export function WordStage({
   problem,
   layout: l,
   lit,
+  spotlight = null,
   revealedCount,
   resolved,
   showThCue,
@@ -142,6 +145,7 @@ export function WordStage({
       cellMin={l.letterCellMin}
       maxWidth={l.stage.width}
       lit={lit}
+      spotlight={spotlight}
       onLetterPress={onLetterPress}
     />
   )

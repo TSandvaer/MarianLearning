@@ -55,12 +55,12 @@ function entry(d: number, node: SkillNode, rate: number): SessionHistoryEntry {
 }
 
 describe('buildMapModel', () => {
-  it('12 math stops in 4 lands, 13 word stops in 5 lands, tree order', () => {
+  it('12 math stops in 4 lands, 15 word stops in 6 lands, tree order', () => {
     const math = buildMapModel(seed(MATH_TREE, 0), 'math')
     expect(math.lands.map((l) => l.stops.length)).toEqual([1, 4, 3, 4])
     expect(stopsInOrder(math).map((s) => s.node)).toEqual([...MATH_TREE])
     const word = buildMapModel(seed(LITERACY_TREE, 0), 'word-song')
-    expect(word.lands.map((l) => l.stops.length)).toEqual([2, 1, 5, 3, 2])
+    expect(word.lands.map((l) => l.stops.length)).toEqual([2, 1, 5, 3, 2, 2])
     expect(stopsInOrder(word).map((s) => s.node)).toEqual([...LITERACY_TREE])
   })
 
@@ -131,6 +131,8 @@ describe('buildMapModel', () => {
 describe('layoutMap', () => {
   const W = 820
   const H = 928
+  /** How far land 1's stops may hang below the region, px (PR #575). */
+  const LAND1_OVERHANG = 12
   const worlds = [
     ['math', MATH_TREE],
     ['word-song', LITERACY_TREE],
@@ -184,8 +186,19 @@ describe('layoutMap', () => {
           expect(b.l).toBeGreaterThanOrEqual(0)
           expect(b.r).toBeLessThanOrEqual(W)
           expect(b.t).toBeGreaterThanOrEqual(0)
-          expect(b.b).toBeLessThanOrEqual(H)
         }
+        // Bottom: gates and the stops above land 1 stay inside. Land 1's
+        // stops may overhang by LAND1_OVERHANG: with Word Song's 6th land
+        // its bands are shorter than an 88 px stop needs at STOP_Y
+        // (measured 1.15 px for a plain stop, 10.15 px for the current one;
+        // Kyle's call on PR #575, option (a): keep the geometry, a small
+        // overhang toward the caption beats pushing the stop out of its band).
+        for (const s of l.stops)
+          expect(s.y + s.size / 2).toBeLessThanOrEqual(
+            s.land === 1 ? H + LAND1_OVERHANG : H,
+          )
+        for (const g of l.gates)
+          expect(g.y + GATE_TAP / 2).toBeLessThanOrEqual(H)
         for (let i = 0; i < boxes.length; i++)
           for (let j = i + 1; j < boxes.length; j++)
             expect(overlap(boxes[i]!, boxes[j]!)).toBe(false)
@@ -371,8 +384,11 @@ describe('layoutMap', () => {
             r: e.left + e.size,
             b: e.top + e.height,
           }
-          // Her face stays recognisable on screen: badge >= 56 px.
-          expect(e.size * k).toBeGreaterThanOrEqual(56)
+          // Her face stays recognisable on screen: badge >= 48 px (was 56,
+          // the web's iPad-landscape rule; 6 Word Song lands measure 49-52
+          // px here, native phone landscape ships 41.4 pt; Kyle's call on
+          // PR #575).
+          expect(e.size * k).toBeGreaterThanOrEqual(48)
           // BudTray: top at 1.02 × size inside the stop box, 3 × 42 px
           // holes + padding ≈ 160 × 55 px.
           const trayTop = stop.y - stop.size / 2 + stop.size * 1.02

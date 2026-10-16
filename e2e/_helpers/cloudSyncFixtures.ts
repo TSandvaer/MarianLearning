@@ -251,6 +251,8 @@ export function buildCloudProgressBlob(opts: {
     'digraphs-th-voiceless': 'locked',
     'sight-words': 'intro',
     'simple-sentences': 'locked',
+    'duck-words': 'locked',
+    'crab-words': 'locked',
   }
   return {
     schemaVersion: 1,

@@ -15,6 +15,7 @@ import {
   getWordEntry,
   isForbiddenPair,
 } from './wordPack'
+import { BIG_WORDS_STEPS, bigWordsOf } from './bigWordsSteps'
 
 // All digraph-tier target words (sh + ch + th). Digraph tiers are NOT
 // classified by the same-vowel CVC heuristic — their distractor rules are
@@ -60,6 +61,16 @@ const ALL_DIGRAPH_TIER_WORDS: ReadonlySet<string> = new Set([
   'thick',
   'cloth',
 ])
+
+// Land 6 "Big words" (content wave 1): duck words (ck / ng endings) and crab
+// words (start blends). Like ch and th they SET `vowel`, and their traps are
+// ending twins and dropped-consonant twins (brick's trap `crab` shares no
+// first letter, last letter, vowel or category with it), so the generic
+// CVC-axis trap test and the cross-vowel scans exclude them, as they do the
+// digraph words. Their matrices are pinned in the 'land 6' block below.
+const BIG_WORDS_TIER_WORDS: ReadonlySet<string> = new Set(
+  Object.values(BIG_WORDS_STEPS).flatMap((rows) => rows.map((r) => r.word)),
+)
 
 describe('pickTier', () => {
   it('returns "gentle" for problems 1 through GENTLE_RAMP_THROUGH', () => {
@@ -193,7 +204,10 @@ describe('pickDistractors', () => {
     // tier tests is the chip-SELECTION /θ/-vs-/t/ contrast, not the CVC
     // character-overlap heuristic.
     for (const target of TARGET_WORDS.filter(
-      (w) => w.vowel !== undefined && !ALL_DIGRAPH_TIER_WORDS.has(w.word),
+      (w) =>
+        w.vowel !== undefined &&
+        !ALL_DIGRAPH_TIER_WORDS.has(w.word) &&
+        !BIG_WORDS_TIER_WORDS.has(w.word),
     )) {
       const [d1, d2] = pickDistractors(target, 5)
       for (const d of [d1, d2]) {
@@ -1181,6 +1195,128 @@ describe('pickDistractors — defensive assertions (matrix-drift guards)', () =>
   })
 })
 
+// --------------------------------------------------------------------------
+// Land 6 "Big words" (content wave 1, design/native/content-wave-1.md § 3.2,
+// § 4.2, § 4.5, AC 8). The tables below are copied from the spec on purpose:
+// `bigWordsSteps.ts` is the code's one source, this is the check against the
+// spec text. A pedagogy swap edits both (Dave's D4: crab's trap is clock /
+// frog and cab is out of the pack).
+// --------------------------------------------------------------------------
+
+describe('land 6 — duck words and crab words', () => {
+  const DUCK: readonly (readonly [string, string[], string[]])[] = [
+    ['duck', ['pen', 'box'], ['dog', 'sock']],
+    ['rock', ['hen', 'cup'], ['sock', 'rug']],
+    ['ring', ['dog', 'hat'], ['king', 'rock']],
+    ['sock', ['fan', 'bug'], ['sack', 'rock']],
+    ['wing', ['box', 'pan'], ['wig', 'king']],
+    ['king', ['bus', 'pot'], ['ring', 'wing']],
+    ['lock', ['fan', 'web'], ['log', 'rock']],
+    ['sack', ['pig', 'jet'], ['sock', 'sun']],
+  ]
+  const CRAB: readonly (readonly [string, string[], string[]])[] = [
+    ['flag', ['cup', 'web'], ['frog', 'bag']],
+    ['drum', ['hat', 'fox'], ['plum', 'dog']],
+    ['brick', ['sun', 'hat'], ['crab', 'clock']],
+    ['crab', ['sun', 'pen'], ['clock', 'frog']],
+    ['swing', ['pot', 'bug'], ['wing', 'king']],
+    ['plum', ['cat', 'hen'], ['drum', 'pig']],
+    ['clock', ['bun', 'jet'], ['lock', 'sock']],
+    ['frog', ['cup', 'bed'], ['dog', 'flag']],
+  ]
+
+  it('holds exactly 8 words per step, in canon order (K9)', () => {
+    expect(bigWordsOf('duck-words')).toEqual(DUCK.map(([w]) => w))
+    expect(bigWordsOf('crab-words')).toEqual(CRAB.map(([w]) => w))
+  })
+
+  it('pairs every word as the spec matrix does', () => {
+    for (const [word, gentle, trap] of [...DUCK, ...CRAB]) {
+      expect(TARGET_PAIRINGS[word], word).toEqual({ gentle, trap })
+      const target = getWordEntry(word)
+      expect(pickDistractors(target, 1).map((d) => d.word)).toEqual(gentle)
+      expect(pickDistractors(target, 4).map((d) => d.word)).toEqual(trap)
+    }
+  })
+
+  it('adds 16 picture targets with their own picture key, no phoneme tag and no flags', () => {
+    const rows = [...DUCK, ...CRAB]
+    const entries = TARGET_WORDS.filter((e) => BIG_WORDS_TIER_WORDS.has(e.word))
+    expect(entries.map((e) => e.word)).toEqual(rows.map(([w]) => w))
+    for (const e of entries) {
+      expect(e).toEqual({
+        word: e.word,
+        pictureKey: e.word,
+        vowel: e.vowel,
+        category: e.category,
+        isTarget: true,
+      })
+    }
+    expect(Object.fromEntries(entries.map((e) => [e.word, e.vowel]))).toEqual({
+      duck: 'u',
+      rock: 'o',
+      ring: 'i',
+      sock: 'o',
+      wing: 'i',
+      king: 'i',
+      lock: 'o',
+      sack: 'a',
+      flag: 'a',
+      drum: 'u',
+      brick: 'i',
+      crab: 'a',
+      swing: 'i',
+      plum: 'u',
+      clock: 'o',
+      frog: 'o',
+    })
+  })
+
+  it('drops cab entirely (Dave, D4): no entry, no pair, no forbidden pair', () => {
+    expect(() => getWordEntry('cab')).toThrow(/No entry for word "cab"/)
+    expect(DISTRACTOR_ONLY_WORDS.map((e) => e.word)).not.toContain('cab')
+    const everyPairWord = Object.values(TARGET_PAIRINGS).flatMap((p) => [
+      ...p.gentle,
+      ...p.trap,
+    ])
+    expect(everyPairWord).not.toContain('cab')
+    expect(FORBIDDEN_PAIRS.flat()).not.toContain('cab')
+  })
+
+  it('no trio contains a forbidden pair, old or new (§ 4.5)', () => {
+    const hits: string[] = []
+    for (const [word, gentle, trap] of [...DUCK, ...CRAB]) {
+      for (const [a, b] of [gentle, trap]) {
+        for (const [x, y] of [
+          [word, a],
+          [word, b],
+          [a, b],
+        ] as const)
+          if (isForbiddenPair(x!, y!)) hits.push(`${word}: ${x}/${y}`)
+      }
+    }
+    expect(hits).toEqual([])
+  })
+
+  it('every gentle chip has another first letter and another vowel than its target', () => {
+    const misses: string[] = []
+    const sameCategory: string[] = []
+    for (const [word, gentle] of [...DUCK, ...CRAB]) {
+      const t = getWordEntry(word)
+      for (const d of gentle.map(getWordEntry)) {
+        if (d.word[0] === t.word[0] || d.vowel === t.vowel)
+          misses.push(`${word}: ${d.word}`)
+        if (d.category === t.category) sameCategory.push(`${word}: ${d.word}`)
+      }
+    }
+    expect(misses).toEqual([])
+    // The spec reads these as other categories; the pack's coarse labels
+    // put fan with lock ('household') and web with flag ('object'). The
+    // pictures differ at a glance, so the matrix stands as approved.
+    expect(sameCategory).toEqual(['lock: fan', 'flag: web'])
+  })
+})
+
 describe('FORBIDDEN_PAIRS', () => {
   it("contains the silhouette-similarity pairs from Kyle's pack-doc + the v2 short-o + v3 short-u + v4 short-i + v5 short-e + digraphs-sh + digraphs-ch + digraphs-th additions (tickets 86c9m3ae3 / 86c9q9ben / 86c9qdba4 / 86c9teua2 / digraphs-sh / digraphs-ch / digraphs-th)", () => {
     // Per design/word-song-picture-pack.md §"Distractor pairing matrix"
@@ -1219,6 +1355,22 @@ describe('FORBIDDEN_PAIRS', () => {
       ['thin', 'thick'], // digraphs-th — antonym-pair silhouettes (same object class, opposite property extreme) — in-pool hygiene
       ['path', 'moth'], // digraphs-th — both low-mass irregular-outline silhouettes — in-pool hygiene
       ['bath', 'box'], // digraphs-th — open-top rounded tub vs plain cuboid — cross-pool hygiene
+      // Land 6 "Big words" (content-wave-1.md § 4.5; cab's two pairs left
+      // with cab, Dave's D4).
+      ['duck', 'hen'],
+      ['sack', 'bag'],
+      ['lock', 'bag'],
+      ['ring', 'gem'],
+      ['king', 'man'],
+      ['king', 'dad'],
+      ['king', 'mom'],
+      ['rock', 'egg'],
+      ['clock', 'fan'],
+      ['drum', 'can'],
+      ['drum', 'tub'],
+      ['plum', 'fig'],
+      ['flag', 'net'],
+      ['brick', 'box'],
     ].map((p) => [...p].sort().join(','))
 
     for (const expected of expectedPairs) {
@@ -1304,6 +1456,8 @@ describe('TARGET_PAIRINGS_CROSSVOWEL', () => {
       !PROBE_WORDS.has(w.word) &&
       !POOL_EXTENSION_PENDING_CROSSVOWEL.has(w.word) &&
       !DIGRAPH_TIER_WORDS.has(w.word) &&
+      // Land 6 words are not CVC cross-vowel nodes either.
+      !BIG_WORDS_TIER_WORDS.has(w.word) &&
       // `w.vowel` is optional (digraphs-sh tier omits it — sh-tier words
       // are phoneme-classified, not vowel-classified). The `undefined`
       // guard keeps the sh-tier words out of the cross-vowel
@@ -1553,6 +1707,7 @@ describe('pickDistractors — cross-vowel mode (ticket 86c9qa0kf)', () => {
         !PROBE_WORDS.has(w.word) &&
         !POOL_EXTENSION_PENDING_CROSSVOWEL.has(w.word) &&
         !DIGRAPH_TIER_WORDS.has(w.word) &&
+        !BIG_WORDS_TIER_WORDS.has(w.word) &&
         // `w.vowel` is optional post-digraphs-sh tier — sh-tier words
         // omit it. Guard excludes sh from the cross-vowel scan; ch is
         // excluded explicitly via `DIGRAPH_TIER_WORDS` (ch SETS `vowel`).

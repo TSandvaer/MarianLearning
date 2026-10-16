@@ -55,6 +55,8 @@ export const RECAP_FRIENDLY_NODE_NAMES: Record<string, string> = {
   'digraphs-th-voiceless': 'reading words',
   'sight-words': 'reading words',
   'simple-sentences': 'reading sentences',
+  'duck-words': 'reading words',
+  'crab-words': 'reading words',
 }
 
 /** Generic fallback — mirrors `FRIENDLY_NODE_NAME_FALLBACK`. Should never fire

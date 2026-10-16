@@ -39,6 +39,7 @@ import type { FocusMode, SkillNode } from '@marian/core/progress'
 import {
   recordAudio,
   startSession,
+  type IntroGuideLineId,
   type LoadedSessionAudio,
   type SessionPrefetcher,
 } from '../audio'
@@ -72,6 +73,9 @@ export interface WordSongSessionSnapshot extends WordSongSessionExtras {
   review: boolean
   /** How many of `plan`'s first problems are the warm-up (0–2). */
   warmupCount: number
+  /** The step intro before the scored problem 1 (content wave 1 § 6.1);
+   *  `null` without one, and without a server plan. */
+  intro: IntroGuideLineId | null
   /** The session audio's player; `null` = the silent caption walk. */
   playUtterance: PlayWordSongUtteranceFn | null
   /** A line's file on disk (tap sounds, blend marks); `null` = none. */
@@ -116,6 +120,8 @@ export interface WordSongRound {
   plan: WordSongSessionPlan
   review: boolean
   warmupCount: number
+  /** The step intro before the scored problem 1 (§ 6.1); `null` = none. */
+  intro: IntroGuideLineId | null
 }
 
 /**
@@ -126,7 +132,7 @@ export interface WordSongRound {
  */
 export function wordSongRoundFromServer(
   serverPlan: unknown,
-  hints: Pick<WordSongProgressHints, 'planKind'>,
+  hints: Pick<WordSongProgressHints, 'planKind' | 'intro'>,
 ): WordSongRound {
   if (hints.planKind.kind === 'review') {
     if (!isReviewPlan(serverPlan)) {
@@ -136,6 +142,7 @@ export function wordSongRoundFromServer(
       plan: wordSongSessionPlanFromServer(serverPlan),
       review: true,
       warmupCount: 0,
+      intro: null,
     }
   }
   const forward = wordSongSessionPlanFromServer(serverPlan)
@@ -150,6 +157,7 @@ export function wordSongRoundFromServer(
     },
     review: false,
     warmupCount: warmup.length,
+    intro: hints.intro ?? null,
   }
 }
 
@@ -165,6 +173,7 @@ const IDLE: WordSongSessionSnapshot = {
   audioReady: false,
   review: false,
   warmupCount: 0,
+  intro: null,
   ...NO_EXTRAS,
 }
 
@@ -271,6 +280,7 @@ export function createWordSongSessionController(
             plan: prepared.plan,
             review: prepared.review,
             warmupCount: prepared.warmupCount,
+            intro: prepared.intro,
             playUtterance: (text, opts) =>
               prepared.audio.playUtterance(text, opts),
             clipFor: (text) => prepared.audio.fileFor(text),

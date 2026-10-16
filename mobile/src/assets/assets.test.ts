@@ -7,6 +7,7 @@ import { TILT_BY_POSE, type EmmaPose } from '@marian/core/character/emmaPose'
 import { PATH_ART_IDS, PATH_ART_SIZES } from '@marian/core/emmasPath/pathArt'
 import { SCENE_PICTURES } from '@marian/core/wordSong/sceneRegistry'
 import { NOVEL_PROBE_WORDS } from '@marian/core/wordSong/novelProbeWords'
+import { BIG_WORDS_STEPS } from '@marian/core/wordSong/bigWordsSteps'
 import { existsSync, readdirSync } from 'fs'
 import { join } from 'path'
 import {
@@ -73,6 +74,18 @@ describe('native asset registry', () => {
     expect(pictureAsset('ship')).toBeUndefined()
   })
 
+  // Content wave 1 (design/native/content-wave-1.md § 3.5, § 4.4, AC 8):
+  // the 16 land-6 words draw as pictures, so every chip is a picture. Red
+  // until Thomas's picture pack is embedded and `npm run export-assets`
+  // bakes it (without them the problems fall back to written-word chips).
+  it('has a picture for every duck-words and crab-words word', () => {
+    const keys = Object.values(BIG_WORDS_STEPS).flatMap((rows) =>
+      rows.map((r) => r.word),
+    )
+    expect(keys).toHaveLength(16)
+    expect(keys.filter((key) => pictureAsset(key) === undefined)).toEqual([])
+  })
+
   it("has the Hub bakes: idle Emma's shadow and a muted copy of every 256 px path art", () => {
     expect(emmaIdleShadowAsset()).toBeDefined()
     for (const id of PATH_ART_IDS) {
@@ -94,7 +107,9 @@ describe('native asset registry', () => {
     const locked = Object.keys(WEB_ASSET_MODULES).filter((k) =>
       k.endsWith('-locked.webp'),
     )
-    expect(locked).toHaveLength(steps.length)
+    expect(locked.sort()).toEqual(
+      steps.map((node) => `/native/path/${node}-256-locked.webp`).sort(),
+    )
   })
 
   it('every registry entry is a web asset that still exists', () => {

@@ -64,6 +64,8 @@ export type WordSongNode =
   | 'digraphs-th-voiceless'
   | 'sight-words'
   | 'simple-sentences'
+  | 'duck-words'
+  | 'crab-words'
 
 /**
  * Word-song stages in declaration order. Mirrors
@@ -83,6 +85,8 @@ export const WORD_SONG_NODES_IN_ORDER: readonly WordSongNode[] = [
   'digraphs-th-voiceless',
   'sight-words',
   'simple-sentences',
+  'duck-words',
+  'crab-words',
 ]
 
 /**

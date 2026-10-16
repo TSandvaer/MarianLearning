@@ -37,7 +37,10 @@ import { generateSessionPlan, type PlannerAnthropicClient } from './_planner.js'
 import {
   WORD_SONG_NOVEL_PROBE_WORDS,
   WORD_SONG_SIMPLE_SENTENCES,
+  WORD_SONG_TARGET_WORDS_CRAB,
+  WORD_SONG_TARGET_WORDS_DUCK,
 } from './_plannerWordList.js'
+import { bigWordsOf } from '@marian/core/wordSong/bigWordsSteps'
 import { wordSongSessionPlanFromServer } from '@marian/core/wordSong/planFromServer'
 import { pickDistractors } from '@marian/core/wordSong/wordDistractors'
 import {
@@ -1425,4 +1428,75 @@ describe('simple-sentences tier — canonical pool ↔ browser-mirror alignment 
       }
     })
   })
+})
+
+// ── Land 6 "Big words" (content wave 1) ─────────────────────────────────
+// duck-words and crab-words are first-class picture tiers with a FIXED
+// 8-word session (design/native/content-wave-1.md § 3.1, K9). The prompt
+// names the words in canon order from `bigWordsSteps.ts`, the planner keeps
+// that order (no continuant-onset reorder), and the parser reads every
+// problem as a picture-chip `cvc-word` with a real distractor trio.
+describe('planner → parser round-trip — duck-words + crab-words (content wave 1)', () => {
+  const STEPS = ['duck-words', 'crab-words'] as const
+
+  function wirePlan(words: readonly string[]): string {
+    return JSON.stringify({
+      id: 'haiku-big-words-001',
+      label: 'Big words roundtrip fixture',
+      utterances: words.flatMap((word, i) => {
+        const n = i + 1
+        const cap = word.charAt(0).toUpperCase() + word.slice(1)
+        return [
+          { id: `word.p${n}.read`, text: `Read the ${word}.` },
+          { id: `word.p${n}.correct`, text: `Yes! That's a ${word}.` },
+          { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+          { id: `word.p${n}.hint`, text: `Let's look. ${cap}.` },
+          { id: `word.p${n}.giveAnswer`, text: `This one is ${word}.` },
+        ]
+      }),
+    })
+  }
+
+  it.each(STEPS)(
+    '%s: the server list is the core table, the prompt names it in order, and 8 picture problems come back in that order',
+    async (step) => {
+      const words = bigWordsOf(step)
+      expect(words).toHaveLength(8)
+      expect(
+        step === 'duck-words'
+          ? WORD_SONG_TARGET_WORDS_DUCK
+          : WORD_SONG_TARGET_WORDS_CRAB,
+      ).toBe(words.join(', '))
+
+      const client = makeMockClient(wirePlan(words))
+      const plan = await generateSessionPlan({
+        client,
+        track: 'word-song',
+        level: 1,
+        childName: 'Marian',
+        focusNode: step,
+      })
+      const create = client.messages.create as unknown as {
+        mock: { calls: unknown[][] }
+      }
+      const request = JSON.stringify(create.mock.calls[0]![0])
+      // The fixed pool, in canon order, and the first-class route (the
+      // user message names the step, not the blending-cv stub).
+      expect(request).toContain(
+        JSON.stringify(
+          `Pool for ${step} (8 words, FIXED ORDER — problem 1 to problem 8):\n${words.join(', ')}`,
+        ).slice(1, -1),
+      )
+      expect(request).toContain(`Focus skill node: ${step}`)
+
+      const rebuilt = wordSongSessionPlanFromServer(plan)
+      expect(rebuilt.problems.map((p) => p.target.word)).toEqual([...words])
+      for (const problem of rebuilt.problems) {
+        expect(problem.contentType).toBe('cvc-word')
+        expect(() =>
+          pickDistractors(problem.target, problem.index),
+        ).not.toThrow()
+      }
+    },
+  )
 })
