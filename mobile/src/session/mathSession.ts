@@ -79,13 +79,19 @@ import { readSessionHistory } from '@marian/core/sessionEnd/sessionHistory'
 import {
   recordAudio,
   startSession,
+  type IntroGuideLineId,
   type LoadedSessionAudio,
   type PrefetchKey,
   type SessionPrefetcher,
   type SessionStartPayload,
 } from '../audio'
 import type { PlayMathUtteranceFn } from '../screens/math/mathTypes'
-import { isReviewPlan, planKindFields, planModeOf } from './reviewSession'
+import {
+  isReviewPlan,
+  planKindFields,
+  planModeOf,
+  sessionIntroFor,
+} from './reviewSession'
 import {
   startSessionWithFallback,
   type SessionStartFallbackHandle,
@@ -101,6 +107,8 @@ export interface MathProgressHints {
   lifetimeFirstEncounters: readonly string[] | undefined
   /** Review, or forward with its warm-up refs (core `sessionPlanKind`). */
   planKind: SessionPlanKind
+  /** The focus step's intro lead line (content wave 1 § 6.1), if it plays. */
+  intro?: IntroGuideLineId | null
 }
 
 const FORWARD: SessionPlanKind = { kind: 'forward', warmup: [] }
@@ -141,6 +149,7 @@ export function readMathProgressHints(): MathProgressHints {
   )
   const slowFacts = buildSlowFactSessionHint(progress)
   return {
+    intro: sessionIntroFor(progress, node, planKind),
     focusNode: node,
     focusMode: mode,
     recentSuccessRate: pickRecentSuccessRate(progress, 'math'),
@@ -238,6 +247,8 @@ export interface MathRound {
   warmupCount: number
   /** Each problem's source step; `null` = the session's focus step. */
   problemNodes: readonly (SkillNode | null)[]
+  /** The step intro before the scored problem 1 (§ 6.1); `null` = none. */
+  intro: IntroGuideLineId | null
 }
 
 /**
@@ -248,7 +259,7 @@ export interface MathRound {
  */
 export function mathRoundFromServer(
   serverPlan: unknown,
-  hints: Pick<MathProgressHints, 'planKind'>,
+  hints: Pick<MathProgressHints, 'planKind' | 'intro'>,
 ): MathRound {
   if (hints.planKind.kind === 'review') {
     if (!isReviewPlan(serverPlan)) {
@@ -259,6 +270,7 @@ export function mathRoundFromServer(
       review: true,
       warmupCount: 0,
       problemNodes: hints.planKind.blocks.map((b) => b.node),
+      intro: null,
     }
   }
   const forward = mathSessionPlanFromServer(serverPlan, { extendedKinds: true })
@@ -277,6 +289,7 @@ export function mathRoundFromServer(
       ...warmup.map((w) => refs[w.block - 1]!.node),
       ...forward.problems.map(() => null),
     ],
+    intro: hints.intro ?? null,
   }
 }
 
@@ -330,6 +343,9 @@ export interface MathSessionSnapshot {
   /** Each problem's source step (`null` = the session focus); `null`
    *  without a server plan. */
   problemNodes: readonly (SkillNode | null)[] | null
+  /** The step intro before the scored problem 1 (content wave 1 § 6.1);
+   *  `null` without one, and without a server plan. */
+  intro: IntroGuideLineId | null
 }
 
 export interface MathSessionFocus {
@@ -377,6 +393,7 @@ const IDLE: MathSessionSnapshot = {
   review: false,
   warmupCount: 0,
   problemNodes: null,
+  intro: null,
 }
 
 /** Settled without a server plan: the static plan, silent captions. */
@@ -498,6 +515,7 @@ export function createMathSessionController(
             review: prepared.review,
             warmupCount: prepared.warmupCount,
             problemNodes: prepared.problemNodes,
+            intro: prepared.intro,
           })
         },
         (err: unknown) => {

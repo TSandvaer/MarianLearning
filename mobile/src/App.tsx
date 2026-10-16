@@ -610,6 +610,7 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               review={mathState.review}
               warmupCount={mathState.warmupCount}
               problemNodes={mathState.problemNodes ?? undefined}
+              sessionIntro={mathState.intro}
               onProblemKindChange={onMathProblemKind}
               onSessionComplete={onMathComplete}
               onRequestExit={onMathExit}
