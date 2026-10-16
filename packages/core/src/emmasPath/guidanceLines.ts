@@ -203,7 +203,11 @@ function buildLines(): GuidanceLine[] {
  * no intro. Each text is the step's own, not a template: "Two letters, one
  * sound!" names duck words' idea, not their name.
  */
-const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {}
+const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {
+  // Word Song land 6 (content wave 1 § 3.3, § 4.3).
+  'duck-words': 'Two letters, one sound!',
+  'crab-words': 'Read all the letters!',
+}
 
 const sessionIntroId = (n: SkillNode) => `guide.session.intro.${n}`
 const SESSION_HIDING_ID = 'guide.session.hiding'
@@ -231,11 +235,14 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * 3-6).
  */
 export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
-  SESSION_HIDING_ID,
+  // In `GUIDANCE_LINES` order (the bundled-MP3 test compares the lists).
   'guide.session.peek-open.duck-words',
   'guide.session.peek-open.crab-words',
   'guide.session.peek-close.duck-words',
   'guide.session.peek-close.crab-words',
+  'guide.session.intro.duck-words',
+  'guide.session.intro.crab-words',
+  SESSION_HIDING_ID,
 ]
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))

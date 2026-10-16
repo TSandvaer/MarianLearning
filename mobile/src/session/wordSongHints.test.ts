@@ -20,6 +20,7 @@ import {
   readWordSongSessionExtras,
   type WordSongProgressHints,
 } from './wordSongHints'
+import { wordSongRoundFromServer } from './wordSongSession'
 
 beforeEach(() => {
   const map = new Map<string, string>()
@@ -219,5 +220,68 @@ describe('th mouth-cue state', () => {
       thLevel: 'mastered',
       thFirstEncounter: false,
     })
+  })
+})
+
+describe('the step intro lead line (content wave 1 § 6.1)', () => {
+  /** Every Word Song step before `node` mastered, `node` at `level`. */
+  function seedOn(node: 'duck-words' | 'crab-words', level: SkillLevel) {
+    const before = WORD_SONG_NODES_IN_ORDER.slice(
+      0,
+      WORD_SONG_NODES_IN_ORDER.indexOf(node),
+    )
+    seed({
+      ...Object.fromEntries(before.map((n) => [n, 'mastered' as SkillLevel])),
+      [node]: level,
+    })
+  }
+
+  it('a forward session on duck words or crab words carries its intro until the step is mastered', () => {
+    seedOn('duck-words', 'intro')
+    expect(readWordSongProgressHints()).toMatchObject({
+      focusNode: 'duck-words',
+      intro: 'guide.session.intro.duck-words',
+    })
+    seedOn('duck-words', 'practicing')
+    expect(readWordSongProgressHints().intro).toBe(
+      'guide.session.intro.duck-words',
+    )
+    seedOn('crab-words', 'practicing')
+    expect(readWordSongProgressHints()).toMatchObject({
+      focusNode: 'crab-words',
+      intro: 'guide.session.intro.crab-words',
+    })
+  })
+
+  it('a step without an intro gets none', () => {
+    seed({ 'letter-sounds': 'practicing' })
+    expect(readWordSongProgressHints().intro).toBeNull()
+  })
+
+  it('the round passes a forward intro through and drops it in a review', () => {
+    const utterances = (prefix: string) => [
+      { id: `${prefix}.read`, text: 'Read the duck.' },
+      { id: `${prefix}.correct`, text: "Yes! That's a duck." },
+      { id: `${prefix}.reprompt`, text: 'Hmm... try again?' },
+      { id: `${prefix}.hint`, text: "Let's look. Duck." },
+      { id: `${prefix}.giveAnswer`, text: 'This one is duck.' },
+    ]
+    const intro = 'guide.session.intro.duck-words' as const
+    const eight = Array.from({ length: 8 }, (_, i) =>
+      utterances(`word.p${i + 1}`),
+    ).flat()
+    const forward = wordSongRoundFromServer(
+      { id: 'word-song-duck-words', label: 'Duck words', utterances: eight },
+      { planKind: { kind: 'forward', warmup: [] }, intro },
+    )
+    expect(forward.intro).toBe(intro)
+    expect(forward.plan.problems.map((p) => p.contentType)).toEqual(
+      Array(8).fill('cvc-word'),
+    )
+    const review = wordSongRoundFromServer(
+      { id: 'review-word-song', label: 'Review', utterances: eight },
+      { planKind: { kind: 'review', blocks: [] }, intro },
+    )
+    expect(review.intro).toBeNull()
   })
 })

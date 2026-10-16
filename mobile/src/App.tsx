@@ -664,6 +664,7 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               digraphsThFirstEncounter={wordSongState.thFirstEncounter}
               review={wordSongState.review}
               warmupCount={wordSongState.warmupCount}
+              sessionIntro={wordSongState.intro}
               onSessionComplete={onWordSongComplete}
               onRequestExit={onWordSongExit}
               onPoseChange={setWordSongPose}

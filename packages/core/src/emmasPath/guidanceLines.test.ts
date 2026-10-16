@@ -39,12 +39,13 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'session-knew': 1,
       'session-peek-open': 24,
       'session-peek-close': 24,
+      'session-intro': 2,
       'session-hiding': 1,
     })
-    expect(GUIDANCE_LINES).toHaveLength(72)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(72)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(72)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(72)
+    expect(GUIDANCE_LINES).toHaveLength(74)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(74)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(74)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(74)
   })
 
   it('bakes each world and count variant', () => {
@@ -123,6 +124,20 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     }
     // A step with no intro text has no line.
     expect(sessionIntroLine('add-to-10')).toBeUndefined()
+    // Word Song land 6 (§ 6.2 rows 8-9).
+    expect(sessionIntroLine('duck-words')).toMatchObject({
+      id: 'guide.session.intro.duck-words',
+      kind: 'session-intro',
+      world: 'word-song',
+      text: 'Two letters, one sound!',
+      src: '/assets/audio/path/guide-session-intro-duck-words.mp3',
+    })
+    expect(sessionIntroLine('crab-words')).toMatchObject({
+      id: 'guide.session.intro.crab-words',
+      world: 'word-song',
+      text: 'Read all the letters!',
+      src: '/assets/audio/path/guide-session-intro-crab-words.mp3',
+    })
     // Awaiting their Lily render (the render commit empties the list).
     expect(GUIDANCE_LINES_AWAITING_RENDER).toContain('guide.session.hiding')
   })
@@ -212,7 +227,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(72)
+    ).toHaveLength(74)
   })
 
   it('repeats no Emma’s Path line', () => {

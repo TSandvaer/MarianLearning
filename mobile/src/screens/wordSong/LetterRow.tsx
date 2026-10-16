@@ -11,6 +11,8 @@
  * - Entrance: the web's springs (300 / 18), 150 ms apart.
  * - Reduce Motion: no pulse, no stagger (150 ms fades); the spotlight
  *   still shows.
+ * - A step intro's spotlight (`./introSpotlight.ts`, content wave 1 § 3.3,
+ *   § 4.3) lights its cells too, each after its own delay.
  * - If the row is wider than `maxWidth`, F steps down 4 pt at a time, never
  *   below 0.8 F.
  */
@@ -39,6 +41,7 @@ function Cell({
   font,
   cellMin,
   lit,
+  litDelayMs,
   fadeOutMs,
   onPress,
 }: {
@@ -47,6 +50,8 @@ function Cell({
   font: number
   cellMin: number
   lit: boolean
+  /** How long after `lit` turns on the spotlight fades in (and pulses). */
+  litDelayMs: number
   fadeOutMs: number
   onPress: () => void
 }) {
@@ -67,11 +72,22 @@ function Cell({
   }, [index, reducedMotion, opacity, enter])
 
   useEffect(() => {
-    spot.set(withTiming(lit ? 1 : 0, { duration: lit ? 120 : fadeOutMs }))
+    const delay = lit ? litDelayMs : 0
+    spot.set(
+      withDelay(
+        delay,
+        withTiming(lit ? 1 : 0, { duration: lit ? 120 : fadeOutMs }),
+      ),
+    )
     if (!lit || reducedMotion) return
     const half = { duration: 200, easing: EASE_OUT }
-    pulse.set(withSequence(withTiming(1.2, half), withTiming(1, half)))
-  }, [lit, fadeOutMs, reducedMotion, spot, pulse])
+    pulse.set(
+      withDelay(
+        delay,
+        withSequence(withTiming(1.2, half), withTiming(1, half)),
+      ),
+    )
+  }, [lit, litDelayMs, fadeOutMs, reducedMotion, spot, pulse])
 
   const cellStyle = useAnimatedStyle(() => ({
     opacity: opacity.get(),
@@ -122,6 +138,11 @@ export interface LetterRowProps {
   maxWidth: number
   /** The lit letter; `word.length` = all; null = none. */
   lit: number | null
+  /**
+   * A step intro's spotlight: per letter, the delay before it lights, or
+   * `null` (dark). `null` / unset = no intro spotlight.
+   */
+  spotlight?: readonly (number | null)[] | null
   onLetterPress: (index: number) => void
 }
 
@@ -131,6 +152,7 @@ export function LetterRow({
   cellMin,
   maxWidth,
   lit,
+  spotlight = null,
   onLetterPress,
 }: LetterRowProps) {
   // The step-down belongs to one F: a rotation (a new F) starts over.
@@ -155,7 +177,15 @@ export function LetterRow({
           index={i}
           font={font}
           cellMin={cellMin}
-          lit={letterHighlighted(i, lit, letters.length)}
+          lit={
+            letterHighlighted(i, lit, letters.length) ||
+            (spotlight?.[i] ?? null) !== null
+          }
+          litDelayMs={
+            letterHighlighted(i, lit, letters.length)
+              ? 0
+              : (spotlight?.[i] ?? 0)
+          }
           fadeOutMs={lit === null ? 200 : 120}
           onPress={() => onLetterPress(i)}
         />

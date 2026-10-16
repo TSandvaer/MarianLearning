@@ -31,8 +31,12 @@ import {
   type SessionPlanKind,
 } from '@marian/core/progress/reviewPlan'
 import { readSessionHistory } from '@marian/core/sessionEnd/sessionHistory'
-import type { PrefetchKey, SessionStartPayload } from '../audio'
-import { planKindFields, planModeOf } from './reviewSession'
+import type {
+  IntroGuideLineId,
+  PrefetchKey,
+  SessionStartPayload,
+} from '../audio'
+import { planKindFields, planModeOf, sessionIntroFor } from './reviewSession'
 
 /** The progress hints the Word Song request carries. */
 export interface WordSongProgressHints {
@@ -47,6 +51,8 @@ export interface WordSongProgressHints {
   /** Review, or forward with its warm-up refs (native spec
    *  review-mode-and-warmup-native.md § 2, core `sessionPlanKind`). */
   planKind: SessionPlanKind
+  /** The focus step's intro lead line (content wave 1 § 6.1), if it plays. */
+  intro?: IntroGuideLineId | null
 }
 
 const NO_HINTS: WordSongProgressHints = {
@@ -66,7 +72,15 @@ export function readWordSongProgressHints(): WordSongProgressHints {
   const sessionCount = readSessionHistory().sessionCount
   const { node, mode } = pickFocusNode(progress, 'word-song', sessionCount)
   const now = progressNow()
+  const planKind = sessionPlanKind(
+    progress,
+    'word-song',
+    now.getTime(),
+    localDateKey(now),
+    sessionCount,
+  )
   return {
+    intro: sessionIntroFor(progress, node, planKind),
     focusNode: node,
     focusMode: mode,
     recentSuccessRate: pickRecentSuccessRate(progress, 'word-song'),
@@ -80,13 +94,7 @@ export function readWordSongProgressHints(): WordSongProgressHints {
       node === 'letter-sounds'
         ? progress.literacy?.letterSoundsVowelStates
         : undefined,
-    planKind: sessionPlanKind(
-      progress,
-      'word-song',
-      now.getTime(),
-      localDateKey(now),
-      sessionCount,
-    ),
+    planKind,
   }
 }
 

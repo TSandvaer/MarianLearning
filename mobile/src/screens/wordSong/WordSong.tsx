@@ -48,6 +48,14 @@
  * arrow (and Android back) cuts the line and calls `onPeekEnd` at once. A
  * peek writes nothing and hands no result over.
  *
+ * Native-only, content wave 1 (`design/native/content-wave-1.md` § 6.1,
+ * § 3.3, § 4.3): the lead before each problem's read comes from
+ * `leadLinesForRound` (opener, warm-up heart, step intro, at most one per
+ * problem). A step intro ("Two letters, one sound!" / "Read all the
+ * letters!") plays before the scored problem 1 with its letter spotlight
+ * (`./introSpotlight.ts`), and on a CVC card the 1500 ms silent beat starts
+ * at the intro's end instead of after the 400 ms gap.
+ *
  * Emma is App's `EmmaStage`; this screen reports her pose (`onPoseChange`).
  */
 import type { EmmaPose } from '@marian/core/character/emmaPose'
@@ -100,6 +108,7 @@ import {
   blendRevealAt,
   createSfx,
   createTapClipPlayer,
+  leadLinesForRound,
   letterWindow,
   litAt,
   PEEK_CLOSE_GAP_MS,
@@ -109,6 +118,7 @@ import {
   sessionGuidePlayer,
   SFX_SOURCES,
   wordWindow,
+  type IntroGuideLineId,
   type Segment,
   type SessionGuideLineId,
   type SessionGuidePlayer,
@@ -130,6 +140,7 @@ import {
   createSilentMathPlayer,
   type SilentMathPlayer,
 } from '../math/silentPlayer'
+import { INTRO_SPOT_OFF_MS, introSpotlight } from './introSpotlight'
 import { nativeRound } from './nativeRound'
 import { startSilentBeat, type SilentBeat } from './silentBeat'
 import { ThIntroPanel } from './ThCue'
@@ -224,6 +235,12 @@ export interface WordSongProps {
   peek?: SkillNode
   /** The peek is over (after the closer, or the back arrow at once). */
   onPeekEnd?: () => void
+  /**
+   * The focus step's intro lead line (content wave 1 § 6.1), before the
+   * scored problem 1's read; `null` / unset = none. The session start
+   * decides (a forward session on a step that is not mastered).
+   */
+  sessionIntro?: IntroGuideLineId | null
 }
 
 interface PerProblemState {
@@ -277,6 +294,7 @@ export function WordSong({
   sessionGuide,
   peek,
   onPeekEnd,
+  sessionIntro = null,
 }: WordSongProps) {
   const appHidden = useIsAppHidden(visibility)
   const reducedMotion = useReducedMotion()
@@ -336,6 +354,22 @@ export function WordSong({
   /** The opener has played (the stage mounts at its end). */
   const [openerDone, setOpenerDone] = useState(false)
   const openerStartedRef = useRef(false)
+  /**
+   * The line before each problem's read (review spec § 4, content wave 1
+   * § 6.1): the opener, a warm-up heart's line, the step intro; at most
+   * one per problem. Word Song has no missing-number problems.
+   */
+  const leads = useMemo(
+    () =>
+      leadLinesForRound(plan.problems.length, {
+        opener,
+        warmupCount: warmups,
+        intro: sessionIntro,
+        hiding: plan.problems.map(() => false),
+        peek: isPeek,
+      }),
+    [plan, opener, warmups, sessionIntro, isPeek],
+  )
   /** The problem whose guide line has started (one per problem). */
   const leadForRef = useRef(-1)
   const leadInTimerRef = useRef<Timer>(null)
@@ -374,6 +408,10 @@ export function WordSong({
   const [shakingChip, setShakingChip] = useState<string | null>(null)
   /** The lit letter (blend or tap); `word.length` lights them all. */
   const [lit, setLit] = useState<number | null>(null)
+  /** A step intro's letter spotlight while it plays (§ 3.3, § 4.3). */
+  const [spotlight, setSpotlight] = useState<readonly (number | null)[] | null>(
+    null,
+  )
   const [celebrating, setCelebrating] = useState(false)
   const [streakFadingOut, setStreakFadingOut] = useState(false)
   const [guidedActive, setGuidedActive] = useState(false)
@@ -385,6 +423,7 @@ export function WordSong({
   const poseTimerRef = useRef<Timer>(null)
   const streakFadeTimerRef = useRef<Timer>(null)
   const litTimerRef = useRef<Timer>(null)
+  const spotOffTimerRef = useRef<Timer>(null)
   const beatRef = useRef<SilentBeat | null>(null)
   /** Bumped by every tap sound; a stale one never darkens a newer light. */
   const tapTokenRef = useRef(0)
@@ -408,6 +447,7 @@ export function WordSong({
       poseTimerRef,
       streakFadeTimerRef,
       litTimerRef,
+      spotOffTimerRef,
       leadInTimerRef,
       closerTimerRef,
     ]) {
@@ -489,14 +529,16 @@ export function WordSong({
       })
     }
     // Review spec § 4: the opener where problem 1's read would start; the
-    // warm-up line before each warm-up read. Line end → 400 ms → the read
-    // (a CVC card's silent beat, then its read).
+    // warm-up line before each warm-up read; content wave 1 § 6.1: the step
+    // intro before the scored problem 1. Line end → 400 ms → the read (a
+    // CVC card's silent beat, then its read); after the step intro a CVC
+    // card's silent beat starts at once, in place of the 400 ms.
+    const planned = leads[my] ?? null
     const lead: SessionGuideLineId | null =
-      opener !== null && my === 0 && !openerStartedRef.current
-        ? opener
-        : my < warmups
-          ? 'guide.session.warmup'
-          : null
+      planned !== null && planned === opener && openerStartedRef.current
+        ? null
+        : planned
+    const isIntro = lead !== null && lead === sessionIntro
     if (lead === null && round.readAloudDelayMs === 0) {
       microtask(dispatch)
       return
@@ -530,12 +572,26 @@ export function WordSong({
         leadForRef.current = my
         if (lead === opener) openerStartedRef.current = true
         setPose('listening')
+        if (isIntro && sessionIntro !== null)
+          setSpotlight(
+            introSpotlight(sessionIntro, problem.target.word, reducedMotion),
+          )
         void speak(sessionGuideLine(lead).text, {
           play: (_text, opts) => guide.playLine(lead, opts),
         }).then(() => {
           if (stale()) return
           if (lead === opener) setOpenerDone(true)
           setPose((c) => (c === 'listening' ? 'idle' : c))
+          if (isIntro) {
+            spotOffTimerRef.current = setTimeout(() => {
+              spotOffTimerRef.current = null
+              setSpotlight(null)
+            }, INTRO_SPOT_OFF_MS)
+            if (round.readAloudDelayMs > 0) {
+              read()
+              return
+            }
+          }
           leadInTimerRef.current = setTimeout(() => {
             leadInTimerRef.current = null
             read()
@@ -641,6 +697,7 @@ export function WordSong({
   const advanceToNext = useCallback(() => {
     if (problemIndex < plan.problems.length - 1) {
       clearTimers()
+      setSpotlight(null)
       setProblemIndex((i) => i + 1)
       setProblemState(FRESH)
       resolvedRef.current = false
@@ -1102,6 +1159,7 @@ export function WordSong({
               problem={problem}
               layout={layout}
               lit={lit}
+              spotlight={spotlight}
               revealedCount={caption.revealed}
               resolved={problemState.resolved}
               showThCue={showThCorner}
