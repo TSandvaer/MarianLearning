@@ -224,7 +224,7 @@ Phone landscape (667×375): Word Song's L frame with the chip column, as for mul
 ### 2.8 "How many plates?" belongs later, not in this step
 
 - **The picture can't hold it.** In this step the plates are on screen from the start. For "Twelve flowers. Four on each plate. How many plates?", the plate count is the answer. It needs a picture where plates appear as groups are made, which is a second new interaction.
-- **One idea per step.** _each_ is a new word for her (§ 6.3). One question shape lets the word settle before the reverse question uses it.
+- **One idea per step.** She first has to learn to hear "How many on each plate?" as the question. A second question shape in the same step would ask her to tell the two apart while both are new.
 - **Dave's roadmap marks it "Later"** (§ 2, step 13).
 - **Proposed home:** a deepening inside sharing once she has mastered it, as missing numbers deepened adding. It would come in a later wave, with its own spec and Dave's check (D1).
 
@@ -244,9 +244,9 @@ P1–P3 use the gentle pair and P4–P8 the trap pair. Every row needs both, bec
 
 | P   | Word | End | Vowel | Category  | Gentle (P1–P3) | Trap (P4–P8) | Why the trap                                                                       |
 | --- | ---- | --- | ----- | --------- | -------------- | ------------ | ---------------------------------------------------------------------------------- |
-| 1   | tent | nt  | e     | structure | dog, cup       | nest, tap    | nest: the same vowel and last letter, so the middle decides; tap: t                |
+| 1   | tent | nt  | e     | structure | dog, cup       | nest, tap    | nest: the same vowel and last letter, so the middle decides; tap: the same t       |
 | 2   | hand | nd  | a     | body-part | bus, pot       | hat, pond    | hat: the same start _ha_; pond: the same ending _nd_                               |
-| 3   | gift | ft  | i     | object    | sun, pot       | gem, fig     | gem: g; fig: the letters f, i, g in another order                                  |
+| 3   | gift | ft  | i     | object    | sun, pot       | gem, fig     | gem: the same g; fig: the letters f, i, g in another order                         |
 | 4   | nest | st  | e     | structure | cup, fox       | net, tent    | **net: nest without the s** (Dave's twin); tent: same vowel and end t              |
 | 5   | desk | sk  | e     | household | sun, cat       | duck, nest   | duck: the same first and last sound; nest: s and one more, the last letter decides |
 | 6   | belt | lt  | e     | clothing  | sun, fox       | bed, tent    | bed: the same start _be_; tent: same vowel and end t                               |
@@ -297,7 +297,7 @@ P1–P3 use the gentle pair and P4–P8 the trap pair. Every row needs both, bec
   - _nose_: a nose alone reads as a face.
   - _cube_: reads as a box or a block, and its twin _cub_ has no picture.
   - _five_, _nine_: number words. Their picture would need digits, which the pack doesn't allow.
-- **Dave's other twins:** _kit_ has no picture, and _cane_ is weak vocabulary for her (and _can / cane_ needs a new picture).
+- **Dave's other twins:** _kit_ has no picture, and _cane_ is weak vocabulary for her (it would also be one more new picture).
 - **`BigWordRow.vowel` widens to `'a' | 'e' | 'i' | 'o' | 'u'`.** For cake rows it holds the vowel letter. Nothing on the land-6 path reads it as a short sound, but the build checks every consumer, as wave 1 did (`wordDistractors.test.ts`, the CVC-axis tests).
 
 ### 4.3 Intro lead and the quiet-E cue
@@ -588,7 +588,7 @@ The spec had to fill these in. Each says what was assumed; mark them ✅ / ⚠�
 - **D5. No Leitner fact for sharing,** so the × facts' boxes and slow-fact times stay clean.
 - **D6. The hint ladder:**
   - "Look at the flowers.", then "One for each plate." (deals one round), then "How many on each plate?" (deals the rest).
-  - The correct line is "Yes! Four on each plate!", so it ends on _each_.
+  - The correct line is "Yes! Four on each plate!", so the answer is said with _each_ again.
 - **D7. Tent words** are Dave's 10 minus _jump_ and _milk_. _mask_ and _raft_ are kept out (long vowel in British English). Where his twin has no picture (had, ten, bet), the trap has the same start and a short vowel (§ 3.2). The lead is "Read to the end!".
 - **D8. Cake words** are 8 of Dave's 12 (§ 4.2). The trap is the short twin where it has a picture. The lead plays before P1 only. The quiet-E cue shows on the lead and on the hint, never from reveal.
 - **D9. Leads every session until mastery**, as wave 1's D5 confirmed for its steps.
