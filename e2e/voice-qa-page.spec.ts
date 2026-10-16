@@ -526,13 +526,26 @@ test.describe('Voice-QA page — New / changed chip', () => {
     await waitForPageReady(page)
     const rowCount = await page.locator('[data-testid^="vqa-item-"]').count()
     const hashes = await harvestRowHashes(page)
-    const [newId, changedId] = Object.keys(hashes)
+    // Mutate two rows whose audio no other row shares: audio found anywhere
+    // in the baseline counts as already heard, so a shared hash would keep
+    // the mutated row off the list.
+    const hashCount = new Map<string, number>()
+    for (const h of Object.values(hashes))
+      hashCount.set(h, (hashCount.get(h) ?? 0) + 1)
+    const [newId, changedId, movedId] = Object.keys(hashes).filter(
+      (id) => hashes[id] !== '' && hashCount.get(hashes[id]) === 1,
+    )
     expect(newId).toBeTruthy()
     expect(changedId).toBeTruthy()
+    expect(movedId).toBeTruthy()
 
     const baselineItems = { ...hashes }
     delete baselineItems[newId]
     baselineItems[changedId] = `stale-${hashes[changedId]}`
+    // Same audio under another key (a canon group's first member changed):
+    // already heard, so NOT listed.
+    delete baselineItems[movedId]
+    baselineItems['moved#elsewhere'] = hashes[movedId]
     await routeBaseline(page, baselineItems)
     await page.goto(PAGE_URL_DEFAULT)
     await waitForPageReady(page)
@@ -550,6 +563,7 @@ test.describe('Voice-QA page — New / changed chip', () => {
     await expect(visibleRows).toHaveCount(2)
     await expect(page.getByTestId(`vqa-item-${newId}`)).toBeVisible()
     await expect(page.getByTestId(`vqa-item-${changedId}`)).toBeVisible()
+    await expect(page.getByTestId(`vqa-item-${movedId}`)).toBeHidden()
     await expect(page.getByTestId(`vqa-diff-${newId}`)).toHaveText('new')
     await expect(page.getByTestId(`vqa-diff-${changedId}`)).toHaveText(
       'changed',

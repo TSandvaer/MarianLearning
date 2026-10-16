@@ -27,41 +27,67 @@ const defs = loadPageDefinitions(html)
 
 describe('baselineDiffOf (page code)', () => {
   const baseline = { 'add-to-10#a': 'h1', 'hub#x.mp3': 'h2' }
+  const hashes = defs.baselineHashesOf(baseline)
+  const diff = (itemId: string, audioHash: string) =>
+    defs.baselineDiffOf({ itemId, audioHash }, baseline, hashes)
 
   it('flags a key missing from the baseline as new', () => {
-    expect(
-      defs.baselineDiffOf({ itemId: 'add-to-10#b', audioHash: 'h9' }, baseline),
-    ).toBe('new')
+    expect(diff('add-to-10#b', 'h9')).toBe('new')
   })
 
   it('flags a key whose audio hash differs as changed', () => {
-    expect(
-      defs.baselineDiffOf({ itemId: 'add-to-10#a', audioHash: 'h9' }, baseline),
-    ).toBe('changed')
+    expect(diff('add-to-10#a', 'h9')).toBe('changed')
   })
 
   it('does not list a key with the same audio hash', () => {
-    expect(
-      defs.baselineDiffOf({ itemId: 'add-to-10#a', audioHash: 'h1' }, baseline),
-    ).toBeNull()
+    expect(diff('add-to-10#a', 'h1')).toBeNull()
+  })
+
+  it("does not list audio that moved to a new key (group's first member changed)", () => {
+    // e.g. #575: crab-words#session.end.recap.focus took over the audio of
+    // cvc-words#session.end.recap.focus, which is already on main.
+    expect(diff('add-to-5#a', 'h1')).toBeNull()
+  })
+
+  it('does not list a key whose new audio is already elsewhere in the baseline', () => {
+    // e.g. #576: add-to-10#math.p7.read now carries a render main already has.
+    expect(diff('add-to-10#a', 'h2')).toBeNull()
   })
 
   it('lists nothing when there is no baseline', () => {
     expect(
-      defs.baselineDiffOf({ itemId: 'add-to-10#b', audioHash: 'h9' }, null),
+      defs.baselineDiffOf(
+        { itemId: 'add-to-10#b', audioHash: 'h9' },
+        null,
+        defs.baselineHashesOf(null),
+      ),
     ).toBeNull()
   })
 
-  it('does not mistake inherited object keys for baseline entries', () => {
+  it('does not treat an empty hash (missing asset) as known audio', () => {
+    const withEmpty = { 'guide#gone.mp3': '' }
     expect(
-      defs.baselineDiffOf({ itemId: 'constructor', audioHash: 'h' }, baseline),
+      defs.baselineDiffOf(
+        { itemId: 'guide#other.mp3', audioHash: '' },
+        withEmpty,
+        defs.baselineHashesOf(withEmpty),
+      ),
     ).toBe('new')
+  })
+
+  it('does not mistake inherited object keys for baseline entries', () => {
+    expect(diff('constructor', 'h')).toBe('new')
   })
 })
 
 describe('diffAgainstBaseline', () => {
   it('lists exactly the new and changed ids, never the unchanged ones', () => {
-    const current = { same: 'h1', changedOne: 'h2-new', brandNew: 'h3' }
+    const current = {
+      same: 'h1',
+      changedOne: 'h2-new',
+      brandNew: 'h3',
+      movedKey: 'h4',
+    }
     const baseline = { same: 'h1', changedOne: 'h2', removed: 'h4' }
     expect(diffAgainstBaseline(defs, current, baseline)).toEqual({
       added: ['brandNew'],

@@ -12,14 +12,15 @@ branch="$(git rev-parse --abbrev-ref HEAD)"
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || {
   echo "release: local main differs from origin/main — push or pull first"; exit 1; }
 
-# Voice-QA baseline (public/voice-qa-baseline.json) staleness. Report only:
-# regenerating it is a commit, and main only changes through PRs, so this
-# never blocks or edits the release. Stale = audio merged since the baseline;
-# those lines show under "New / changed" on voice-qa.html until it is
-# regenerated (yarn voice-qa:baseline on a branch off main, then a PR).
+# Voice-QA baseline (public/voice-qa-baseline.json). Rule: regenerate it right
+# after each release, from the released SHA. Production then lists exactly
+# what changed since the last release under "New / changed" on voice-qa.html.
+# Report only: regenerating is a commit, and main only changes through PRs, so
+# this never blocks or edits the release.
+released_sha="$(git rev-parse HEAD)"
+vqa_baseline_stale=0
 if ! npx tsx scripts/voiceQaBaseline.ts --check; then
-  echo "release: note — regenerate the voice-QA baseline after this release:"
-  echo "  git checkout -b chore/voice-qa-baseline origin/main && yarn voice-qa:baseline"
+  vqa_baseline_stale=1
 fi
 
 echo "Releasing $(git log -1 --format='%h %s') to production…"
@@ -37,3 +38,9 @@ MSG
 fi
 gh workflow run post-deploy-smoke.yml --ref main
 echo "Smoke check dispatched: gh run list --workflow post-deploy-smoke.yml --limit 1"
+
+if [ "$vqa_baseline_stale" = 1 ]; then
+  echo "release: the voice-QA lines listed above are New / changed on production."
+  echo "release: now regenerate the voice-QA baseline from the released SHA, then open a PR:"
+  echo "  git checkout -b chore/voice-qa-baseline ${released_sha} && yarn voice-qa:baseline"
+fi

@@ -2,10 +2,11 @@
  * Voice-QA baseline: a snapshot of every public/voice-qa.html item's audio
  * hash on main, written to public/voice-qa-baseline.json.
  *
- * The page's "New / changed" chip lists the items whose key is missing from
- * this snapshot, or whose audio hash differs from it. A PR branch carries
- * main's snapshot, so its preview shows exactly the lines that PR added or
- * re-rendered.
+ * The page's "New / changed" chip lists the items whose audio hash appears
+ * nowhere in this snapshot: 'new' when the key is missing from it, 'changed'
+ * when the key holds a different hash. Audio already in the snapshot is never
+ * listed, even when a canon group's key moved because its alphabetically-
+ * first member changed.
  *
  *   npx tsx scripts/voiceQaBaseline.ts           write the baseline
  *   npx tsx scripts/voiceQaBaseline.ts --check   compare the tree with the
@@ -14,9 +15,12 @@
  *   --force   write even when HEAD is not on origin/main or the audio paths
  *             have uncommitted changes
  *
- * When to regenerate: after each merge to main that changes audio, at the
- * latest at release, on a branch off main, committed in a PR. Never on a
- * feature branch: its own lines would drop out of "New / changed".
+ * When to regenerate: right after each release, from the released SHA
+ * (`git checkout -b chore/voice-qa-baseline <released sha>`), committed in a
+ * PR. scripts/release.sh prints the exact command. Production then lists what
+ * changed since the last release; a PR preview lists its own lines plus any
+ * audio merged since the last release. Never regenerate on a feature branch:
+ * its own lines would drop out of "New / changed".
  *
  * Keys and hashes come from the page's own code. The manifest block
  * (CANON_FILES through GUIDANCE_FILES, including ASSET_BASES) and the
@@ -49,9 +53,13 @@ export interface PageDefinitions {
   PATH_GROUPS: ReadonlyArray<readonly [string, Manifest]>
   GUIDANCE_FILES: Manifest
   canonicalItemIdOf: (members: CanonMember[]) => string
+  baselineHashesOf: (
+    baselineItems: Readonly<Record<string, string>> | null,
+  ) => Set<string>
   baselineDiffOf: (
     item: { itemId: string; audioHash: string },
     baselineItems: Readonly<Record<string, string>> | null,
+    baselineHashes: ReadonlySet<string>,
   ) => DiffState
   initialFilterOf: (search: string, newCount: number) => string
 }
@@ -96,8 +104,8 @@ export function loadPageDefinitions(html: string): PageDefinitions {
   const factory = new Function(
     `'use strict'\n${manifest}\n${pure}\n` +
       'return { CANON_FILES, ASSET_BASES, GREET_FILES, HUB_FILES, ' +
-      'PATH_GROUPS, GUIDANCE_FILES, canonicalItemIdOf, baselineDiffOf, ' +
-      'initialFilterOf }',
+      'PATH_GROUPS, GUIDANCE_FILES, canonicalItemIdOf, baselineHashesOf, ' +
+      'baselineDiffOf, initialFilterOf }',
   )
   return factory() as PageDefinitions
 }
@@ -209,8 +217,13 @@ export function diffAgainstBaseline(
 ): { added: string[]; changed: string[] } {
   const added: string[] = []
   const changed: string[] = []
+  const hashes = defs.baselineHashesOf(baselineItems)
   for (const [itemId, audioHash] of Object.entries(current)) {
-    const state = defs.baselineDiffOf({ itemId, audioHash }, baselineItems)
+    const state = defs.baselineDiffOf(
+      { itemId, audioHash },
+      baselineItems,
+      hashes,
+    )
     if (state === 'new') added.push(itemId)
     else if (state === 'changed') changed.push(itemId)
   }
@@ -229,9 +242,10 @@ export function buildBaselineFile(
     sourceSha,
     note:
       'Snapshot of public/voice-qa.html item audio hashes (itemId -> sha256). ' +
-      'Regenerate after each merge to main that changes audio, at the latest ' +
-      'at release: yarn voice-qa:baseline on a branch off main, committed in ' +
-      'a PR. Never regenerate on a feature branch.',
+      'Regenerate right after each release, from the released SHA: ' +
+      'yarn voice-qa:baseline on a branch at that SHA, committed in a PR ' +
+      '(scripts/release.sh prints the command). Never regenerate on a ' +
+      'feature branch.',
     itemCount: Object.keys(sorted).length,
     items: sorted,
   }

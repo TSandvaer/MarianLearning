@@ -424,14 +424,15 @@
       tooling.
     </p>
     <p class="sub" data-testid="vqa-baseline-info">
-      <strong>New / changed</strong> = lines that are new, or whose audio was
-      re-rendered, since the baseline snapshot of main
-      (<code>voice-qa-baseline.json</code>). These are the lines to ear-test;
-      the page opens on them when there are any.
-      <span id="vqa-baseline-meta"></span> The baseline is regenerated after
-      each merge to main that changes audio, and at the latest at release:
-      <code>yarn voice-qa:baseline</code> on a branch off main, committed in a
-      PR.
+      <strong>New / changed</strong> = lines whose audio is not in the baseline
+      snapshot of main (<code>voice-qa-baseline.json</code>): new lines and
+      re-rendered ones. These are the lines to ear-test; the page opens on them
+      when there are any. <span id="vqa-baseline-meta"></span> The baseline is
+      regenerated right after each release, from the released SHA (<code
+        >yarn voice-qa:baseline</code
+      >, committed in a PR). So production lists what changed since the last
+      release, and a PR preview lists its own lines plus any audio merged since
+      the last release.
     </p>
 
     <div id="status" class="status">Loading baked canon&hellip;</div>
@@ -1384,6 +1385,7 @@
       // /voice-qa-baseline.json; null when the file is missing or malformed
       // (the New / changed chip is then disabled, everything else works).
       let baseline = null
+      let baselineHashes = new Set() // every audio hash in baseline.items
       let activeFilter = 'all'
 
       // ── Pure helpers BEGIN ───────────────────────────────────────────────
@@ -1410,11 +1412,21 @@
         return members[0].file + '#' + members[0].id
       }
 
-      // 'new' when the baseline has no entry for the item's key, 'changed'
-      // when it has one with a different audio hash, null otherwise (and
-      // null for every item when there is no baseline at all).
-      function baselineDiffOf(item, baselineItems) {
+      // Every audio hash in the baseline. Build once per baseline and pass it
+      // to baselineDiffOf.
+      function baselineHashesOf(baselineItems) {
+        return new Set(Object.values(baselineItems || {}))
+      }
+
+      // null when the item's audio is anywhere in the baseline: a canon
+      // group's key moves when its alphabetically-first member changes, but
+      // audio already on main is not new to the ear. Otherwise 'new' when
+      // the baseline has no entry for the item's key, 'changed' when it has
+      // one (with a different hash). null for every item when there is no
+      // baseline at all.
+      function baselineDiffOf(item, baselineItems, baselineHashes) {
         if (!baselineItems) return null
+        if (item.audioHash && baselineHashes.has(item.audioHash)) return null
         if (!Object.prototype.hasOwnProperty.call(baselineItems, item.itemId))
           return 'new'
         return baselineItems[item.itemId] === item.audioHash ? null : 'changed'
@@ -2200,7 +2212,11 @@
             mime: r.mime,
             assetUrl: r.assetUrl,
           }
-          item.diff = baselineDiffOf(item, baseline && baseline.items)
+          item.diff = baselineDiffOf(
+            item,
+            baseline && baseline.items,
+            baselineHashes,
+          )
           items.push(item)
           itemById.set(item.itemId, item)
           body.appendChild(buildRow(item))
@@ -2278,6 +2294,7 @@
           const canonUnique = byHash.size
 
           baseline = await baselinePromise
+          baselineHashes = baselineHashesOf(baseline && baseline.items)
           applyBaselineInfo()
 
           // Reveal control bar before appending rows.

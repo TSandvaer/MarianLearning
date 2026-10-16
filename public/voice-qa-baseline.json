@@ -1,7 +1,7 @@
 {
   "generatedAt": "2026-10-16T08:49:16.810Z",
   "sourceSha": "62b064678f3233814d499c9880c2b9754b6b4322",
-  "note": "Snapshot of public/voice-qa.html item audio hashes (itemId -> sha256). Regenerate after each merge to main that changes audio, at the latest at release: yarn voice-qa:baseline on a branch off main, committed in a PR. Never regenerate on a feature branch.",
+  "note": "Snapshot of public/voice-qa.html item audio hashes (itemId -> sha256). Regenerate right after each release, from the released SHA: yarn voice-qa:baseline on a branch at that SHA, committed in a PR (scripts/release.sh prints the command). Never regenerate on a feature branch.",
   "itemCount": 989,
   "items": {
     "add-to-10#math.p1.correct": "43bca036c4d0edf20f5035823020ee00995e61bc48aeca7e823dd617af0cb8af",
