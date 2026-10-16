@@ -3913,10 +3913,10 @@ onetime@^7.0.0:
   dependencies:
     mimic-function "^5.0.0"
 
-openai@^7.34.0:
-  version "7.34.0"
-  resolved "https://registry.yarnpkg.com/openai/-/openai-7.34.0.tgz#86ea47b0d27bdc60b3aa6906cb422e293fa25667"
-  integrity sha512-PMwuTQ/3cVyWZJOVpb6bzlrQj17uImlnUGQWqh5zHlN/snwK5ww4ZUHW8NYGtH6f9PQOEPxyD/f8WJVIHp1q2A==
+openai@^6.49.0:
+  version "6.49.0"
+  resolved "https://registry.yarnpkg.com/openai/-/openai-6.49.0.tgz#6e9f798e146935ed38d955b43d57d6796cee5e6b"
+  integrity sha512-aYCc0C6L864eR6WSYIwQGyXriw/nIyZx0ObvhzOEVuk0zoBDpynjSbrionWI7q65B5H8jJX0DXR9snEzM6bfPg==
 
 optionator@^0.9.3:
   version "0.9.4"
