@@ -134,22 +134,36 @@ export async function adoptDeviceId(
 
 /**
  * Adopt another device's ID, read first (native). Reconcile against the
- * ID, then install it as this device's ID, unless the cloud read failed
- * (`cloud-error`): then nothing changed and this device keeps its own ID.
+ * ID, then install it as this device's ID, unless the reconcile left this
+ * device on its own progress without agreeing with that record:
+ *
+ *   - `cloud-error`: the read failed or was aborted; nothing changed.
+ *   - `cloud-blob-rejected`: the record was read but could not be
+ *     installed (failed validation), so local progress is unchanged.
+ *   - the reconcile threw: the promise rejects before the ID write.
+ *
+ * In each case this device keeps its own ID. Adopting it would leave this
+ * device on the other device's ID with its own progress, and its next
+ * session-end push would overwrite that device's cloud record.
  *
  * Why not the web's order: the native screen aborts its request when it
  * unmounts (Done mid-restore). With the ID installed first, an aborted
- * read would leave this device on the other device's ID with its own
- * progress, and its next session-end push would overwrite that device's
- * cloud record. Read-first makes an aborted or failed restore a no-op.
- * Once the read succeeded, the install (inside the reconcile) and the ID
- * write both land, even after the screen is gone.
+ * read would hit exactly that overwrite. Read-first makes an aborted,
+ * failed or rejected restore a no-op. Once the reconcile settled on the
+ * record (installed it, pushed to it, or found it equal), the install
+ * (inside the reconcile) and the ID write both land, even after the
+ * screen is gone.
  */
 export async function adoptDeviceIdAfterRead(
   uuid: string,
   deps: AdoptDeviceIdDeps = DEFAULT_ADOPT_DEPS,
 ): Promise<ReconcileOutcome> {
   const outcome = await deps.reconcile(uuid, deps.loadLocal())
-  if (outcome.kind !== 'cloud-error') deps.writeDeviceId(uuid)
+  if (
+    outcome.kind !== 'cloud-error' &&
+    outcome.kind !== 'cloud-blob-rejected'
+  ) {
+    deps.writeDeviceId(uuid)
+  }
   return outcome
 }

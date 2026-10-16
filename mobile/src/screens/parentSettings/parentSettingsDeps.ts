@@ -52,7 +52,8 @@ export interface ParentSettingsDeps {
   pushNow: (progress: Progress, signal: AbortSignal) => Promise<PushResult>
   /**
    * Reconcile against `uuid`, then adopt it as this device's ID (unless
-   * the read failed): `adoptDeviceIdAfterRead`.
+   * the read failed or that device's copy was rejected):
+   * `adoptDeviceIdAfterRead`.
    */
   restoreFromDeviceId: (
     uuid: string,
