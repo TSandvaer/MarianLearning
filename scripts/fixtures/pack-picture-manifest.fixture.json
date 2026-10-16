@@ -1,0 +1,50 @@
+[
+  {
+    "word": "cat",
+    "tier": "short-a",
+    "batch": 1,
+    "subject": "a small orange tabby cat sitting, seen from the front, pointed ears, long curled tail",
+    "avoid": ["a dog", "a fox"],
+    "distinctFrom": ["dog", "fox"]
+  },
+  {
+    "word": "hat",
+    "tier": "short-a",
+    "batch": 1,
+    "subject": "a round blue sun hat with a wide brim all the way around",
+    "avoid": ["a baseball cap with a peak"],
+    "distinctFrom": ["cap"]
+  },
+  {
+    "word": "pig",
+    "tier": "short-i",
+    "batch": 1,
+    "subject": "a pink pig standing, seen from the side, curly tail, round snout",
+    "avoid": [],
+    "distinctFrom": []
+  },
+  {
+    "word": "sack",
+    "tier": "duck-words",
+    "batch": 1,
+    "subject": "a plump burlap sack tied shut at the top with a rope, lumpy rounded bottom, no handles",
+    "avoid": ["a bag with handles", "a pot"],
+    "distinctFrom": ["bag"]
+  },
+  {
+    "word": "bus",
+    "tier": "short-u",
+    "batch": 2,
+    "subject": "a yellow school bus seen from the side, round wheels, a row of windows",
+    "avoid": ["a van"],
+    "distinctFrom": ["van"]
+  },
+  {
+    "word": "sun",
+    "tier": "short-u",
+    "batch": 2,
+    "subject": "a bright yellow sun, a round disc with short straight rays, no face",
+    "avoid": ["a flower"],
+    "distinctFrom": []
+  }
+]
