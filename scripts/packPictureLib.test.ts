@@ -5,15 +5,18 @@
  * prompt building, spend math, the --pick mapping, CLI args, retry + pool.
  */
 import { readFileSync } from 'node:fs'
+import { APIConnectionError, APIConnectionTimeoutError, APIError } from 'openai'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  asSentence,
   backoffMs,
   budgetAllows,
   buildPrompt,
   classifyApiError,
   costFromUsage,
   estimateCallCost,
+  isBillingError,
   ledgerLine,
   parseCli,
   parseManifest,
@@ -22,6 +25,7 @@ import {
   runPool,
   selectEntries,
   sumLedger,
+  variantsOnDisk,
   withRetry,
 } from './packPictureLib.ts'
 import type { LedgerEntry, PictureManifestEntry } from './packPictureLib.ts'
@@ -39,23 +43,32 @@ const row = (
   word: 'hen',
   tier: 'short-e',
   batch: 1,
-  subject: 'a hen standing, seen from the side',
+  subject: 'A hen standing, seen from the side.',
   avoid: [],
   distinctFrom: [],
   ...over,
 })
 
-function apiError(status: number, code?: string, retryAfter?: string): Error {
-  const err = new Error(`HTTP ${status}`) as Error & {
-    status: number
-    code?: string
-    headers: Headers
-  }
-  err.status = status
-  err.code = code
-  err.headers = new Headers(retryAfter ? { 'retry-after': retryAfter } : {})
-  return err
+/** A real SDK error, built the way the SDK builds one from an HTTP response. */
+function sdkError(
+  status: number,
+  body: { type?: string; code?: string; message?: string },
+  retryAfter?: string,
+): APIError {
+  return APIError.generate(
+    status,
+    { error: { message: 'error', ...body } },
+    undefined,
+    new Headers(retryAfter ? { 'retry-after': retryAfter } : {}),
+  )
 }
+
+const CREDIT_EXHAUSTED = () =>
+  sdkError(429, {
+    type: 'insufficient_quota',
+    code: 'credit_balance_exhausted',
+    message: 'Your organization has no prepaid credits remaining.',
+  })
 
 describe('parseManifest', () => {
   it('accepts the stub fixture', () => {
@@ -73,7 +86,7 @@ describe('parseManifest', () => {
       tier: 'short-a',
       batch: 1,
       subject:
-        'a small orange tabby cat sitting, seen from the front, pointed ears, long curled tail',
+        'A small orange tabby cat sitting, seen from the front, with pointed ears and a long curled tail.',
       avoid: ['a dog', 'a fox'],
       distinctFrom: ['dog', 'fox'],
     })
@@ -144,11 +157,11 @@ describe('parseManifest', () => {
   it('ignores unknown keys, trims the subject, drops blank avoid items', () => {
     const [e] = parseManifest([
       {
-        ...row({ subject: '  a hen  ', avoid: ['a duck', '  '] }),
+        ...row({ subject: '  A hen.  ', avoid: ['a duck', '  '] }),
         notes: 'kyle',
       },
     ])
-    expect(e).toEqual(row({ subject: 'a hen', avoid: ['a duck'] }))
+    expect(e).toEqual(row({ subject: 'A hen.', avoid: ['a duck'] }))
   })
 })
 
@@ -183,28 +196,66 @@ describe('selectEntries', () => {
 })
 
 describe('buildPrompt', () => {
-  it('builds the bake-off style prompt with a transparent-background clause', () => {
-    expect(buildPrompt(row({ subject: 'a red apple' }))).toBe(
-      "Draw a red apple as a single children's picture-book illustration in exactly the same art " +
-        'style as the reference pictures: the same soft line weight, the same flat soft colours and ' +
-        'gentle cel-shading, the same simplicity and finish. The references show the style only; do ' +
-        'not copy their subjects. One subject, centred, filling about 70% of a square frame, on a ' +
-        'fully transparent background with no scenery, no shadow, no ground, no text, no border.',
+  // The real manifest's dad row (PR #579): one capitalised sentence.
+  const dad = row({
+    subject:
+      'A dad and his small daughter standing side by side, facing the viewer and holding hands.',
+    avoid: ['one man standing alone', "a mother's long hair or dress"],
+  })
+
+  it('lets a one-sentence subject stand as its own sentence', () => {
+    expect(buildPrompt(dad)).toBe(
+      'Subject: A dad and his small daughter standing side by side, facing the viewer and ' +
+        "holding hands. Draw this subject as a single children's picture-book illustration in " +
+        'exactly the same art style as the reference pictures: the same soft line weight, the same ' +
+        'flat soft colours and gentle cel-shading, the same simplicity and finish. The references ' +
+        'show the style only; do not copy their subjects. Show only the subject, with no other ' +
+        'objects, people or animals, centred and filling about 70% of a square frame, on a fully ' +
+        'transparent background. No scene, no ground, no drop shadow, no border, no text or ' +
+        "letters, and no faces on objects. Must not look like: one man standing alone; a mother's " +
+        'long hair or dress.',
     )
   })
 
-  it('does not ask for a cream background', () => {
-    expect(buildPrompt(row())).not.toMatch(/cream/i)
+  it('never splices the sentence into a noun slot', () => {
+    const p = buildPrompt(dad)
+    expect(p).not.toMatch(/\. as a/)
+    expect(p).not.toMatch(/Draw A /)
   })
 
-  it('appends the avoid list from the manifest', () => {
-    expect(buildPrompt(row({ avoid: ['a duck', 'a rooster'] }))).toMatch(
-      / no border\. Must not look like: a duck; a rooster\.$/,
+  it("carries Kyle's pack-wide rules on every prompt", () => {
+    for (const e of parseManifest(FIXTURE)) {
+      const p = buildPrompt(e)
+      expect(p).toContain('Show only the subject')
+      expect(p).toContain('No scene')
+      expect(p).toContain('no drop shadow')
+      expect(p).toContain('no text or letters')
+      expect(p).toContain('no faces on objects')
+      expect(p).not.toMatch(/cream/i)
+    }
+  })
+
+  it('turns a bare noun phrase into a sentence', () => {
+    expect(buildPrompt(row({ subject: 'a red apple' }))).toMatch(
+      /^Subject: A red apple\. Draw this subject /,
+    )
+  })
+
+  it('keeps a $ in the subject literally', () => {
+    expect(buildPrompt(row({ subject: 'A tag that says $& 5.' }))).toMatch(
+      /^Subject: A tag that says \$& 5\. Draw/,
     )
   })
 
   it('omits the avoid clause when the list is empty', () => {
     expect(buildPrompt(row({ avoid: [] }))).not.toContain('Must not look like')
+  })
+
+  it('asSentence: trims, capitalises, adds a full stop only when missing', () => {
+    expect(asSentence('  a hen  ')).toBe('A hen.')
+    expect(asSentence('A hen.')).toBe('A hen.')
+    expect(asSentence('A hen!')).toBe('A hen!')
+    expect(asSentence('')).toBe('')
   })
 })
 
@@ -346,19 +397,37 @@ describe('pick mapping', () => {
   })
 })
 
+describe('variantsOnDisk', () => {
+  it("lists one word's variant numbers in order, ignoring other files", () => {
+    const files = [
+      'cat__v2.png',
+      'cat__v10.png',
+      'cat__v1.png',
+      'catfish__v3.png',
+      'cat__v1.webp',
+      'cat__vx.png',
+      'cat__v0.png',
+      'contact-sheet.png',
+    ]
+    expect(variantsOnDisk(files, 'cat')).toEqual([1, 2, 10])
+    expect(variantsOnDisk(files, 'hat')).toEqual([])
+  })
+})
+
 describe('parseCli', () => {
-  it('defaults to 2 variants, no budget, the real manifest', () => {
+  it('defaults to 2 variants, no budget, no force, the real manifest', () => {
     expect(parseCli(['--batch', '3'])).toEqual({
       mode: 'generate',
       selection: { kind: 'batch', batch: 3 },
       variants: 2,
       dryRun: false,
       budgetUsd: undefined,
+      force: false,
       manifestPath: 'design/word-song/picture-manifest.json',
     })
   })
 
-  it('parses --words, --variants, --budget, --dry-run, --manifest', () => {
+  it('parses --words, --variants, --budget, --force, --dry-run, --manifest', () => {
     expect(
       parseCli([
         '--words',
@@ -367,6 +436,7 @@ describe('parseCli', () => {
         '3',
         '--budget',
         '2.5',
+        '--force',
         '--dry-run',
         '--manifest',
         'x.json',
@@ -377,6 +447,7 @@ describe('parseCli', () => {
       variants: 3,
       dryRun: true,
       budgetUsd: 2.5,
+      force: true,
       manifestPath: 'x.json',
     })
   })
@@ -416,19 +487,57 @@ describe('parseCli', () => {
     expect(() => parseCli(['--pick', 'hen=v1', '--variants', '2'])).toThrow(
       'do not apply to --pick',
     )
+    expect(() => parseCli(['--pick', 'hen=v1', '--force'])).toThrow(
+      'do not apply to --pick',
+    )
     expect(() => parseCli(['--batch', '1', '--quality', 'high'])).toThrow()
   })
 })
 
 describe('errors and retry', () => {
-  it('classifies API errors', () => {
-    expect(classifyApiError(apiError(429, 'insufficient_quota'))).toBe('fatal')
-    expect(classifyApiError(apiError(429, 'rate_limit_exceeded'))).toBe('retry')
-    expect(classifyApiError(apiError(500))).toBe('retry')
-    expect(classifyApiError(apiError(503))).toBe('retry')
-    expect(classifyApiError(apiError(401))).toBe('fatal')
-    expect(classifyApiError(apiError(403))).toBe('fatal')
-    expect(classifyApiError(apiError(400))).toBe('word')
+  it('stops the run when prepaid credit is exhausted (429 credit_balance_exhausted)', () => {
+    const err = CREDIT_EXHAUSTED()
+    expect(err.status).toBe(429)
+    expect(isBillingError(err)).toBe(true)
+    expect(classifyApiError(err)).toBe('fatal')
+  })
+
+  it('treats every billing / quota / spend-limit code as fatal', () => {
+    for (const body of [
+      { type: 'insufficient_quota', code: 'insufficient_quota' },
+      { type: 'insufficient_quota', code: 'something_new' },
+      { code: 'organization_spend_limit_exceeded' },
+      { code: 'project_spend_limit_exceeded' },
+      { code: 'organization_usage_limit_exceeded' },
+    ]) {
+      expect(classifyApiError(sdkError(429, body))).toBe('fatal')
+    }
+    // Any status: a billing code on a 400 still stops the run.
+    expect(
+      classifyApiError(sdkError(400, { code: 'billing_limit_reached' })),
+    ).toBe('fatal')
+  })
+
+  it('classifies the other API errors', () => {
+    expect(
+      classifyApiError(
+        sdkError(429, { type: 'requests', code: 'rate_limit_exceeded' }),
+      ),
+    ).toBe('retry')
+    expect(classifyApiError(sdkError(500, {}))).toBe('retry')
+    expect(classifyApiError(sdkError(503, {}))).toBe('retry')
+    expect(classifyApiError(sdkError(401, {}))).toBe('fatal')
+    expect(classifyApiError(sdkError(403, {}))).toBe('fatal')
+    expect(classifyApiError(sdkError(404, { code: 'model_not_found' }))).toBe(
+      'fatal',
+    )
+    expect(
+      classifyApiError(sdkError(400, { code: 'moderation_blocked' })),
+    ).toBe('word')
+    expect(classifyApiError(new APIConnectionError({ message: 'reset' }))).toBe(
+      'retry',
+    )
+    expect(classifyApiError(new APIConnectionTimeoutError())).toBe('word')
     expect(classifyApiError(new Error('ENOENT'))).toBe('word')
     expect(classifyApiError(undefined)).toBe('word')
   })
@@ -445,8 +554,10 @@ describe('errors and retry', () => {
     const sleep = vi.fn(async () => {})
     const fn = vi
       .fn<() => Promise<string>>()
-      .mockRejectedValueOnce(apiError(429, 'rate_limit_exceeded', '3'))
-      .mockRejectedValueOnce(apiError(502))
+      .mockRejectedValueOnce(
+        sdkError(429, { code: 'rate_limit_exceeded' }, '3'),
+      )
+      .mockRejectedValueOnce(sdkError(502, {}))
       .mockResolvedValueOnce('ok')
     await expect(withRetry(fn, { maxRetries: 4, sleep })).resolves.toBe('ok')
     expect(fn).toHaveBeenCalledTimes(3)
@@ -455,7 +566,7 @@ describe('errors and retry', () => {
 
   it('does not retry a 400 or an out-of-credit 429', async () => {
     const sleep = vi.fn(async () => {})
-    for (const err of [apiError(400), apiError(429, 'insufficient_quota')]) {
+    for (const err of [sdkError(400, {}), CREDIT_EXHAUSTED()]) {
       const fn = vi.fn<() => Promise<string>>().mockRejectedValue(err)
       await expect(withRetry(fn, { maxRetries: 4, sleep })).rejects.toBe(err)
       expect(fn).toHaveBeenCalledTimes(1)
@@ -465,9 +576,11 @@ describe('errors and retry', () => {
 
   it('gives up after maxRetries', async () => {
     const sleep = vi.fn(async () => {})
-    const fn = vi.fn<() => Promise<string>>().mockRejectedValue(apiError(500))
+    const fn = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValue(sdkError(500, { message: 'boom' }))
     await expect(withRetry(fn, { maxRetries: 2, sleep })).rejects.toThrow(
-      'HTTP 500',
+      '500 boom',
     )
     expect(fn).toHaveBeenCalledTimes(3)
   })

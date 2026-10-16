@@ -28,7 +28,6 @@
 
 import {
   appendFileSync,
-  copyFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -39,18 +38,21 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import OpenAI, { toFile } from 'openai'
+import sharp from 'sharp'
 import type {
   ImageEditParamsNonStreaming,
   ImagesResponse,
 } from 'openai/resources/images'
 
 import {
+  DEFAULT_VARIANTS,
   IMAGE_SIZE,
   MAX_CONCURRENCY,
   MAX_RETRIES,
   MODEL,
   PATHS,
   MEASURED,
+  PACK_PICTURE_PX,
   QUALITY,
   RATES_PER_1M,
   USAGE,
@@ -73,6 +75,7 @@ import {
   selectEntries,
   sumLedger,
   variantRelPath,
+  variantsOnDisk,
   withRetry,
 } from './packPictureLib.ts'
 import type {
@@ -100,7 +103,9 @@ export interface Deps {
 
 export interface WordResult {
   word: string
-  status: 'ok' | 'failed' | 'skipped'
+  /** `exists`: variants already on disk and no `--force`, so no call (and no
+   *  spend). `skipped`: not attempted because the run stopped. */
+  status: 'ok' | 'failed' | 'skipped' | 'exists'
   images: number
   costUsd: number
   detail?: string
@@ -178,9 +183,25 @@ function readLedgerTotal(root: string, log: (s: string) => void): number {
 
 function errorText(err: unknown): string {
   const e = err as { status?: unknown; message?: unknown }
-  const status = typeof e?.status === 'number' ? `${e.status} ` : ''
   const msg = typeof e?.message === 'string' ? e.message : String(err)
+  // SDK messages already start with the status ("429 You exceeded ...").
+  const status =
+    typeof e?.status === 'number' && !msg.startsWith(String(e.status))
+      ? `${e.status} `
+      : ''
   return `${status}${msg}`.replace(/\s+/g, ' ').slice(0, 300)
+}
+
+function listBatchDir(root: string, batch: number): string[] {
+  const dir = join(root, batchDirRel(batch))
+  return existsSync(dir) ? readdirSync(dir) : []
+}
+
+function variantRange(ks: readonly number[]): string {
+  if (ks.length === 0) return ''
+  const first = ks[0]
+  const last = ks[ks.length - 1]
+  return first === last ? `v${first}` : `v${first}-v${last}`
 }
 
 /** Highest variant index on disk for any of `words` in a batch dir. */
@@ -228,6 +249,25 @@ async function writeContactSheet(
   return rel
 }
 
+/** Ready-to-paste command for the words a stopped or partly failed run did
+ *  not finish. */
+export function rerunCommand(
+  words: string[],
+  cmd: Extract<CliCommand, { mode: 'generate' }>,
+): string {
+  const parts = [
+    'npx tsx scripts/generatePackPictures.ts',
+    `--words ${words.join(',')}`,
+  ]
+  if (cmd.variants !== DEFAULT_VARIANTS)
+    parts.push(`--variants ${cmd.variants}`)
+  if (cmd.budgetUsd !== undefined) parts.push('--budget <usd>')
+  if (cmd.manifestPath !== PATHS.manifest) {
+    parts.push(`--manifest ${cmd.manifestPath}`)
+  }
+  return parts.join(' ')
+}
+
 export async function runGenerate(
   cmd: Extract<CliCommand, { mode: 'generate' }>,
   deps: Deps,
@@ -236,10 +276,21 @@ export async function runGenerate(
   const manifest = readManifest(root, cmd.manifestPath)
   const entries = selectEntries(manifest, cmd.selection)
   const n = cmd.variants
-  const jobs = entries.map((e) => {
+  const plans = entries.map((e) => {
     const prompt = buildPrompt(e)
-    return { entry: e, prompt, estimate: estimateCallCost(n, prompt.length) }
+    const existing = variantsOnDisk(listBatchDir(root, e.batch), e.word)
+    return {
+      entry: e,
+      prompt,
+      estimate: estimateCallCost(n, prompt.length),
+      existing,
+      // Never overwrite a paid variant: new ones are numbered after them.
+      firstVariant: (existing[existing.length - 1] ?? 0) + 1,
+    }
   })
+  // Words already on disk are not generated (or paid for) again unless --force.
+  const jobs = plans.filter((p) => cmd.force || p.existing.length === 0)
+  const onDisk = plans.filter((p) => !cmd.force && p.existing.length > 0)
   const estTotal = roundUsd(jobs.reduce((s, j) => s + j.estimate.costUsd, 0))
   const missingAnchors = anchorRelPaths().filter(
     (p) => !existsSync(join(root, p)),
@@ -251,13 +302,24 @@ export async function runGenerate(
       `DRY RUN — no API call. Model ${MODEL}, ${IMAGE_SIZE}, quality ${QUALITY}, ${n} variant(s) per word.`,
     )
     log(`Manifest: ${cmd.manifestPath}`)
-    log(`Words (${jobs.length}):`)
-    for (const j of jobs) {
-      log(
-        `  ${j.entry.word.padEnd(12)} tier ${j.entry.tier.padEnd(14)} batch ${String(j.entry.batch).padEnd(3)} est ${formatUsd(j.estimate.costUsd)}`,
-      )
+    log(`Words (${plans.length}):`)
+    for (const p of plans) {
+      const head = `  ${p.entry.word.padEnd(12)} tier ${p.entry.tier.padEnd(14)} batch ${String(p.entry.batch).padEnd(3)}`
+      if (!cmd.force && p.existing.length > 0) {
+        log(`${head} skip: ${variantRange(p.existing)} on disk`)
+      } else {
+        const adds = variantRange(
+          Array.from({ length: n }, (_, i) => p.firstVariant + i),
+        )
+        log(`${head} est ${formatUsd(p.estimate.costUsd)} (writes ${adds})`)
+      }
     }
-    log(`Images: ${jobs.length} word(s) x ${n} = ${jobs.length * n}`)
+    log(
+      `Images: ${jobs.length} word(s) x ${n} = ${jobs.length * n}` +
+        (onDisk.length > 0
+          ? ` (${onDisk.length} already on disk, skipped; --force adds more)`
+          : ''),
+    )
     log(
       `Estimated cost: ${formatUsd(estTotal)} ` +
         `(per call: ${MEASURED.anchorImageInputTokens} image-in tokens @ $${RATES_PER_1M.imageInput}/1M + ~prompt/4 text-in @ $${RATES_PER_1M.textInput}/1M + ${n} x ${MEASURED.outputTokensPerImage} out @ $${RATES_PER_1M.imageOutput}/1M)`,
@@ -298,18 +360,25 @@ export async function runGenerate(
     }
   }
 
-  if (missingAnchors.length > 0) {
+  if (missingAnchors.length > 0 && jobs.length > 0) {
     throw new Error(
       `Style anchors missing:\n  ${missingAnchors.join('\n  ')}\n` +
         'They are local and gitignored (not in a fresh checkout or worktree). ' +
         `Copy anchor-hen.png, anchor-sack.png and anchor-wing.png into ${PATHS.anchorsDir}/.`,
     )
   }
-  const edit = deps.createEditor()
-  const anchors = anchorRelPaths().map((rel) => ({
-    name: rel.slice(rel.lastIndexOf('/') + 1),
-    bytes: readFileSync(join(root, rel)),
-  }))
+  // Nothing to call (every word already on disk): no key or anchors needed.
+  const edit: EditImages =
+    jobs.length > 0
+      ? deps.createEditor()
+      : () => Promise.reject(new Error('no calls in this run'))
+  const anchors =
+    jobs.length > 0
+      ? anchorRelPaths().map((rel) => ({
+          name: rel.slice(rel.lastIndexOf('/') + 1),
+          bytes: readFileSync(join(root, rel)),
+        }))
+      : []
 
   const runId = randomUUID()
   const ledgerPath = join(root, PATHS.ledger)
@@ -319,16 +388,29 @@ export async function runGenerate(
   let reserved = 0
   let stoppedBy: GenerateSummary['stoppedBy'] = null
   const results = new Map<string, WordResult>()
+  for (const p of onDisk) {
+    results.set(p.entry.word, {
+      word: p.entry.word,
+      status: 'exists',
+      images: 0,
+      costUsd: 0,
+      detail: `${variantRange(p.existing)} on disk (--force adds more)`,
+    })
+  }
 
   log(
     `Generating ${jobs.length} word(s) x ${n} with ${MODEL} (max ${MAX_CONCURRENCY} concurrent). ` +
+      (onDisk.length > 0
+        ? `${onDisk.length} word(s) already on disk, skipped. `
+        : '') +
       `Estimate ${formatUsd(estTotal)}; ledger so far ${formatUsd(ledgerTotal)}` +
       (cmd.budgetUsd !== undefined
         ? `; budget ${formatUsd(cmd.budgetUsd)}.`
         : '.'),
   )
 
-  await runPool(jobs, MAX_CONCURRENCY, async ({ entry, prompt, estimate }) => {
+  await runPool(jobs, MAX_CONCURRENCY, async (job) => {
+    const { entry, prompt, estimate, firstVariant } = job
     const { word, batch } = entry
     if (stoppedBy !== null) {
       results.set(word, {
@@ -432,7 +514,7 @@ export async function runGenerate(
       (d) => typeof d.b64_json === 'string',
     )
     images.forEach((d, i) => {
-      const rel = variantRelPath(batch, word, i + 1)
+      const rel = variantRelPath(batch, word, firstVariant + i)
       mkdirSync(join(root, dirname(rel)), { recursive: true })
       writeFileSync(
         join(root, rel),
@@ -440,8 +522,9 @@ export async function runGenerate(
       )
     })
     const short = images.length < n ? ` (asked for ${n})` : ''
+    const written = variantRange(images.map((_, i) => firstVariant + i))
     log(
-      `ok   ${word.padEnd(12)} ${images.length} image(s)${short}  ${formatUsd(cost.costUsd)}${usageMissing ? ' (no usage in response; estimate recorded)' : ''}`,
+      `ok   ${word.padEnd(12)} ${images.length} image(s) ${written}${short}  ${formatUsd(cost.costUsd)}${usageMissing ? ' (no usage in response; estimate recorded)' : ''}`,
     )
     results.set(word, {
       word,
@@ -452,7 +535,7 @@ export async function runGenerate(
     })
   })
 
-  const ordered = jobs.map(
+  const ordered = plans.map(
     ({ entry }) =>
       results.get(entry.word) ?? {
         word: entry.word,
@@ -475,14 +558,25 @@ export async function runGenerate(
       `  ${r.status.padEnd(7)} ${r.word.padEnd(12)} ${String(r.images).padStart(2)} img  ${formatUsd(r.costUsd)}${r.detail ? `  ${r.detail}` : ''}`,
     )
   }
-  const failed = ordered.filter((r) => r.status === 'failed').length
-  const skipped = ordered.filter((r) => r.status === 'skipped').length
+  const count = (s: WordResult['status']) =>
+    ordered.filter((r) => r.status === s).length
+  const failed = count('failed')
+  const skipped = count('skipped')
+  const existed = count('exists')
   log(
-    `Batch total: ${formatUsd(runSpent)} for ${ordered.length - failed - skipped}/${ordered.length} word(s)` +
-      `${failed ? `, ${failed} failed` : ''}${skipped ? `, ${skipped} skipped` : ''}.`,
+    `Batch total: ${formatUsd(runSpent)} for ${count('ok')}/${ordered.length} word(s)` +
+      `${failed ? `, ${failed} failed` : ''}${skipped ? `, ${skipped} skipped` : ''}` +
+      `${existed ? `, ${existed} already on disk` : ''}.`,
   )
   log(`Spend ledger total: ${formatUsd(ledgerAfter)} (${PATHS.ledger})`)
   for (const s of sheets) log(`Contact sheet: ${s}`)
+  const rest = ordered
+    .filter((r) => r.status === 'failed' || r.status === 'skipped')
+    .map((r) => r.word)
+  if (rest.length > 0) {
+    log('To generate the rest (only these words are called and paid for):')
+    log(`  ${rerunCommand(rest, cmd)}`)
+  }
 
   return {
     results: ordered,
@@ -493,10 +587,16 @@ export async function runGenerate(
   }
 }
 
-export function runPick(
+/**
+ * Writes the chosen variants into the embed pipeline at the pack's size:
+ * 1024x1024 → 500x500 transparent PNG (PACK_PICTURE_PX). Every pick is
+ * decoded and resized in memory first, so one bad file means nothing is
+ * written.
+ */
+export async function runPick(
   cmd: Extract<CliCommand, { mode: 'pick' }>,
   deps: Pick<Deps, 'root' | 'log'>,
-): { copied: number } {
+): Promise<{ copied: number }> {
   const { root, log } = deps
   const manifest = readManifest(root, cmd.manifestPath)
   const plan = planPicks(cmd.picks, manifest)
@@ -506,13 +606,34 @@ export function runPick(
       `Picked variant(s) not on disk (nothing copied):\n  ${missing.map((c) => c.src).join('\n  ')}`,
     )
   }
-  for (const c of plan) {
-    log(`${cmd.dryRun ? 'would copy' : 'copy'} ${c.src} → ${c.dest}`)
+  const px = PACK_PICTURE_PX
+  const resized = await Promise.all(
+    plan.map(async (c) => {
+      try {
+        return await sharp(join(root, c.src))
+          .resize(px, px, {
+            fit: 'contain',
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
+          })
+          .ensureAlpha()
+          .png()
+          .toBuffer()
+      } catch (err) {
+        throw new Error(
+          `Could not read ${c.src} (nothing copied): ${(err as Error).message}`,
+        )
+      }
+    }),
+  )
+  plan.forEach((c, i) => {
+    log(
+      `${cmd.dryRun ? 'would write' : 'write'} ${c.src} → ${c.dest} (${px}x${px})`,
+    )
     if (!cmd.dryRun) {
       mkdirSync(join(root, dirname(c.dest)), { recursive: true })
-      copyFileSync(join(root, c.src), join(root, c.dest))
+      writeFileSync(join(root, c.dest), resized[i])
     }
-  }
+  })
   const tiers = [...new Set(plan.map((c) => dirname(c.dest)))]
   log('')
   log('Next, per tier:')
@@ -539,11 +660,14 @@ async function main(): Promise<void> {
   }
   try {
     if (cmd.mode === 'pick') {
-      runPick(cmd, deps)
+      await runPick(cmd, deps)
       return
     }
     const summary = await runGenerate(cmd, deps)
-    if (summary.results.some((r) => r.status !== 'ok')) process.exitCode = 1
+    const unfinished = summary.results.some(
+      (r) => r.status === 'failed' || r.status === 'skipped',
+    )
+    if (unfinished) process.exitCode = 1
   } catch (err) {
     console.error(`ERROR: ${(err as Error).message}`)
     process.exit(1)

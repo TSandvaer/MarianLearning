@@ -2,8 +2,8 @@
  * @vitest-environment node
  *
  * generatePackPictures end to end against a temp repo root and a mocked
- * images.edit: files, ledger, budget stop, failure handling, contact sheet,
- * --pick. No network, no key.
+ * images.edit: files, ledger, budget stop, failure handling, skip-existing,
+ * contact sheet, --pick. No network, no key.
  */
 import {
   existsSync,
@@ -15,6 +15,8 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { APIError } from 'openai'
+import type { ImagesResponse } from 'openai/resources/images'
 import sharp from 'sharp'
 import {
   afterEach,
@@ -25,7 +27,6 @@ import {
   it,
   vi,
 } from 'vitest'
-import type { ImagesResponse } from 'openai/resources/images'
 
 import { runGenerate, runPick } from './generatePackPictures.ts'
 import type { Deps, EditImages } from './generatePackPictures.ts'
@@ -85,10 +86,10 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true })
 })
 
-function okResponse(n: number): ImagesResponse {
+function okResponse(n: number, b64 = pngB64): ImagesResponse {
   return {
     created: 0,
-    data: Array.from({ length: n }, () => ({ b64_json: pngB64 })),
+    data: Array.from({ length: n }, () => ({ b64_json: b64 })),
     usage: {
       input_tokens: 3150,
       input_tokens_details: { image_tokens: 3072, text_tokens: 78 },
@@ -124,6 +125,9 @@ function ledgerLines(): Record<string, unknown>[] {
     .split('\n')
     .map((l) => JSON.parse(l) as Record<string, unknown>)
 }
+
+const variant = (batch: number, file: string) =>
+  join(root, PATHS.outRoot, `batch-${batch}`, file)
 
 describe('runGenerate', () => {
   it('dry run: no editor, prints words, image count and estimate', async () => {
@@ -175,7 +179,9 @@ describe('runGenerate', () => {
       n: 2,
     })
     expect(Array.isArray(p.image) && p.image.length).toBe(3)
-    expect(p.prompt).toContain('Draw a small orange tabby cat')
+    expect(p.prompt).toMatch(
+      /^Subject: A small orange tabby cat sitting, .* curled tail\. Draw this subject /,
+    )
     expect(p.prompt).toContain('Must not look like: a dog; a fox.')
 
     expect(s.results.map((r) => [r.word, r.status, r.images])).toEqual([
@@ -186,12 +192,8 @@ describe('runGenerate', () => {
       ['bus', 'ok', 2],
       ['sun', 'ok', 2],
     ])
-    expect(existsSync(join(root, PATHS.outRoot, 'batch-1/cat__v1.png'))).toBe(
-      true,
-    )
-    expect(existsSync(join(root, PATHS.outRoot, 'batch-2/sun__v2.png'))).toBe(
-      true,
-    )
+    expect(existsSync(variant(1, 'cat__v1.png'))).toBe(true)
+    expect(existsSync(variant(2, 'sun__v2.png'))).toBe(true)
 
     const ledger = ledgerLines()
     expect(ledger).toHaveLength(6)
@@ -229,7 +231,7 @@ describe('runGenerate', () => {
       `${JSON.stringify({ costUsd: 1 })}\n`,
     )
     const edit = vi.fn<EditImages>(async (params) => okResponse(params.n ?? 1))
-    // Each call estimates ~$0.0516: $1 spent + 2 calls fit under $1.12, a 3rd does not.
+    // Each call estimates ~$0.052: $1 spent + 2 calls fit under $1.12, a 3rd does not.
     const s = await runGenerate(
       gen(['--batch', '1', '--budget', '1.12']),
       deps(edit),
@@ -242,7 +244,11 @@ describe('runGenerate', () => {
       'skipped',
       'skipped',
     ])
-    expect(logs.join('\n')).toMatch(/STOP budget/)
+    const out = logs.join('\n')
+    expect(out).toMatch(/STOP budget/)
+    expect(out).toContain(
+      `  npx tsx scripts/generatePackPictures.ts --words pig,sack --budget <usd> --manifest ${FIXTURE}`,
+    )
   })
 
   it('carries on past one word failing and reports it', async () => {
@@ -264,6 +270,7 @@ describe('runGenerate', () => {
     expect(s.results[2].detail).toBe('400 Your request was rejected')
     expect(ledgerLines()).toHaveLength(3)
     expect(s.stoppedBy).toBeNull()
+    expect(logs.join('\n')).toContain(`--words pig --manifest ${FIXTURE}`)
   })
 
   it('retries a 429 and succeeds', async () => {
@@ -280,28 +287,35 @@ describe('runGenerate', () => {
     expect(logs.join('\n')).toContain('retry cat 1/4')
   })
 
-  it('stops the run when credit runs out (429 insufficient_quota)', async () => {
+  it('stops the run, without retrying, when prepaid credit runs out', async () => {
+    const sleep = vi.fn(async () => {})
     const edit = vi.fn<EditImages>(async () => {
-      throw Object.assign(new Error('You exceeded your current quota'), {
-        status: 429,
-        code: 'insufficient_quota',
-      })
+      throw APIError.generate(
+        429,
+        {
+          error: {
+            type: 'insufficient_quota',
+            code: 'credit_balance_exhausted',
+            message: 'Your organization has no prepaid credits remaining.',
+          },
+        },
+        undefined,
+        new Headers(),
+      )
     })
-    const s = await runGenerate(
-      gen(['--words', 'cat,hat,pig,sack,bus,sun']),
-      deps(edit),
-    )
-    expect(edit).toHaveBeenCalledTimes(4) // the first 4 were already in flight
+    const d = { ...deps(edit), sleep }
+    const s = await runGenerate(gen(['--words', 'cat,hat,pig,sack,bus,sun']), d)
+    expect(edit.mock.calls.length).toBeLessThanOrEqual(4) // only the ones already in flight
+    expect(sleep).not.toHaveBeenCalled()
     expect(s.stoppedBy).toBe('fatal')
-    expect(s.results.map((r) => r.status)).toEqual([
-      'failed',
-      'failed',
-      'failed',
-      'failed',
+    expect(s.results.slice(4).map((r) => r.status)).toEqual([
       'skipped',
       'skipped',
     ])
     expect(ledgerLines()).toHaveLength(0)
+    expect(logs.join('\n')).toContain(
+      'FAIL cat: 429 Your organization has no prepaid credits remaining. (stopping the run)',
+    )
   })
 
   it('records the estimate when a response carries no usage', async () => {
@@ -325,6 +339,69 @@ describe('runGenerate', () => {
   })
 })
 
+describe('re-runs never overwrite or re-pay', () => {
+  it('skips a word whose variants are on disk', async () => {
+    const edit = vi.fn<EditImages>(async (params) => okResponse(params.n ?? 1))
+    await runGenerate(gen(['--words', 'cat']), deps(edit))
+    const before = readFileSync(variant(1, 'cat__v1.png'))
+
+    logs = []
+    const s = await runGenerate(gen(['--batch', '1']), deps(edit))
+    // cat is skipped; only hat, pig, sack are called.
+    expect(edit).toHaveBeenCalledTimes(4)
+    expect(s.results.map((r) => [r.word, r.status])).toEqual([
+      ['cat', 'exists'],
+      ['hat', 'ok'],
+      ['pig', 'ok'],
+      ['sack', 'ok'],
+    ])
+    expect(ledgerLines()).toHaveLength(4)
+    expect(readFileSync(variant(1, 'cat__v1.png'))).toEqual(before)
+    expect(logs.join('\n')).toContain('1 already on disk')
+  })
+
+  it('dry run lists on-disk words as skipped and leaves them out of the cost', async () => {
+    const edit = vi.fn<EditImages>(async (params) => okResponse(params.n ?? 1))
+    await runGenerate(gen(['--words', 'cat']), deps(edit))
+    logs = []
+    await runGenerate(gen(['--batch', '1', '--dry-run']), deps(edit))
+    const out = logs.join('\n')
+    expect(out).toMatch(/cat .* skip: v1-v2 on disk/)
+    expect(out).toContain(
+      'Images: 3 word(s) x 2 = 6 (1 already on disk, skipped; --force adds more)',
+    )
+  })
+
+  it('--force adds v3, v4 after the existing variants without touching them', async () => {
+    const other = await sharp({
+      create: {
+        width: 8,
+        height: 8,
+        channels: 4,
+        background: { r: 0, g: 200, b: 0, alpha: 1 },
+      },
+    })
+      .png()
+      .toBuffer()
+    const edit = vi.fn<EditImages>(async (params) => okResponse(params.n ?? 1))
+    await runGenerate(gen(['--words', 'cat']), deps(edit))
+    const v1 = readFileSync(variant(1, 'cat__v1.png'))
+
+    const edit2 = vi.fn<EditImages>(async (params) =>
+      okResponse(params.n ?? 1, other.toString('base64')),
+    )
+    const s = await runGenerate(gen(['--words', 'cat', '--force']), deps(edit2))
+    expect(edit2).toHaveBeenCalledTimes(1)
+    expect(s.results[0]).toMatchObject({ status: 'ok', images: 2 })
+    expect(readFileSync(variant(1, 'cat__v1.png'))).toEqual(v1)
+    expect(readFileSync(variant(1, 'cat__v3.png'))).toEqual(other)
+    expect(existsSync(variant(1, 'cat__v4.png'))).toBe(true)
+    // The sheet grows to show all four.
+    const meta = await sharp(join(root, s.sheets[0])).metadata()
+    expect(meta.width).toBe(16 + 240 + 5 * (256 + 16))
+  })
+})
+
 describe('runPick', () => {
   function pick(
     arg: string,
@@ -341,40 +418,50 @@ describe('runPick', () => {
     return cmd
   }
 
-  beforeEach(() => {
-    const dir = join(root, PATHS.outRoot, 'batch-1')
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(join(dir, 'cat__v2.png'), 'cat-v2')
-    writeFileSync(join(dir, 'sack__v1.png'), 'sack-v1')
+  // Generator-sized source: 1024x1024 with real alpha.
+  beforeEach(async () => {
+    mkdirSync(join(root, PATHS.outRoot, 'batch-1'), { recursive: true })
+    for (const f of ['cat__v2.png', 'sack__v1.png']) {
+      await sharp({
+        create: {
+          width: 1024,
+          height: 1024,
+          channels: 4,
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+        },
+      })
+        .png()
+        .toFile(variant(1, f))
+    }
   })
 
-  it('copies picks into transparent-<tier>/picture-<word>.png', () => {
-    const r = runPick(pick('cat=v2,sack=v1'), {
+  it('writes picks at the pack size (500x500, alpha) into transparent-<tier>/', async () => {
+    const r = await runPick(pick('cat=v2,sack=v1'), {
       root,
       log: (l) => logs.push(l),
     })
     expect(r.copied).toBe(2)
-    expect(
-      readFileSync(
-        join(root, PATHS.packRoot, 'transparent-short-a/picture-cat.png'),
-        'utf8',
-      ),
-    ).toBe('cat-v2')
-    expect(
-      readFileSync(
-        join(root, PATHS.packRoot, 'transparent-duck-words/picture-sack.png'),
-        'utf8',
-      ),
-    ).toBe('sack-v1')
+    for (const dest of [
+      'transparent-short-a/picture-cat.png',
+      'transparent-duck-words/picture-sack.png',
+    ]) {
+      const meta = await sharp(join(root, PATHS.packRoot, dest)).metadata()
+      expect([meta.width, meta.height, meta.format, meta.hasAlpha]).toEqual([
+        500,
+        500,
+        'png',
+        true,
+      ])
+    }
     expect(logs).toContain(
       '  yarn embed-pictures design/references/picture-pack/transparent-short-a public/assets/pictures',
     )
   })
 
-  it('copies nothing when any picked variant is missing', () => {
-    expect(() =>
+  it('copies nothing when any picked variant is missing', async () => {
+    await expect(
       runPick(pick('cat=v2,hat=v1'), { root, log: () => {} }),
-    ).toThrow(
+    ).rejects.toThrow(
       /not on disk \(nothing copied\):\n {2}design\/references\/picture-pack\/openai\/batch-1\/hat__v1\.png/,
     )
     expect(
@@ -384,11 +471,26 @@ describe('runPick', () => {
     ).toBe(false)
   })
 
-  it('dry run prints the plan and copies nothing', () => {
-    const r = runPick(pick('cat=v2', true), { root, log: (l) => logs.push(l) })
+  it('copies nothing when any picked variant is unreadable', async () => {
+    writeFileSync(variant(1, 'sack__v1.png'), 'not a png')
+    await expect(
+      runPick(pick('cat=v2,sack=v1'), { root, log: () => {} }),
+    ).rejects.toThrow(/Could not read .*sack__v1\.png \(nothing copied\)/)
+    expect(
+      existsSync(
+        join(root, PATHS.packRoot, 'transparent-short-a/picture-cat.png'),
+      ),
+    ).toBe(false)
+  })
+
+  it('dry run prints the plan and writes nothing', async () => {
+    const r = await runPick(pick('cat=v2', true), {
+      root,
+      log: (l) => logs.push(l),
+    })
     expect(r.copied).toBe(0)
     expect(logs[0]).toBe(
-      'would copy design/references/picture-pack/openai/batch-1/cat__v2.png → design/references/picture-pack/transparent-short-a/picture-cat.png',
+      'would write design/references/picture-pack/openai/batch-1/cat__v2.png → design/references/picture-pack/transparent-short-a/picture-cat.png (500x500)',
     )
     expect(existsSync(join(root, PATHS.packRoot, 'transparent-short-a'))).toBe(
       false,

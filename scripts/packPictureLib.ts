@@ -9,6 +9,7 @@
  */
 
 import { parseArgs } from 'node:util'
+import { APIConnectionError, APIConnectionTimeoutError } from 'openai'
 
 // ── Fixed call shape (proven in the 2026-10-16 bake-off) ────────────────────
 
@@ -56,6 +57,26 @@ export function currentPictureRelPath(word: string): string {
 /** Destination the existing embed pipeline reads (scripts/embed-pictures.ts). */
 export function pickDestRelPath(tier: string, word: string): string {
   return `${PATHS.packRoot}/transparent-${tier}/picture-${word}.png`
+}
+
+/** Pack picture size: every shipped pack PNG-in-SVG embeds a 500x500 PNG,
+ *  and neither embed-pictures.ts nor mobile's export-assets.mjs resizes. */
+export const PACK_PICTURE_PX = 500
+
+/** Variant indices already on disk for `word`, ascending, from a listing of
+ *  its batch dir. */
+export function variantsOnDisk(
+  fileNames: readonly string[],
+  word: string,
+): number[] {
+  const prefix = `${word}__v`
+  return fileNames
+    .filter((f) => f.startsWith(prefix) && f.endsWith('.png'))
+    .map((f) => f.slice(prefix.length, -'.png'.length))
+    .filter((k) => /^\d+$/.test(k))
+    .map(Number)
+    .filter((k) => k >= 1)
+    .sort((a, b) => a - b)
 }
 
 // ── Manifest ────────────────────────────────────────────────────────────────
@@ -191,26 +212,49 @@ export function selectEntries(
 // ── Prompt ──────────────────────────────────────────────────────────────────
 
 /**
- * Bake-off STYLE prompt, with the background clause adapted for
- * `background: "transparent"` (the bake-off asked for a cream background and
- * still got real alpha; asking for transparency directly removes the
- * contradiction).
+ * The bake-off STYLE prompt, restructured so the manifest's one-sentence
+ * `subject` stands as its own sentence ("Subject: … Draw this subject …").
  */
-export const STYLE_TEMPLATE =
-  "Draw {subject} as a single children's picture-book illustration in exactly the same art style " +
-  'as the reference pictures: the same soft line weight, the same flat soft colours and gentle ' +
-  'cel-shading, the same simplicity and finish. The references show the style only; do not copy ' +
-  'their subjects. One subject, centred, filling about 70% of a square frame, on a fully ' +
-  'transparent background with no scenery, no shadow, no ground, no text, no border.'
+export const STYLE_INSTRUCTION =
+  "Draw this subject as a single children's picture-book illustration in exactly the same art " +
+  'style as the reference pictures: the same soft line weight, the same flat soft colours and ' +
+  'gentle cel-shading, the same simplicity and finish. The references show the style only; do ' +
+  'not copy their subjects.'
+
+/**
+ * Pack-wide rules every prompt carries (picture-manifest.md § "Assumed in the
+ * script, not repeated per word", from picture-pack-style-anchor.md § 3.7):
+ * one subject, no scene, no text or letters, no faces on objects, no drop
+ * shadow. The background is transparent (`background: "transparent"`), not
+ * the bake-off's cream. "One subject" is phrased as "only the subject" so a
+ * two-figure subject (dad) isn't read as "draw one person".
+ */
+export const PACK_RULES =
+  'Show only the subject, with no other objects, people or animals, centred and filling about ' +
+  '70% of a square frame, on a fully transparent background. No scene, no ground, no drop ' +
+  'shadow, no border, no text or letters, and no faces on objects.'
+
+/** Trims, capitalises the first letter and ends with a full stop if the text
+ *  has no closing punctuation. The manifest contract is one sentence; a bare
+ *  noun phrase works too. */
+export function asSentence(text: string): string {
+  const t = text.trim()
+  if (t === '') return t
+  const capped = `${t.charAt(0).toUpperCase()}${t.slice(1)}`
+  return /[.!?]$/.test(capped) ? capped : `${capped}.`
+}
 
 export function buildPrompt(
   entry: Pick<PictureManifestEntry, 'subject' | 'avoid'>,
 ): string {
-  const base = STYLE_TEMPLATE.replace('{subject}', entry.subject.trim())
+  const parts = [
+    `Subject: ${asSentence(entry.subject)}`,
+    STYLE_INSTRUCTION,
+    PACK_RULES,
+  ]
   const avoid = entry.avoid.map((s) => s.trim()).filter(Boolean)
-  return avoid.length > 0
-    ? `${base} Must not look like: ${avoid.join('; ')}.`
-    : base
+  if (avoid.length > 0) parts.push(`Must not look like: ${avoid.join('; ')}.`)
+  return parts.join(' ')
 }
 
 // ── Spend ───────────────────────────────────────────────────────────────────
@@ -429,6 +473,10 @@ export type CliCommand =
       variants: number
       dryRun: boolean
       budgetUsd: number | undefined
+      /** Generate again for words that already have variants on disk (new
+       *  variants are numbered after the existing ones; nothing is
+       *  overwritten). */
+      force: boolean
       manifestPath: string
     }
   | {
@@ -439,10 +487,12 @@ export type CliCommand =
     }
 
 export const USAGE = `Usage:
-  npx tsx scripts/generatePackPictures.ts --batch N [--variants 2] [--budget USD] [--dry-run]
-  npx tsx scripts/generatePackPictures.ts --words a,b [--variants 2] [--budget USD] [--dry-run]
+  npx tsx scripts/generatePackPictures.ts --batch N [--variants 2] [--budget USD] [--force] [--dry-run]
+  npx tsx scripts/generatePackPictures.ts --words a,b [--variants 2] [--budget USD] [--force] [--dry-run]
   npx tsx scripts/generatePackPictures.ts --pick word=v2,word=v1 [--dry-run]
 Options:
+  --force           also generate words that already have variants on disk
+                    (adds v3, v4, ...; never overwrites)
   --manifest PATH   manifest JSON (default ${PATHS.manifest})`
 
 export function parseCli(argv: string[]): CliCommand {
@@ -455,6 +505,7 @@ export function parseCli(argv: string[]): CliCommand {
       words: { type: 'string' },
       variants: { type: 'string' },
       'dry-run': { type: 'boolean', default: false },
+      force: { type: 'boolean', default: false },
       budget: { type: 'string' },
       pick: { type: 'string' },
       manifest: { type: 'string' },
@@ -470,8 +521,14 @@ export function parseCli(argv: string[]): CliCommand {
   }
 
   if (values.pick !== undefined) {
-    if (values.variants !== undefined || values.budget !== undefined) {
-      throw new Error('--variants and --budget do not apply to --pick.')
+    if (
+      values.variants !== undefined ||
+      values.budget !== undefined ||
+      values.force === true
+    ) {
+      throw new Error(
+        '--variants, --budget and --force do not apply to --pick.',
+      )
     }
     return {
       mode: 'pick',
@@ -526,24 +583,53 @@ export function parseCli(argv: string[]): CliCommand {
     variants,
     dryRun,
     budgetUsd,
+    force: values.force === true,
     manifestPath,
   }
 }
 
 // ── Errors, retry, pool ─────────────────────────────────────────────────────
 
-/** `retry`: transient (429 rate limit, 5xx). `fatal`: every later call would
- *  fail too (bad key, no access, out of credit), so stop the run. `word`:
- *  this word failed (e.g. a 400 on its prompt); carry on with the rest. */
+/** `retry`: transient (429 rate limit, 5xx, dropped connection). `fatal`:
+ *  every later call would fail too (out of credit or over a spend limit, bad
+ *  key, no access, unknown model), so stop the run. `word`: this word failed
+ *  (e.g. a 400 on its prompt); carry on with the rest. */
 export type ErrorClass = 'retry' | 'fatal' | 'word'
 
+/** Billing codes from OpenAI's error-codes guide ("API errors"): a 429 whose
+ *  `type` may be `insufficient_quota` while `code` names the cause. */
+export const BILLING_ERROR_CODES: ReadonlySet<string> = new Set([
+  'insufficient_quota',
+  'credit_balance_exhausted',
+  'organization_spend_limit_exceeded',
+  'project_spend_limit_exceeded',
+  'organization_usage_limit_exceeded',
+])
+
+/** True for any billing / credit / quota error, whatever the HTTP status:
+ *  a listed code or type, or any code or type that mentions billing, quota,
+ *  credit or a spend / usage limit. */
+export function isBillingError(err: unknown): boolean {
+  const e = (err ?? {}) as { code?: unknown; type?: unknown }
+  return [e.code, e.type].some(
+    (v) =>
+      typeof v === 'string' &&
+      (BILLING_ERROR_CODES.has(v) ||
+        /billing|quota|credit|spend_limit|usage_limit/i.test(v)),
+  )
+}
+
 export function classifyApiError(err: unknown): ErrorClass {
-  const e = (err ?? {}) as { status?: unknown; code?: unknown }
+  // A timeout may have completed (and billed) server-side: don't pay twice.
+  if (err instanceof APIConnectionTimeoutError) return 'word'
+  // The request never landed (Wi-Fi blip): safe to retry.
+  if (err instanceof APIConnectionError) return 'retry'
+  if (isBillingError(err)) return 'fatal'
+  const e = (err ?? {}) as { status?: unknown }
   const status = typeof e.status === 'number' ? e.status : undefined
-  if (status === 429 && e.code === 'insufficient_quota') return 'fatal'
   if (status === 429) return 'retry'
   if (status !== undefined && status >= 500) return 'retry'
-  if (status === 401 || status === 403) return 'fatal'
+  if (status === 401 || status === 403 || status === 404) return 'fatal'
   return 'word'
 }
 
