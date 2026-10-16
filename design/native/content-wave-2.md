@@ -227,3 +227,104 @@ The deal is one rule: **flower k** (k = 0 … T−1) leaves the **last** occupie
 - **One idea per step.** _each_ is a new word for her (§ 6.3). One question shape lets the word settle before the reverse question uses it.
 - **Dave's roadmap marks it "Later"** (§ 2, step 13).
 - **Proposed home:** a deepening inside sharing once she has mastered it, as missing numbers deepened adding. It would come in a later wave, with its own spec and Dave's check (D1).
+
+## 3. WS-C: tent words (`tent-words`, end blends)
+
+### 3.1 The step
+
+- **SkillNode `tent-words`**, after `crab-words` in `LITERACY_TREE` and `WORD_SONG_NODES_IN_ORDER`. Default `'locked'`.
+- **Format:** `cvc-word` as it is: "Read the tent.", the word card with its letter row, three picture chips, the 1500 ms silent beat, the chip gate, the hint and the given answer. All as duck and crab words.
+- **8 words**, served from canon in this order every session (K9). Short vowels only, and every word keeps its short vowel in British English too (Lily's voice). Mastery, fast track, pace guard and peek follow the sibling rules. No graduation gate.
+- **No blend clip** (wave 1's K11). The letters pulse silently, and the 2nd wrong plays "Let's look. Tent.".
+- **Every word takes "Yes! That's a <word>."**, so the celebration exception list doesn't grow.
+
+### 3.2 Word list and chip pairs (canon order)
+
+P1–P3 use the gentle pair and P4–P8 the trap pair. Every row needs both, because a review moves blocks.
+
+| P   | Word | End | Vowel | Category  | Gentle (P1–P3) | Trap (P4–P8) | Why the trap                                                                       |
+| --- | ---- | --- | ----- | --------- | -------------- | ------------ | ---------------------------------------------------------------------------------- |
+| 1   | tent | nt  | e     | structure | dog, cup       | nest, tap    | nest: the same vowel and last letter, so the middle decides; tap: t                |
+| 2   | hand | nd  | a     | body-part | bus, pot       | hat, pond    | hat: the same start _ha_; pond: the same ending _nd_                               |
+| 3   | gift | ft  | i     | object    | sun, pot       | gem, fig     | gem: g; fig: the letters f, i, g in another order                                  |
+| 4   | nest | st  | e     | structure | cup, fox       | net, tent    | **net: nest without the s** (Dave's twin); tent: same vowel and end t              |
+| 5   | desk | sk  | e     | household | sun, cat       | duck, nest   | duck: the same first and last sound; nest: s and one more, the last letter decides |
+| 6   | belt | lt  | e     | clothing  | sun, fox       | bed, tent    | bed: the same start _be_; tent: same vowel and end t                               |
+| 7   | lamp | mp  | a     | household | bus, dog       | lock, hand   | lock: l and four letters; hand: the same vowel and four letters                    |
+| 8   | pond | nd  | o     | nature    | cup, hen       | pot, hand    | pot: the same start _po_; hand: the same ending _nd_                               |
+
+- **These are 8 of Dave's 10 words.**
+  - Dropped: _jump_ (a verb: "Yes! That's a jump." breaks) and _milk_ ("Yes! That's a milk." breaks, and an exception would grow the celebration list).
+  - Also checked and kept out: _mask_ and _raft_ have a long vowel in British English (the _bath_ vowel).
+- **Dave's twins:** _nest / net_ is the only one with a picture. _had_, _bet_ and _ten_ have none (`ls mobile/assets/pictures`, 2026-10-16: 73 files, no _ten_; the roadmap said _ten_ had one). Where the twin is missing, the trap has the same start and a short vowel (hand / hat, belt / bed, pond / pot), so she has to read past the vowel to the end. That is this step's new skill.
+- **Gentle pairs** follow the CVC rule: another category, another first sound, another vowel.
+- **New category:** `'nature'` (pond, and pine in § 4) joins `WordCategory`, because no existing one fits a pond or a tree.
+
+### 3.3 Intro lead
+
+"Read to the end!" plays before P1's silent beat, in every forward session on the step until it is mastered (§ 6.1).
+
+- While Emma says it, the cells light one after another from the left, 150 ms apart (each a 120 ms fade in). This is crab words' animation.
+- When the last cell has lit, the last two cells (n t) pulse once, 1 → 1.08 → 1 over 300 ms.
+- All cells go dark 200 ms after the line ends. [Reduce Motion: they light at once, with no pulse.]
+
+**Why:** children this age often drop a consonant of an end cluster (R4), so "to the end" names where to look. It costs one new word, _end_ (§ 6.3).
+
+## 4. WS-D: cake words (`cake-words`, magic e)
+
+### 4.1 The step
+
+- **SkillNode `cake-words`**, after `tent-words`. Default `'locked'`. Format, mastery, fast track and peek as § 3.1.
+- **8 words**, all CVCe (consonant, vowel, consonant, e). The vowel says its name, and in British English _tube_ says "u" as its name too.
+- **No blend clip.** The 2nd wrong plays "Let's look. Cake." with the quiet-E cue (§ 4.3).
+
+### 4.2 Word list and chip pairs (canon order)
+
+| P   | Word | Pattern | Category | Gentle (P1–P3) | Trap (P4–P8) | Why the trap                                                              |
+| --- | ---- | ------- | -------- | -------------- | ------------ | ------------------------------------------------------------------------- |
+| 1   | cake | a_e     | food     | dog, pen       | cape, cat    | cape: the same start and pattern, the 3rd letter decides; cat: short _ca_ |
+| 2   | kite | i_e     | object   | sun, hen       | king, bike   | king: the same start _ki_, short; bike: the same i_e                      |
+| 3   | bone | o_e     | object   | jet, sun       | box, rope    | box: the same start _bo_, short; rope: the same o_e                       |
+| 4   | cape | a_e     | clothing | dog, bus       | cap, cake    | **cap: cape without the e** (Dave's twin); cake: same start and pattern   |
+| 5   | pine | i_e     | nature   | dog, cup       | pin, kite    | **pin: pine without the e**; kite: the same i_e                           |
+| 6   | rope | o_e     | object   | hen, sun       | rock, bone   | rock: the same start _ro_, short; bone: the same o_e                      |
+| 7   | tube | u_e     | object   | hen, cat       | tub, top     | **tub: tube without the e**; top: t with a short vowel                    |
+| 8   | bike | i_e     | vehicle  | dog, pen       | bib, kite    | bib: the same start _bi_, short; kite: the same i_e                       |
+
+- **The trap is the short word she already reads.** If she skips the e, she reads _cap_, _pin_ or _tub_, and that picture is on the row. The second trap shares the pattern, so "it has an e" alone doesn't decide either.
+- **Order:** the three most familiar words open (P1–P3), and P1 is _cake_, so the lead's "A" is the card's vowel. The three twins sit at P4, P5 and P7.
+- **These are 8 of Dave's 12 words.** Dropped:
+  - _nose_: a nose alone reads as a face.
+  - _cube_: reads as a box or a block, and its twin _cub_ has no picture.
+  - _five_, _nine_: number words. Their picture would need digits, which the pack doesn't allow.
+- **Dave's other twins:** _kit_ has no picture, and _cane_ is weak vocabulary for her (and _can / cane_ needs a new picture).
+- **`BigWordRow.vowel` widens to `'a' | 'e' | 'i' | 'o' | 'u'`.** For cake rows it holds the vowel letter. Nothing on the land-6 path reads it as a short sound, but the build checks every consumer, as wave 1 did (`wordDistractors.test.ts`, the CVC-axis tests).
+
+### 4.3 Intro lead and the quiet-E cue
+
+**Lead:** "The E is quiet. It makes the A say its name." plays before P1's silent beat, in every forward session until mastery. It is Dave's sentence, with the letters written as capitals, the way the letter-sound lines write them ("A says aaa."), so Lily says the letter names.
+
+- **On the word tick "quiet":** the e cell (cell 4) dims to 35% opacity over 200 ms.
+- **On the tick "A":** the a cell (cell 2) lights on the rose spotlight (120 ms fade in).
+- **200 ms after the line ends**, both return to normal. Then come the 1500 ms silent beat and "Read the cake." [Reduce Motion: the same states with plain fades; no motion.]
+- **Fallback text** if the ear test hears "the A" as "the uh": "The E is quiet. A says its name."
+
+**The cue on the hint** (the 2nd wrong of every cake-words card, in any session that shows one): while "Let's look. Kite." plays, cell 4 dims and cell 2 lights. They stay that way until the problem advances, so the 3rd try has the cue. On these cards this replaces the silent letter pulse.
+
+- **New `LetterRow` cell state `'quiet'`:** the glyph is `colors.ink` at 35% opacity, with no spotlight.
+- **All 8 words are CVCe**, so the rule is fixed: vowel = cell 2, e = cell 4.
+- **Never from reveal.** She has to learn to spot the final e herself, and real text never dims it (D8).
+
+## 5. New forbidden pairs
+
+Added to `FORBIDDEN_PAIRS` before the rows are coded:
+
+| Pair        | Why                                 |
+| ----------- | ----------------------------------- |
+| gift – box  | both are boxes                      |
+| nest – egg  | the nest holds eggs                 |
+| desk – bed  | both are furniture on four legs     |
+| kite – flag | both are cloth on a stick or string |
+| rope – sack | the sack is tied shut with a rope   |
+
+No trio in § 3.2 or § 4.2 contains a forbidden pair, old or new, and every chip word has a picture. I checked this with a scratch script against `wordPack.ts` and `picture-manifest.json` on 2026-10-16 (not committed).
