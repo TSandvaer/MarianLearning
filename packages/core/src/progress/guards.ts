@@ -80,6 +80,16 @@ function isObject(v: unknown): v is Record<string, unknown> {
 }
 
 /**
+ * True iff `v` names a step this build knows. The guard itself does NOT
+ * use this on step names stored in the doc (see "Forward compatibility"
+ * on `isProgressV1`); read-path code uses it to drop the one field an
+ * unknown step cannot stay in (`storage.ts:withKnownPendingPromotion`).
+ */
+export function isKnownSkillNode(v: unknown): v is SkillNode {
+  return typeof v === 'string' && SKILL_NODES.has(v as SkillNode)
+}
+
+/**
  * A per-step day counter (`goodDays`, `secureDays`): an object of string
  * arrays (local-day keys). Keys are NOT checked against SKILL_NODES: an
  * entry for a renamed/removed step is inert, and rejecting it would
@@ -136,13 +146,14 @@ function isHistoryEntry(v: unknown): v is SessionHistoryEntry {
     return false
   }
   if (!Array.isArray(v.skillFocus)) return false
-  if (
-    !v.skillFocus.every(
-      (n) => typeof n === 'string' && SKILL_NODES.has(n as SkillNode),
-    )
-  ) {
-    return false
-  }
+  // Strings only, NOT checked against SKILL_NODES (forward compatibility,
+  // see `isProgressV1`). An entry for a step this build does not know —
+  // one a newer build added, or one a rename retired ('digraphs',
+  // 'two-digit-addsub': the K2 remaps rewrite skillLevels keys, never
+  // history) — is inert: every reader matches skillFocus by membership
+  // (`.includes(node)` / `.some(...)`) or joins it into the cloud dedupe
+  // key, so an unknown name never matches and the entry is kept as is.
+  if (!v.skillFocus.every((n) => typeof n === 'string')) return false
   // latencyMs is optional (ticket 86c9pwgc8 — additive, no schemaVersion
   // bump). When present it must be an array of finite numbers; the `-1`
   // sentinel for "no measurement" is allowed (so we accept any finite
@@ -350,7 +361,26 @@ export function isLiteracyProgress(v: unknown): boolean {
   return true
 }
 
-/** True iff `v` matches the v1 Progress shape exactly. */
+/**
+ * True iff `v` matches the v1 Progress shape.
+ *
+ * Forward compatibility: a doc written by a build that knows more steps
+ * must pass on a build that knows fewer, because two devices on
+ * different builds share one cloud copy. So a step NAME stored in the doc
+ * is checked to be a string, never checked against SKILL_NODES, and one
+ * unknown step never rejects the whole doc. That covers every place a
+ * step name lands: `skillLevels` keys (only the KNOWN steps are required;
+ * extra keys pass), `history[].skillFocus`, `pendingPromotion`,
+ * `lifetimeFirstEncounters`, `goodDays` / `secureDays` keys, `paceHold`
+ * and `unlocksCelebrated`. Unknown names are inert to this build's
+ * readers and are kept, so a load + save here hands them back to the
+ * newer build intact. The one exception is `pendingPromotion`, dropped on
+ * the read path (`storage.ts:withKnownPendingPromotion`). Pinned by
+ * `forwardCompat.test.ts`.
+ *
+ * Values are still strict: a non-string where a step name belongs, or a
+ * known step whose level is not a `SkillLevel`, rejects.
+ */
 export function isProgressV1(v: unknown): v is Progress {
   if (!isObject(v)) return false
   if (v.schemaVersion !== 1) return false
@@ -405,35 +435,31 @@ export function isProgressV1(v: unknown): v is Progress {
     if (!isParentSettings(v.parentSettings)) return false
   }
   // pendingPromotion is optional (M3 — additive, no schemaVersion bump).
-  // When present it must be a known SkillNode string; an empty / missing
-  // field is the normal state and means "no queued promotion".
+  // When present it must be a string; an empty / missing field is the
+  // normal state and means "no queued promotion". An unknown step passes
+  // here (forward compatibility, see above) and is dropped on the read
+  // path by `storage.ts:withKnownPendingPromotion`.
   if ('pendingPromotion' in v && v.pendingPromotion !== undefined) {
-    if (
-      typeof v.pendingPromotion !== 'string' ||
-      !SKILL_NODES.has(v.pendingPromotion as SkillNode)
-    ) {
-      return false
-    }
+    if (typeof v.pendingPromotion !== 'string') return false
   }
   // lifetimeFirstEncounters is optional (ticket 86c9q9ben — additive,
-  // no schemaVersion bump). When present it must be an array of known
-  // SkillNode strings. Type widened from `WordSongNode[]` to
-  // `SkillNode[]` by Wave 3.4 so math focus nodes (`'sub-to-10'`)
-  // round-trip without the prior runtime-only widening dance. The
-  // producers today are still word-song-only (see
-  // `lifetimeFirstEncounters.ts` for why); the guard accepts any
-  // SkillNode so a future math-track producer needs no schema work.
-  // Duplicates are tolerated — the read-time predicate uses Set
-  // semantics. An empty array is the normal greenfield state.
+  // no schemaVersion bump). When present it must be an array of
+  // strings. Type widened from `WordSongNode[]` to `SkillNode[]` by
+  // Wave 3.4 so math focus nodes (`'sub-to-10'`) round-trip without the
+  // prior runtime-only widening dance. The producers today are still
+  // word-song-only (see `lifetimeFirstEncounters.ts` for why); the guard
+  // accepts any step name so a future math-track producer needs no
+  // schema work, and an unknown step is inert (forward compatibility,
+  // see above: the read-time predicate is a membership test). Duplicates
+  // are tolerated — the read-time predicate uses Set semantics. An empty
+  // array is the normal greenfield state.
   if (
     'lifetimeFirstEncounters' in v &&
     v.lifetimeFirstEncounters !== undefined
   ) {
     if (!Array.isArray(v.lifetimeFirstEncounters)) return false
-    for (const node of v.lifetimeFirstEncounters) {
-      if (typeof node !== 'string' || !SKILL_NODES.has(node as SkillNode)) {
-        return false
-      }
+    if (!v.lifetimeFirstEncounters.every((n) => typeof n === 'string')) {
+      return false
     }
   }
   // literacy is optional (Wave 9 W9.2 — ticket 86c9ya3gd; additive, no

@@ -50,7 +50,11 @@ import { isProgressV1 } from './guards'
 import { inferLifetimeFirstEncountersFromProgress } from './lifetimeFirstEncounters'
 import { recordGoodDays, unionGoodDays } from './mastery'
 import { mergeUnlocksCelebrated } from './pathBeats'
-import { saveProgress, withRetiredLegacyThresholds } from './storage'
+import {
+  saveProgress,
+  withKnownPendingPromotion,
+  withRetiredLegacyThresholds,
+} from './storage'
 import type {
   GoodDays,
   LetterSoundsVowel,
@@ -540,8 +544,13 @@ function installCloudBlob(
   // Mirror of the storage.ts one-time threshold retirement (ticket
   // 123jpnbc3dm): a cloud blob from a device that predates the good-day
   // counter carries no `goodDays`, so its stored old default thresholds
-  // retire here exactly as a local load would retire them.
-  const defaulted = withRetiredLegacyThresholds(guarded)
+  // retire here exactly as a local load would retire them. Before it, the
+  // same unknown-step drop a local load runs: a cloud blob from a build
+  // that knows more steps loads here, minus a `pendingPromotion` this
+  // build cannot act on (`storage.ts:withKnownPendingPromotion`).
+  const defaulted = withRetiredLegacyThresholds(
+    withKnownPendingPromotion(guarded),
+  )
 
   // History merge (ticket 86c9qa6na — P1 data-loss fix). The cloud blob
   // wins last-write-wins on every field EXCEPT `history`. Under plain

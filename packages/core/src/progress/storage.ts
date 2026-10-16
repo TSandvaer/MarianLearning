@@ -12,7 +12,7 @@
 
 import { getKeyValueStore } from '../platform/keyValueStore'
 import { LETTER_SOUNDS_VOWELS, defaultLockedSkillLevels } from './defaults'
-import { isProgressV1, readSchemaVersion } from './guards'
+import { isKnownSkillNode, isProgressV1, readSchemaVersion } from './guards'
 import { inferLifetimeFirstEncountersFromProgress } from './lifetimeFirstEncounters'
 import { recordGoodDays } from './mastery'
 import { migrate } from './migrate'
@@ -80,7 +80,9 @@ export function loadProgress(): Progress | null {
     return withSeededGoodDays(
       withDefaultedCvcGraduationSessionFired(
         withDefaultedLifetimeFirstEncounters(
-          withDefaultedSettings(withRetiredLegacyThresholds(defaulted)),
+          withDefaultedSettings(
+            withRetiredLegacyThresholds(withKnownPendingPromotion(defaulted)),
+          ),
         ),
       ),
     )
@@ -92,10 +94,37 @@ export function loadProgress(): Progress | null {
   return withSeededGoodDays(
     withDefaultedCvcGraduationSessionFired(
       withDefaultedLifetimeFirstEncounters(
-        withDefaultedSettings(withRetiredLegacyThresholds(migrated)),
+        withDefaultedSettings(
+          withRetiredLegacyThresholds(withKnownPendingPromotion(migrated)),
+        ),
       ),
     ),
   )
+}
+
+/**
+ * Drop a `pendingPromotion` that names a step this build does not know
+ * (forward compatibility — see `guards.ts:isProgressV1`).
+ *
+ * The guard lets the unknown name through so the doc loads. It cannot
+ * stay: this build would show the raw step id in the parent banner,
+ * confirming it would mark a step mastered without unlocking the next
+ * one (this build does not know the next one), and with auto-promote off
+ * a queued unknown step blocks this build's own queue (`mastery.ts`
+ * keeps an existing queue while its step is still practicing). Dropping
+ * it is safe: with auto-promote off the newer build re-queues the step on
+ * its next mastery pass while the step still qualifies; with it on the
+ * field is only a transient cue that the next mastery pass clears anyway.
+ *
+ * Shared with `cloudSync.ts:installCloudBlob` so the local load and the
+ * cloud install agree. Returns the input when nothing changes.
+ */
+export function withKnownPendingPromotion(p: Progress): Progress {
+  if (p.pendingPromotion === undefined) return p
+  if (isKnownSkillNode(p.pendingPromotion)) return p
+  const rest = { ...p }
+  delete rest.pendingPromotion
+  return rest
 }
 
 /**
