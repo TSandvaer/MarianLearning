@@ -138,8 +138,8 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       text: 'Read all the letters!',
       src: '/assets/audio/path/guide-session-intro-crab-words.mp3',
     })
-    // Awaiting their Lily render (the render commit empties the list).
-    expect(GUIDANCE_LINES_AWAITING_RENDER).toContain('guide.session.hiding')
+    // Rendered in Lily with the peek pairs (§ 6.2 rows 3-6, 8-10).
+    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
   })
 
   it('names the step in the peek opener and closer (Thomas 2026-10-15), with the path lines’ spoken names and their verb', () => {
