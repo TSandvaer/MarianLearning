@@ -164,3 +164,84 @@ P1–P3, P5 and P7 keep their current canon blocks and audio. Dropped from today
 ### 1.9 Web consequence (for Matt)
 
 The frozen web reads plans without `extendedKinds`, so a missing-number read throws there and the web's add-to-10 and add-to-20 fall back to their silent static plan. This is how the web already treats the skip-counting and multiplication steps. Marian plays native only (since 2026-10-14). The alternative, a web-only canon, costs a second file per step for a surface nobody plays.
+
+## 2. NG-B: times mix (`mult-mix`)
+
+### 2.1 The step
+
+- **SkillNode `mult-mix`**, after `mult-6-9` in `MATH_TREE` and `MATH_NODES_IN_ORDER`. Default level `'locked'`.
+- **Spoken name** "all the groups", verb **are** ("All the groups are for later. You will learn it!"). `FRIENDLY_NODE_NAMES` (the recap): "counting in groups", as for the other three times steps.
+- **Map:** the 4th stop of land 4, Groups (§ 5).
+- **What a problem is:** an existing multiply problem, unchanged: "Seven times four. How many?", `7 × 4 = ?` above 4 plates of 7 flowers, three chips (`math-skip-counting-multiplication-native.md` § 3–§ 5).
+- **Tags and "+" show from reveal on every problem**, the `mult-6-9` rule. Most mixed problems have groups of 6–9, which she can't see at a glance.
+- **Chips:** today's multiply rule (§ 4 of that spec), with the times-mix ceiling **M = 40** for every problem in the session (largest answer 36, so `10 × ceil(37 / 10)`). `MULTIPLICATION_FOCUS_NODES` (`packages/core/src/wire/leitnerFocus.ts`) gains `mult-mix`, so `*` facts may ride its requests.
+- **Mastery, fast track, pace guard, peek:** the sibling steps' rules, unchanged (math preset).
+
+### 2.2 The fact pool (28 facts)
+
+The pool is every canon block of `MIX_SOURCE_STEPS = ['mult-2-5-10', 'mult-3-4', 'mult-6-9', 'mult-mix']` whose fact has `op: '*'`, a factor A of 2–9 and B of 2–5 groups, kept once per fact key (the first block in that step order).
+
+| Source file   | Facts in the pool                                  | Count |
+| ------------- | -------------------------------------------------- | ----- |
+| `mult-2-5-10` | 2×2, 2×3, 5×2, 2×5, 5×4 (5×1, 10×1, 10×2 left out) | 5     |
+| `mult-3-4`    | 3×2, 3×3, 4×2, 2×4, 3×4, 4×3, 4×4 (2×3 already in) | 7     |
+| `mult-6-9`    | 6×2, 7×2, 8×2, 6×3, 7×3, 9×2, 8×3, 9×3             | 8     |
+| `mult-mix`    | 5×3, 4×5, 6×4, 3×5, 7×4, 5×5, 8×4, 9×4 (new canon) | 8     |
+
+"A × B" is B plates of A (the canon's reading, no commutative flip). The new `mult-mix` canon file fills the gaps in A 2–9 × B 2–5 that no file covers. Four gaps stay open in wave 1: 6×5, 7×5, 8×5 and 9×5 (answers 30–45). A canon file holds 8 problems, and these four are the heaviest pictures (up to 45 flowers).
+
+**Suggested `mult-mix` canon order** (easier to harder; P1–P3 are what the peek plays): P1 5×3, P2 4×5, P3 6×4, P4 3×5, P5 7×4, P6 5×5, P7 8×4, P8 9×4.
+
+- Its lines follow the planner's generic-tier templates exactly. hint2 goes by group count: "Six, six, six, six." for 6×4, "Three, three, three, three, three." for 3×5.
+- P4–P8 chips by today's rule: 3×5 [8, 16], 7×4 [11, 27], 5×5 [10, 26], 8×4 [12, 31], 9×4 [13, 37].
+- The P1–P3 values come from `pickDistractors`'s gentle tier with M = 40, and a unit test pins them.
+
+### 2.3 Composing a session: `pickMixBlocks`
+
+New pure function in `packages/core/src/progress/reviewPlan.ts`, beside `pickReviewBlocks`:
+
+```ts
+export const MIX_SOURCE_STEPS: readonly NumberGardenNode[]
+export function pickMixBlocks(
+  p: Progress,
+  nowMs: number,
+  seed: number,
+  warmup: readonly CanonBlockRef[], // this session's warm-up refs (0–2)
+): CanonBlockRef[] // exactly 8
+```
+
+`strength(f)` = the fact's Leitner box (1–5), or 0 when it isn't in `mathFactsLeitner` (never played).
+
+1. **P1–P3, the gentle opening:** the 3 facts with strength ≥ 2 and the highest strength. Ties go to the smaller product, then the key `${a}*${b}` ascending. If fewer than 3 qualify, fill with the smallest-product facts not yet picked. **Why:** the session opens on facts she got right before, the same reasoning as the warm-up's first heart (Thomas, 2026-10-14).
+2. **P4–P8, the weak facts:**
+   1. Due facts first, ranked exactly as `rankedDueFacts` (overdue days, then box, then key), up to `LEITNER_DUE_PER_SESSION_CAP` minus the warm-up's fact count (the shared cap of 3, `review-mode-and-warmup-native.md` § 7.4). Warm-up facts and P1–P3 picks are skipped.
+   2. Then the lowest strength first (never-played facts count as 0). Ties are broken by pool index rotated by the seed, `(index + seed) % pool.length` ascending, so sessions vary.
+3. **Order P4–P8:** take the picks in order, but when the next one has the same A as the problem before it (P3 included), take the first later pick whose A differs. Adjacent problems then come from different tables whenever possible (Dave's M4: mixed practice).
+
+`seed` is `readSessionHistory().sessionCount` at kick time, as for reviews. It is the same at prefetch and at the tap, so both ask for the same refs.
+
+**Worked example (a made-up box, for illustration):** she has played the three times steps. 4×4, 2×5 and 3×3 sit in box 3, 9×3 and 7×3 are box 1 (due), and the 8 `mult-mix` facts are unplayed.
+
+- P1–P3 = 3×3, 4×4, 2×5 (box 3, smallest products first).
+- P4–P8 = 7×3 and 9×3 (due, box 1), then three unplayed facts by rotated pool index, reordered so no two neighbours share A.
+
+### 2.4 Wire, server, client
+
+- **Wire** (`packages/core/src/wire/types.ts`): `MIX_BLOCK_COUNT = 8`, `MIX_PLAN_ID_PREFIX = 'mix-'`, and an optional `mix?: { blocks: CanonBlockRef[] }` on the session-start track payload: exactly 8 refs, each a step in `MIX_SOURCE_STEPS`.
+- **Server** (`api/_review.ts`, the responder that reviews and peeks already share): `mix` runs as step 0, before the canon lookup, the session cache and the rate limiter.
+  - It copies the 8 blocks with their baked audio, renamed `math.p1..p8.`, plus `mult-mix`'s `session.end.*` utterances, so the plan carries everything a canon forward plan does.
+  - It returns plan id `mix-math` and label `Times mix`. Warm-up refs are appended afterwards, as for any forward response.
+  - No Anthropic call, no TTS and no cache write. A bad ref is 400 `invalid-request`.
+- **Client:** `sessionPlanKind` returns `{ kind: 'forward', warmup, mix }` when the forward focus is `mult-mix`. The math session start sends `mix` with the warm-up refs.
+  - A plan whose id starts with `mix-` and parses to 8 problems is the session.
+  - **Any other forward plan is accepted as-is.** An old server ignores `mix` and serves `mult-mix`'s own canon: still times mix, just the same 8 every day.
+  - No Leitner hint is sent with `mix`: the blocks already carry the due facts.
+- **Screen:** `problemNodes` is `mult-mix` for all 8 problems (chips, ceiling, tags), whichever file a block came from.
+- **Session end:** a normal forward write. `skillFocus` is `['mult-mix']`. `problemFacts` (the review's nullable per-problem field) carries the 8 facts, because `planFacts` assumes one source file. Leitner records each fact once.
+- **Ship order:** `yarn release` before the device check.
+
+### 2.5 Review, warm-up, peek
+
+- **Peek:** `pickPeekBlocks('mult-mix')` = its canon P1–P3 (5×3, 4×5, 6×4). Opener "Let's look at all the groups!", closer "All the groups are for later. You will learn it!".
+- **Review:** once mastered, `mult-mix` is in the review pool with its own 8 canon blocks.
+- **Warm-up:** unchanged. `blockFor(fact, [C, ...S])` searches `mult-mix`'s canon first, then the mastered steps.
