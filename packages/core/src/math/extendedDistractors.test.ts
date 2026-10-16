@@ -148,7 +148,8 @@ describe.each(Object.keys(CANON_CHIPS))('canon chips — %s', (node) => {
   it('produces the spec values for all 8 problems', () => {
     expect(
       problems.map((p) => {
-        if (p.kind === 'arithmetic') throw new Error('arithmetic in canon')
+        if (p.kind === 'arithmetic' || p.kind === 'missing-addend')
+          throw new Error('arithmetic in canon')
         return [p.correct, extendedDistractors(p, ceiling)]
       }),
     ).toEqual(CANON_CHIPS[node])
@@ -156,7 +157,8 @@ describe.each(Object.keys(CANON_CHIPS))('canon chips — %s', (node) => {
 
   it('3 distinct chips per problem, none equal to the answer', () => {
     for (const p of problems) {
-      if (p.kind === 'arithmetic') throw new Error('arithmetic in canon')
+      if (p.kind === 'arithmetic' || p.kind === 'missing-addend')
+        throw new Error('arithmetic in canon')
       const chips = [p.correct, ...extendedDistractors(p, ceiling)]
       expect(new Set(chips).size).toBe(3)
     }
@@ -189,7 +191,8 @@ describe('extendedOfferedClass', () => {
     ['mult-6-9', 'wrong-op'],
   ] as const)('%s: null on P1–P3, %s on P4–P8', (node, offered) => {
     const classes = canonProblems(node).map((p) => {
-      if (p.kind === 'arithmetic') throw new Error('arithmetic in canon')
+      if (p.kind === 'arithmetic' || p.kind === 'missing-addend')
+        throw new Error('arithmetic in canon')
       return extendedOfferedClass(p)
     })
     expect(classes).toEqual([null, null, null, ...Array(5).fill(offered)])

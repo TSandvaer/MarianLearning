@@ -4,7 +4,9 @@
  *
  * The chips follow each problem's own step (review spec § 7.4): its
  * distractor rules, and a ceiling from that step's problems only. Without
- * `problemNodes` every problem is `focusNode`'s, exactly as before.
+ * `problemNodes` every problem is `focusNode`'s, exactly as before. A
+ * missing number (content wave 1 § 1.6) takes the arithmetic chips of its
+ * bond, around the missing part.
  */
 import {
   ANSWER_RANGE_MAX_TO_20,
@@ -63,11 +65,36 @@ export function problemChips(
   const nodeOf = (i: number) => problemNodes?.[i] ?? focusNode
   const node = nodeOf(problemIndex)
   const sameStep = problems.filter((_, j) => nodeOf(j) === node)
-  if (p.kind === 'arithmetic') {
-    const corrects = sameStep
-      .filter((q) => q.kind === 'arithmetic')
+  // The adding steps' answers on screen: the sums and the missing parts.
+  const addingCorrects = () =>
+    sameStep
+      .filter((q) => q.kind === 'arithmetic' || q.kind === 'missing-addend')
       .map((q) => q.correct)
-    return buildChipOrder(p, arithmeticChipCeiling(p, node, corrects), node)
+  if (p.kind === 'arithmetic') {
+    return buildChipOrder(
+      p,
+      arithmeticChipCeiling(p, node, addingCorrects()),
+      node,
+    )
+  }
+  if (p.kind === 'missing-addend') {
+    // Content wave 1 § 1.6: `pickDistractors` around the missing part, the
+    // arithmetic chips' LCG and seed, through `buildChipOrder` with the bond
+    // `A + B` (the web's copy stays verbatim). On P4–P8 the off-by-one, her
+    // count-on slip.
+    const bond = {
+      index: p.index,
+      addendA: p.addendA,
+      addendB: p.correct,
+      correct: p.correct,
+      op: '+' as const,
+      utterances: p.utterances,
+    }
+    return buildChipOrder(
+      bond,
+      chipMaxAnswerForCorrects(addingCorrects()),
+      node,
+    )
   }
   const ceiling = multiplyChipCeiling(
     sameStep.filter((q) => q.kind === 'multiply').map((q) => q.correct),

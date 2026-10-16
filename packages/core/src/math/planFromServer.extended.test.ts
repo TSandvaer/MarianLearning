@@ -15,16 +15,20 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   isArithmeticProblem,
+  isMissingAddendProblem,
   isMultiplyProblem,
   isNumberRecogProblem,
   isSkipCountProblem,
+  problemFact,
   type MultiplyProblem,
   type SkipCountProblem,
 } from './extendedProblems'
 import {
   PlanFromServerError,
   mathSessionPlanFromServer,
+  parseMissingAddendRead,
   parseMultiplyRead,
+  parseReadOperands,
   parseRecognizeRead,
   parseSkipCountRead,
   wordToNumber,
@@ -472,7 +476,7 @@ describe('extended kinds — mixed and failing plans', () => {
     expect(plan.problems.map((p) => p.index)).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
   })
 
-  it('an unknown read line names all six templates', () => {
+  it('an unknown read line names all seven templates', () => {
     const reads = Array.from({ length: 8 }, () => 'Two times two. How many?')
     reads[2] = 'Tap the cat.'
     expect(() =>
@@ -483,7 +487,7 @@ describe('extended kinds — mixed and failing plans', () => {
         'How many are left?"; subtraction first-session "<W> take away <W>. ' +
         'How many are left?"; number recognition "Tap the <W>."; skip-count ' +
         '"<W>, <W>, <W>. What is next?"; multiplication "<W> times <W>. How ' +
-        'many?")',
+        'many?"; missing number "<W> and what make <W>?")',
     )
   })
 
@@ -498,5 +502,115 @@ describe('extended kinds — mixed and failing plans', () => {
     expect(() =>
       mathSessionPlanFromServer(broken, { extendedKinds: true }),
     ).toThrow('server plan problem 5 missing slot "reprompt"')
+  })
+})
+
+describe('missing-addend (content wave 1 § 1.6, AC 1)', () => {
+  function serverPlan(reads: readonly string[]) {
+    return {
+      id: 'missing',
+      label: 'Missing',
+      utterances: reads.flatMap((read, i) =>
+        ['read', 'correct', 'reprompt', 'hint', 'giveAnswer'].map((slot) => ({
+          id: `math.p${i + 1}.${slot}`,
+          text: slot === 'read' ? read : `${slot} ${i + 1}`,
+        })),
+      ),
+    }
+  }
+  const PLAIN = 'Three plus two. How many?'
+
+  it('reads "<A> and what make <T>?" as the missing part', () => {
+    expect(parseMissingAddendRead('Seven and what make ten?')).toEqual({
+      addendA: 7,
+      total: 10,
+      correct: 3,
+    })
+    expect(parseMissingAddendRead('Nine and what make thirteen?')).toEqual({
+      addendA: 9,
+      total: 13,
+      correct: 4,
+    })
+    // Any case and spacing, as the other templates.
+    expect(parseMissingAddendRead('  six AND what   make eleven ?')).toEqual({
+      addendA: 6,
+      total: 11,
+      correct: 5,
+    })
+  })
+
+  it('in a plan: kind "missing-addend", the given part, the whole and the answer', () => {
+    const reads = Array.from({ length: 8 }, () => PLAIN)
+    reads[3] = 'Seven and what make ten?'
+    reads[5] = 'Nine and what make thirteen?'
+    const plan = mathSessionPlanFromServer(serverPlan(reads), {
+      extendedKinds: true,
+    })
+    const p4 = plan.problems[3]!
+    expect(isMissingAddendProblem(p4)).toBe(true)
+    expect(p4).toMatchObject({
+      kind: 'missing-addend',
+      index: 4,
+      addendA: 7,
+      total: 10,
+      correct: 3,
+    })
+    expect(plan.problems[5]).toMatchObject({
+      kind: 'missing-addend',
+      addendA: 9,
+      total: 13,
+      correct: 4,
+    })
+    expect(plan.problems.filter(isMissingAddendProblem)).toHaveLength(2)
+  })
+
+  it.each([
+    ['Ten and what make ten?'], // nothing is missing
+    ['Eleven and what make ten?'], // the part is bigger than the whole
+    ['Zero and what make ten?'], // the given part is at least 1
+    ['Ten and what make twenty-one?'], // the whole is at most 20
+  ])('rejects %s', (read) => {
+    expect(() => parseMissingAddendRead(read)).toThrow(PlanFromServerError)
+    const reads = Array.from({ length: 8 }, () => PLAIN)
+    reads[3] = read
+    expect(() =>
+      mathSessionPlanFromServer(serverPlan(reads), { extendedKinds: true }),
+    ).toThrow(PlanFromServerError)
+  })
+
+  it('records the bond it completes, the key plain addition uses (K4)', () => {
+    const reads = Array.from({ length: 8 }, () => PLAIN)
+    reads[3] = 'Seven and what make ten?'
+    reads[4] = 'Seven plus three. How many?'
+    const plan = mathSessionPlanFromServer(serverPlan(reads), {
+      extendedKinds: true,
+    })
+    expect(problemFact(plan.problems[3]!)).toEqual({ a: 7, b: 3, op: '+' })
+    expect(problemFact(plan.problems[4]!)).toEqual({ a: 7, b: 3, op: '+' })
+    expect(problemFact(plan.problems[0]!)).toEqual({ a: 3, b: 2, op: '+' })
+  })
+
+  it('an unknown number word throws', () => {
+    expect(() => parseMissingAddendRead('Seven and what make tenn?')).toThrow(
+      PlanFromServerError,
+    )
+  })
+
+  it('the default call (the web) throws on it, as on the skip and multiply reads', () => {
+    const reads = Array.from({ length: 8 }, () => PLAIN)
+    reads[3] = 'Seven and what make ten?'
+    expect(() => mathSessionPlanFromServer(serverPlan(reads))).toThrow(
+      'math read line "Seven and what make ten?" did not match any known math read template',
+    )
+  })
+
+  it('no other template reads it, and it reads no other template', () => {
+    expect(() => parseReadOperands('Seven and what make ten?')).toThrow(
+      PlanFromServerError,
+    )
+    expect(() => parseMissingAddendRead(PLAIN)).toThrow(PlanFromServerError)
+    expect(() => parseMissingAddendRead('Two times three. How many?')).toThrow(
+      PlanFromServerError,
+    )
   })
 })

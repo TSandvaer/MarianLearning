@@ -36,7 +36,8 @@ describe.each(NODES)('buildExtendedChipOrder — %s canon', (node) => {
 
   it('3 distinct chips: the answer + core’s two, the same order every time', () => {
     for (const p of problems) {
-      if (p.kind === 'arithmetic') throw new Error('arithmetic in canon')
+      if (p.kind === 'arithmetic' || p.kind === 'missing-addend')
+        throw new Error('arithmetic in canon')
       const { values } = buildExtendedChipOrder(p, ceiling)
       expect(values).toHaveLength(3)
       expect([...values].sort((a, b) => a - b)).toEqual(
@@ -48,7 +49,8 @@ describe.each(NODES)('buildExtendedChipOrder — %s canon', (node) => {
 
   it('offers nothing on P1–P3, its class on P4–P8', () => {
     const classes = problems.map((p) => {
-      if (p.kind === 'arithmetic') throw new Error('arithmetic in canon')
+      if (p.kind === 'arithmetic' || p.kind === 'missing-addend')
+        throw new Error('arithmetic in canon')
       return buildExtendedChipOrder(p, ceiling).offeredClass
     })
     const offered =

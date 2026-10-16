@@ -53,8 +53,9 @@
  * Extended kinds (opt-in, native only)
  * ------------------------------------
  * `{ extendedKinds: true }` also reads the number-recognition ("Tap the
- * seven."), skip-count ("Two, four, six, eight. What is next?") and
- * multiplication ("Two times three. How many?") read lines and returns an
+ * seven."), skip-count ("Two, four, six, eight. What is next?"),
+ * multiplication ("Two times three. How many?") and missing-number ("Seven
+ * and what make ten?") read lines and returns an
  * `ExtendedMathSessionPlan` (see `extendedProblems.ts`). Without the option (the frozen web app's call) the
  * output is exactly what it was before: arithmetic only, and those read
  * lines throw.
@@ -66,6 +67,7 @@
 
 import {
   EXTENDED_ANSWER_MAX,
+  MISSING_ADDEND_TOTAL_MAX,
   type ExtendedMathProblem,
   type ExtendedMathSessionPlan,
 } from './extendedProblems'
@@ -428,6 +430,10 @@ function extendedProblemFromRead(
       utterances,
     }
   }
+  const missing = matchMissingAddendRead(read)
+  if (missing) {
+    return { kind: 'missing-addend', index, ...missing, utterances }
+  }
   const multiply = matchMultiplyRead(read)
   if (multiply) {
     assertRecordableAnswer(read, multiply.factorA * multiply.factorB)
@@ -453,7 +459,7 @@ function extendedProblemFromRead(
       `How many are left?"; subtraction first-session "<W> take away <W>. ` +
       `How many are left?"; number recognition "Tap the <W>."; skip-count ` +
       `"<W>, <W>, <W>. What is next?"; multiplication "<W> times <W>. How ` +
-      `many?")`,
+      `many?"; missing number "<W> and what make <W>?")`,
   )
 }
 
@@ -603,6 +609,55 @@ export function parseMultiplyRead(read: string): {
     `math read line "${read}" did not match the multiplication read ` +
       `template "<W> times <W>. How many?"`,
   )
+}
+
+/** Extract the given part, the whole and the missing part from a
+ *  missing-addend `read` line (content wave 1 § 1.6).
+ *
+ *  Template (canon and planner): `"<A> and what make <T>?"`, e.g. `"Seven
+ *  and what make ten?"` → addendA 7, total 10, correct 3. Valid when
+ *  1 ≤ A < T ≤ {@link MISSING_ADDEND_TOTAL_MAX}. Case-insensitive; throws on
+ *  any drift, an unknown number word or an out-of-range pair. Disjoint from
+ *  every other template (none contains "and what make").
+ *
+ *  Opt-in kind: only `mathSessionPlanFromServer(plan, { extendedKinds: true
+ *  })` reads this template. */
+export function parseMissingAddendRead(read: string): {
+  addendA: number
+  total: number
+  correct: number
+} {
+  const missing = matchMissingAddendRead(read)
+  if (missing) return missing
+  throw new PlanFromServerError(
+    `math read line "${read}" did not match the missing-number read ` +
+      `template "<W> and what make <W>?"`,
+  )
+}
+
+/** {@link parseMissingAddendRead}'s template: `null` on a miss; throws on an
+ *  unknown number word or a pair outside 1 ≤ A < T ≤ 20. */
+function matchMissingAddendRead(
+  read: string,
+): { addendA: number; total: number; correct: number } | null {
+  const match = read.match(
+    /^\s*([a-z-]+)\s+and\s+what\s+make\s+([a-z-]+)\s*\?\s*$/i,
+  )
+  if (!match) return null
+  const addendA = wordToNumber(match[1]!.toLowerCase())
+  const total = wordToNumber(match[2]!.toLowerCase())
+  if (addendA === undefined || total === undefined) {
+    throw new PlanFromServerError(
+      `math read line "${read}" had unrecognised number word(s)`,
+    )
+  }
+  if (addendA < 1 || addendA >= total || total > MISSING_ADDEND_TOTAL_MAX) {
+    throw new PlanFromServerError(
+      `math read line "${read}" names ${addendA} of ${total}; a missing ` +
+        `number needs 1 ≤ part < whole ≤ ${MISSING_ADDEND_TOTAL_MAX}`,
+    )
+  }
+  return { addendA, total, correct: total - addendA }
 }
 
 /** {@link parseRecognizeRead}'s template: `null` when the line is not

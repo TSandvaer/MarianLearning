@@ -25,6 +25,7 @@ import {
   DOT_CARD_FADE_OUT_MS,
   DOT_CARD_FADE_IN_SPRING,
 } from './dotCard'
+import type { MissingAddendProblem } from './extendedProblems'
 import type { MathProblem } from './sessionPlans'
 
 /**
@@ -318,5 +319,27 @@ describe('subMinuendFromProblem', () => {
     expect(subMinuendFromProblem(subProblem(4, 1))).toBeNull()
     expect(subMinuendFromProblem(subProblem(11, 2))).toBeNull()
     expect(subMinuendFromProblem(problem(8, 2))).toBeNull()
+  })
+})
+
+describe('missing-addend problems (content wave 1 § 1.4)', () => {
+  // `3 + ? = 5`: both parts are dice-sized, but the card would show both
+  // parts and so the answer.
+  const missing: MissingAddendProblem = {
+    kind: 'missing-addend',
+    index: 4,
+    addendA: 3,
+    total: 5,
+    correct: 2,
+    utterances: {
+      read: 'Three and what make five?',
+      correct: 'Yes! Three and two make five!',
+      reprompt: 'Hmm... try again?',
+      hint: 'Look.',
+      giveAnswer: 'This one is two.',
+    },
+  }
+  it('never shows the dot card', () => {
+    expect(shouldShowDotCard(missing)).toBe(false)
   })
 })

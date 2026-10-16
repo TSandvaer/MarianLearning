@@ -14,6 +14,7 @@ import type { SessionEndPayload } from './sessionEndPayload'
 import {
   buildLeitnerOutcomes,
   computeGraduationSplit,
+  forwardLeitnerOutcomes,
   normalizeSessionEndPayload,
   writeSessionEnd,
 } from './sessionEndWrite'
@@ -162,6 +163,42 @@ it('Leitner outcomes zip facts with first-tap correctness (overlapping prefix)',
     ),
   ).toEqual([{ fact: { a: 3, b: 2, op: '+' }, correct: true }])
   expect(buildLeitnerOutcomes([], [true])).toBeUndefined()
+})
+
+it('one Leitner outcome per fact per session, from its first occurrence (content wave 1 § 1.7, AC 4)', () => {
+  // `7 + 3` as plain addition at P2 and as `7 + ? = 10` at P4: one bond.
+  const facts = [
+    { a: 2, b: 2, op: '+' as const },
+    { a: 7, b: 3, op: '+' as const },
+    { a: 3, b: 2, op: '+' as const },
+    { a: 7, b: 3, op: '+' as const },
+  ]
+  const outcomes = forwardLeitnerOutcomes({
+    ...MATH,
+    mathFacts: facts,
+    perProblemCorrect: [true, false, true, true],
+  })
+  expect(outcomes).toEqual([
+    { fact: { a: 2, b: 2, op: '+' }, correct: true },
+    { fact: { a: 7, b: 3, op: '+' }, correct: false },
+    { fact: { a: 3, b: 2, op: '+' }, correct: true },
+  ])
+  // And through the write: the box holds 7+3 once, at its first outcome.
+  saveProgress(defaultProgress())
+  writeSessionEnd(
+    {
+      ...MATH,
+      mathFacts: facts,
+      perProblemCorrect: [true, false, true, true],
+      sessionFocus: { node: 'add-to-10', mode: 'forward' },
+    },
+    { clock },
+  )
+  const items = loadProgress()!.mathFactsLeitner.items.filter(
+    (e) => e.item.a === 7 && e.item.b === 3 && e.item.op === '+',
+  )
+  expect(items).toHaveLength(1)
+  expect(items[0]!.box).toBe(1)
 })
 
 it('no graduation split without the novel-probe word list, or on math', () => {
