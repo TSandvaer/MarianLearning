@@ -26,20 +26,18 @@ Marian learns to share a number of flowers out equally, and Word Song gains 16 n
 
 ## Decisions
 
-| #   | Call                                                                                                                                                                                                                                                                                                               |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| K1  | **Sharing asks one question only: "How many on each plate?"** "How many plates?" comes later, because it needs its own picture: the plates are its answer, so they can't be on screen from the start (§ 2.8).                                                                                                      |
-| K2  | **The read is Dave's: "Twelve flowers, three plates. How many on each plate?".** The screen shows a pile of 12 flowers with a "12" tag and 3 empty plates with "?" tags. There is no equation and no division sign in this step; the digits sit on the tags (§ 2.2).                                               |
-| K3  | **Flowers are dealt one at a time, one for each plate in turn** ("one for you, one for you"). P1–P3 deal on their own after the read (the concrete model, every session). On P4–P8 the deal waits for the hints, and a right answer plays it fast as proof (§ 2.4).                                                |
-| K4  | **Range: 2–5 plates, 2–6 on each plate, at most 20 flowers.** The plates are wave 1's (`GroupsRow`, at most 5). P1–P3 use 2 plates; on P4–P8 the plate count is never the answer (§ 2.7).                                                                                                                          |
-| K5  | **Chips are `pickDistractors` as it is, with ceiling M = 10.** P1–P3 gentle, P4–P8 off-by-one (§ 2.6, D4).                                                                                                                                                                                                         |
-| K6  | **A sharing problem records no Leitner fact**, as skip counting doesn't. Its time includes the deal, so it would mark × facts slow (§ 2.6, D5).                                                                                                                                                                    |
-| K7  | **Spoken names: "sharing", "tent words", "cake words".** Not "jump words": _jump_ is an action, so it can't be a picture word ("Yes! That's a jump." breaks, the reason wave 1 dropped _swim_), and every word step is named after its stop picture (§ 1).                                                         |
-| K8  | **Sharing is the 5th stop of land 4, Groups. Tent and cake words are the 3rd and 4th stops of land 6, Big words.** Wave 1 planned both placements (`content-wave-1.md` § 5.1). There are no new lands and no new land emblems.                                                                                     |
-| K9  | **Exactly 8 words per Word Song step, in canon order** (wave 1's K9). All 16 targets are new pictures. Every chip partner is an existing picture, so the pack grows by 16 and no more (§ 7).                                                                                                                       |
-| K10 | **Traps test the new letters.** Tent words: Dave's twin where it has a picture (nest / net), otherwise the same start (hand / hat, belt / bed, pond / pot, desk / duck). Cake words: the short twin she already knows (cape / cap, pine / pin, tube / tub), otherwise a short word with the same start (§ 3, § 4). |
-| K11 | **One lead line per new step** before scored P1, in every forward session until mastered (wave 1's § 6.1 mechanism): "Let's share the flowers!", "Read to the end!", "The E is quiet. It makes the A say its name."                                                                                                |
-| K12 | **A "quiet E" cue on cake-words cards:** during the lead, and on the 2nd-wrong hint of every cake-words card, the e cell dims and the vowel cell lights. It never shows from reveal (§ 4.3, D8).                                                                                                                   |
+- **K1. One question: "How many on each plate?"** "How many plates?" comes later, because its answer is the plates, so they can't be on screen from the start (§ 2.8).
+- **K2. The read is Dave's: "Twelve flowers, three plates. How many on each plate?"** The screen shows a pile of 12 flowers with a "12" tag and 3 empty plates with "?" tags. There is no equation and no division sign in this step (§ 2.2).
+- **K3. The flowers are dealt one for each plate in turn.** P1–P3 deal on their own after the read, so the model shows every session. On P4–P8 the deal waits for the hints, and a right answer plays it fast as proof (§ 2.4).
+- **K4. Range: 2–5 plates, 2–6 on each, at most 20 flowers.** The plates are `GroupsRow`'s, at most 5 (§ 2.7).
+- **K5. The chips are `pickDistractors` unchanged, with M = 10** (§ 2.6, D4).
+- **K6. A sharing problem records no Leitner fact**, as skip counting doesn't. Its time includes the deal, so it would mark × facts slow (§ 2.6, D5).
+- **K7. Spoken names: "sharing", "tent words", "cake words".** Not "jump words": _jump_ is an action, so it can't be a picture word ("Yes! That's a jump." breaks, as _swim_ did in wave 1), and word steps are named after their stop picture (§ 1).
+- **K8. Sharing is the 5th stop of land 4, Groups. Tent and cake words are the 3rd and 4th stops of land 6, Big words**, as wave 1 planned (`content-wave-1.md` § 5.1). There are no new lands.
+- **K9. Exactly 8 words per Word Song step, in canon order** (wave 1's K9). The 16 targets are new pictures, and every chip partner is an existing one (§ 7).
+- **K10. The traps test the new letters.** Tent words: Dave's twin where it has a picture (nest / net), otherwise the same start (hand / hat, belt / bed, pond / pot). Cake words: the short twin she knows (cape / cap, pine / pin, tube / tub), otherwise a short word with the same start (§ 3, § 4).
+- **K11. One lead line per new step** before scored P1, in every forward session until mastered (wave 1's § 6.1): "Let's share the flowers!", "Read to the end!", "The E is quiet. It makes the A say its name."
+- **K12. The quiet-E cue:** in the lead, and on the 2nd-wrong hint of every cake-words card, the e cell dims and the vowel cell lights. It never shows from reveal (§ 4.3, D8).
 
 Mastery, the fast track, the pace guard, reviews, warm-ups and the Map peek work on the new steps as on their siblings. Nothing in this wave adds a timer, a currency, a streak or a loss mechanic.
 
@@ -141,35 +139,37 @@ Phone landscape (667×375): Word Song's L frame with the chip column, as for mul
 
 ### 2.4 Beats, problem by problem
 
-| Moment                 | Line                                                    | What happens on screen                                                                                                                                                                                                                            |
-| ---------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| lead (scored P1 only)  | "Let's share the flowers!"                              | The stage is up. Then 400 ms, then the read (wave 1 § 6.1).                                                                                                                                                                                       |
-| read                   | "Twelve flowers, three plates. How many on each plate?" | Chips open on `onPlay`, as today. On the word tick whose number is T, the total tag pulses. On the tick whose number is B, the plates ripple left to right.                                                                                       |
-| auto-deal (P1–P3)      | —                                                       | 300 ms after the read ends, the whole pile is dealt (§ 2.5). Emma is `attentive-pointing` during the deal, then `listening`. The rule is session index ≤ 3 (the chip tier's rule), so a review block at P2 deals too.                             |
-| wrong tap (1st, 2nd)   | "Hmm... try again?"                                     | Today's poof, shake and `puzzled-tilt`. The picture doesn't change.                                                                                                                                                                               |
-| hint1                  | "Look at the flowers."                                  | Wherever the flowers are (pile or plates), they ripple in deal order (60 ms stagger).                                                                                                                                                             |
-| hint2                  | "One for each plate."                                   | Undealt: round 1 is dealt, one flower for each plate, 300 ms apart. Already dealt: the plates light one by one (multiply's hint-2 plate pulse).                                                                                                   |
-| hint3                  | "How many on each plate?"                               | Undealt: the rest of the pile is dealt (§ 2.5 timing). Already dealt: all plates pulse together.                                                                                                                                                  |
-| giveAnswer (3rd wrong) | "This one is four."                                     | Any undealt flowers land at once. Every "?" tag gets a 4 pt `colors.myRose` ring, like the glowing chip. The guided tap then plays the correct moment.                                                                                            |
-| correct                | "Yes! Four on each plate!"                              | Any undealt flowers are dealt fast, then every "?" tag fills with the share, and the plates pulse together once. Today's chip burst, sparkle, plink and `celebration`. The finished picture is multiply's picture of 4 × 3: three plates of four. |
-| advance                | —                                                       | Today's 250 ms Math exit. Everything resets per problem.                                                                                                                                                                                          |
+- **Lead** (scored P1 only): "Let's share the flowers!" The stage is up, then 400 ms, then the read (wave 1 § 6.1).
+- **Read:** "Twelve flowers, three plates. How many on each plate?" The chips open on `onPlay`, as today. On the word tick whose number is T, the total tag pulses. On the tick whose number is B, the plates ripple left to right.
+- **Auto-deal (P1–P3):** 300 ms after the read ends, the whole pile is dealt (§ 2.5). Emma is `attentive-pointing` during the deal, then `listening`. The rule is session index ≤ 3 (the chip tier's rule), so a review block at P2 deals too.
+- **Wrong tap (1st, 2nd):** "Hmm... try again?" with today's poof, shake and `puzzled-tilt`. The picture doesn't change.
+- **hint1, "Look at the flowers.":** the flowers ripple in deal order (60 ms stagger), wherever they are.
+- **hint2, "One for each plate.":** if the pile is undealt, round 1 is dealt, one flower for each plate, 300 ms apart. If it is dealt, the plates light one by one (multiply's hint-2 plate pulse).
+- **hint3, "How many on each plate?":** the rest of the pile is dealt (§ 2.5 timing). If it is already dealt, all plates pulse together.
+- **giveAnswer (3rd wrong), "This one is four.":** any flowers left land at once, and every "?" tag gets a 4 pt `colors.myRose` ring, like the glowing chip. The guided tap then plays the correct moment.
+- **Correct, "Yes! Four on each plate!":** any flowers left are dealt fast, then every "?" tag fills with the share, and the plates pulse together once. The chip burst, sparkle, plink and `celebration` are today's. The finished picture is multiply's 4 × 3: three plates of four.
+- **Advance:** today's 250 ms Math exit. Everything resets per problem.
 
 ### 2.5 Motion brief (Reanimated; Reduce Motion in brackets)
 
-The deal is one rule: **flower k** (k = 0 … T−1) leaves the **last** occupied pile cell and lands on plate `(k mod B) + 1`, in that plate's next free cell (columns of 5, top to bottom, left column first). So round r puts one flower on every plate, left to right, and the pile shrinks from its end.
+**The deal rule:** flower k (k = 0 … T−1) leaves the **last** occupied pile cell and lands on plate `(k mod B) + 1`, in that plate's next free cell (columns of 5, top to bottom, left column first). So each round puts one flower on every plate, left to right, and the pile shrinks from its end.
 
-| Motion        | Spec                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Normal deal   | Launch at `k × 120 ms + floor(k / B) × 100 ms` (a 100 ms breath between rounds). Flight 320 ms, `Easing.out(Easing.cubic)` on progress p: x lerps; y lerps minus an arc `4 · h · p · (1 − p)`, h = 32 pt (tablet 40); scale lerps `s / 20` → 1. Landing: scale 1 → 1.12 (80 ms) → spring to 1 (stiffness 300, damping 14). [Fade: the pile flower fades out 120 ms as its plate cell fades in 120 ms, same schedule, no travel or scale.] |
-| Hint-2 round  | The first B flowers only, launched 300 ms apart, same flight. [same fade]                                                                                                                                                                                                                                                                                                                                                                 |
-| Fast deal     | On a right tap with flowers left: interval `min(50, 900 / left)` ms, flight 220 ms, no round breath, so it ends within about 1.1 s. [one 200 ms crossfade for all]                                                                                                                                                                                                                                                                        |
-| Instant       | The given answer: every flower left moves straight to its cell together, 200 ms `EASE_OUT`, no arc. [200 ms crossfade]                                                                                                                                                                                                                                                                                                                    |
-| Tag fill      | After the last landing: "?" fades out (100 ms), then the numeral springs 0.6 → 1 (stiffness 260, damping 20) while the pill turns `colors.myPink` and the dashed border fades. Plate k starts at `80 × (k − 1)` ms. [200 ms crossfade]                                                                                                                                                                                                    |
-| Pulse, ripple | Multiply's (§ 7 of its spec): 1 → 1.06 → 1 over 300 ms `EASE_IN_OUT`, 150 ms stagger for the plates. The total-tag pulse is 1 → 1.1 → 1. [no scale]                                                                                                                                                                                                                                                                                       |
-
-- **Durations** (normal deal, the whole pile): 6 on 2 plates is about 1.2 s; 12 on 3 about 2.1 s; 20 on 4 (the longest) about 3.0 s.
-- **Implementation:** the pile and the moving flowers are one absolutely positioned layer of T `FlowerGlyph`s (each flower's home is its pile cell; its target is its plate cell). There is one shared value per flower, scheduled with `withDelay` on the UI thread, so there are no JS timers. It animates at most 20 transforms at once: no bundle or battery concern beyond today's ripples.
-- **A layout change mid-deal** (rotation) lands every flower already launched at once; the rest keep their schedule in the new layout.
+- **Normal deal:**
+  - Launch at `k × 120 ms + floor(k / B) × 100 ms` (a 100 ms breath between rounds).
+  - The flight lasts 320 ms, with `Easing.out(Easing.cubic)` on progress p. x lerps; y lerps minus the arc `4 · h · p · (1 − p)`, h = 32 pt (tablet 40); the scale lerps from `s / 20` to 1.
+  - Landing: the scale goes 1 → 1.12 (80 ms), then springs back to 1 (stiffness 300, damping 14).
+  - [Each pile flower fades out over 120 ms as its plate cell fades in, on the same schedule. No travel, no scale.]
+- **Hint-2 round:** only the first B flowers, launched 300 ms apart, with the same flight. [The same fade.]
+- **Fast deal** (a right tap with flowers left): the interval is `min(50, 900 / left)` ms, the flight 220 ms, and there is no breath, so it ends within about 1.1 s. [One 200 ms crossfade for all of them.]
+- **Instant** (the given answer): every flower left moves straight to its cell, all together, 200 ms `EASE_OUT`, no arc. [A 200 ms crossfade.]
+- **Tag fill** (after the last landing): the "?" fades out (100 ms). Then the numeral springs 0.6 → 1 (stiffness 260, damping 20), while the pill turns `colors.myPink` and the dashed border fades. Plate k starts at `80 × (k − 1)` ms. [A 200 ms crossfade.]
+- **Pulse and ripple:** multiply's (§ 7 of its spec): 1 → 1.06 → 1 over 300 ms `EASE_IN_OUT`, 150 ms stagger for the plates. The total tag goes 1 → 1.1 → 1. [No scale.]
+- **Durations** of a normal deal of the whole pile: 6 on 2 plates about 1.2 s, 12 on 3 about 2.0 s, and 20 on 4 (the longest) about 3.0 s.
+- **Implementation:**
+  - The pile and the moving flowers are one absolutely positioned layer of T `FlowerGlyph`s. Each flower's home is its pile cell and its target is its plate cell.
+  - One shared value per flower, scheduled with `withDelay` on the UI thread, so there are no JS timers.
+  - At most 20 transforms move at once, so there is no bundle or battery cost beyond today's ripples.
+- **Rotation mid-deal:** every flower already launched lands at once, and the rest keep their schedule in the new layout.
 - **No new sounds.** The deal is silent, so Emma's voice stays the only audio.
 
 ### 2.6 Data model, parser, chips, session end
@@ -328,3 +328,121 @@ Added to `FORBIDDEN_PAIRS` before the rows are coded:
 | rope – sack | the sack is tied shut with a rope   |
 
 No trio in § 3.2 or § 4.2 contains a forbidden pair, old or new, and every chip word has a picture. I checked this with a scratch script against `wordPack.ts` and `picture-manifest.json` on 2026-10-16 (not committed).
+
+## 6. Copy / TTS script
+
+### 6.1 Lead lines
+
+Wave 1's mechanism (`content-wave-1.md` § 6.1): `createManifestLinePlayer('session-guide', …)`, Emma `listening`, before scored P1 of every forward session until mastery, and never in a peek, review or warm-up heart. The ids are `guide.session.intro.<node>` (kind `'session-intro'`). After a Word Song lead, the 1500 ms silent beat starts when it ends. After the Math lead, the read follows 400 ms later.
+
+### 6.2 Every new spoken line (for the Lily render)
+
+**Guidance (9)** and **path (15)**, one column per step:
+
+| Line id                           | `div-share`                                           | `tent-words`                                         | `cake-words`                                         |
+| --------------------------------- | ----------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------- |
+| `guide.session.peek-open.<node>`  | "Let's look at sharing!"                              | "Let's look at tent words!"                          | "Let's look at cake words!"                          |
+| `guide.session.peek-close.<node>` | "Sharing is for later. You will learn it!"            | "Tent words are for later. You will learn it!"       | "Cake words are for later. You will learn it!"       |
+| `guide.session.intro.<node>`      | "Let's share the flowers!"                            | "Read to the end!"                                   | "The E is quiet. It makes the A say its name."       |
+| `path.open.<node>`                | "Here is your path! You are on sharing."              | "Here is your path! You are on tent words."          | "Here is your path! You are on cake words."          |
+| `path.stop.<node>`                | "Sharing."                                            | "Tent words."                                        | "Cake words."                                        |
+| `path.locked.next.<node>`         | "Sharing! First, all the groups. Then this!"          | "Tent words! First, crab words. Then this!"          | "Cake words! First, tent words. Then this!"          |
+| `end.bud.<node>`                  | "Look! A new flower for sharing!"                     | "Look! A new flower for tent words!"                 | "Look! A new flower for cake words!"                 |
+| `end.unlock.<node>`               | "You learned all the groups! Now you can do sharing!" | "You learned crab words! Now you can do tent words!" | "You learned tent words! Now you can do cake words!" |
+
+**Canon:**
+
+- **`div-share` (16 new texts):**
+  - The 8 reads and 5 distinct correct lines of § 2.7.
+  - hint2 "One for each plate." and hint3 "How many on each plate?".
+  - "You worked on sharing today!".
+- **`tent-words` and `cake-words` (32 each):** four lines per word, in § 3.2 / § 4.2 order:
+  - read "Read the <word>."
+  - correct "Yes! That's a <word>."
+  - hint "Let's look. <Word>."
+  - giveAnswer "This one is <word>."
+- **Reused, not rendered:** "Hmm... try again?", "Look at the flowers.", "This one is two." to "This one is six.", "You worked on reading words today!", and every other `session.end.*` line (19 per file).
+
+**Total: 104 distinct new texts, 2,479 characters for ElevenLabs Lily.**
+
+| Surface            | Texts | Characters |
+| ------------------ | ----- | ---------- |
+| guidance           | 9     | 284        |
+| path               | 15    | 524        |
+| canon `div-share`  | 16    | 599        |
+| canon `tent-words` | 32    | 536        |
+| canon `cake-words` | 32    | 536        |
+
+- **How it was counted:** a scratch script (not committed, 2026-10-16) generated the texts from this spec's lists and compared them with every `text` in `public/canon/*/level-1/*.json`, every literal in `guidanceLines.ts`, and the path lines of today's spoken names. 26 slots reuse an existing text.
+- **The bill is right only if the bake reuses audio.** `revoiceCanonLily.ts` de-duplicates on the exact request text and caches renders. If a new file's 19 shared `session.end.*` lines were re-rendered, each file would add 382 characters. The `--dry-run` prints the real number before any spend.
+- **Canon is written, not Haiku-baked.** Every line is fixed, so a splice script writes the three files exactly (as `scripts/spliceContentWave1Canon.ts` did for wave 1's math). That costs no Anthropic credit. The three nodes join `PENDING_CANON_NODES` so an ordinary bake never draws them.
+- **Render with** `renderGuidanceLinesLily.ts`, `renderPathLinesLily.ts` and `revoiceCanonLily.ts --unrendered`. `pathLines.test.ts`'s baked count grows by 15.
+
+**Prediction for the ear test (Predict-Before-Soak; bar 2):**
+
+- The "Read the <word>." lines sound like crab words', and the end clusters keep both consonants (the d in _hand_, the k in _desk_ and the t in _belt_ are audible).
+- _tube_ comes out British, "tyoob".
+- The cake lead runs about 3.0–3.6 s, with a pause after "quiet", and says "the ay", not "the uh".
+- The sharing reads run about 3.2–4.0 s and pause at the comma and the full stop.
+- **Not predicted:** whether Lily stresses _each_ in "How many on each plate?". The ear test settles it.
+
+### 6.3 Vocabulary check (the ~200-word cap)
+
+- **New core words: 6.**
+  - **share** (also _sharing_), **plate** (also _plates_): the step's own words.
+  - **end**: the tent lead.
+  - **quiet**, **say**, **its**: the cake lead.
+  - _makes_ is a form of wave 1's _make_. _each_ is already in use ("We add two each time.").
+  - That brings wave 1's count of about 162 to about 168, still under ~200.
+- **Target words:** the 16 step words. _tent_ and _cake_ also name the steps.
+- **Zero-cost choices, made on purpose:**
+  - "Let's share the flowers!", not "divide", "equal" or "fair".
+  - hint3 reuses the read's question. hint1 reuses "Look at the flowers.".
+  - The digits sit on tags, so no "÷" word is needed.
+- Every text is ASCII-7, with no IPA and no sound demonstration inside a sentence.
+
+## 7. Pictures (OpenAI, the manifest pipeline)
+
+**16 new pictures:** the 8 tent words and the 8 cake words. None is in `mobile/assets/pictures/` (73 WebPs, `ls` 2026-10-16).
+
+- **Reused as chips (26 existing pictures):** bed, bib, box, bus, cap, cat, cup, dog, duck, fig, fox, gem, hat, hen, jet, king, lock, net, pen, pin, pot, rock, sun, tap, top, tub.
+- **Cost:** 16 × $0.078 ≈ $1.25 for one take each. A second round on the four riskiest (pond, desk, pine, tube) adds about $0.31.
+- **If one of those four fails its second round, stop and tell Matt** before spending more. A swap changes a word and its chip row, so it goes back through Dave.
+- **The 3 clay path pieces (§ 1) are not in this pipeline.** They are made the way the clay set was, with Thomas's tool.
+
+**Append to `design/word-song/picture-manifest.json`** (batches 9 and 10, riskiest first). The `distinctFrom` lists follow the manifest's rule: forbidden partners first, then trio mates A–Z, computed by the scratch script.
+
+```
+  { "word": "pond", "tier": "tent-words", "batch": 9, "subject": "A small round pond seen a little from above: calm blue water in a ring of rounded grey stones, two green reeds at one side and one round green lily pad on the water.", "avoid": ["a frog, a duck or any animal", "a lake with a far shore or hills", "a puddle on a road", "a fountain or a bucket"], "distinctFrom": ["cup", "hand", "hat", "hen", "pot"] },
+  { "word": "desk", "tier": "tent-words", "batch": 9, "subject": "A child's wooden school desk in three-quarter view: a flat warm-brown top on four straight legs, one small drawer at the front, and nothing on top.", "avoid": ["a lamp, books or a computer on it", "a chair", "a bed's headboard, pillow or blanket", "a table with a cloth"], "distinctFrom": ["bed", "cat", "duck", "nest", "sun"] },
+  { "word": "belt", "tier": "tent-words", "batch": 9, "subject": "One brown leather belt lying in a loose open curve, with a square silver buckle at one end and a row of small holes near the other end.", "avoid": ["a tight coil or spiral that reads as a snake", "trousers or a person wearing it", "a watch strap"], "distinctFrom": ["bed", "fox", "sun", "tent"] },
+  { "word": "nest", "tier": "tent-words", "batch": 9, "subject": "A round bird's nest of woven warm-brown twigs, seen from the side and a little above, holding three small pale-blue eggs.", "avoid": ["a bird in or near the nest", "one big tan hen's egg", "a basket with a handle", "a tree or a branch"], "distinctFrom": ["egg", "cup", "desk", "duck", "fox", "net", "tap", "tent"] },
+  { "word": "gift", "tier": "tent-words", "batch": 9, "subject": "One wrapped present in three-quarter view: a cube-shaped box in soft rose paper, with a cream ribbon crossing it and a big cream bow on top.", "avoid": ["plain brown cardboard, like the box picture", "a tag or a card", "more than one present", "a cake"], "distinctFrom": ["box", "fig", "gem", "pot", "sun"] },
+  { "word": "lamp", "tier": "tent-words", "batch": 9, "subject": "A table lamp in side view: a round cream base, a short straight stem and a soft rose bell-shaped shade, switched on, with a warm glow under the shade.", "avoid": ["a desk or a table under it", "a street lamp", "a candle or a torch", "a ceiling light"], "distinctFrom": ["bus", "dog", "hand", "lock"] },
+  { "word": "hand", "tier": "tent-words", "batch": 9, "subject": "One open hand seen from the palm side, fingers together and the thumb out, warm peach skin, cut off cleanly at the wrist.", "avoid": ["fingers spread wide, as if counting five", "a fist or a pointing finger", "an arm or a sleeve", "a glove"], "distinctFrom": ["bus", "hat", "lamp", "lock", "pond", "pot"] },
+  { "word": "tent", "tier": "tent-words", "batch": 9, "subject": "A small camping tent in three-quarter view: a soft orange triangle with a darker orange door flap tied open and two short guy ropes pegged to the ground.", "avoid": ["a house, a roof or a chimney", "a circus tent", "a flag on top", "people or a campfire"], "distinctFrom": ["bed", "belt", "cup", "dog", "nest", "net", "tap"] },
+  { "word": "pine", "tier": "cake-words", "batch": 10, "subject": "One small pine tree on its own: a tall, narrow cone of dark-green layered needles on a short brown trunk, with two brown pine cones hanging from the lowest layer.", "avoid": ["decorations, lights or a star, like a Christmas tree", "a round leafy tree", "a forest or a hill", "a pot"], "distinctFrom": ["cup", "dog", "kite", "pin"] },
+  { "word": "tube", "tier": "cake-words", "batch": 10, "subject": "One soft squeezable tube lying on its side: mint green with a rose band near its round white screw cap, gently squeezed in the middle.", "avoid": ["toothpaste coming out, or a toothbrush", "letters or a logo", "a cardboard roll", "a can or a standing cylinder"], "distinctFrom": ["cat", "hen", "top", "tub"] },
+  { "word": "cape", "tier": "cake-words", "batch": 10, "subject": "One rose-red cape on its own, spread open in a wide half-circle, with a cream lining and a cream bow at the neck.", "avoid": ["a person or a hood", "a dress with sleeves", "a blanket or a towel", "a logo or a symbol"], "distinctFrom": ["bus", "cake", "cap", "cat", "dog"] },
+  { "word": "rope", "tier": "cake-words", "batch": 10, "subject": "One length of thick warm-tan rope lying across the picture, tied in a loose single knot in the middle, both ends a little frayed.", "avoid": ["a coil or spiral that reads as a snake", "a lasso loop", "a sack tied with it", "a swing or a boat"], "distinctFrom": ["sack", "bone", "box", "hen", "rock", "sun"] },
+  { "word": "bone", "tier": "cake-words", "batch": 10, "subject": "One cartoon dog bone lying diagonally: a straight shaft with two rounded knobs at each end, warm ivory with soft tan shading.", "avoid": ["pure white that vanishes on a cream background", "a dog or a bowl", "a skeleton", "a dumbbell"], "distinctFrom": ["box", "jet", "rock", "rope", "sun"] },
+  { "word": "cake", "tier": "cake-words", "batch": 10, "subject": "A round two-layer cake in three-quarter view: soft pink icing dripping a little over the sides, a cream filling line between the layers, and one red cherry on top.", "avoid": ["candles or numbers", "a cut slice", "a cupcake or a bun", "a plate or a fork"], "distinctFrom": ["cap", "cape", "cat", "dog", "pen"] },
+  { "word": "kite", "tier": "cake-words", "batch": 10, "subject": "A diamond-shaped kite flying at a tilt, in four triangles of sky blue and rose pink, with a long wavy string and a tail of three small cream bows.", "avoid": ["a flag on a pole", "a person holding it", "a bird", "letters or patterns"], "distinctFrom": ["flag", "bib", "bike", "hen", "king", "pin", "pine", "sun"] },
+  { "word": "bike", "tier": "cake-words", "batch": 10, "subject": "A child's bicycle in side view: a rose-pink frame, two black tyres with thin spokes, a cream seat, handlebars and pedals.", "avoid": ["a rider", "a motorbike or a scooter", "training wheels", "a car"], "distinctFrom": ["bib", "dog", "king", "kite", "pen"] }
+```
+
+**Edits to the same file and its notes, so the manifest's checks pass:**
+
+- **Symmetry:** add the new words to their partners' `distinctFrom`. Forbidden partners go first:
+  - **bed:** desk (forbidden); belt, tent
+  - **box:** gift (forbidden); bone, rope
+  - **egg:** nest (forbidden)
+  - **flag:** kite (forbidden)
+  - **sack:** rope (forbidden)
+  - bib: bike, kite · bus: cape, hand, lamp · cap: cake, cape · cat: cake, cape, desk, tube
+  - cup: fox, nest, pine, pond, tent · dog: bike, cake, cape, lamp, pine, tent · duck: desk, nest · fig: gem, gift
+  - fox: belt, cup, nest · gem: fig, gift · hat: hand, pond · hen: kite, pond, rope, sun, tube · jet: bone, sun
+  - king: bike, kite · lock: hand, lamp · net: nest, tent · pen: bike, cake · pin: kite, pine
+  - pot: gift, hand, pond · rock: bone, rope · sun: belt, bone, desk, gift, hen, jet, kite, rope · tap: nest, tent · top: tub, tube · tub: top, tube
+- **The build check's word set** grows from 73 to 89 words. `picture-manifest.md` gets the two tiers in its `tier` row and batches 9 and 10 in its table.
+- **Don't append before Thomas approves (T4).** The generator reads the whole file, so an early append could start the spend.
