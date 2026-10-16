@@ -61,6 +61,25 @@ export function multiplyChipCeiling(corrects: readonly number[]): number {
   return Math.min(EXTENDED_ANSWER_MAX, 10 * Math.ceil((max + 1) / 10))
 }
 
+/**
+ * Times mix's ceiling (content wave 1 § 2.1): M = 40 for every problem of a
+ * `mult-mix` session, whichever 8 facts it drew (its largest pool answer is
+ * 36, so `10 × ceil(37 / 10)`). A per-plan ceiling would move the chips
+ * from day to day as the mix changes.
+ */
+export const MULT_MIX_CHIP_CEILING = 40
+
+/** The multiplication chip ceiling of a step's problems on screen: times
+ *  mix's fixed one, else {@link multiplyChipCeiling} of their answers. */
+export function multiplyChipCeilingFor(
+  node: string | undefined,
+  corrects: readonly number[],
+): number {
+  return node === 'mult-mix'
+    ? MULT_MIX_CHIP_CEILING
+    : multiplyChipCeiling(corrects)
+}
+
 /** Number recognition: `pickDistractors(correct, index, 10)`, unchanged
  *  (spec § 10): far values on P1–P3, the neighbours on P4–P8. */
 export function recognizeDistractors(

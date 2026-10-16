@@ -172,6 +172,8 @@ interface CliArgs {
    *  aborting the bake. Default false (fail-fast). Use during local
    *  prompt-iteration only — CI never sets this. Ticket 86c9qhr9k. */
   lintWarn: boolean
+  /** Bake the `PENDING_CANON_NODES` combos too (the deliberate render). */
+  includePending: boolean
 }
 
 function parseArgs(argv: readonly string[]): CliArgs {
@@ -179,6 +181,7 @@ function parseArgs(argv: readonly string[]): CliArgs {
     force: argv.includes('--force'),
     dryRun: argv.includes('--dry-run'),
     lintWarn: argv.includes('--lint-warn'),
+    includePending: argv.includes('--include-pending'),
     child: 'Marian',
     out: join(REPO_ROOT, 'public', 'canon'),
   }
@@ -238,6 +241,9 @@ const MATH_FOCUS_NODES: readonly string[] = [
   'mult-2-5-10',
   'mult-3-4',
   'mult-6-9',
+  // Content wave 1: written by scripts/spliceContentWave1Canon.ts, not
+  // baked (the file exists, so the incremental bake skips it).
+  'mult-mix',
 ]
 
 // Word-song first-class content modes — must match the
@@ -324,6 +330,40 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'sight-words',
   'simple-sentences',
 ]
+
+/**
+ * Combos an ordinary run never bakes (content wave 1). Neither a local
+ * `yarn canon:generate` nor the Vercel `prebuild` (which runs the
+ * incremental bake with the build env's keys) may spend Haiku / TTS credit
+ * on them by the way, and `--force` must not re-draw them.
+ *
+ * - add-to-10, add-to-20, mult-mix: written by
+ *   `scripts/spliceContentWave1Canon.ts` (problems kept byte-for-byte from
+ *   main, the § 1.8 / § 2.2 lines), never Haiku-baked; their new lines are
+ *   rendered by `scripts/revoiceCanonLily.ts --unrendered`. A Haiku bake
+ *   would re-draw the kept problems.
+ *
+ * The deliberate render runs `npx tsx scripts/generateSessionCanon.ts
+ * --include-pending`; an existing file is still skipped without `--force`.
+ */
+export const PENDING_CANON_NODES: ReadonlySet<string> = new Set([
+  'add-to-10',
+  'add-to-20',
+  'mult-mix',
+])
+
+/** The combos a run bakes: missing (or all, with `--force`), minus pending. */
+export function combosToBakeFor(
+  combos: readonly Combo[],
+  args: Pick<CliArgs, 'force' | 'includePending'>,
+  fileExists: (combo: Combo) => boolean,
+): Combo[] {
+  return combos.filter(
+    (combo) =>
+      (args.force || !fileExists(combo)) &&
+      (args.includePending || !PENDING_CANON_NODES.has(combo.focusNode)),
+  )
+}
 
 export function activeCombos(): readonly Combo[] {
   const out: Combo[] = []
@@ -663,9 +703,10 @@ async function main(): Promise<void> {
   // the keys aren't set in the build environment.
   const combosToBake = args.dryRun
     ? combos
-    : args.force
-      ? combos
-      : combos.filter((combo) => !existsSync(canonFilePath(args.out, combo)))
+    : combosToBakeFor(combos, args, (combo) =>
+        existsSync(canonFilePath(args.out, combo)),
+      )
+  const bakeKeys = new Set(combosToBake.map((c) => `${c.track}/${c.focusNode}`))
 
   // ── pre-flight ──
   // Two failure modes for missing keys, depending on context:
@@ -734,6 +775,14 @@ async function main(): Promise<void> {
 
     if (!args.force && existsSync(path)) {
       console.log(`skip   ${label}  (exists; pass --force to regen)`)
+      skipped++
+      continue
+    }
+
+    if (!args.dryRun && !bakeKeys.has(`${combo.track}/${combo.focusNode}`)) {
+      console.log(
+        `skip   ${label}  (pending a deliberate render; pass --include-pending)`,
+      )
       skipped++
       continue
     }

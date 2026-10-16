@@ -198,7 +198,7 @@ describe('buildHubCardModel', () => {
     const m = buildHubCardModel(p, 'math')
     expect(m.complete).toBe(true)
     expect(m.unlocksNext).toBeNull()
-    expect(m.current).toBe('mult-6-9')
+    expect(m.current).toBe('mult-mix')
     expect(m.landNumber).toBe(4)
     expect(m.slots.every((slot) => slot === 'grown')).toBe(true)
     expect(m.flowersToUnlock).toBe(0)

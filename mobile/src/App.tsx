@@ -395,7 +395,11 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
           snapshot.plan ?? mathDefaults.plan,
           mathSession.sessionFocus,
           snapshot.plan !== null
-            ? { review: snapshot.review, warmupCount: snapshot.warmupCount }
+            ? {
+                review: snapshot.review,
+                warmupCount: snapshot.warmupCount,
+                mix: snapshot.mix,
+              }
             : undefined,
         ),
       )
@@ -610,6 +614,7 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               review={mathState.review}
               warmupCount={mathState.warmupCount}
               problemNodes={mathState.problemNodes ?? undefined}
+              sessionIntro={mathState.intro}
               onProblemKindChange={onMathProblemKind}
               onSessionComplete={onMathComplete}
               onRequestExit={onMathExit}

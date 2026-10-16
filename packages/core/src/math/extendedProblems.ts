@@ -27,6 +27,10 @@
  *    Operand order is meaningful: the canon and the planner read it as
  *    `factorB` copies of `factorA` ("Two times three" → hint "Two, then two,
  *    then two."), with no commutative flip.
+ *  - missing-addend: `"Seven and what make ten?"` — the answer is the
+ *    missing part (content wave 1 § 1.6). Lives inside add-to-10 and
+ *    add-to-20 (P4, P6, P8), so the web's silent fallback now covers those
+ *    two steps too (§ 1.9).
  *
  * Answer chips
  * ------------
@@ -37,6 +41,7 @@
  * Pure types plus type guards: no I/O, no React.
  */
 
+import type { MathFact } from '../progress/types'
 import type { MathProblem, MathProblemUtterances } from './sessionPlans'
 
 /**
@@ -55,6 +60,7 @@ export type ExtendedMathProblemKind =
   | 'recognize'
   | 'skip-count'
   | 'multiply'
+  | 'missing-addend'
 
 /** An addition or subtraction problem in an extended plan: a
  *  {@link MathProblem}, tagged so the union can discriminate. Assignable to
@@ -108,12 +114,38 @@ export interface MultiplyProblem {
   utterances: MathProblemUtterances
 }
 
+/** The largest whole a missing-addend read may name (content wave 1
+ *  § 1.6: 1 ≤ A < T ≤ 20, the add-to-20 range). */
+export const MISSING_ADDEND_TOTAL_MAX = 20
+
+/**
+ * A missing-addend problem (content wave 1 § 1, NG-A): Emma names one part
+ * and the whole, the child taps the other part. e.g. "Seven and what make
+ * ten?" → addendA 7, total 10, correct 3; the screen shows `7 + ? = 10`.
+ * It practises the same bond as `7 + 3`, so it records the same Leitner
+ * fact, `{ a: addendA, b: correct, op: '+' }` (K4).
+ */
+export interface MissingAddendProblem {
+  kind: 'missing-addend'
+  /** 1-based position in the session (1..8). */
+  index: number
+  /** The given part (1..19). */
+  addendA: number
+  /** The whole (2..{@link MISSING_ADDEND_TOTAL_MAX}). */
+  total: number
+  /** The missing part, `total − addendA` (≥ 1). */
+  correct: number
+  /** Pre-canned utterance lines, same slots as arithmetic problems. */
+  utterances: MathProblemUtterances
+}
+
 /** One problem in an extended plan. Switch on `kind`. */
 export type ExtendedMathProblem =
   | ArithmeticProblem
   | NumberRecogProblem
   | SkipCountProblem
   | MultiplyProblem
+  | MissingAddendProblem
 
 /** A Math session plan with the extended problem kinds: exactly 8 problems. */
 export interface ExtendedMathSessionPlan {
@@ -143,8 +175,40 @@ export function isSkipCountProblem(
   return problem.kind === 'skip-count'
 }
 
+/** Also takes a plain (kind-less) `MathProblem`, which is never one. */
+export function isMissingAddendProblem(
+  problem: MathProblem | ExtendedMathProblem,
+): problem is MissingAddendProblem {
+  return 'kind' in problem && problem.kind === 'missing-addend'
+}
+
 export function isMultiplyProblem(
   problem: ExtendedMathProblem,
 ): problem is MultiplyProblem {
   return problem.kind === 'multiply'
+}
+
+/**
+ * The Leitner fact a problem practises, or `null` for one that is not an
+ * a/b fact (number recognition, skip counting). Arithmetic is `a ± b`;
+ * multiplication `A * B` in read order (`2*3` is not `3*2`); a missing
+ * number is the bond it completes, `{ a: addendA, b: correct, op: '+' }`,
+ * the key plain addition uses (content wave 1 K4). One reading for the
+ * session end, the canon fact table and the review picker.
+ */
+export function problemFact(
+  problem: MathProblem | ExtendedMathProblem,
+): MathFact | null {
+  if (!('kind' in problem) || problem.kind === 'arithmetic') {
+    return { a: problem.addendA, b: problem.addendB, op: problem.op }
+  }
+  switch (problem.kind) {
+    case 'multiply':
+      return { a: problem.factorA, b: problem.factorB, op: '*' }
+    case 'missing-addend':
+      return { a: problem.addendA, b: problem.correct, op: '+' }
+    case 'recognize':
+    case 'skip-count':
+      return null
+  }
 }

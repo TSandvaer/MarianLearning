@@ -127,6 +127,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import type { SessionStartResponse } from '../api/_types.js'
 import { isSessionStartResponse } from '../api/_types.js'
+import {
+  MISSING_NUMBER_RANGES,
+  MISSING_NUMBER_SLOTS,
+  bondKey,
+  missingNumberFits,
+} from '../packages/core/src/wire/missingNumbers.js'
 
 // ── CanonFileTier (Wave 5 PR B — ticket 86c9y1p99 schema-literal rename) ──
 //
@@ -208,6 +214,13 @@ export type CompositionRule =
   // distinct from category-cap because it spans two specific
   // categories (not a single-category cap).
   | 'adjacent-vowel-ban'
+  // add-to-10 / add-to-20 missing numbers (content wave 1 § 1.2): a
+  // missing number sits at a missing-number slot, and a session with any
+  // has one at every slot; its bond keeps to the step's range; and no
+  // bond appears twice in one session, in either shape or order.
+  | 'missing-number-slot'
+  | 'missing-number-range'
+  | 'same-bond'
 
 /**
  * One detected violation against a single problem (or whole-session in the
@@ -653,6 +666,163 @@ export function assertSubToTenCompositionClean(
 // priority; the taxonomy is built around making sure those facts are
 // detected and counted as a single high-leverage bucket.
 
+// ── missing numbers inside add-to-10 / add-to-20 (content wave 1 § 1.2) ──
+//
+// "Seven and what make ten?" is `7 + ? = 10`: Emma names one part and the
+// whole, the child taps the other part. The slots and the bond ranges live
+// in `packages/core/src/wire/missingNumbers.ts` (one place: Dave's marks may
+// move them). The plain problems of a session keep every rule below; a
+// missing number is checked here instead.
+
+const RE_MISSING_NUMBER =
+  /^\s*([a-z]+)\s+and\s+what\s+make\s+([a-z]+)\s*\?\s*$/i
+
+export interface ParsedMissingNumber {
+  /** The part Emma names. */
+  given: number
+  total: number
+  /** The part the child taps. */
+  missing: number
+}
+
+/**
+ * Parse a missing-number read line (`"<W> and what make <W>?"`), or `null`
+ * on any other line, an unknown number word or a part not smaller than the
+ * whole. Pure.
+ */
+export function parseMissingNumberReadLine(
+  text: string,
+): ParsedMissingNumber | null {
+  const m = RE_MISSING_NUMBER.exec(text)
+  if (!m) return null
+  const given = ADD_TO_TWENTY_NUMBER_WORDS[m[1]!.toLowerCase()]
+  const total = ADD_TO_TWENTY_NUMBER_WORDS[m[2]!.toLowerCase()]
+  if (given === undefined || total === undefined) return null
+  if (given < 1 || given >= total) return null
+  return { given, total, missing: total - given }
+}
+
+/** One read line's bond, for the same-bond rule. */
+interface BondRow {
+  index: number
+  a: number
+  b: number
+  shape: 'plain' | 'missing'
+}
+
+function lintMissingNumbers(
+  step: keyof typeof MISSING_NUMBER_RANGES,
+  missing: ReadonlyArray<{ index: number; parsed: ParsedMissingNumber }>,
+  plain: readonly BondRow[],
+): CompositionViolation[] {
+  const out: CompositionViolation[] = []
+  const slots = MISSING_NUMBER_SLOTS.join(', P')
+  if (missing.length > 0) {
+    for (const r of missing) {
+      if (!MISSING_NUMBER_SLOTS.includes(r.index)) {
+        out.push({
+          rule: 'missing-number-slot',
+          problemIndex: r.index,
+          message:
+            `P${r.index} is a missing number; missing numbers sit at ` +
+            `P${slots} only (content wave 1 § 1.2).`,
+          factId: `${r.parsed.given}+?=${r.parsed.total}`,
+        })
+      }
+    }
+    for (const slot of MISSING_NUMBER_SLOTS) {
+      if (!missing.some((r) => r.index === slot)) {
+        out.push({
+          rule: 'missing-number-slot',
+          problemIndex: slot,
+          message:
+            `P${slot} must be a missing number: a session with missing ` +
+            `numbers has one at each of P${slots} (content wave 1 § 1.2).`,
+          factId: null,
+        })
+      }
+    }
+    const range = MISSING_NUMBER_RANGES[step]
+    for (const r of missing) {
+      const { given, missing: part, total } = r.parsed
+      if (!missingNumberFits(step, given, part)) {
+        out.push({
+          rule: 'missing-number-range',
+          problemIndex: r.index,
+          message:
+            `P${r.index} ${given} + ? = ${total} is outside ${step}'s ` +
+            `missing-number bonds (given ${range.givenMin}-${range.givenMax}, ` +
+            `missing ${range.missingMin}-${range.missingMax}, whole ` +
+            `${range.totalMin}-${range.totalMax}; content wave 1 § 1.2).`,
+          factId: `${given}+?=${total}`,
+        })
+      }
+    }
+  }
+  const rows: BondRow[] = [
+    ...plain,
+    ...missing.map((r) => ({
+      index: r.index,
+      a: r.parsed.given,
+      b: r.parsed.missing,
+      shape: 'missing' as const,
+    })),
+  ].sort((x, y) => x.index - y.index)
+  const byBond = new Map<string, BondRow[]>()
+  for (const r of rows) {
+    const key = bondKey(r.a, r.b)
+    byBond.set(key, [...(byBond.get(key) ?? []), r])
+  }
+  for (const [key, group] of byBond) {
+    if (group.length < 2) continue
+    // An exact repeat of one plain problem is `no-duplicates`' finding.
+    const exactPlainRepeat = group.every(
+      (r) => r.shape === 'plain' && r.a === group[0]!.a && r.b === group[0]!.b,
+    )
+    if (exactPlainRepeat) continue
+    out.push({
+      rule: 'same-bond',
+      problemIndex: null,
+      message:
+        `Bond {${key.replace('+', ', ')}} appears ${group.length} times ` +
+        `(slots P${group.map((r) => r.index).join(', P')}); no bond twice ` +
+        `in one session, in either shape or order (content wave 1 § 1.2).`,
+      factId: key,
+    })
+  }
+  return out
+}
+
+/** The missing-number rows and the plain rows' bonds of a session. */
+function splitMissing(
+  problems: ReadonlyArray<{
+    index: number
+    parsed: ParsedFact | null
+    missing: ParsedMissingNumber | null
+  }>,
+): {
+  missing: { index: number; parsed: ParsedMissingNumber }[]
+  plainBonds: BondRow[]
+} {
+  return {
+    missing: problems.flatMap((p) =>
+      p.missing === null ? [] : [{ index: p.index, parsed: p.missing }],
+    ),
+    plainBonds: problems.flatMap((p) =>
+      p.parsed === null
+        ? []
+        : [
+            {
+              index: p.index,
+              a: p.parsed.a,
+              b: p.parsed.b,
+              shape: 'plain' as const,
+            },
+          ],
+    ),
+  }
+}
+
 export type AddToTenBand = 'EASY' | 'MEDIUM' | 'HARD'
 
 export type AddToTenCategory =
@@ -760,6 +930,8 @@ interface AddProblemRow {
   text: string
   parsed: ParsedFact | null
   poolMatch: AddToTenPoolFact | null
+  /** A missing number (content wave 1 § 1.2): checked apart. */
+  missing: ParsedMissingNumber | null
 }
 
 function extractAddProblems(
@@ -771,7 +943,8 @@ function extractAddProblems(
     const m = re.exec(u.id)
     if (!m) continue
     const index = Number.parseInt(m[1]!, 10)
-    const parsed = parseAddToTenReadLine(u.text)
+    const missing = parseMissingNumberReadLine(u.text)
+    const parsed = missing === null ? parseAddToTenReadLine(u.text) : null
     const poolMatch = parsed
       ? (ADD_TO_TEN_POOL.find((f) => f.a === parsed.a && f.b === parsed.b) ??
         null)
@@ -782,6 +955,7 @@ function extractAddProblems(
       text: u.text,
       parsed,
       poolMatch,
+      missing,
     })
   }
   rows.sort((x, y) => x.index - y.index)
@@ -803,13 +977,15 @@ export function lintAddToTenComposition(
 
   // ── unparseable / pool-membership pass ──
   for (const p of problems) {
+    if (p.missing !== null) continue
     if (p.parsed === null) {
       violations.push({
         rule: 'unparseable-problem',
         problemIndex: p.index,
         message:
           `P${p.index} (${p.utteranceId}) text does not match the ` +
-          `add-to-10 read template ("<W> plus <W>. How many?"): ` +
+          `add-to-10 read templates ("<W> plus <W>. How many?", ` +
+          `"<W> and what make <W>?"): ` +
           JSON.stringify(p.text),
         factId: null,
       })
@@ -875,9 +1051,16 @@ export function lintAddToTenComposition(
   }
 
   // ── sums-to-10 coverage pass (≥ 1 in P4-P8) ──
-  const sumsToTenInDiscriminate = matched.filter(
-    (p) => p.poolMatch.category === 'sums-to-10' && p.index >= 4,
-  )
+  // A missing number with the whole ten IS a bond to ten (content wave 1
+  // § 1.2): it covers the make-10 rule as a plain sums-to-10 fact does.
+  const sumsToTenInDiscriminate = [
+    ...matched.filter(
+      (p) => p.poolMatch.category === 'sums-to-10' && p.index >= 4,
+    ),
+    ...problems.filter(
+      (p) => p.missing !== null && p.missing.total === 10 && p.index >= 4,
+    ),
+  ]
   if (sumsToTenInDiscriminate.length < config.sumsToTenInP4ToP8Min) {
     violations.push({
       rule: 'high-leverage-coverage',
@@ -912,6 +1095,10 @@ export function lintAddToTenComposition(
       })
     }
   }
+
+  // ── missing numbers + same-bond pass (content wave 1 § 1.2) ──
+  const { missing, plainBonds } = splitMissing(problems)
+  violations.push(...lintMissingNumbers('add-to-10', missing, plainBonds))
 
   return violations
 }
@@ -1631,6 +1818,8 @@ interface AddToTwentyProblemRow {
   text: string
   parsed: ParsedFact | null
   poolMatch: AddToTwentyPoolFact | null
+  /** A missing number (content wave 1 § 1.2): checked apart. */
+  missing: ParsedMissingNumber | null
 }
 
 // Teen-extended number-word table. Separate from `NUMBER_WORDS` (which
@@ -1695,7 +1884,8 @@ function extractAddToTwentyProblems(
     const m = re.exec(u.id)
     if (!m) continue
     const index = Number.parseInt(m[1]!, 10)
-    const parsed = parseAddToTwentyReadLine(u.text)
+    const missing = parseMissingNumberReadLine(u.text)
+    const parsed = missing === null ? parseAddToTwentyReadLine(u.text) : null
     const poolMatch = parsed
       ? (ADD_TO_TWENTY_POOL.find((f) => f.a === parsed.a && f.b === parsed.b) ??
         null)
@@ -1706,6 +1896,7 @@ function extractAddToTwentyProblems(
       text: u.text,
       parsed,
       poolMatch,
+      missing,
     })
   }
   rows.sort((x, y) => x.index - y.index)
@@ -1753,14 +1944,15 @@ export function lintAddToTwentyComposition(
 
   // ── unparseable / pool-membership pass ──
   for (const p of problems) {
+    if (p.missing !== null) continue
     if (p.parsed === null) {
       violations.push({
         rule: 'unparseable-problem',
         problemIndex: p.index,
         message:
           `P${p.index} (${p.utteranceId}) text does not match the ` +
-          `add-to-20 read template ("<addend-A> plus <addend-B>. How ` +
-          `many?"): ` +
+          `add-to-20 read templates ("<addend-A> plus <addend-B>. How ` +
+          `many?", "<W> and what make <W>?"): ` +
           JSON.stringify(p.text),
         factId: null,
       })
@@ -1844,9 +2036,16 @@ export function lintAddToTwentyComposition(
   // are make-ten-bridge (#7, #8, #9, #10, #14), so a P4-P8 rule would
   // be trivially satisfied. P5-P8 forces the rule to bind even when
   // P4 happens to carry a non-make-ten-bridge fact.
-  const makeTenBridgeInDiscriminate = matched.filter(
-    (p) => p.poolMatch.category === 'make-ten-bridge' && p.index >= 5,
-  )
+  // An add-to-20 missing number crosses ten by its range (content wave 1
+  // § 1.2): a make-ten bridge in the other shape.
+  const makeTenBridgeInDiscriminate = [
+    ...matched.filter(
+      (p) => p.poolMatch.category === 'make-ten-bridge' && p.index >= 5,
+    ),
+    ...problems.filter(
+      (p) => p.missing !== null && p.missing.total > 10 && p.index >= 5,
+    ),
+  ]
   if (makeTenBridgeInDiscriminate.length < config.makeTenBridgeInP5ToP8Min) {
     violations.push({
       rule: 'high-leverage-coverage',
@@ -1886,6 +2085,10 @@ export function lintAddToTwentyComposition(
       })
     }
   }
+
+  // ── missing numbers + same-bond pass (content wave 1 § 1.2) ──
+  const { missing, plainBonds } = splitMissing(problems)
+  violations.push(...lintMissingNumbers('add-to-20', missing, plainBonds))
 
   return violations
 }

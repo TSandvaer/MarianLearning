@@ -286,3 +286,49 @@ describe('warm-up (AC 13, 14)', () => {
     expect(result.earnedThisSession).toBe(13)
   })
 })
+
+describe('the step intro lead (content wave 1 § 6.1)', () => {
+  it('plays before the scored problem 1, after the warm-up hearts, 400 ms before its read; never again', async () => {
+    const h = await setup({
+      plan: ROUND,
+      warmupCount: 2,
+      sessionIntro: 'guide.session.intro.mult-mix',
+    })
+    const round = ROUND.problems
+    for (let i = 0; i < 2; i++) {
+      expect(h.guide.lines.at(-1)!.id).toBe('guide.session.warmup')
+      await startAndEnd(h.guide.lines.at(-1)!)
+      await advance(SESSION_GUIDE_GAP_MS)
+      await answer(h, round[i]!, [round[i]!.correct])
+    }
+    expect(h.guide.lines.map((l) => l.id)).toEqual([
+      'guide.session.warmup',
+      'guide.session.warmup',
+      'guide.session.intro.mult-mix',
+    ])
+    // The stage is up while Emma says it; the read waits for it + 400 ms.
+    expect(screen.getAllByTestId('math-chips')).toHaveLength(1)
+    const reads = h.voice.lines.length
+    await startAndEnd(h.guide.lines[2]!)
+    await advance(SESSION_GUIDE_GAP_MS - 1)
+    expect(h.voice.lines).toHaveLength(reads)
+    await advance(1)
+    expect(h.voice.last().text).toBe(round[2]!.utterances.read)
+    for (let i = 2; i < 10; i++) await answer(h, round[i]!, [round[i]!.correct])
+    expect(h.guide.lines).toHaveLength(3)
+    expect(h.onSessionComplete).toHaveBeenCalledTimes(1)
+  })
+
+  it('no intro in a review, even when one is passed', async () => {
+    const h = await setup({
+      plan: REVIEW_PLAN,
+      review: true,
+      sessionIntro: 'guide.session.intro.mult-mix',
+    })
+    await startAndEnd(h.guide.lines[0]!)
+    await advance(SESSION_GUIDE_GAP_MS)
+    for (let i = 0; i < 8; i++)
+      await answer(h, SCORED[i]!, [SCORED[i]!.correct])
+    expect(h.guide.lines.map((l) => l.id)).toEqual(['guide.session.review'])
+  })
+})

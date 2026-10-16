@@ -25,6 +25,8 @@
  */
 import { buildHubCardModel, currentStepOf } from '../hub/hubCardModel'
 import {
+  MIX_BLOCK_COUNT,
+  MIX_SOURCE_STEPS as WIRE_MIX_SOURCE_STEPS,
   REVIEW_BLOCK_COUNT,
   WARMUP_BLOCK_MAX,
   type CanonBlockRef as WireCanonBlockRef,
@@ -63,10 +65,11 @@ export interface CanonBlockRef extends WireCanonBlockRef {
   problem: number
 }
 
-/** What a session start asks the server for (§ 2). */
+/** What a session start asks the server for (§ 2). A forward session on
+ *  the times-mix step also names its 8 blocks (content wave 1 § 2.4). */
 export type SessionPlanKind =
   | { kind: 'review'; blocks: CanonBlockRef[] }
-  | { kind: 'forward'; warmup: CanonBlockRef[] }
+  | { kind: 'forward'; warmup: CanonBlockRef[]; mix?: CanonBlockRef[] }
 
 function treeOf(world: MasteryTrack): readonly SkillNode[] {
   return world === 'math' ? MATH_TREE : LITERACY_TREE
@@ -327,7 +330,12 @@ export function pickWarmupBlocks(
  * § 2: what the session start asks for. A review when today's flower is
  * asleep and 8 blocks can be picked; otherwise the forward session with
  * its warm-up (0–2 blocks). A review and a warm-up never meet: a review
- * needs today's history entry, a warm-up its absence.
+ * needs today's history entry, a warm-up its absence. A forward session
+ * whose focus is the times-mix step carries its 8 blocks too (content
+ * wave 1 § 2.4), picked after the warm-up so they share one due cap.
+ *
+ * `focus` is the session's forward focus step (`pickFocusNode`'s); without
+ * it, the world's current step.
  */
 export function sessionPlanKind(
   p: Progress,
@@ -335,15 +343,214 @@ export function sessionPlanKind(
   nowMs: number,
   today: string,
   seed: number,
+  focus?: SkillNode,
 ): SessionPlanKind {
   if (isReviewSession(p, world, today)) {
     const blocks = pickReviewBlocks(p, world, nowMs, seed)
     if (blocks.length === REVIEW_PROBLEMS) return { kind: 'review', blocks }
   }
-  return {
-    kind: 'forward',
-    warmup: pickWarmupBlocks(p, world, nowMs, today, seed),
+  const warmup = pickWarmupBlocks(p, world, nowMs, today, seed)
+  const step = focus ?? currentStepOf(p, world)
+  if (world === 'math' && step === MIX_STEP) {
+    const mix = pickMixBlocks(p, nowMs, seed, warmup)
+    if (mix.length === MIX_BLOCK_COUNT) return { kind: 'forward', warmup, mix }
   }
+  return { kind: 'forward', warmup }
+}
+
+// ── Times mix (content wave 1 § 2.2–§ 2.3) ──────────────────────────────
+
+/** The times-mix step. */
+const MIX_STEP: NumberGardenNode = 'mult-mix'
+
+/**
+ * The steps a times mix draws its blocks from, in pool order (the first
+ * block of a fact wins). The wire's list, typed (the server validates refs
+ * against it).
+ */
+export const MIX_SOURCE_STEPS: readonly NumberGardenNode[] =
+  WIRE_MIX_SOURCE_STEPS as readonly NumberGardenNode[]
+
+/**
+ * The pool's group sizes (A, the number in each group) and group counts
+ * (B). Up to 5 groups: the plates picture holds at most 5 plates (§ 2.2,
+ * K6). One place: Dave's marks (§ 12 D2) may widen it.
+ */
+export const MIX_GROUP_SIZE = { min: 2, max: 9 } as const
+export const MIX_GROUP_COUNT = { min: 2, max: 5 } as const
+
+/** One pool fact and the canon block that serves it. */
+export interface MixPoolFact {
+  fact: MathFact
+  ref: CanonBlockRef
+}
+
+let mixPool: readonly MixPoolFact[] | null = null
+
+/**
+ * § 2.2: every canon block of `MIX_SOURCE_STEPS` whose fact is `A * B` with
+ * A in `MIX_GROUP_SIZE` and B in `MIX_GROUP_COUNT`, once per fact (the
+ * first block in step order). 28 facts with today's canon.
+ */
+export function mixFactPool(): readonly MixPoolFact[] {
+  if (mixPool !== null) return mixPool
+  const out: MixPoolFact[] = []
+  const seen = new Set<string>()
+  for (const node of MIX_SOURCE_STEPS) {
+    CANON_MATH_FACTS[node].forEach((fact, i) => {
+      if (fact === null || fact.op !== '*') return
+      if (fact.a < MIX_GROUP_SIZE.min || fact.a > MIX_GROUP_SIZE.max) return
+      if (fact.b < MIX_GROUP_COUNT.min || fact.b > MIX_GROUP_COUNT.max) return
+      const key = factKey(fact)
+      if (seen.has(key)) return
+      seen.add(key)
+      out.push({ fact, ref: { node, problem: i + 1 } })
+    })
+  }
+  mixPool = out
+  return out
+}
+
+/** P1–P3 of a times mix: the gentle opening. */
+const MIX_OPENING = 3
+/** P1–P3 open on facts she got right before: box 2 or higher. */
+const MIX_KNOWN_MIN_BOX = 2
+
+const product = (f: MathFact) => f.a * f.b
+const byKey = (x: MathFact, y: MathFact) => {
+  const a = factKey(x)
+  const b = factKey(y)
+  return a < b ? -1 : a > b ? 1 : 0
+}
+
+/**
+ * § 2.3 step 3 (Kyle, 2026-10-16): of all orders of `picks`, the one with
+ * the fewest neighbours sharing A (`before`, P3's A, neighbours the first);
+ * ties go to the order that comes first compared pick by pick in pick
+ * order. When a no-repeat order exists this is the first one, which is the
+ * greedy pass ("take the next pick whose A differs") whenever that pass
+ * finishes without a repeat; e.g. after a 3, A 4, 2, 3, 4, 4 plays as
+ * 4, 2, 4, 3, 4. A depth-first search in pick order (at most 120 orders
+ * for five picks) that keeps the first order with the fewest repeats and
+ * prunes branches that can no longer beat it.
+ */
+export function orderByTable(
+  picks: readonly MixPoolFact[],
+  before: number | undefined,
+): MixPoolFact[] {
+  let best: MixPoolFact[] = [...picks]
+  let bestRepeats = Number.POSITIVE_INFINITY
+  const walk = (
+    left: readonly MixPoolFact[],
+    prev: number | undefined,
+    path: MixPoolFact[],
+    repeats: number,
+  ): void => {
+    if (repeats >= bestRepeats) return
+    if (left.length === 0) {
+      best = path
+      bestRepeats = repeats
+      return
+    }
+    for (let i = 0; i < left.length && bestRepeats > 0; i++) {
+      const x = left[i]!
+      walk(
+        left.filter((_, j) => j !== i),
+        x.fact.a,
+        [...path, x],
+        repeats + (x.fact.a === prev ? 1 : 0),
+      )
+    }
+  }
+  walk(picks, before, [], 0)
+  return best
+}
+
+/**
+ * § 2.3: the 8 blocks of a times-mix session.
+ *
+ * `strength(f)` = the fact's Leitner box (1–5), or 0 when it has none.
+ *
+ * 1. P1–P3: the 3 facts with strength ≥ 2 and the highest strength (ties:
+ *    the smaller product, then the key `${a}*${b}`); fewer than 3 → the
+ *    smallest products fill. Played in product order, smallest first.
+ * 2. P4–P8: the due facts first, ranked as `rankedDueFacts`, up to
+ *    `LEITNER_DUE_PER_SESSION_CAP` minus the warm-up's fact count,
+ *    skipping warm-up facts and P1–P3; then the lowest strength first,
+ *    ties by pool index rotated by `seed`.
+ * 3. P4–P8 in pick order, except that when the next pick has the same A as
+ *    the problem before it (P3 included), the first later pick with
+ *    another A goes first (`orderByTable`).
+ *
+ * `seed` is the session count at kick time (as for reviews), so the
+ * prefetch and the tap ask for the same refs. Pure.
+ */
+export function pickMixBlocks(
+  p: Progress,
+  nowMs: number,
+  seed: number,
+  warmup: readonly CanonBlockRef[],
+): CanonBlockRef[] {
+  const pool = mixFactPool()
+  const box = new Map(
+    p.mathFactsLeitner.items.map((e) => [factKey(e.item), e.box as number]),
+  )
+  const strength = (f: MathFact) => box.get(factKey(f)) ?? 0
+  const picked = new Set<string>()
+
+  // 1. The opening.
+  const known = pool
+    .filter((x) => strength(x.fact) >= MIX_KNOWN_MIN_BOX)
+    .sort(
+      (x, y) =>
+        strength(y.fact) - strength(x.fact) ||
+        product(x.fact) - product(y.fact) ||
+        byKey(x.fact, y.fact),
+    )
+  const smallest = [...pool].sort(
+    (x, y) => product(x.fact) - product(y.fact) || byKey(x.fact, y.fact),
+  )
+  const opening: MixPoolFact[] = []
+  for (const x of [...known, ...smallest]) {
+    if (opening.length >= MIX_OPENING) break
+    if (picked.has(factKey(x.fact))) continue
+    opening.push(x)
+    picked.add(factKey(x.fact))
+  }
+  opening.sort(
+    (x, y) => product(x.fact) - product(y.fact) || byKey(x.fact, y.fact),
+  )
+
+  // 2. The weak facts: due first (one cap shared with the warm-up), then
+  //    the lowest strength.
+  const warmFacts = new Set(warmupFactsOf(warmup).map(factKey))
+  const byFact = new Map(pool.map((x) => [factKey(x.fact), x]))
+  const cap = Math.max(0, LEITNER_DUE_PER_SESSION_CAP - warmFacts.size)
+  const rest: MixPoolFact[] = []
+  for (const { fact } of rankedDueFacts(p, nowMs)) {
+    if (rest.length >= cap) break
+    const key = factKey(fact)
+    const x = byFact.get(key)
+    if (x === undefined || picked.has(key) || warmFacts.has(key)) continue
+    rest.push(x)
+    picked.add(key)
+  }
+  const rotated = (i: number) => (i + seed) % pool.length
+  const fill = pool
+    .map((x, i) => ({ x, i }))
+    .filter(({ x }) => !picked.has(factKey(x.fact)))
+    .sort(
+      (u, v) =>
+        strength(u.x.fact) - strength(v.x.fact) || rotated(u.i) - rotated(v.i),
+    )
+  for (const { x } of fill) {
+    if (rest.length >= MIX_BLOCK_COUNT - opening.length) break
+    rest.push(x)
+  }
+
+  // 3. Neighbours from different tables whenever possible.
+  const ordered = orderByTable(rest, opening[opening.length - 1]?.fact.a)
+  return [...opening, ...ordered].map((x) => ({ ...x.ref }))
 }
 
 /** The canon facts of a math warm-up's blocks (non-fact blocks dropped). */

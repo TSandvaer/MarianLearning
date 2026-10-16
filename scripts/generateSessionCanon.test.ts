@@ -41,7 +41,7 @@ import {
  */
 
 describe('activeCombos — coverage matches the curriculum', () => {
-  it('produces 24 combos: 11 math nodes × level 1 + 13 word-song nodes × level 1 (simple-sentences baked post-Wave 13)', () => {
+  it('produces 25 combos: 12 math nodes × level 1 + 13 word-song nodes × level 1 (simple-sentences baked post-Wave 13; mult-mix spliced, content wave 1)', () => {
     // Step 2 of the planner-parser contract added cvc-words alongside
     // blending-cv as a first-class word-song content mode. Ticket
     // 86c9m3ae3 added `cvc-words-short-o` as the next-vowel sibling
@@ -79,10 +79,10 @@ describe('activeCombos — coverage matches the curriculum', () => {
     // `design/wave-13-simple-sentences-plan.md`. After this tier, EVERY
     // word-song node is first-class — no remaining untuned tiers.
     const combos = activeCombos()
-    expect(combos).toHaveLength(24)
+    expect(combos).toHaveLength(25)
     const mathCount = combos.filter((c) => c.track === 'math').length
     const wordSongCount = combos.filter((c) => c.track === 'word-song').length
-    expect(mathCount).toBe(11)
+    expect(mathCount).toBe(12)
     expect(wordSongCount).toBe(13)
   })
 

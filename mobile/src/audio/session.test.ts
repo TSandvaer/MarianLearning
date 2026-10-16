@@ -315,6 +315,37 @@ describe('session audio: eager files, lazy players', () => {
     expect(fakePlayers).toHaveLength(0)
   })
 
+  it('a line whose audio is not rendered yet (empty base64) writes no file and walks its caption', async () => {
+    // Content wave 1: new canon lines ship with `base64: ''` until their
+    // Lily render (`scripts/spliceContentWave1Canon.ts`).
+    const s = loadSessionAudio(
+      's1',
+      [
+        ...UTTERANCES,
+        {
+          id: 'p3.read',
+          text: 'Seven and what make ten?',
+          audio: { kind: 'inline', base64: '', mime: 'audio/mpeg' },
+        },
+      ],
+      { engine, files, yieldThen: sync },
+    )
+    expect(s.fileCount).toBe(3)
+    expect([...(files.dirs.get('s1')?.keys() ?? [])]).not.toContain('p3.read')
+    const onPlay = jest.fn()
+    const ticks: number[] = []
+    await expect(
+      s.playUtterance('Seven and what make ten?', {
+        onPlay,
+        onWordTick: (i) => ticks.push(i),
+      }),
+    ).resolves.toBeUndefined()
+    expect(onPlay).toHaveBeenCalledTimes(1)
+    expect(ticks).toEqual([0, 1, 2, 3, 4])
+    expect(fakePlayers).toHaveLength(0)
+    expect(s.fileFor('Seven and what make ten?')).toBeUndefined()
+  })
+
   it('playUtteranceById rejects for an unknown id', async () => {
     const s = loadSessionAudio('s1', UTTERANCES, {
       engine,

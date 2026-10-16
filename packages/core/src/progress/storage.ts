@@ -14,7 +14,7 @@ import { getKeyValueStore } from '../platform/keyValueStore'
 import { LETTER_SOUNDS_VOWELS, defaultLockedSkillLevels } from './defaults'
 import { isKnownSkillNode, isProgressV1, readSchemaVersion } from './guards'
 import { inferLifetimeFirstEncountersFromProgress } from './lifetimeFirstEncounters'
-import { recordGoodDays } from './mastery'
+import { LITERACY_TREE, MATH_TREE, recordGoodDays } from './mastery'
 import { migrate } from './migrate'
 import { getSettings, retireLegacyMasteryThreshold } from './parentSettings'
 import type {
@@ -22,6 +22,7 @@ import type {
   ParentSettings,
   Progress,
   SkillLevels,
+  SkillNode,
   VowelSubMasteryState,
 } from './types'
 import { CURRENT_SCHEMA_VERSION } from './types'
@@ -127,11 +128,27 @@ export function withKnownPendingPromotion(p: Progress): Progress {
   return rest
 }
 
+/** Each step's predecessor in its world's tree (a world's first has none). */
+function treePredecessors(): Map<SkillNode, SkillNode> {
+  const out = new Map<SkillNode, SkillNode>()
+  for (const tree of [MATH_TREE, LITERACY_TREE]) {
+    tree.forEach((node, i) => {
+      if (i > 0) out.set(node, tree[i - 1]!)
+    })
+  }
+  return out
+}
+
+const TREE_PREDECESSOR: ReadonlyMap<SkillNode, SkillNode> = treePredecessors()
+
 /**
  * Read-path skill-level defaulter (ticket 86c9pkfth).
  *
  * Fills missing keys on the parsed `skillLevels` object with the
- * schema-floor value `'locked'`. Mirror-of-shape for `withDefaultedSettings`
+ * schema-floor value `'locked'`, or `'intro'` when the step's tree
+ * predecessor is stored `'mastered'` (content wave 1 § 5.3, K13: a step a
+ * new build adds behind a mastered one opens, and the Map plays its unlock
+ * beat because it is not in `unlocksCelebrated`). Mirror-of-shape for `withDefaultedSettings`
  * below: layered post-parse so the strict `isProgressV1` guard never sees
  * a missing-key shape it would reject.
  *
@@ -251,6 +268,14 @@ export function withDefaultedSkillLevels(parsed: unknown): unknown {
       // guard catches that downstream.
       filled[key] = withRemap[key] as SkillLevels[typeof key]
     } else {
+      // A step this build added (content wave 1 § 5.3, K13): it opens
+      // when the step before it is already mastered. The mastery rule
+      // only walks 'intro' / 'practicing' steps, so a 'locked' fill
+      // behind a finished world would never open.
+      const before = TREE_PREDECESSOR.get(key)
+      if (before !== undefined && withRemap[before] === 'mastered') {
+        filled[key] = 'intro'
+      }
       mutated = true
     }
   }

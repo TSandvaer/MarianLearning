@@ -181,6 +181,10 @@ export function loadSessionAudio(
   const uris = new Map<string, string>()
   const fileBytes = new Map<string, number>()
   for (const u of utterances) {
+    // A line whose audio is not rendered yet (an empty clip in the canon,
+    // e.g. content wave 1 before its Lily render): no file and no id, so
+    // `playUtterance` walks its caption silently, as for any unknown text.
+    if (u.audio.base64 === '') continue
     texts.set(u.id, u.text)
     if (!textToId.has(u.text)) {
       textToId.set(u.text, u.id)

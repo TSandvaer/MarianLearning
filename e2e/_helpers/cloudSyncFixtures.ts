@@ -236,6 +236,7 @@ export function buildCloudProgressBlob(opts: {
     'mult-2-5-10': 'intro',
     'mult-3-4': 'locked',
     'mult-6-9': 'locked',
+    'mult-mix': 'locked',
     'letter-names': 'mastered',
     'letter-sounds': 'practicing',
     'blending-cv': 'practicing',

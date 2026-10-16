@@ -102,8 +102,10 @@ import {
 import { getCanonEntry } from './_canon.js'
 import { applyFirstEncounterGate } from './_firstEncounterGate.js'
 import {
+  buildMixResponse,
   buildPeekResponse,
   buildReviewResponse,
+  hasMixRequest,
   hasPeekRequest,
   hasReviewRequest,
   withWarmupBlocks,
@@ -869,6 +871,27 @@ export async function handler(
           200,
           headers,
         )
+      // Times mix (content wave 1 § 2.4): core composed the 8 blocks; the
+      // review's step 0, copied with their baked audio plus mult-mix's
+      // session-end lines. Free; warm-up blocks ride along via `serve`.
+      if (hasMixRequest(body.payload)) {
+        const mix = buildMixResponse(
+          body.payload,
+          trackPayload.track,
+          canonResolver,
+        )
+        if (mix === null) {
+          return jsonResponse(
+            {
+              error: 'invalid-request',
+              message: 'mix must name 8 canon blocks of the times-mix steps',
+            },
+            400,
+            headers,
+          )
+        }
+        return serve(mix)
+      }
       // Canon hit (ticket 86c9kwhbc, D — pre-baked session canon). We
       // pre-render every active (track, level, focusNode) combo at
       // build time as a static blob and ship it inside the function

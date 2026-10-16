@@ -32,6 +32,15 @@
 //   renamed `<ns>.p1..p3.<slot>` and a plan id starting `peek-` (label
 //   `Peek`); same place in the handler, same 400 on a bad ref. A peek counts
 //   toward nothing; the server never sees what the child does with it.
+// - `payload.mix = { blocks }` (exactly 8 refs, each a step of
+//   `MIX_SOURCE_STEPS`: a times-mix session, content wave 1
+//   design/native/content-wave-1.md § 2.4): core composed the session from
+//   the multiplication steps' canon. `buildMixResponse` answers with the 8
+//   blocks renamed `math.p1..p8.<slot>` plus mult-mix's own
+//   `session.end.*` lines (everything a canon forward plan carries), plan
+//   id `mix-math`, label `Times mix`. Same place in the handler (before the
+//   canon lookup, the session cache and the limiter), same 400 on a bad
+//   ref; warm-up refs are appended afterwards, as for any forward response.
 
 import {
   VALID_MATH_FOCUS_NODES,
@@ -39,6 +48,9 @@ import {
 } from './_planner.js'
 import type { PlannerTrack } from './_planner.js'
 import {
+  MIX_BLOCK_COUNT,
+  MIX_PLAN_ID_PREFIX,
+  MIX_SOURCE_STEPS,
   PEEK_BLOCK_COUNT,
   PEEK_PLAN_ID_PREFIX,
   REVIEW_BLOCK_COUNT,
@@ -180,6 +192,68 @@ export function hasPeekRequest(payload: unknown): boolean {
   return hasField(payload, PEEK.field)
 }
 
+/** Does the payload ask for a times-mix session (`payload.mix` present)? */
+export function hasMixRequest(payload: unknown): boolean {
+  return hasField(payload, 'mix')
+}
+
+/** The step whose `session.end.*` lines a times-mix session carries. */
+const MIX_STEP = 'mult-mix'
+
+/**
+ * The times-mix response for `payload.mix` (content wave 1 § 2.4), or
+ * `null` when the request is invalid (not math, not exactly 8 refs, a ref
+ * outside `MIX_SOURCE_STEPS`, a problem outside 1..8, a missing canon
+ * entry): the handler answers 400 `invalid-request`. Every other progress
+ * hint is ignored. No Anthropic call, no TTS, no cache write.
+ */
+export function buildMixResponse(
+  payload: unknown,
+  track: PlannerTrack,
+  resolve: CanonResolver,
+): SessionStartResponse | null {
+  if (track !== 'math') return null
+  const raw = (payload as Record<string, unknown>).mix
+  const refs = parseBlocks(raw, track, MIX_BLOCK_COUNT, MIX_BLOCK_COUNT)
+  if (refs === null) return null
+  if (refs.some((r) => !MIX_SOURCE_STEPS.includes(r.node))) return null
+  const blocks = copyRefs(refs, track, resolve)
+  const own = resolve({ track, level: 1, focusNode: MIX_STEP })
+  if (blocks === null || own === null) return null
+  const isEnd = (u: { id: string }) => u.id.startsWith('session.end.')
+  return {
+    ok: true,
+    kind: 'session-start',
+    plan: {
+      id: `${MIX_PLAN_ID_PREFIX}${track}`,
+      label: 'Times mix',
+      utterances: [...blocks.plan, ...planLinesOf(own).filter(isEnd)],
+    },
+    utterances: [...blocks.utterances, ...own.utterances.filter(isEnd)],
+  }
+}
+
+/** `refs`' blocks renamed `<ns>.p1..pN.`, or `null` if one can't be served. */
+function copyRefs(
+  refs: readonly CanonBlockRef[],
+  track: PlannerTrack,
+  resolve: CanonResolver,
+): { plan: PlanLine[]; utterances: Utterance[] } | null {
+  const ns = namespaceOf(track)
+  const plan: PlanLine[] = []
+  const utterances: Utterance[] = []
+  for (let i = 0; i < refs.length; i++) {
+    const ref = refs[i]!
+    const entry = resolve({ track, level: 1, focusNode: ref.node })
+    if (entry === null) return null
+    const block = copyBlock(entry, ns, ref.problem, `p${i + 1}`)
+    if (block.plan.length === 0 || block.utterances.length === 0) return null
+    plan.push(...block.plan)
+    utterances.push(...block.utterances)
+  }
+  return { plan, utterances }
+}
+
 /**
  * The review response for `payload.review`, or `null` when the request is
  * invalid (not exactly 8 refs, a step of another track, a problem outside
@@ -219,27 +293,17 @@ function buildBlockSession(
   const refs = parseBlocks(raw, track, kind.count, kind.count)
   if (refs === null) return null
   if (kind.oneStep && refs.some((r) => r.node !== refs[0]!.node)) return null
-  const ns = namespaceOf(track)
-  const plan: PlanLine[] = []
-  const utterances: Utterance[] = []
-  for (let i = 0; i < refs.length; i++) {
-    const ref = refs[i]!
-    const entry = resolve({ track, level: 1, focusNode: ref.node })
-    if (entry === null) return null
-    const block = copyBlock(entry, ns, ref.problem, `p${i + 1}`)
-    if (block.plan.length === 0 || block.utterances.length === 0) return null
-    plan.push(...block.plan)
-    utterances.push(...block.utterances)
-  }
+  const blocks = copyRefs(refs, track, resolve)
+  if (blocks === null) return null
   return {
     ok: true,
     kind: 'session-start',
     plan: {
       id: `${kind.idPrefix}${track}`,
       label: kind.label,
-      utterances: plan,
+      utterances: blocks.plan,
     },
-    utterances,
+    utterances: blocks.utterances,
   }
 }
 

@@ -7,6 +7,7 @@ import {
   GUIDANCE_LINES_AWAITING_RENDER,
   guidanceLine,
   peekLines,
+  sessionIntroLine,
 } from './guidanceLines'
 import { PATH_LINES } from './pathLines'
 
@@ -36,13 +37,15 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'session-review': 1,
       'session-warmup': 1,
       'session-knew': 1,
-      'session-peek-open': 22,
-      'session-peek-close': 22,
+      'session-peek-open': 23,
+      'session-peek-close': 23,
+      'session-intro': 1,
+      'session-hiding': 1,
     })
-    expect(GUIDANCE_LINES).toHaveLength(67)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(67)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(67)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(67)
+    expect(GUIDANCE_LINES).toHaveLength(71)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(71)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(71)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(71)
   })
 
   it('bakes each world and count variant', () => {
@@ -104,6 +107,40 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     expect(guidanceLine('guide.session.peek-close')).toBeUndefined()
   })
 
+  it('bakes the lead lines of content wave 1 § 6.1 with their exact approved texts (AC 6)', () => {
+    expect(guidanceLine('guide.session.hiding')).toMatchObject({
+      kind: 'session-hiding',
+      world: 'math',
+      text: 'Some flowers are hiding!',
+      src: '/assets/audio/path/guide-session-hiding.mp3',
+    })
+    // Every intro line is `guide.session.intro.<step>`, kind
+    // `session-intro`, with its step's world.
+    for (const l of GUIDANCE_LINES.filter((x) => x.kind === 'session-intro')) {
+      const node = l.id.slice('guide.session.intro.'.length)
+      expect(sessionIntroLine(node as never)).toBe(l)
+      const tree = l.world === 'math' ? MATH_TREE : LITERACY_TREE
+      expect(tree as readonly string[]).toContain(node)
+    }
+    // A step with no intro text has no line.
+    expect(sessionIntroLine('add-to-10')).toBeUndefined()
+    // Times mix (§ 6.2 rows 1, 2, 7).
+    expect(sessionIntroLine('mult-mix')).toMatchObject({
+      id: 'guide.session.intro.mult-mix',
+      world: 'math',
+      text: "Let's play all the groups!",
+      src: '/assets/audio/path/guide-session-intro-mult-mix.mp3',
+    })
+    expect(peekLines('mult-mix')?.open.text).toBe(
+      "Let's look at all the groups!",
+    )
+    expect(peekLines('mult-mix')?.close.text).toBe(
+      'All the groups are for later. You will learn it!',
+    )
+    // Rendered in Lily with "Some flowers are hiding!" (§ 6.2 rows 1, 2, 7, 10).
+    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
+  })
+
   it('names the step in the peek opener and closer (Thomas 2026-10-15), with the path lines’ spoken names and their verb', () => {
     expect(peekLines('sub-to-10')).toMatchObject({
       open: {
@@ -136,6 +173,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'mult-2-5-10',
       'mult-3-4',
       'mult-6-9',
+      'mult-mix',
       'letter-sounds',
       'cvc-words',
       'cvc-words-short-o',
@@ -178,7 +216,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(67)
+    ).toHaveLength(71)
   })
 
   it('repeats no Emma’s Path line', () => {

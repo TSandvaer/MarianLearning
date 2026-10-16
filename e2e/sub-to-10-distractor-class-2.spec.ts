@@ -279,9 +279,14 @@ const SUB_TO_TEN_CANON_PATH = resolve(
   process.cwd(),
   'public/canon/math/level-1/sub-to-10.json',
 )
+// Content wave 1 (design/native/content-wave-1.md § 1.9): the committed
+// add-to-10 canon now carries missing-number problems the frozen web does not
+// read (it falls back to its static plan). This web spec keeps testing the
+// plain-addition canon, frozen from main 11ac65e in
+// e2e/fixtures/canon-web-plain-addition/.
 const ADD_TO_TEN_CANON_PATH = resolve(
   process.cwd(),
-  'public/canon/math/level-1/add-to-10.json',
+  'e2e/fixtures/canon-web-plain-addition/add-to-10.json',
 )
 
 // The canon-bytes mock is the shared `installMathCanonClaudeMock`

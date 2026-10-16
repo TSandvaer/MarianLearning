@@ -11,9 +11,13 @@
  * steps mix, so some problems may have none); `warmupFacts` +
  * `warmupCorrect` are a forward session's warm-up outcomes.
  */
-import type {
-  ExtendedMathProblem,
-  ExtendedMathSessionPlan,
+// A problem's fact (native spec § 8; content wave 1 K4): `a ± b`, `A * B`
+// (`2*3` and `3*2` are separate facts), a missing number's bond (`7 + ? =
+// 10` is `7+3`); `null` for number recognition and skip counting.
+import {
+  problemFact,
+  type ExtendedMathProblem,
+  type ExtendedMathSessionPlan,
 } from '@marian/core/math/extendedProblems'
 import type {
   MathProblem,
@@ -64,21 +68,11 @@ export interface RoundShape {
   review: boolean
   /** The first `warmupCount` problems of the plan are the warm-up. */
   warmupCount: number
+  /** A times-mix session (content wave 1 § 2.4). */
+  mix?: boolean
 }
 
 const FORWARD_ROUND: RoundShape = { review: false, warmupCount: 0 }
-
-/** A problem's fact (native spec § 8): `a ± b` for arithmetic, `A * B` for
- *  multiplication (`2*3` and `3*2` are separate facts, as the canon reads
- *  them); `null` for number recognition and skip counting, which are not
- *  a/b facts. */
-function problemFact(p: MathProblem | ExtendedMathProblem): MathFact | null {
-  if (!('kind' in p) || p.kind === 'arithmetic') {
-    return { a: p.addendA, b: p.addendB, op: p.op }
-  }
-  if (p.kind === 'multiply') return { a: p.factorA, b: p.factorB, op: '*' }
-  return null
-}
 
 /** The problems' facts, one per problem, or `undefined` when a problem has
  *  none: `mathFacts` is zipped with `perProblemCorrect` by position for
@@ -136,6 +130,11 @@ export function mathSessionEndPayload(
     ...(sessionFocus !== null ? { sessionFocus } : {}),
     ...(round.review
       ? { review: true as const, problemFacts: scored.map(problemFact) }
+      : {}),
+    // A times mix's 8 blocks come from several files: their facts, per
+    // problem (content wave 1 § 2.4).
+    ...(round.mix === true && !round.review
+      ? { problemFacts: scored.map(problemFact) }
       : {}),
     ...(warmup.length > 0
       ? {

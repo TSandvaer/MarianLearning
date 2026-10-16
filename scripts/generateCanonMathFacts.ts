@@ -8,9 +8,10 @@
  * fact, and the server only copies the chosen blocks: `api/` can import
  * nothing from core but the import-free `wire/` modules, so the table has
  * to live in core. A fact is read exactly as the native app reads the plan
- * (`mathSessionPlanFromServer(plan, { extendedKinds: true })`): `{a, b, op}`
- * for arithmetic and multiplication (`2*3` and `3*2` are different facts),
- * `null` for number recognition and skip counting. The file of each step is
+ * (`mathSessionPlanFromServer(plan, { extendedKinds: true })`) and the
+ * session end records it (core `problemFact`): `{a, b, op}` for arithmetic,
+ * multiplication (`2*3` and `3*2` are different facts) and missing numbers
+ * (`7 + ? = 10` is `7+3`), `null` for number recognition and skip counting. The file of each step is
  * `canonFileTierFor`'s, the server's own wire→disk mapping
  * (`two-digit-addsub-no-regroup` → `two-digit-addsub.json`).
  *
@@ -25,7 +26,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { canonFilePath } from '../api/_canon.js'
 import { mathSessionPlanFromServer } from '@marian/core/math/planFromServer'
-import type { ExtendedMathProblem } from '@marian/core/math/extendedProblems'
+import { problemFact } from '@marian/core/math/extendedProblems'
 import { MATH_TREE } from '@marian/core/progress/mastery'
 import type { MathFact, NumberGardenNode } from '@marian/core/progress/types'
 
@@ -41,13 +42,6 @@ export const OUT = join(
 )
 
 export type CanonMathFacts = Record<NumberGardenNode, (MathFact | null)[]>
-
-/** A problem's fact, as `mobile/src/session/sessionEndPayload.ts` reads it. */
-function problemFact(p: ExtendedMathProblem): MathFact | null {
-  if (p.kind === 'arithmetic') return { a: p.addendA, b: p.addendB, op: p.op }
-  if (p.kind === 'multiply') return { a: p.factorA, b: p.factorB, op: '*' }
-  return null
-}
 
 /** The table, read from the canon files under `canonRoot`. */
 export function deriveCanonMathFacts(

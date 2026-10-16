@@ -78,7 +78,9 @@ export { isAudioMuted } from './mute'
 export { readAudioLog, recordAudio } from './audioLog'
 export type { AudioLogRow } from './audioLog'
 export {
+  introGuideLine,
   KNEW_GAP_MS,
+  leadLinesForRound,
   PEEK_CLOSE_GAP_MS,
   peekGuideLines,
   sessionGuideLine,
@@ -87,7 +89,9 @@ export {
   SESSION_GUIDE_MANIFEST,
 } from './sessionGuide'
 export type {
+  IntroGuideLineId,
   PeekGuideLineId,
+  RoundLeadContext,
   SessionGuideLineId,
   SessionGuidePlayer,
 } from './sessionGuide'

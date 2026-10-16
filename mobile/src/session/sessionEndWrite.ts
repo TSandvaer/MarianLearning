@@ -242,9 +242,11 @@ function factOutcomes(
 
 /**
  * A forward math session's Leitner outcomes: the warm-up's (non-fact
- * problems left out), then the scored ones, minus any scored problem whose
- * fact the warm-up already recorded: the scored repeat came after priming,
- * so only the warm-up's first tap counts (§ 7.4, Dave 2026-10-14).
+ * problems left out), then the scored ones, one outcome per fact from its
+ * first occurrence. A scored problem whose fact the warm-up already
+ * recorded came after priming, so only the warm-up's first tap counts
+ * (§ 7.4, Dave 2026-10-14); the same holds for a fact two scored problems
+ * share (`7 + 3` and `7 + ? = 10` are one bond, content wave 1 § 1.7).
  * `undefined` when there is nothing to record.
  */
 export function forwardLeitnerOutcomes(
@@ -258,8 +260,13 @@ export function forwardLeitnerOutcomes(
     p.mathFacts !== undefined && p.perProblemCorrect !== undefined
       ? (buildLeitnerOutcomes(p.mathFacts, p.perProblemCorrect) ?? [])
       : []
-  const primed = new Set(warmup.map((o) => factKey(o.fact)))
-  const out = [...warmup, ...scored.filter((o) => !primed.has(factKey(o.fact)))]
+  const seen = new Set<string>()
+  const out = [...warmup, ...scored].filter((o) => {
+    const key = factKey(o.fact)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
   return out.length > 0 ? out : undefined
 }
 

@@ -138,6 +138,7 @@ import {
   audioEngine,
   createSfx,
   KNEW_GAP_MS,
+  leadLinesForRound,
   PEEK_CLOSE_GAP_MS,
   peekGuideLines,
   recordAudio,
@@ -172,6 +173,7 @@ import { GettingReady } from './GettingReady'
 import { countSpokenFactor } from './extendedHints'
 import { GroupsRow } from './GroupsRow'
 import { MathHud } from './MathHud'
+import { EquationGap, MissingGroup, type BudReveal } from './MissingNumber'
 import { problemChips, type ProblemChips } from './problemChips'
 import type {
   MathSessionResult,
@@ -195,6 +197,8 @@ export const CHIP_GATE_FALLBACK_MS = 2000
 export const MATH_EXIT_MS = 250
 /** Multiplication's sign (U+00D7; Fredoka has the glyph). Spec § 3. */
 export const TIMES_GLYPH = '×'
+/** A missing number's "?" token in the equation (it fills; § 1.4). */
+const GAP = Symbol('gap')
 /** Review spec § 5: the stage fades in over 200 ms after the opener. */
 export const STAGE_FADE_MS = 200
 /** The HUD's ease-out (MathHud `EASE_OUT`). */
@@ -291,6 +295,12 @@ export interface MathProps {
   peek?: SkillNode
   /** The peek is over (after the closer, or the back button at once). */
   onPeekEnd?: () => void
+  /**
+   * The focus step's intro lead line (content wave 1 § 6.1), before the
+   * scored problem 1's read; `null` / unset = none. The session start
+   * decides (a forward session on a step that is not mastered).
+   */
+  sessionIntro?: SessionGuideLineId | null
 }
 
 interface PerProblemState {
@@ -376,6 +386,7 @@ export function MathScreen({
   sessionGuide,
   peek,
   onPeekEnd,
+  sessionIntro = null,
 }: MathProps) {
   const appHidden = useIsAppHidden(visibility)
   const reducedMotion = useReducedMotion()
@@ -435,6 +446,22 @@ export function MathScreen({
   /** The opener has played (the stage mounts at its end). */
   const [openerDone, setOpenerDone] = useState(false)
   const openerStartedRef = useRef(false)
+  /**
+   * The line before each problem's read (content wave 1 § 6.1): the
+   * opener, a warm-up heart's line, the step intro, the hiding line; at
+   * most one per problem. Missing-number problems join with their kind.
+   */
+  const leads = useMemo(
+    () =>
+      leadLinesForRound(plan.problems.length, {
+        opener,
+        warmupCount: warmups,
+        intro: sessionIntro,
+        hiding: plan.problems.map((p) => p.kind === 'missing-addend'),
+        peek: isPeek,
+      }),
+    [plan, opener, warmups, sessionIntro, isPeek],
+  )
 
   // ── Persistent + per-session state (web names) ───────────────────────
 
@@ -515,6 +542,9 @@ export function MathScreen({
    *  wrong's re-prompt) must not unlight them (spec § 3: after hint 2 the
    *  tags stay). */
   const [hint2Lit, setHint2Lit] = useState(0)
+  /** A missing number's hidden part: shown from hint 3 (content wave 1
+   *  § 1.5); stays until the problem ends. The guided answer shows it too. */
+  const [budReveal, setBudReveal] = useState<BudReveal>('hidden')
   const [shakingChip, setShakingChip] = useState<number | null>(null)
   const [captionText, setCaptionText] = useState('')
   const [captionRevealed, setCaptionRevealed] = useState(0)
@@ -712,13 +742,13 @@ export function MathScreen({
     const live = () =>
       !unmountedRef.current && problemIndexRef.current === myProblemIndex
     // Review spec § 4: the opener where problem 1's read would start; the
-    // warm-up line before each warm-up read. Line end → 400 ms → the read.
+    // warm-up line before each warm-up read; content wave 1 § 6.1: the step
+    // intro and the hiding line. Line end → 400 ms → the read.
+    const planned = leads[myProblemIndex] ?? null
     const lead: SessionGuideLineId | null =
-      opener !== null && myProblemIndex === 0 && !openerStartedRef.current
-        ? opener
-        : myProblemIndex < warmups
-          ? 'guide.session.warmup'
-          : null
+      planned !== null && planned === opener && openerStartedRef.current
+        ? null
+        : planned
     microtask(() => {
       if (!live()) return
       if (spokeReadAloudRef.current) return
@@ -782,6 +812,7 @@ export function MathScreen({
       setHintStep(null)
       setHint2Done(false)
       setHint2Lit(0)
+      setBudReveal('hidden')
       if (hintTimerRef.current !== null) {
         clearTimeout(hintTimerRef.current)
         hintTimerRef.current = null
@@ -939,8 +970,10 @@ export function MathScreen({
       if (!stillLive()) return
       setPose('attentive-pointing')
       // The extended kinds' visuals follow `hintStep`; arithmetic's flower
-      // groups follow `hintBeat` (web W12-02).
-      const extended = problem.kind !== 'arithmetic'
+      // groups follow `hintBeat` (web W12-02), and so do a missing number's
+      // (group A ripples on hints 1–2; hint 3 shows the buds).
+      const missing = problem.kind === 'missing-addend'
+      const extended = problem.kind !== 'arithmetic' && !missing
       const triple = resolveHintTriple(problem.utterances)
       if (triple === null) {
         const legacy = problem.utterances.hint
@@ -977,6 +1010,9 @@ export function MathScreen({
       if (extended) {
         setHint2Done(true)
         setHintStep(3)
+      } else if (missing) {
+        setHintBeat(null)
+        setBudReveal((r) => (r === 'hidden' ? 'hint' : r))
       } else {
         setHintBeat('group-b')
       }
@@ -1043,6 +1079,8 @@ export function MathScreen({
         if (didScheduleGuided) {
           setGuidedActive(true)
           setHintBeat(null) // a hint it interrupted stops pulsing
+          // A missing number's buds show if hint 3 didn't (§ 1.5).
+          setBudReveal((r) => (r === 'hidden' ? 'guided' : r))
           setProblemState((prev) => ({ ...prev, guidedPlayed: true }))
           void speak(problem.utterances.giveAnswer).then(() => {
             if (unmountedRef.current) return
@@ -1279,6 +1317,10 @@ export function MathScreen({
   // The arithmetic problem on screen; `null` for the extended kinds, which
   // never run the subitising scaffolds (spec § 1).
   const arith = currentProblem.kind === 'arithmetic' ? currentProblem : null
+  // A missing number (content wave 1 § 1): `A + ? = T` over group A and the
+  // hidden part; never a dot card (it would show both parts).
+  const missing =
+    currentProblem.kind === 'missing-addend' ? currentProblem : null
   const showStreak = streak >= 2 || streakFadingOut
   // The subitising scaffolds never run for review, warm-up or peek problems.
   const scaffoldsAllowed = !review && !isPeek && problemIndex >= warmups
@@ -1337,7 +1379,9 @@ export function MathScreen({
   const counting =
     arith !== null && arith.op === '+'
       ? countingMetrics(layout, arith.addendA, arith.addendB, area.width)
-      : null
+      : missing !== null
+        ? countingMetrics(layout, missing.addendA, missing.correct, area.width)
+        : null
   // Phone: the counting slot is always reserved, so the equation never
   // moves between problems (mixed-op and two-digit tiers included).
   // Tablet (web): the row is there with counters or the minuend cell.
@@ -1349,7 +1393,7 @@ export function MathScreen({
         ? layout.dotCard.cell
         : 0)
   const showVisualRow =
-    arith !== null &&
+    (arith !== null || missing !== null) &&
     (layout.visualSlot !== null || counting !== null || subMinuendInScope)
 
   // The extended kinds' visuals, sized once per plan (spec decision 10).
@@ -1383,16 +1427,28 @@ export function MathScreen({
       detail: `no groups for ${multiply.factorA} × ${multiply.factorB} (drawn for 1–10 × 1–5)`,
     })
   }, [multiply, groupsDrawn])
-  const equation =
+  // The equation's tokens; `GAP` is a missing number's "?" (§ 1.4), the
+  // only one that fills. Every other equation ends "= ?" as before.
+  const equation: readonly (string | typeof GAP)[] | null =
     multiply !== null
-      ? [String(multiply.factorA), TIMES_GLYPH, String(multiply.factorB)]
+      ? [
+          String(multiply.factorA),
+          TIMES_GLYPH,
+          String(multiply.factorB),
+          '=',
+          '?',
+        ]
       : arith !== null
         ? [
             String(arith.addendA),
             arith.op === '-' ? '−' : '+',
             String(arith.addendB),
+            '=',
+            '?',
           ]
-        : null
+        : missing !== null
+          ? [String(missing.addendA), '+', GAP, '=', String(missing.total)]
+          : null
 
   return (
     <>
@@ -1501,21 +1557,32 @@ export function MathScreen({
                   accessibilityLabel={currentProblem.utterances.read}
                   style={[styles.equation, { gap: layout.equationGap }]}
                 >
-                  {[...equation, '=', '?'].map((token, i) => (
-                    <Text
-                      key={i}
-                      allowFontScaling={false}
-                      style={[
-                        styles.equationText,
-                        {
-                          fontSize: layout.equationFont,
-                          lineHeight: layout.equationLineHeight,
-                        },
-                      ]}
-                    >
-                      {token}
-                    </Text>
-                  ))}
+                  {equation.map((token, i) =>
+                    token === GAP && missing !== null ? (
+                      <EquationGap
+                        key={`gap-${problemIndex}`}
+                        answer={missing.correct}
+                        answered={problemState.resolved}
+                        guided={guidedActive}
+                        font={layout.equationFont}
+                        lineHeight={layout.equationLineHeight}
+                      />
+                    ) : (
+                      <Text
+                        key={i}
+                        allowFontScaling={false}
+                        style={[
+                          styles.equationText,
+                          {
+                            fontSize: layout.equationFont,
+                            lineHeight: layout.equationLineHeight,
+                          },
+                        ]}
+                      >
+                        {token as string}
+                      </Text>
+                    ),
+                  )}
                 </View>
               )}
 
@@ -1549,6 +1616,24 @@ export function MathScreen({
                       metrics={counting}
                       visible={flowersVisible}
                       hintBeat={hintBeat}
+                    />
+                  )}
+                  {counting !== null && missing !== null && (
+                    <CountingRow
+                      key={`missing-${problemIndex}`}
+                      addendA={missing.addendA}
+                      addendB={missing.correct}
+                      metrics={counting}
+                      visible
+                      hintBeat={hintBeat}
+                      groupB={
+                        <MissingGroup
+                          count={missing.correct}
+                          metrics={counting}
+                          reveal={budReveal}
+                          answered={problemState.resolved}
+                        />
+                      }
                     />
                   )}
                   {showDotCardOverlay && dotCardPips !== null && (

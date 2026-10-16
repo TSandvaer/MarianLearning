@@ -28,9 +28,10 @@ describe('CANON_MATH_FACTS (generated from the math canon)', () => {
   })
 
   it('reads the canon blocks the spec examples name', () => {
-    // § 7.2 warm-up example: add-to-10 #3 is 3+2, #4 is 2+4.
+    // add-to-10 #3 is 3+2; #4 is the missing number 7 + ? = 10, which
+    // records the bond 7+3 (content wave 1 AC 3, K4).
     expect(CANON_MATH_FACTS['add-to-10'][2]).toEqual({ a: 3, b: 2, op: '+' })
-    expect(CANON_MATH_FACTS['add-to-10'][3]).toEqual({ a: 2, b: 4, op: '+' })
+    expect(CANON_MATH_FACTS['add-to-10'][3]).toEqual({ a: 7, b: 3, op: '+' })
     // Number recognition and skip counting are not a/b facts.
     expect(CANON_MATH_FACTS['number-recog']).toEqual(Array(8).fill(null))
     expect(CANON_MATH_FACTS['skip-counting'].every((f) => f === null)).toBe(
