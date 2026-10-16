@@ -1,0 +1,1667 @@
+[
+  {
+    "word": "dad",
+    "tier": "short-a",
+    "batch": 1,
+    "subject": "A dad and his small daughter standing side by side, facing the viewer and holding hands: the dad is tall, with short dark-brown hair, a plain beige T-shirt and blue-grey jeans; the girl is small, in a short cream dress; both faces are simple, with dot eyes and a small smile.",
+    "avoid": [
+      "one man standing alone",
+      "a mother's long hair or dress",
+      "a crown or a robe",
+      "a detailed, realistic face"
+    ],
+    "distinctFrom": [
+      "man",
+      "mom",
+      "king",
+      "bag",
+      "bat",
+      "box",
+      "bus",
+      "cup",
+      "gum",
+      "hot",
+      "sun"
+    ]
+  },
+  {
+    "word": "man",
+    "tier": "short-a",
+    "batch": 1,
+    "subject": "One grown man standing alone, facing the viewer in a relaxed pose, with short dark-brown hair, a plain peach T-shirt and straight blue-grey jeans, and a simple face with dot eyes and a small smile.",
+    "avoid": [
+      "a second person or a child",
+      "a crown or a robe",
+      "a beard, glasses or a hat",
+      "a detailed, realistic face"
+    ],
+    "distinctFrom": [
+      "dad",
+      "king",
+      "box",
+      "bun",
+      "can",
+      "cat",
+      "cup",
+      "fan",
+      "jug",
+      "log",
+      "mat",
+      "pan",
+      "sun",
+      "van"
+    ]
+  },
+  {
+    "word": "hat",
+    "tier": "short-a",
+    "batch": 1,
+    "subject": "A wide-brimmed straw sun hat in three-quarter view, pale straw-cream with a soft rose ribbon tied round the round crown, the whole circular brim visible.",
+    "avoid": [
+      "a peak at the front only, like a baseball cap",
+      "a top hat, beanie or cowboy hat",
+      "a head wearing it"
+    ],
+    "distinctFrom": [
+      "cap",
+      "bag",
+      "bat",
+      "brick",
+      "bug",
+      "cat",
+      "cup",
+      "dog",
+      "drum",
+      "fox",
+      "gum",
+      "hot",
+      "hut",
+      "jug",
+      "log",
+      "mom",
+      "nut",
+      "pot",
+      "ring",
+      "sun"
+    ]
+  },
+  {
+    "word": "cap",
+    "tier": "short-a",
+    "batch": 1,
+    "subject": "A rose-pink baseball cap in three-quarter view, with a rounded crown, faint stitched panel lines and a peak that sticks out at the front only.",
+    "avoid": [
+      "a wide brim all the way round, like a sun hat",
+      "a logo or letters",
+      "a head wearing it",
+      "a beanie"
+    ],
+    "distinctFrom": [
+      "hat",
+      "bag",
+      "bat",
+      "bug",
+      "bus",
+      "cat",
+      "cup",
+      "dog",
+      "log",
+      "map",
+      "mat",
+      "mop",
+      "pan",
+      "tap"
+    ]
+  },
+  {
+    "word": "rat",
+    "tier": "short-a",
+    "batch": 1,
+    "subject": "One small, friendly grey-brown rat standing on all fours in side view, with a pointed snout, round pink ears, small dark eyes and a long, thin pink tail curving behind it.",
+    "avoid": [
+      "a cat's pointed ears and whiskers",
+      "wings, like a bat",
+      "a pink round body, like a pig",
+      "a flat cartoon mouse icon",
+      "a scary or dirty sewer rat"
+    ],
+    "distinctFrom": ["bat", "bus", "cup", "mat"]
+  },
+  {
+    "word": "map",
+    "tier": "short-a",
+    "batch": 1,
+    "subject": "A paper map lying open and slightly tilted, cream paper with two curled corners and fold lines, showing simple soft-green land shapes on a soft-blue sea and a dotted path ending at a small red pin.",
+    "avoid": [
+      "a plain striped rectangle, like a mat or rug",
+      "a small card on a string, like a tag",
+      "a globe or a ball",
+      "letters, numbers or place names",
+      "an X mark"
+    ],
+    "distinctFrom": ["cap", "dog", "mat", "sun"]
+  },
+  {
+    "word": "mat",
+    "tier": "short-a",
+    "batch": 1,
+    "subject": "A small rectangular woven mat lying flat in three-quarter view, with soft rose-pink and cream stripes and plain, straight edges.",
+    "avoid": [
+      "fringe or tassels on the ends, like a rug",
+      "land shapes or fold lines, like a map",
+      "a rolled yoga mat",
+      "letters such as WELCOME"
+    ],
+    "distinctFrom": [
+      "rug",
+      "bat",
+      "cap",
+      "cat",
+      "dog",
+      "fox",
+      "hot",
+      "jug",
+      "man",
+      "map",
+      "nut",
+      "pen",
+      "rat"
+    ]
+  },
+  {
+    "word": "cat",
+    "tier": "short-a",
+    "batch": 1,
+    "subject": "One grey tabby cat sitting upright in three-quarter view, with pointed triangle ears, whiskers, a narrow muzzle, a small pink nose and its tail curled round its paws.",
+    "avoid": [
+      "floppy ears or a broad muzzle, like a dog",
+      "long bunny ears",
+      "a long thin bare tail, like a rat",
+      "a snout or curly tail, like a pig"
+    ],
+    "distinctFrom": [
+      "dog",
+      "pig",
+      "bag",
+      "bat",
+      "box",
+      "bun",
+      "bus",
+      "cap",
+      "cup",
+      "hat",
+      "hen",
+      "hot",
+      "hut",
+      "log",
+      "man",
+      "mat",
+      "mom",
+      "mop",
+      "nut",
+      "plum",
+      "pot",
+      "rug",
+      "sun",
+      "tub"
+    ]
+  },
+  {
+    "word": "bat",
+    "tier": "short-a",
+    "batch": 1,
+    "subject": "One friendly soft-purple bat facing the viewer with both wings spread wide open, a small round furry body, big kind eyes and no fangs.",
+    "avoid": [
+      "a baseball bat",
+      "fangs or a Halloween or vampire look",
+      "a bird",
+      "a mouse or rat with no wings"
+    ],
+    "distinctFrom": [
+      "bag",
+      "cap",
+      "cat",
+      "cup",
+      "dad",
+      "hat",
+      "hot",
+      "hut",
+      "mat",
+      "mom",
+      "rat",
+      "sun",
+      "tag"
+    ]
+  },
+  {
+    "word": "nap",
+    "tier": "short-a",
+    "batch": 2,
+    "subject": "A small child asleep on her side under a soft rose-pink blanket, eyes closed and head on a cream pillow, with a small yellow crescent moon floating above her.",
+    "avoid": [
+      "letters such as Z or Zzz",
+      "a bed frame with legs or a headboard",
+      "a mat under the child",
+      "an awake child"
+    ],
+    "distinctFrom": ["bus", "fan", "pan", "sun"]
+  },
+  {
+    "word": "tap",
+    "tier": "short-a",
+    "batch": 2,
+    "subject": "A silver kitchen tap seen from the side, with a round handle on top and a curved spout pointing down, and one blue drop of water falling from the spout.",
+    "avoid": [
+      "a sink or basin",
+      "a hand",
+      "a shower head",
+      "a running stream of water"
+    ],
+    "distinctFrom": ["cap", "cup", "dog", "pan"]
+  },
+  {
+    "word": "tag",
+    "tier": "short-a",
+    "batch": 2,
+    "subject": "A blank rose-pink paper tag, slightly tilted, with a round hole at the top and a loop of beige string tied through it.",
+    "avoid": [
+      "writing, a price or a barcode",
+      "a flag on a pole",
+      "a bag with a handle",
+      "a map"
+    ],
+    "distinctFrom": ["bag", "bat", "bug", "cup", "dog", "mom", "pen"]
+  },
+  {
+    "word": "bag",
+    "tier": "short-a",
+    "batch": 2,
+    "subject": "A soft rose-pink fabric tote bag in three-quarter view, a little slouchy, with one fabric handle arching over the top.",
+    "avoid": [
+      "a tied sack with no handles",
+      "a backpack, a purse with a clasp or a paper shopping bag",
+      "a padlock shape",
+      "mesh or holes, like a net",
+      "a logo"
+    ],
+    "distinctFrom": [
+      "net",
+      "sack",
+      "lock",
+      "bat",
+      "box",
+      "bug",
+      "bus",
+      "cap",
+      "cat",
+      "dad",
+      "dog",
+      "flag",
+      "fox",
+      "frog",
+      "hat",
+      "jam",
+      "jug",
+      "log",
+      "mom",
+      "pan",
+      "pen",
+      "rug",
+      "sun",
+      "tag",
+      "tub"
+    ]
+  },
+  {
+    "word": "pan",
+    "tier": "short-a",
+    "batch": 2,
+    "subject": "An empty grey frying pan seen from slightly above, a shallow round pan with a pale inside and one long straight handle pointing up to the right.",
+    "avoid": [
+      "two short side handles or a deep body, like a pot",
+      "food or oil in it",
+      "a lid"
+    ],
+    "distinctFrom": [
+      "pot",
+      "bag",
+      "box",
+      "cap",
+      "cup",
+      "dog",
+      "fan",
+      "jam",
+      "man",
+      "mom",
+      "mop",
+      "nap",
+      "pen",
+      "sun",
+      "tap",
+      "wing"
+    ]
+  },
+  {
+    "word": "van",
+    "tier": "short-a",
+    "batch": 2,
+    "subject": "A soft peach-pink family van in three-quarter front-side view, short and boxy, with exactly two side windows, a side door and two wheels.",
+    "avoid": [
+      "a long vehicle with many windows, like a bus",
+      "a car or a lorry",
+      "a face on the front",
+      "letters or a logo"
+    ],
+    "distinctFrom": [
+      "bus",
+      "cup",
+      "fan",
+      "fox",
+      "man",
+      "mom",
+      "pen",
+      "rug",
+      "sun"
+    ]
+  },
+  {
+    "word": "fan",
+    "tier": "short-a",
+    "batch": 2,
+    "subject": "A cream electric pedestal fan in three-quarter front view, with a round grille showing three soft blades, a thin straight pole and a round base.",
+    "avoid": [
+      "a round clock face with hands",
+      "a hand-held folding fan",
+      "a ceiling fan",
+      "a face on the fan"
+    ],
+    "distinctFrom": [
+      "clock",
+      "box",
+      "bug",
+      "bun",
+      "bus",
+      "can",
+      "dog",
+      "lock",
+      "man",
+      "nap",
+      "pan",
+      "sock",
+      "sun",
+      "tub",
+      "van",
+      "web"
+    ]
+  },
+  {
+    "word": "can",
+    "tier": "short-a",
+    "batch": 2,
+    "subject": "One closed drink can in three-quarter view, with a silver top, a ring-pull tab and a plain soft sage-green band round the middle.",
+    "avoid": [
+      "a drum with a zigzag cord or sticks",
+      "a cup with a handle",
+      "a brand name, letters or a logo",
+      "an open top"
+    ],
+    "distinctFrom": ["drum", "bun", "dog", "fan", "fox", "man", "rug", "sun"]
+  },
+  {
+    "word": "jam",
+    "tier": "short-a",
+    "batch": 2,
+    "subject": "A glass jar of rose-red jam in three-quarter view, the jam showing through the glass, with a cream lid and a plain cream band round the middle.",
+    "avoid": [
+      "letters on the label",
+      "a metal can",
+      "a spoon or bread",
+      "a closed tin"
+    ],
+    "distinctFrom": ["bag", "bus", "dog", "gum", "log", "mom", "pan"]
+  },
+  {
+    "word": "mom",
+    "tier": "short-o",
+    "batch": 3,
+    "subject": "A mom and her small daughter standing side by side, facing the viewer and holding hands: the mom has shoulder-length dark-brown hair and a soft rose A-line dress that flares at the hem; the girl is small, in a short soft-yellow dress; both faces are simple, with dot eyes and a small smile.",
+    "avoid": [
+      "a dad's short hair, T-shirt and jeans",
+      "one woman standing alone",
+      "a baby in her arms",
+      "a crown or a robe",
+      "make-up or high heels"
+    ],
+    "distinctFrom": [
+      "dad",
+      "king",
+      "bag",
+      "bat",
+      "box",
+      "bug",
+      "bun",
+      "bus",
+      "cat",
+      "cup",
+      "dog",
+      "fox",
+      "gum",
+      "hat",
+      "hot",
+      "hut",
+      "jam",
+      "jug",
+      "log",
+      "mop",
+      "nut",
+      "pan",
+      "pot",
+      "rug",
+      "sun",
+      "tag",
+      "top",
+      "tub",
+      "van"
+    ]
+  },
+  {
+    "word": "hot",
+    "tier": "short-o",
+    "batch": 3,
+    "subject": "A wide, shallow cream bowl in three-quarter view, filled with plain warm soup, with three soft curls of steam rising above it.",
+    "avoid": [
+      "side handles or a deep body, like a cooking pot",
+      "a mug with a handle",
+      "noodles, a spoon or chopsticks",
+      "a face in the steam"
+    ],
+    "distinctFrom": [
+      "bat",
+      "box",
+      "cat",
+      "cot",
+      "dad",
+      "dog",
+      "fox",
+      "gum",
+      "hat",
+      "hut",
+      "mat",
+      "mom",
+      "mop",
+      "nut",
+      "pot",
+      "sun"
+    ]
+  },
+  {
+    "word": "pot",
+    "tier": "short-o",
+    "batch": 3,
+    "subject": "An empty soft-grey cooking pot in three-quarter view from slightly above, deep and round with no lid, and two short handles on opposite sides.",
+    "avoid": [
+      "one long handle or a shallow body, like a frying pan",
+      "steam or food",
+      "a lid on top",
+      "a bowl"
+    ],
+    "distinctFrom": [
+      "pan",
+      "bug",
+      "bus",
+      "cat",
+      "cot",
+      "dog",
+      "fox",
+      "hat",
+      "hot",
+      "king",
+      "mom",
+      "mop",
+      "nut",
+      "sun",
+      "swing"
+    ]
+  },
+  {
+    "word": "pop",
+    "tier": "short-o",
+    "batch": 3,
+    "subject": "One round rose-pink lollipop standing upright, the candy with a soft lighter spiral, on a long, thin white stick that is clearly visible below the candy.",
+    "avoid": [
+      "a ball with no stick",
+      "a sewing pin with a small head",
+      "a wrapper",
+      "a hand holding it",
+      "a fizzy drink"
+    ],
+    "distinctFrom": ["fox", "log", "mop", "top"]
+  },
+  {
+    "word": "mop",
+    "tier": "short-o",
+    "batch": 3,
+    "subject": "A cleaning mop standing upright, with a long, thin warm-brown wooden handle and a head of soft cream-pink yarn strands hanging down at the bottom.",
+    "avoid": [
+      "a stiff broom",
+      "a bucket or water",
+      "a paintbrush or a pen",
+      "a wig of hair"
+    ],
+    "distinctFrom": [
+      "cap",
+      "cat",
+      "cup",
+      "dog",
+      "fox",
+      "hot",
+      "log",
+      "mom",
+      "pan",
+      "pop",
+      "pot",
+      "sun",
+      "top"
+    ]
+  },
+  {
+    "word": "cot",
+    "tier": "short-o",
+    "batch": 3,
+    "subject": "A small, low, narrow cot in three-quarter view: a light wooden frame on four short legs, a thin cream mattress and one small white pillow at one end, with no headboard.",
+    "avoid": [
+      "a big bed with a headboard or a blanket",
+      "a baby's cot with bars",
+      "a hospital bed or bunk bed",
+      "someone sleeping on it"
+    ],
+    "distinctFrom": ["box", "fox", "hot", "pot"]
+  },
+  {
+    "word": "dog",
+    "tier": "short-o",
+    "batch": 3,
+    "subject": "One friendly golden-brown dog sitting upright in three-quarter view, with soft floppy ears, a broad round muzzle, a dark nose and its tail curled at its side.",
+    "avoid": [
+      "a cat's pointed ears or whiskers",
+      "an orange coat and bushy white-tipped tail, like a fox",
+      "a pink snout, like a pig",
+      "a toy dog"
+    ],
+    "distinctFrom": [
+      "cat",
+      "pig",
+      "bag",
+      "box",
+      "bug",
+      "bus",
+      "can",
+      "cap",
+      "cup",
+      "drum",
+      "duck",
+      "fan",
+      "flag",
+      "fox",
+      "frog",
+      "gum",
+      "hat",
+      "hot",
+      "jam",
+      "jug",
+      "log",
+      "map",
+      "mat",
+      "mom",
+      "mop",
+      "pan",
+      "pen",
+      "plum",
+      "pot",
+      "ring",
+      "rug",
+      "sock",
+      "sun",
+      "tag",
+      "tap",
+      "top",
+      "tub"
+    ]
+  },
+  {
+    "word": "box",
+    "tier": "short-o",
+    "batch": 3,
+    "subject": "One closed cardboard box in three-quarter view, warm tan-brown with a darker side, the top, front and one side all visible, and a strip of cream tape across the top.",
+    "avoid": [
+      "an open lid or things inside",
+      "a gift ribbon",
+      "round studs on top, like a toy brick",
+      "a bin with a lid",
+      "labels or letters"
+    ],
+    "distinctFrom": [
+      "brick",
+      "bag",
+      "bug",
+      "bus",
+      "cat",
+      "cot",
+      "cup",
+      "dad",
+      "dog",
+      "duck",
+      "fan",
+      "fox",
+      "hot",
+      "jug",
+      "log",
+      "man",
+      "mom",
+      "pan",
+      "pen",
+      "sun",
+      "tub",
+      "wing"
+    ]
+  },
+  {
+    "word": "top",
+    "tier": "short-o",
+    "batch": 3,
+    "subject": "A wooden spinning top standing still on its point in three-quarter view, an upside-down cone with soft coral and cream stripes and a small round knob on top.",
+    "avoid": [
+      "motion lines or blur",
+      "an ice-cream cone",
+      "a party hat",
+      "a hand"
+    ],
+    "distinctFrom": ["dog", "mom", "mop", "pop"]
+  },
+  {
+    "word": "log",
+    "tier": "short-o",
+    "batch": 3,
+    "subject": "One wooden log lying on its side, warm-brown bark with a few lines, and one cut end facing the viewer that shows pale tree rings.",
+    "avoid": [
+      "leaves or branches",
+      "a pile of firewood",
+      "a standing tree trunk",
+      "a grey rock"
+    ],
+    "distinctFrom": [
+      "bag",
+      "box",
+      "bug",
+      "bus",
+      "cap",
+      "cat",
+      "cup",
+      "dog",
+      "fox",
+      "hat",
+      "jam",
+      "lock",
+      "man",
+      "mom",
+      "mop",
+      "pop",
+      "rock"
+    ]
+  },
+  {
+    "word": "fox",
+    "tier": "short-o",
+    "batch": 3,
+    "subject": "One fox sitting in three-quarter view, with a soft orange coat, a cream chest, pointed ears and a big bushy tail with a white tip curled beside it.",
+    "avoid": ["a dog's floppy ears", "a cat", "a scary or hunting fox"],
+    "distinctFrom": [
+      "bag",
+      "box",
+      "bug",
+      "can",
+      "cot",
+      "dog",
+      "drum",
+      "hat",
+      "hot",
+      "jug",
+      "log",
+      "mat",
+      "mom",
+      "mop",
+      "pop",
+      "pot",
+      "rug",
+      "sun",
+      "van"
+    ]
+  },
+  {
+    "word": "tub",
+    "tier": "short-u",
+    "batch": 4,
+    "subject": "A free-standing cream bathtub in three-quarter view, a deep oval tub on four small curved feet, with its open top and a soft rose rim showing.",
+    "avoid": [
+      "a mug with a handle",
+      "a drum",
+      "a boat",
+      "water, bubbles or a rubber duck",
+      "a tiled bathroom"
+    ],
+    "distinctFrom": [
+      "cup",
+      "drum",
+      "bag",
+      "box",
+      "bug",
+      "bun",
+      "cat",
+      "dog",
+      "fan",
+      "hut",
+      "jug",
+      "mom",
+      "rug",
+      "sun"
+    ]
+  },
+  {
+    "word": "cup",
+    "tier": "short-u",
+    "batch": 4,
+    "subject": "One empty rose-pink mug in three-quarter view, a straight-sided cup with one curved handle on the right and an open top.",
+    "avoid": [
+      "feet or a big bath shape, like a tub",
+      "a spout, like a jug",
+      "steam or a drink inside",
+      "a saucer",
+      "a can"
+    ],
+    "distinctFrom": [
+      "tub",
+      "bat",
+      "bed",
+      "box",
+      "bug",
+      "bus",
+      "cap",
+      "cat",
+      "dad",
+      "dog",
+      "flag",
+      "frog",
+      "hat",
+      "hen",
+      "hut",
+      "jug",
+      "log",
+      "man",
+      "mom",
+      "mop",
+      "nut",
+      "pan",
+      "pen",
+      "rat",
+      "rock",
+      "rug",
+      "sun",
+      "tag",
+      "tap",
+      "van",
+      "web"
+    ]
+  },
+  {
+    "word": "jug",
+    "tier": "short-u",
+    "batch": 4,
+    "subject": "A cream pottery jug in three-quarter view, with a round belly, one curved handle on one side and a clear pouring spout on the other.",
+    "avoid": [
+      "a mug with no spout",
+      "a glass pitcher",
+      "water pouring out",
+      "a teapot lid",
+      "a vase"
+    ],
+    "distinctFrom": [
+      "bag",
+      "box",
+      "bug",
+      "bun",
+      "cup",
+      "dog",
+      "fox",
+      "hat",
+      "man",
+      "mat",
+      "mom",
+      "nut",
+      "rug",
+      "sun",
+      "tub"
+    ]
+  },
+  {
+    "word": "gum",
+    "tier": "short-u",
+    "batch": 4,
+    "subject": "One stick of chewing gum half out of its soft mint-green paper wrapper, the pale pink gum stick showing.",
+    "avoid": [
+      "a bar of soap or butter",
+      "a chocolate bar",
+      "a gumball or a bubble",
+      "a pack of many sticks",
+      "letters or a brand"
+    ],
+    "distinctFrom": [
+      "bug",
+      "bun",
+      "dad",
+      "dog",
+      "hat",
+      "hot",
+      "jam",
+      "mom",
+      "rug",
+      "sun"
+    ]
+  },
+  {
+    "word": "rug",
+    "tier": "short-u",
+    "batch": 4,
+    "subject": "A rectangular rug lying flat, seen from slightly above, with wide soft peach, cream and rose stripes and white fringe tassels on both short ends.",
+    "avoid": [
+      "plain ends with no fringe, like a mat",
+      "a busy Persian pattern",
+      "a rolled-up rug",
+      "a pet sitting on it",
+      "a towel"
+    ],
+    "distinctFrom": [
+      "mat",
+      "bag",
+      "bug",
+      "bun",
+      "can",
+      "cat",
+      "cup",
+      "dog",
+      "fox",
+      "gum",
+      "hut",
+      "jug",
+      "mom",
+      "nut",
+      "rock",
+      "sock",
+      "sun",
+      "tub",
+      "van"
+    ]
+  },
+  {
+    "word": "nut",
+    "tier": "short-u",
+    "batch": 4,
+    "subject": "One closed walnut in its shell in three-quarter view, light warm-brown with a wrinkled surface and a clear seam down the middle.",
+    "avoid": [
+      "a smooth egg",
+      "a round bread bun",
+      "a cracked shell or a pile of nuts",
+      "an acorn with a cap",
+      "a coconut"
+    ],
+    "distinctFrom": [
+      "egg",
+      "bun",
+      "bus",
+      "cat",
+      "cup",
+      "hat",
+      "hot",
+      "hut",
+      "jug",
+      "mat",
+      "mom",
+      "pot",
+      "rug",
+      "sun"
+    ]
+  },
+  {
+    "word": "bun",
+    "tier": "short-u",
+    "batch": 4,
+    "subject": "One round bread bun seen from slightly above, with a golden-brown crust, a cross-shaped cut on top and a paler base.",
+    "avoid": ["a smooth egg", "a hamburger", "a fig", "a ball", "sesame seeds"],
+    "distinctFrom": [
+      "fig",
+      "egg",
+      "can",
+      "cat",
+      "clock",
+      "fan",
+      "gum",
+      "hut",
+      "jet",
+      "jug",
+      "man",
+      "mom",
+      "nut",
+      "rug",
+      "sun",
+      "tub"
+    ]
+  },
+  {
+    "word": "bus",
+    "tier": "short-u",
+    "batch": 4,
+    "subject": "A long soft-yellow city bus in three-quarter front-side view, with four or more side windows, a flat front with two headlights, and two wheels.",
+    "avoid": [
+      "a short vehicle with two windows, like a van",
+      "a face on the front",
+      "a driver or passengers",
+      "a road or a bus stop",
+      "letters or route numbers"
+    ],
+    "distinctFrom": [
+      "van",
+      "bag",
+      "box",
+      "bug",
+      "cap",
+      "cat",
+      "cup",
+      "dad",
+      "dog",
+      "fan",
+      "hut",
+      "jam",
+      "king",
+      "log",
+      "mom",
+      "nap",
+      "nut",
+      "pen",
+      "pot",
+      "rat",
+      "sun"
+    ]
+  },
+  {
+    "word": "sun",
+    "tier": "short-u",
+    "batch": 4,
+    "subject": "A warm-yellow sun disc seen from the front, with even pointed rays all the way round and a soft orange tint on the rays.",
+    "avoid": [
+      "a face on the sun",
+      "clouds or sky",
+      "a crescent moon",
+      "a pale cream disc that fades into the background"
+    ],
+    "distinctFrom": [
+      "bag",
+      "bat",
+      "box",
+      "brick",
+      "bug",
+      "bun",
+      "bus",
+      "can",
+      "cat",
+      "crab",
+      "cup",
+      "dad",
+      "dog",
+      "fan",
+      "fox",
+      "gum",
+      "hat",
+      "hot",
+      "hut",
+      "jug",
+      "man",
+      "map",
+      "mom",
+      "mop",
+      "nap",
+      "nut",
+      "pan",
+      "pen",
+      "pot",
+      "rug",
+      "sack",
+      "sock",
+      "tub",
+      "van"
+    ]
+  },
+  {
+    "word": "bug",
+    "tier": "short-u",
+    "batch": 4,
+    "subject": "One friendly ladybird-style bug seen from above at a slight angle, with a round soft rose-pink shell, cream spots, six thin legs and two curled antennae.",
+    "avoid": [
+      "a spider with eight legs",
+      "a bee with a sting",
+      "a leaf or grass",
+      "a scary, realistic insect"
+    ],
+    "distinctFrom": [
+      "bag",
+      "box",
+      "bus",
+      "cap",
+      "cup",
+      "dog",
+      "fan",
+      "fox",
+      "gum",
+      "hat",
+      "hut",
+      "jug",
+      "log",
+      "mom",
+      "pot",
+      "rug",
+      "sock",
+      "sun",
+      "swing",
+      "tag",
+      "tub"
+    ]
+  },
+  {
+    "word": "hut",
+    "tier": "short-u",
+    "batch": 4,
+    "subject": "A small one-room hut in three-quarter view, with cream walls, a plain brown pointed roof and a clear wooden door at the front.",
+    "avoid": [
+      "a big house or two floors",
+      "a hat",
+      "trees, a beach or a scene",
+      "a chimney with smoke"
+    ],
+    "distinctFrom": [
+      "bat",
+      "bug",
+      "bun",
+      "bus",
+      "cat",
+      "cup",
+      "hat",
+      "hot",
+      "mom",
+      "nut",
+      "rug",
+      "sun",
+      "tub"
+    ]
+  },
+  {
+    "word": "pin",
+    "tier": "short-i",
+    "batch": 5,
+    "subject": "One silver sewing pin lying diagonally, a long, thin straight shaft with a sharp tip and a small round soft-mauve head.",
+    "avoid": [
+      "a lollipop on a stick",
+      "a needle with thread",
+      "a pincushion or many pins",
+      "a bowling pin",
+      "a drawing pin in a board"
+    ],
+    "distinctFrom": ["bib", "bin", "fig", "lid", "sip", "wig"]
+  },
+  {
+    "word": "sip",
+    "tier": "short-i",
+    "batch": 5,
+    "subject": "A small clear glass of pale pink juice in three-quarter view, with a rose-and-white striped straw leaning in it.",
+    "avoid": [
+      "a mug with a handle",
+      "a jar with a lid",
+      "ice cubes, fizz or a cocktail umbrella",
+      "a mouth or a hand",
+      "a bowl with steam"
+    ],
+    "distinctFrom": ["bin", "fig", "lid", "pin", "wig"]
+  },
+  {
+    "word": "lid",
+    "tier": "short-i",
+    "batch": 5,
+    "subject": "One domed pot lid on its own, seen from slightly above, soft golden-copper with a round wooden knob on top and its rim showing.",
+    "avoid": ["a pot under it", "a flat plate or a coin", "steam"],
+    "distinctFrom": ["bib", "bin", "fig", "pig", "pin", "sip", "wig"]
+  },
+  {
+    "word": "fig",
+    "tier": "short-i",
+    "batch": 5,
+    "subject": "One fresh fig in three-quarter view, a soft purple teardrop shape that is wider at the bottom, with a short green-brown stem on top.",
+    "avoid": [
+      "a round plum with a leaf",
+      "an onion",
+      "a cut-open fig",
+      "a bread bun",
+      "a bunch of fruit"
+    ],
+    "distinctFrom": [
+      "bun",
+      "plum",
+      "bib",
+      "bin",
+      "lid",
+      "pig",
+      "pin",
+      "sip",
+      "wig"
+    ]
+  },
+  {
+    "word": "pig",
+    "tier": "short-i",
+    "batch": 5,
+    "subject": "One friendly pink pig standing in side view, with a round body, a flat button snout, small floppy ears, four short legs and a curly tail.",
+    "avoid": [
+      "clothes or standing on two legs",
+      "a piggy bank",
+      "a dog's long muzzle",
+      "a cat's whiskers",
+      "mud or a farm"
+    ],
+    "distinctFrom": [
+      "dog",
+      "cat",
+      "bib",
+      "bin",
+      "drum",
+      "fig",
+      "jet",
+      "lid",
+      "plum",
+      "sack",
+      "wig"
+    ]
+  },
+  {
+    "word": "wig",
+    "tier": "short-i",
+    "batch": 5,
+    "subject": "A shoulder-length warm-brown wig with a fringe, on a plain cream head-shaped stand that has no face.",
+    "avoid": [
+      "eyes, a nose or a mouth on the stand",
+      "a girl or a person wearing it",
+      "a mop",
+      "a hat"
+    ],
+    "distinctFrom": [
+      "bib",
+      "bin",
+      "fig",
+      "king",
+      "lid",
+      "pig",
+      "pin",
+      "sip",
+      "wing"
+    ]
+  },
+  {
+    "word": "bin",
+    "tier": "short-i",
+    "batch": 5,
+    "subject": "A tall pale grey-blue rubbish bin in three-quarter view, a rectangular bin with its hinged lid partly open.",
+    "avoid": [
+      "a closed lid, like a box",
+      "rubbish spilling out",
+      "a round can",
+      "a foot pedal"
+    ],
+    "distinctFrom": ["fig", "lid", "pig", "pin", "sip", "wig"]
+  },
+  {
+    "word": "bib",
+    "tier": "short-i",
+    "batch": 5,
+    "subject": "One baby bib seen from the front, a soft peach U-shaped cloth with a neck hole and two rose-pink ties at the top.",
+    "avoid": [
+      "a baby wearing it",
+      "food stains",
+      "letters on it",
+      "a napkin or a towel"
+    ],
+    "distinctFrom": ["fig", "lid", "pig", "pin", "wig"]
+  },
+  {
+    "word": "net",
+    "tier": "short-e",
+    "batch": 6,
+    "subject": "A butterfly net held at an angle: a round wooden hoop with a short, loose open mesh hanging from it, wide holes clearly visible, on a long warm-brown handle.",
+    "avoid": [
+      "a tennis racket with a flat string face",
+      "a solid cloth bag",
+      "a flag on a pole",
+      "a spider web",
+      "a fish or butterfly in it"
+    ],
+    "distinctFrom": ["bag", "flag", "bed", "gem", "hen", "jet", "leg", "pen"]
+  },
+  {
+    "word": "web",
+    "tier": "short-e",
+    "batch": 6,
+    "subject": "A spider web seen straight on, nearly round, with about six rings and ten straight spokes from the centre, in thin soft mauve-grey lines, with no spider.",
+    "avoid": [
+      "a spider or an insect",
+      "a net with a handle",
+      "a messy tangle",
+      "leaves or branches",
+      "a Halloween look"
+    ],
+    "distinctFrom": [
+      "bed",
+      "cup",
+      "egg",
+      "fan",
+      "flag",
+      "gem",
+      "hen",
+      "jet",
+      "lock"
+    ]
+  },
+  {
+    "word": "egg",
+    "tier": "short-e",
+    "batch": 6,
+    "subject": "One smooth, whole hen's egg standing upright, with a warm tan shell, slightly wider at the bottom and with no marks.",
+    "avoid": [
+      "a seam down the middle, like a nut",
+      "a cut on top, like a bun",
+      "a grey stone",
+      "cracks or a chick",
+      "a white egg that fades into the cream background"
+    ],
+    "distinctFrom": ["nut", "bun", "rock", "bed", "gem", "hen", "leg", "web"]
+  },
+  {
+    "word": "leg",
+    "tier": "short-e",
+    "batch": 6,
+    "subject": "One wooden chair leg standing upright, warm-brown turned wood with rounded bands, with just the corner of the chair seat showing at the top.",
+    "avoid": [
+      "a person's or an animal's leg",
+      "a foot or a shoe",
+      "a whole chair",
+      "a table"
+    ],
+    "distinctFrom": ["bed", "egg", "gem", "hen", "net"]
+  },
+  {
+    "word": "pen",
+    "tier": "short-e",
+    "batch": 6,
+    "subject": "One ballpoint pen lying diagonally, with a slim rose-pink body, a silver clip near the top and a small silver writing tip.",
+    "avoid": [
+      "a pencil with a wooden tip or an eraser",
+      "a feather quill",
+      "a hand or paper",
+      "ink lines"
+    ],
+    "distinctFrom": [
+      "bag",
+      "bed",
+      "box",
+      "bus",
+      "crab",
+      "cup",
+      "dog",
+      "duck",
+      "gem",
+      "hen",
+      "jet",
+      "mat",
+      "net",
+      "pan",
+      "sun",
+      "tag",
+      "van"
+    ]
+  },
+  {
+    "word": "gem",
+    "tier": "short-e",
+    "batch": 6,
+    "subject": "One cut gemstone in three-quarter view, soft rose-pink, with five or six clear flat facets and a lighter top facet.",
+    "avoid": [
+      "a ring band",
+      "a crown",
+      "sparkle rays round it",
+      "a pile of jewels"
+    ],
+    "distinctFrom": [
+      "ring",
+      "bed",
+      "egg",
+      "hen",
+      "jet",
+      "leg",
+      "net",
+      "pen",
+      "web"
+    ]
+  },
+  {
+    "word": "hen",
+    "tier": "short-e",
+    "batch": 6,
+    "subject": "One plump cream hen in three-quarter side view, with a rose-red comb on top of her head, a small yellow beak, a red wattle and two thin yellow legs.",
+    "avoid": [
+      "a duck's flat bill or webbed feet",
+      "a yellow chick",
+      "a rooster with a big tail",
+      "eggs or a nest"
+    ],
+    "distinctFrom": [
+      "duck",
+      "bed",
+      "cat",
+      "cup",
+      "egg",
+      "gem",
+      "jet",
+      "leg",
+      "net",
+      "pen",
+      "plum",
+      "rock",
+      "web"
+    ]
+  },
+  {
+    "word": "bed",
+    "tier": "short-e",
+    "batch": 6,
+    "subject": "A single wooden bed in three-quarter view on four short legs, with a tall rounded headboard, a cream mattress, one rose-pink pillow and a folded rose blanket at the foot.",
+    "avoid": [
+      "a low, narrow bed with no headboard, like a cot",
+      "a person sleeping",
+      "a bunk bed or hospital bed",
+      "a bedroom"
+    ],
+    "distinctFrom": [
+      "cup",
+      "egg",
+      "frog",
+      "gem",
+      "hen",
+      "leg",
+      "net",
+      "pen",
+      "web"
+    ]
+  },
+  {
+    "word": "jet",
+    "tier": "short-e",
+    "batch": 6,
+    "subject": "A soft-blue passenger jet in flight, in three-quarter front-side view, with two wide wings, a tail fin, a cockpit window and a row of small round windows.",
+    "avoid": [
+      "clouds, sky or a runway",
+      "a fighter jet or rockets",
+      "a face on the nose",
+      "a white plane that fades into the background"
+    ],
+    "distinctFrom": [
+      "bun",
+      "clock",
+      "gem",
+      "hen",
+      "net",
+      "pen",
+      "pig",
+      "sack",
+      "web"
+    ]
+  },
+  {
+    "word": "wing",
+    "tier": "duck-words",
+    "batch": 7,
+    "subject": "One bird's wing on its own, spread open like a fan, with three rows of dove-grey feathers with rose-pink tips, seen from the side, no bird body.",
+    "avoid": [
+      "a single feather or a quill",
+      "a leaf",
+      "a whole bird",
+      "an angel's wing"
+    ],
+    "distinctFrom": ["box", "king", "pan", "ring", "swing", "wig"]
+  },
+  {
+    "word": "sack",
+    "tier": "duck-words",
+    "batch": 7,
+    "subject": "One plump burlap sack in three-quarter view, rough warm-tan woven cloth with a lumpy round bottom, tied shut at the top with a rope, with no handles.",
+    "avoid": [
+      "handles, like a bag",
+      "a handbag or shopping bag",
+      "potatoes or things spilling out",
+      "a sock"
+    ],
+    "distinctFrom": ["bag", "jet", "pig", "rock", "sock", "sun"]
+  },
+  {
+    "word": "rock",
+    "tier": "duck-words",
+    "batch": 7,
+    "subject": "One chunky grey rock, wider than tall, with a few flat sides and one small crack line, cool grey with a darker shadow side.",
+    "avoid": [
+      "an oval or tan shape, like an egg",
+      "a pile of pebbles",
+      "a mountain",
+      "moss"
+    ],
+    "distinctFrom": [
+      "egg",
+      "cup",
+      "hen",
+      "king",
+      "lock",
+      "log",
+      "ring",
+      "rug",
+      "sack",
+      "sock"
+    ]
+  },
+  {
+    "word": "lock",
+    "tier": "duck-words",
+    "batch": 7,
+    "subject": "One closed padlock seen from the front, a rounded warm-brass body with a keyhole in the middle and a curved silver shackle on top.",
+    "avoid": ["a bag handle", "a key", "a number dial", "a door"],
+    "distinctFrom": ["bag", "clock", "fan", "log", "rock", "sock", "web"]
+  },
+  {
+    "word": "king",
+    "tier": "duck-words",
+    "batch": 7,
+    "subject": "A friendly king standing in three-quarter view, with a big gold crown set with small rose-pink gems, a soft red robe with a cream collar, and a simple face with dot eyes and no nose.",
+    "avoid": [
+      "a plain man in a T-shirt",
+      "a dad with a child",
+      "a throne or a castle",
+      "a detailed face or big anime eyes",
+      "a sword or a sceptre"
+    ],
+    "distinctFrom": [
+      "man",
+      "dad",
+      "mom",
+      "bus",
+      "pot",
+      "ring",
+      "rock",
+      "swing",
+      "wig",
+      "wing"
+    ]
+  },
+  {
+    "word": "ring",
+    "tier": "duck-words",
+    "batch": 7,
+    "subject": "One gold finger ring in three-quarter view, the round band clearly a circle, with one small rose-pink gem on top.",
+    "avoid": [
+      "a big gem with a thin band",
+      "a hand or a finger",
+      "a jewellery box",
+      "a bracelet"
+    ],
+    "distinctFrom": ["gem", "dog", "hat", "king", "rock", "wing"]
+  },
+  {
+    "word": "sock",
+    "tier": "duck-words",
+    "batch": 7,
+    "subject": "One single sock in side view, with rose-pink and cream stripes, a clear heel bend and a rounded toe.",
+    "avoid": [
+      "a pair of socks",
+      "a shoe or a foot",
+      "a Christmas stocking",
+      "a tied sack"
+    ],
+    "distinctFrom": [
+      "bug",
+      "clock",
+      "dog",
+      "duck",
+      "fan",
+      "lock",
+      "rock",
+      "rug",
+      "sack",
+      "sun"
+    ]
+  },
+  {
+    "word": "duck",
+    "tier": "duck-words",
+    "batch": 7,
+    "subject": "One duck standing in side view, with a soft green head, a warm-brown chest, a grey-cream body, an orange bill and orange webbed feet.",
+    "avoid": [
+      "a hen's comb",
+      "a yellow duckling or chick",
+      "water",
+      "a rubber duck"
+    ],
+    "distinctFrom": ["hen", "box", "dog", "pen", "sock"]
+  },
+  {
+    "word": "clock",
+    "tier": "crab-words",
+    "batch": 8,
+    "subject": "A round rose-pink alarm clock seen from the front, with two bells on top, two little feet and a cream face with short tick marks and two hands, and no numbers.",
+    "avoid": [
+      "numbers or letters",
+      "a fan on a stand",
+      "a wristwatch",
+      "a digital clock"
+    ],
+    "distinctFrom": [
+      "fan",
+      "brick",
+      "bun",
+      "crab",
+      "frog",
+      "jet",
+      "lock",
+      "sock"
+    ]
+  },
+  {
+    "word": "swing",
+    "tier": "crab-words",
+    "batch": 8,
+    "subject": "One playground swing in three-quarter view, an empty wooden seat hanging on two ropes from a simple wooden A-frame.",
+    "avoid": [
+      "a child on the swing",
+      "a slide or a playground",
+      "a tree",
+      "grass"
+    ],
+    "distinctFrom": ["bug", "king", "pot", "wing"]
+  },
+  {
+    "word": "brick",
+    "tier": "crab-words",
+    "batch": 8,
+    "subject": "One toy building brick in three-quarter view from above, a rose-red block with four plain round studs on top.",
+    "avoid": [
+      "a cardboard box",
+      "a wall or many bricks",
+      "a logo on the studs",
+      "a real clay brick"
+    ],
+    "distinctFrom": ["box", "clock", "crab", "hat", "sun"]
+  },
+  {
+    "word": "drum",
+    "tier": "crab-words",
+    "batch": 8,
+    "subject": "One toy drum in three-quarter view, with a cream top skin, rose-pink sides with a zigzag cord, and two drumsticks crossed on top.",
+    "avoid": ["a plain can", "a bathtub", "a drum kit or cymbals", "a bucket"],
+    "distinctFrom": ["can", "tub", "dog", "fox", "hat", "pig", "plum"]
+  },
+  {
+    "word": "plum",
+    "tier": "crab-words",
+    "batch": 8,
+    "subject": "One round plum with deep purple skin, a soft groove down one side, a short brown stem and one green leaf.",
+    "avoid": ["a teardrop fig", "grapes", "a cut plum", "a ball"],
+    "distinctFrom": ["fig", "cat", "dog", "drum", "hen", "pig"]
+  },
+  {
+    "word": "flag",
+    "tier": "crab-words",
+    "batch": 8,
+    "subject": "One small rectangular flag waving on a thin wooden pole, plain rose-pink cloth with nothing on it.",
+    "avoid": [
+      "a country's flag, stars or stripes",
+      "a net on a pole",
+      "a tag on a string",
+      "letters or symbols"
+    ],
+    "distinctFrom": ["net", "bag", "cup", "dog", "frog", "web"]
+  },
+  {
+    "word": "frog",
+    "tier": "crab-words",
+    "batch": 8,
+    "subject": "One green frog sitting in three-quarter front view, with eyes bulging on top of its head, a pale yellow-green tummy and long folded back legs.",
+    "avoid": [
+      "a lily pad or water",
+      "a warty toad",
+      "a crown",
+      "a cartoon face with eyebrows"
+    ],
+    "distinctFrom": ["bag", "bed", "clock", "crab", "cup", "dog", "flag"]
+  },
+  {
+    "word": "crab",
+    "tier": "crab-words",
+    "batch": 8,
+    "subject": "One soft coral-red crab seen from the front, with two big claws held up, six thin legs and eyes on short stalks.",
+    "avoid": [
+      "a lobster",
+      "sand or a beach",
+      "a bright, saturated red",
+      "a spider"
+    ],
+    "distinctFrom": ["brick", "clock", "frog", "pen", "sun"]
+  }
+]
