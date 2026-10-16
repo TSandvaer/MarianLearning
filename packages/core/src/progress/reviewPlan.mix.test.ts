@@ -18,8 +18,10 @@ import { LEITNER_DUE_PER_SESSION_CAP } from './leitner'
 import {
   MIX_SOURCE_STEPS,
   mixFactPool,
+  orderByTable,
   pickMixBlocks,
   type CanonBlockRef,
+  type MixPoolFact,
 } from './reviewPlan'
 import type { LeitnerBoxIndex, LeitnerItem, MathFact, Progress } from './types'
 
@@ -179,5 +181,76 @@ describe('pickMixBlocks (§ 2.3, AC 5)', () => {
     // Without the warm-up: the first 3 due facts lead.
     const free = keys(pickMixBlocks(p, NOW_MS, 0, [])).slice(3, 6)
     expect(free.sort()).toEqual(['6*4', '7*3', '8*4'])
+  })
+})
+
+describe('orderByTable: the P4–P8 order (§ 2.3 step 3, Kyle 2026-10-16)', () => {
+  /** Picks with these A values, in pick order (B tells them apart). */
+  const picks = (...as: number[]): MixPoolFact[] =>
+    as.map((a, i) => ({
+      fact: { a, b: i + 2, op: '*' },
+      ref: { node: 'mult-mix', problem: i + 1 },
+    }))
+  const order = (before: number | undefined, ...as: number[]) =>
+    orderByTable(picks(...as), before).map((x) => x.fact.a)
+  const ids = (before: number | undefined, ...as: number[]) =>
+    orderByTable(picks(...as), before).map((x) => x.fact.b - 2)
+  const repeats = (before: number, seq: number[]) =>
+    [before, ...seq].filter((a, i, all) => i > 0 && a === all[i - 1]).length
+
+  it('the greedy pass when it finishes without a repeat', () => {
+    expect(order(3, 4, 2, 5, 6, 7)).toEqual([4, 2, 5, 6, 7])
+    expect(order(4, 4, 2, 5, 6, 7)).toEqual([2, 4, 5, 6, 7])
+  })
+
+  it("the first no-repeat order where greedy can't finish (the spec's example: after a 3, 4 2 3 4 4 → 4 2 4 3 4)", () => {
+    expect(order(3, 4, 2, 3, 4, 4)).toEqual([4, 2, 4, 3, 4])
+  })
+
+  it('no order avoids a repeat: the fewest repeats, ties to the first order pick by pick', () => {
+    // After a 3, one 2 and four 4s: at least 2 repeats. Greedy (2 first)
+    // would make 3. Of the 2-repeat orders, the first in pick order puts
+    // pick 1 (a 4) first, then the 2.
+    const seq = order(3, 2, 4, 4, 4, 4)
+    expect(repeats(3, seq)).toBe(2)
+    expect(seq).toEqual([4, 2, 4, 4, 4])
+    expect(ids(3, 2, 4, 4, 4, 4)).toEqual([1, 0, 2, 3, 4])
+    // All the same table: the pick order itself.
+    expect(ids(5, 5, 5, 5, 5, 5)).toEqual([0, 1, 2, 3, 4])
+  })
+})
+
+describe('warm-up facts in a times mix (§ 2.3, Kyle 2026-10-16)', () => {
+  // 7×3 is mult-6-9 #5: the warm-up heart.
+  const HEART: CanonBlockRef = { node: 'mult-6-9', problem: 5 }
+
+  it('a heart she got right may open the mix (P1–P3 skip nothing)', () => {
+    const p = withBox(
+      item(7, 3, 4, at(MON, 17)),
+      item(2, 2, 2, at(MON, 17)),
+      item(2, 3, 2, at(MON, 17)),
+    )
+    expect(keys(pickMixBlocks(p, NOW_MS, 0, [HEART])).slice(0, 3)).toContain(
+      '7*3',
+    )
+  })
+
+  it('a heart she missed skips the due picks but comes back in the fill when the rest are stronger', () => {
+    // Every pool fact known and not due (box 2, seen today), but the
+    // heart: box 1, due.
+    const today = at(TUE, 7)
+    const p = withBox(
+      ...mixFactPool()
+        .filter((x) => key(x.fact) !== '7*3')
+        .map((x) => item(x.fact.a, x.fact.b, 2, today)),
+      item(7, 3, 1, at(MON, 18)),
+    )
+    const scored = keys(pickMixBlocks(p, NOW_MS, 0, [HEART])).slice(3)
+    // Not a due pick (its share of the cap is the heart's)…
+    expect(keys(pickMixBlocks(p, NOW_MS, 0, [HEART]))).toHaveLength(8)
+    // …but the weakest fact, so the fill brings it back once.
+    expect(scored.filter((k) => k === '7*3')).toHaveLength(1)
+    // Without the warm-up it is the due pick, P4 itself.
+    expect(keys(pickMixBlocks(p, NOW_MS, 0, []))[3]).toBe('7*3')
   })
 })

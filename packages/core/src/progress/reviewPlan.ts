@@ -424,46 +424,46 @@ const byKey = (x: MathFact, y: MathFact) => {
 }
 
 /**
- * § 2.3 step 3: `picks` in pick order, except that the next problem never
- * has the same A as the one before (`before` = P3's) when some order
- * avoids it. A depth-first search that tries the picks in order, so it
- * equals the rule's greedy order ("take the first later pick whose A
- * differs") whenever that one works, and only backtracks where the greedy
- * order would be forced into a repeat (e.g. A 4, 2, 3, 4, 4 after a 3:
- * 4 2 4 3 4). No such order: the greedy one.
+ * § 2.3 step 3 (Kyle, 2026-10-16): of all orders of `picks`, the one with
+ * the fewest neighbours sharing A (`before`, P3's A, neighbours the first);
+ * ties go to the order that comes first compared pick by pick in pick
+ * order. When a no-repeat order exists this is the first one, which is the
+ * greedy pass ("take the next pick whose A differs") whenever that pass
+ * finishes without a repeat; e.g. after a 3, A 4, 2, 3, 4, 4 plays as
+ * 4, 2, 4, 3, 4. A depth-first search in pick order (at most 120 orders
+ * for five picks) that keeps the first order with the fewest repeats and
+ * prunes branches that can no longer beat it.
  */
-function orderByTable(
+export function orderByTable(
   picks: readonly MixPoolFact[],
   before: number | undefined,
 ): MixPoolFact[] {
-  const solve = (
+  let best: MixPoolFact[] = [...picks]
+  let bestRepeats = Number.POSITIVE_INFINITY
+  const walk = (
     left: readonly MixPoolFact[],
     prev: number | undefined,
-  ): MixPoolFact[] | null => {
-    if (left.length === 0) return []
-    for (let i = 0; i < left.length; i++) {
+    path: MixPoolFact[],
+    repeats: number,
+  ): void => {
+    if (repeats >= bestRepeats) return
+    if (left.length === 0) {
+      best = path
+      bestRepeats = repeats
+      return
+    }
+    for (let i = 0; i < left.length && bestRepeats > 0; i++) {
       const x = left[i]!
-      if (x.fact.a === prev) continue
-      const tail = solve(
+      walk(
         left.filter((_, j) => j !== i),
         x.fact.a,
+        [...path, x],
+        repeats + (x.fact.a === prev ? 1 : 0),
       )
-      if (tail !== null) return [x, ...tail]
     }
-    return null
   }
-  const found = solve(picks, before)
-  if (found !== null) return found
-  const ordered: MixPoolFact[] = []
-  let prev = before
-  const queue = [...picks]
-  while (queue.length > 0) {
-    const j = queue.findIndex((x) => x.fact.a !== prev)
-    const next = queue.splice(j >= 0 ? j : 0, 1)[0]!
-    ordered.push(next)
-    prev = next.fact.a
-  }
-  return ordered
+  walk(picks, before, [], 0)
+  return best
 }
 
 /**

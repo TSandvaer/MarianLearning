@@ -145,10 +145,10 @@ The staggers are Reanimated `withDelay`s, so no new JS timer is needed. Emma's p
 ### 1.7 Leitner, history, warm-up, review, peek
 
 - **Fact:** `{ a: addendA, b: correct, op: '+' }`, the same key as plain addition (K4). `CANON_MATH_FACTS` is regenerated from the re-baked files.
-- **One Leitner outcome per fact per session,** from its first occurrence. § 1.2 already forbids repeats; this rule covers a planner that drifts. It is the warm-up's existing rule (`review-mode-and-warmup-native.md` § 7.4), extended to scored problems.
+- **One Leitner outcome per fact per session,** from its first occurrence, in every forward session on every step. § 1.2 already forbids repeats in an add session; this rule covers a planner that drifts and a times-mix fill that draws a warm-up fact. It is the warm-up's existing rule (`review-mode-and-warmup-native.md` § 7.4), extended to scored problems. A review can't repeat a fact (`pickReviewBlocks` skips one).
 - **History:** `perProblemAnswerValue` is the tapped value, `mathFacts` gets the fact, and `latencyMs` is recorded as today. Slow-fact derivation sees these latencies under the same fact. That is accepted: a bond she is slow on is a bond to practise.
-- **Warm-up:** `blockFor(fact, …)` can now pick a missing-number block as a heart. The heart's own "Remember this one?" plays, and the hiding lead does not (one lead per problem).
-- **Review:** missing-number blocks come up through `rot(seed)` like any block. The hiding lead plays before the first one in the round.
+- **Warm-up:** `blockFor(fact, …)` can now pick a missing-number block as a heart. The heart's own "Remember this one?" plays there, and the hiding line moves to the round's next missing-number problem (§ 6.1).
+- **Review:** missing-number blocks come up through `rot(seed)` like any block. The hiding line plays before the first one in the round whose slot is free (a missing-number block at P1 holds the review opener).
 - **Peek:** add-to-10 and add-to-20 peeks are P1–P3, plain addition, so they don't change.
 - **Fast track and mastery:** unchanged. A secure session needs all 8 right on the first tap, these 3 included.
 
@@ -214,9 +214,9 @@ export function pickMixBlocks(
 
 1. **P1–P3, the gentle opening:** the 3 facts with strength ≥ 2 and the highest strength. Ties go to the smaller product, then the key `${a}*${b}` ascending. If fewer than 3 qualify, fill with the smallest-product facts not yet picked. The three play in product order, smallest first. **Why:** the session opens on facts she got right before, the same reasoning as the warm-up's first heart (Thomas, 2026-10-14).
 2. **P4–P8, the weak facts:**
-   1. Due facts first, ranked exactly as `rankedDueFacts` (overdue days, then box, then key), up to `LEITNER_DUE_PER_SESSION_CAP` minus the warm-up's fact count (the shared cap of 3, `review-mode-and-warmup-native.md` § 7.4). Warm-up facts and P1–P3 picks are skipped.
-   2. Then the lowest strength first (never-played facts count as 0). Ties are broken by pool index rotated by the seed, `(index + seed) % pool.length` ascending, so sessions vary.
-3. **Order P4–P8:** take the picks in order, but when the next one has the same A as the problem before it (P3 included), take the first later pick whose A differs. Adjacent problems then come from different tables whenever possible (Dave's M4: mixed practice).
+   1. Due facts first, ranked exactly as `rankedDueFacts` (overdue days, then box, then key), up to `LEITNER_DUE_PER_SESSION_CAP` minus the warm-up's fact count (the shared cap of 3, `review-mode-and-warmup-native.md` § 7.4). Warm-up facts and P1–P3 picks are skipped here: a warm-up fact has already used its share of the cap.
+   2. Then the lowest strength first (never-played facts count as 0), skipping facts already picked. Ties are broken by pool index rotated by the seed, `(index + seed) % pool.length` ascending, so sessions vary. A warm-up fact may be drawn here (or in P1–P3). A heart she missed (box 1) usually comes back, which is the same-session re-exposure Dave asked for (review spec § 1, 2026-10-14). Leitner records it once, from the heart.
+3. **Order P4–P8:** of all orders of the five picks, use the one with the fewest neighbours sharing A (P3 and P4 count as neighbours). Ties go to the order that comes first when compared pick by pick in step 2's order. When a no-repeat order exists this is the first one, and it equals the greedy pass (take the next pick whose A differs from the problem before it) whenever that pass finishes without a repeat. Example: after a 3, the picks with A 4, 2, 3, 4, 4 play as 4, 2, 4, 3, 4. Adjacent problems come from different tables whenever possible (Dave's M4: mixed practice).
 
 `seed` is `readSessionHistory().sessionCount` at kick time, as for reviews. It is the same at prefetch and at the tap, so both ask for the same refs.
 
@@ -429,7 +429,7 @@ Generate them as the clay set was made (Thomas's tool choice), with the matching
 A **lead line** plays before a problem's read, with the stage up. It reuses the warm-up line's player and timing (`review-mode-and-warmup-native.md` § 4: `createManifestLinePlayer('session-guide', …)`, a caption walk at 165 wpm when there is no clip, Emma `listening`, the back button cancels it).
 
 - **Timing:** the lead ends → 400 ms → the read. On a `cvc-word` problem, the 1500 ms silent beat starts when the lead ends and replaces the 400 ms, so the decode-first beat is kept in full.
-- **At most one lead per problem.** Priority: a warm-up heart's "Remember this one?", then a step intro, then the hiding line.
+- **At most one lead per problem.** Priority: a review's or peek's opener (it holds P1), then a warm-up heart's "Remember this one?", then a step intro, then the hiding line. The hiding line moves to the round's next missing-number problem with a free slot, and doesn't play if none is left. A step intro never loses its slot: it sits on scored P1 of a forward session, which is never a heart.
 - **Never in a peek** (a peek has its own opener) and never on a warm-up heart other than its own line.
 
 | Line id                          | Text                         | Before which problem                           | In which rounds                                       |
