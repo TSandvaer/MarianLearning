@@ -28,8 +28,9 @@
     "word": "man",
     "tier": "short-a",
     "batch": 1,
-    "subject": "One grown man standing alone, facing the viewer in a relaxed pose, with short dark-brown hair, a plain peach T-shirt and straight blue-grey jeans, and a simple face with dot eyes and a small smile.",
+    "subject": "One grown man standing alone, facing the viewer in a relaxed pose: clearly an adult, tall with broad shoulders, a longer adult face and a strong jaw, short dark-brown hair, a plain peach T-shirt and straight blue-grey jeans, and a simple face with dot eyes and a small smile.",
     "avoid": [
+      "a boy or a teenager",
       "a second person or a child",
       "a crown or a robe",
       "a beard, glasses or a hat",
