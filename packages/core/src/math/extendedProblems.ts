@@ -175,10 +175,11 @@ export function isSkipCountProblem(
   return problem.kind === 'skip-count'
 }
 
+/** Also takes a plain (kind-less) `MathProblem`, which is never one. */
 export function isMissingAddendProblem(
-  problem: ExtendedMathProblem,
+  problem: MathProblem | ExtendedMathProblem,
 ): problem is MissingAddendProblem {
-  return problem.kind === 'missing-addend'
+  return 'kind' in problem && problem.kind === 'missing-addend'
 }
 
 export function isMultiplyProblem(

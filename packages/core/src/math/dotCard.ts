@@ -44,7 +44,10 @@
  * effect-free so the screen can call it in render without state sync.
  */
 
-import type { MissingAddendProblem } from './extendedProblems'
+import {
+  isMissingAddendProblem,
+  type MissingAddendProblem,
+} from './extendedProblems'
 import type { MathProblem } from './sessionPlans'
 
 /**
@@ -82,19 +85,12 @@ export const MIN_PIPS_PER_CELL = 1 as const
  * is an addition-only CRA scaffold; sub-to-10 explicitly skips it per
  * Dave's research §Q2 / Kyle's spec §3).
  */
-/** A missing-addend problem among plain ones (only it carries that kind). */
-function isMissingNumber(
-  problem: MathProblem | MissingAddendProblem,
-): problem is MissingAddendProblem {
-  return (problem as { kind?: unknown }).kind === 'missing-addend'
-}
-
 export function shouldShowDotCard(
   problem: MathProblem | MissingAddendProblem,
 ): boolean {
   // A missing number never: the card shows both parts, and so the answer
   // (content wave 1 § 1.4).
-  if (isMissingNumber(problem)) return false
+  if (isMissingAddendProblem(problem)) return false
   // Op-gate FIRST — subtraction never shows the dot-card regardless of
   // operand sizes. See module header "sub-to-10" block for rationale.
   if (problem.op !== '+') return false
