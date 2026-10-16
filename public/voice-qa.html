@@ -579,10 +579,11 @@
         'other',
       ]
 
-      // Canon files — 11 math + 14 word-song. Iterated in alphabetical
+      // Canon files — 11 math + 16 word-song. Iterated in alphabetical
       // (group, file-stem) order so the dedup canonical-member choice is
-      // deterministic across runs. word-song order also matches
-      // WORD_SONG_NODES_IN_ORDER (sight-words then simple-sentences last).
+      // deterministic across runs. A stem whose file is not baked yet
+      // (404) is skipped with a console note, so a new step can be listed
+      // before its render lands (content wave 1: duck-words, crab-words).
       const CANON_FILES = [
         // math/level-1
         ['math', 'add-to-10'],
@@ -598,6 +599,7 @@
         ['math', 'two-digit-addsub-with-regroup'],
         // word-song/level-1
         ['word-song', 'blending-cv'],
+        ['word-song', 'crab-words'],
         ['word-song', 'cvc-words'],
         ['word-song', 'cvc-words-short-e'],
         ['word-song', 'cvc-words-short-i'],
@@ -606,6 +608,7 @@
         ['word-song', 'digraphs-ch'],
         ['word-song', 'digraphs-sh'],
         ['word-song', 'digraphs-th-voiceless'],
+        ['word-song', 'duck-words'],
         ['word-song', 'letter-names'],
         ['word-song', 'letter-sounds'],
         ['word-song', 'letter-sounds-audit'],
@@ -1941,6 +1944,11 @@
             // these JSONs; an SW that predates a canon re-render (VQA-FIX.1)
             // would otherwise serve stale bytes and hash a phantom verdict.
             const res = await fetch(url, { cache: 'no-store' })
+            if (res.status === 404) {
+              console.warn('[voice-qa] canon not baked yet, skipped: ' + url)
+              onProgress(fi + 1, totalFiles, byHash.size)
+              continue
+            }
             if (!res.ok) throw new Error(stem + ' ' + res.status)
             canon = await res.json()
           } catch (e) {

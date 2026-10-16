@@ -41,7 +41,7 @@ import {
  */
 
 describe('activeCombos — coverage matches the curriculum', () => {
-  it('produces 24 combos: 11 math nodes × level 1 + 13 word-song nodes × level 1 (simple-sentences baked post-Wave 13)', () => {
+  it('produces 26 combos: 11 math nodes × level 1 + 15 word-song nodes × level 1 (duck-words + crab-words, content wave 1)', () => {
     // Step 2 of the planner-parser contract added cvc-words alongside
     // blending-cv as a first-class word-song content mode. Ticket
     // 86c9m3ae3 added `cvc-words-short-o` as the next-vowel sibling
@@ -78,12 +78,14 @@ describe('activeCombos — coverage matches the curriculum', () => {
     // `design/word-song/simple-sentences-content.md` +
     // `design/wave-13-simple-sentences-plan.md`. After this tier, EVERY
     // word-song node is first-class — no remaining untuned tiers.
+    // Content wave 1 added `duck-words` and `crab-words` (land 6, "Big
+    // words"; design/native/content-wave-1.md § 3–§ 4), fixed 8-word sessions.
     const combos = activeCombos()
-    expect(combos).toHaveLength(24)
+    expect(combos).toHaveLength(26)
     const mathCount = combos.filter((c) => c.track === 'math').length
     const wordSongCount = combos.filter((c) => c.track === 'word-song').length
     expect(mathCount).toBe(11)
-    expect(wordSongCount).toBe(13)
+    expect(wordSongCount).toBe(15)
   })
 
   it('every math combo names a node from VALID_MATH_FOCUS_NODES (Wave 6C — bake list emits BOTH `-no-regroup` and `-with-regroup` wire literals)', () => {
@@ -99,12 +101,13 @@ describe('activeCombos — coverage matches the curriculum', () => {
     }
   })
 
-  it('word-song combos are letter-names + letter-sounds + blending-cv + cvc-words + cvc-words-short-o + cvc-words-short-u + cvc-words-short-i + cvc-words-short-e + digraphs-sh + digraphs-ch + digraphs-th-voiceless + sight-words + simple-sentences (planner first-class scope)', () => {
+  it('word-song combos are letter-names + letter-sounds + blending-cv + cvc-words + cvc-words-short-o + cvc-words-short-u + cvc-words-short-i + cvc-words-short-e + digraphs-sh + digraphs-ch + digraphs-th-voiceless + sight-words + simple-sentences + duck-words + crab-words (planner first-class scope)', () => {
     const combos = activeCombos().filter((c) => c.track === 'word-song')
-    expect(combos).toHaveLength(13)
+    expect(combos).toHaveLength(15)
     const focusNodes = combos.map((c) => c.focusNode).sort()
     expect(focusNodes).toEqual([
       'blending-cv',
+      'crab-words',
       'cvc-words',
       'cvc-words-short-e',
       'cvc-words-short-i',
@@ -113,6 +116,7 @@ describe('activeCombos — coverage matches the curriculum', () => {
       'digraphs-ch',
       'digraphs-sh',
       'digraphs-th-voiceless',
+      'duck-words',
       'letter-names',
       'letter-sounds',
       'sight-words',

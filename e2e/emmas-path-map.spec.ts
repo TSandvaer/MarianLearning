@@ -57,6 +57,9 @@ const WORD = [
   'digraphs-th-voiceless',
   'sight-words',
   'simple-sentences',
+  // Content wave 1: land 6, "Big words".
+  'duck-words',
+  'crab-words',
 ] as const
 
 /** Mastered before `current`, practicing at it, locked after (-1 = all mastered). */
@@ -609,9 +612,9 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     await arm(page, seedProgress({ word: 4 }))
     await openMapFromHub(page, 'word-song')
 
-    await expect(page.getByTestId('map-stop')).toHaveCount(13)
-    await expect(page.getByTestId('map-band')).toHaveCount(5)
-    await expect(page.getByTestId('map-gate')).toHaveCount(4)
+    await expect(page.getByTestId('map-stop')).toHaveCount(15)
+    await expect(page.getByTestId('map-band')).toHaveCount(6)
+    await expect(page.getByTestId('map-gate')).toHaveCount(5)
     await expect(page.getByTestId('map-emma')).toHaveAttribute(
       'data-node',
       'cvc-words-short-o',
@@ -624,11 +627,12 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     await expect(ribbon(page)).toHaveText(
       'Here is your path! You are on dog words.',
     )
-    // Gates: 2 (blending) and 3 (words) open, 4 and 5 closed.
+    // Gates: 2 (blending) and 3 (words) open, 4, 5 and 6 closed.
     await expect(gate(page, 2)).toHaveAttribute('data-open', 'true')
     await expect(gate(page, 3)).toHaveAttribute('data-open', 'true')
     await expect(gate(page, 4)).toHaveAttribute('data-open', 'false')
     await expect(gate(page, 5)).toHaveAttribute('data-open', 'false')
+    await expect(gate(page, 6)).toHaveAttribute('data-open', 'false')
     const scroll = await page.evaluate(
       () => document.documentElement.scrollHeight <= window.innerHeight,
     )

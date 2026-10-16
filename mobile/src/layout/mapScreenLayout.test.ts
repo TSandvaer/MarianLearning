@@ -69,7 +69,10 @@ function worst(v: Viewport, world: MasteryTrack) {
 
 const close = (a: number, b: number) => Math.abs(a - b) <= 0.051
 
-// § 1 sizes table (Word Song, the worst world).
+// § 1 sizes table (Word Song, the worst world). Content wave 1 added Word
+// Song land 6 (`design/native/content-wave-1.md` § 5.2): the 430×932 row
+// and the L / TL rows shrink with the 6th band; 375×667 and both W rows
+// keep their sizes.
 const TABLE: [
   string,
   Viewport,
@@ -86,12 +89,12 @@ const TABLE: [
     vp(430, 932, 59, 34),
     'P',
     0.524,
-    51.9,
-    62.4,
+    46.15,
+    55.6,
     48.2,
     null,
   ],
-  ['667×375', vp(667, 375), 'L', 0.45, 39.6, 47.7, 41.4, 448],
+  ['667×375', vp(667, 375), 'L', 0.45, 39.6, 47.7, 41.4, 527],
   ['820×1180 (t24 b20)', vp(820, 1180, 24, 20), 'W', 1, 88, 106, 92, null],
   [
     '744×1133 (t24 b20)',
@@ -103,8 +106,17 @@ const TABLE: [
     83.5,
     null,
   ],
-  ['1180×820 (b20)', vp(1180, 820, 0, 20), 'TL', 0.787, 69.3, 83.4, 72.4, null],
-  ['1133×744 (b20)', vp(1133, 744, 0, 20), 'TL', 0.711, 62.5, 75.3, 65.4, null],
+  ['1180×820 (b20)', vp(1180, 820, 0, 20), 'TL', 0.669, 58.9, 70.9, 61.5, null],
+  [
+    '1133×744 (b20)',
+    vp(1133, 744, 0, 20),
+    'TL',
+    0.604,
+    53.15,
+    64.0,
+    55.6,
+    null,
+  ],
 ]
 
 describe('mapPathScale: the § 1 sizes table', () => {

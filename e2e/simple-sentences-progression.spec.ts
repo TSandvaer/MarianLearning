@@ -2,6 +2,14 @@
  * E2E spec — simple-sentences TERMINAL-TIER PROGRESSION:
  * intro → practicing → mastered with NO downstream unlock.
  *
+ * UPDATE (content wave 1, design/native/content-wave-1.md § 3.1):
+ * simple-sentences is no longer terminal. `duck-words` (then `crab-words`,
+ * land 6 "Big words") follows it, so mastering simple-sentences now unlocks
+ * EXACTLY `duck-words` ('locked' → 'intro'). This is the "future tier
+ * insertion" the regression lock below was written to catch; test 1 now
+ * asserts the new single unlock instead of none. The history below
+ * describes the spec as it shipped in W13-05.
+ *
  * Ticket: 86ca8d4ar (W13-05). Wave 13 simple-sentences content tier.
  *   Paired with the W13-03 content stack. Plan:
  *   `design/wave-13-simple-sentences-plan.md` (Track 4).
@@ -152,6 +160,8 @@ const WORD_SONG_NODES: ReadonlyArray<string> = [
   'digraphs-th-voiceless',
   'sight-words',
   'simple-sentences',
+  'duck-words',
+  'crab-words',
 ]
 
 /**
@@ -241,7 +251,7 @@ function buildTerminalSeed(): Record<string, unknown> {
   }
 }
 
-test.describe('simple-sentences TERMINAL progression — mastery with NO downstream unlock (W13-05)', () => {
+test.describe('simple-sentences progression — mastery unlocks duck words (W13-05, content wave 1)', () => {
   /**
    * TEST 1 — Terminal-tier progression walk: intro → practicing →
    * mastered, NO downstream unlock.
@@ -260,7 +270,7 @@ test.describe('simple-sentences TERMINAL progression — mastery with NO downstr
    * intro → mastered) and no node went from `'locked'` to a non-locked
    * level (the unlock cascade was a no-op at the terminal node).
    */
-  test('1. three perfect simple-sentences sessions promote intro → mastered with NO downstream unlock (nextNode → null)', async ({
+  test('1. three perfect simple-sentences sessions promote intro → mastered and unlock exactly duck-words', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
@@ -318,28 +328,25 @@ test.describe('simple-sentences TERMINAL progression — mastery with NO downstr
     // SMOKING GUN A — practicing→mastered fires under the 90/3 window.
     expect(afterSession3.skillLevels['simple-sentences']).toBe('mastered')
 
-    // SMOKING GUN B — NO DOWNSTREAM UNLOCK. simple-sentences is terminal
-    // (`nextNode → null`), so mastering it unlocks nothing. Prove the
-    // post-walk word-song map differs from the seed in EXACTLY ONE node
-    // (the terminal node intro → mastered) and that NO node went from
-    // `'locked'` to a non-locked level (the unlock cascade was a no-op).
+    // SMOKING GUN B — ONE DOWNSTREAM UNLOCK. `nextNode('word-song',
+    // 'simple-sentences')` is `duck-words` (content wave 1), so mastering
+    // simple-sentences opens it and nothing else. Prove the post-walk
+    // word-song map differs from the seed in EXACTLY these two nodes.
     const changedNodes = WORD_SONG_NODES.filter(
       (node) => afterSession3.skillLevels[node] !== seedLevels[node],
     )
-    expect(changedNodes).toEqual(['simple-sentences'])
+    expect(changedNodes).toEqual(['simple-sentences', 'duck-words'])
 
-    // And specifically: no word-song node that was `'locked'` in the seed
-    // is now unlocked (the cascade fired on nothing). There were no
-    // `'locked'` word-song nodes in the seed (all prior mastered, terminal
-    // at intro), so the set of newly-unlocked nodes is exactly empty —
-    // asserted as the empty array so a regression that adds a
-    // post-terminal node + unlocks it names itself.
+    // And specifically: the one node that left `'locked'` is duck-words,
+    // at `'intro'`; crab-words (after it) stays locked.
     const newlyUnlocked = WORD_SONG_NODES.filter(
       (node) =>
         seedLevels[node] === 'locked' &&
         afterSession3.skillLevels[node] !== 'locked',
     )
-    expect(newlyUnlocked).toEqual([])
+    expect(newlyUnlocked).toEqual(['duck-words'])
+    expect(afterSession3.skillLevels['duck-words']).toBe('intro')
+    expect(afterSession3.skillLevels['crab-words']).toBe('locked')
 
     // History accumulates exactly 3 entries, all on the terminal node —
     // the picker falls back to the LAST node when everything before it is

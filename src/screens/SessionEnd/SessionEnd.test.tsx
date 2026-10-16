@@ -504,6 +504,8 @@ describe('SessionEnd', () => {
       'digraphs-th-voiceless',
       'sight-words',
       'simple-sentences',
+      'duck-words',
+      'crab-words',
     ] as const) {
       allMasteredWordSong[node] = 'mastered'
     }
@@ -562,6 +564,8 @@ describe('SessionEnd', () => {
       'digraphs-th-voiceless',
       'sight-words',
       'simple-sentences',
+      'duck-words',
+      'crab-words',
     ] as const) {
       allMastered[node] = 'mastered'
     }

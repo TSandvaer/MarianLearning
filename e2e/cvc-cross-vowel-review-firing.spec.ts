@@ -256,6 +256,9 @@ test.describe('cvc cross-vowel REVIEW FIRING (ticket 86c9qa6n3, AC6) — REGRESS
           'digraphs-th-voiceless': 'mastered',
           'sight-words': 'mastered',
           'simple-sentences': 'mastered',
+          // Content wave 1 (land 6): the tree's last two steps.
+          'duck-words': 'mastered',
+          'crab-words': 'mastered',
         },
       }),
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),

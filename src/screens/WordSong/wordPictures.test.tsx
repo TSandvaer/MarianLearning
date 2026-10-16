@@ -97,6 +97,24 @@ describe('WordPicture', () => {
     'tin',
     'tick',
     'pat',
+    // Land 6 "Big words" (content wave 1): the frozen web never gets their
+    // inline bodies; native bakes the picture pack instead.
+    'duck',
+    'rock',
+    'ring',
+    'sock',
+    'wing',
+    'king',
+    'lock',
+    'sack',
+    'flag',
+    'drum',
+    'brick',
+    'crab',
+    'swing',
+    'plum',
+    'clock',
+    'frog',
   ])
 
   it('renders a non-empty body for every picture in the curated pack', () => {
@@ -149,8 +167,9 @@ describe('WordPicture', () => {
       unmount()
     }
     // 9 digraphs-sh keys + 9 digraphs-ch keys + 10 digraphs-th keys
-    // (7 th targets + 3 t-contrast distractor-only entries).
-    expect(fallbackCount).toBe(28)
+    // (7 th targets + 3 t-contrast distractor-only entries) + 16 land-6
+    // words.
+    expect(fallbackCount).toBe(44)
   })
 
   it('falls back to the unknown-picture text shape for an unknown key', () => {
