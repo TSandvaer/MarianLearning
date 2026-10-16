@@ -331,8 +331,8 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
  * in Lily by `revoiceCanonLily.ts` and ear-tested), so neither a local
  * `yarn canon:generate` nor the Vercel `prebuild` may spend on them by the
  * way. The render runs `npx tsx scripts/generateSessionCanon.ts
- * --include-pending`; once the file is committed the entry is inert (an
- * existing file is skipped anyway) and can be dropped.
+ * --include-pending`. Keep the entries after the file is committed:
+ * `--force` must not re-draw a hand-checked Lily canon.
  */
 export const PENDING_CANON_NODES: ReadonlySet<string> = new Set([
   'duck-words',

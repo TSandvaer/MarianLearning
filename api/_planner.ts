@@ -1050,8 +1050,8 @@ const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
   // (Dave, W11-01) + `WORD_SONG_TARGET_WORDS_SIGHT` in `_plannerWordList.ts`.
   'sight-words',
   // Wave 13 (ticket 86ca8e6fr) — `simple-sentences`, the sentence-
-  // COMPLETION (cloze) tier and the LAST Word Song content tier (terminal
-  // node of WORD_SONG_NODES_IN_ORDER). Emma reads a 3–4 word sentence with
+  // COMPLETION (cloze) tier (land 5's last step; content wave 1's
+  // duck-words and crab-words follow it). Emma reads a 3–4 word sentence with
   // one word gapped ("Finish the sentence: The cat ___ the bag."); Marian
   // taps the written-word chip that fills the gap. The target is carried
   // in the `correct` line ("Yes! Bit.") NOT the gapped read — Emma never
@@ -2283,7 +2283,7 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 const WORD_SONG_TRACK_GUIDE = `Track: Word Song.
 
 The user message names a focus skill node. The planner emits content
-matching that node. Thirteen first-class content modes today:
+matching that node. Fifteen first-class content modes today:
 
   - letter-names: "Tap the letter <NAME>." problems. Marian sees a
     trio of LETTER GLYPHS (the alphabet, uppercase + lowercase — no
@@ -2383,10 +2383,9 @@ matching that node. Thirteen first-class content modes today:
   - simple-sentences: "Finish the sentence: <sentence>." problems where
     <sentence> is a 3–4 word sentence with ONE word replaced by the gap
     token "___" (three underscores), e.g. "Finish the sentence: The cat
-    ___ the bag." This is the sentence-COMPLETION (cloze) tier and the
-    LAST whole-Word-Song tier — Marian arrives here after she's mastered
-    sight-words. CRITICAL DISTINCTION from EVERY prior tier: Emma must
-    NEVER speak the answer word (that defeats the cloze). The answer lives
+    ___ the bag." This is the sentence-COMPLETION (cloze) tier — Marian
+    arrives here after she's mastered sight-words. CRITICAL DISTINCTION
+    from EVERY prior tier: Emma must NEVER speak the answer word (that defeats the cloze). The answer lives
     in the "correct" line ("Yes! Sat.") and is NEVER in the read line —
     the read line carries the literal "___" gap token at the gap (the
     audio render speaks "blank" there). Marian reads the gapped
@@ -2736,9 +2735,9 @@ no IPA.
 
 SIMPLE-SENTENCES COMPLETION (simple-sentences tier ONLY; OVERRIDES the
 default word-tier read + correct + hint templates — apply these instead).
-The simple-sentences tier is a sentence-COMPLETION (cloze) tier — the
-LAST Word Song tier. Marian reads a 3–4 word sentence with one word
-gapped and taps the written-word chip that fills the gap. The teaching
+The simple-sentences tier is a sentence-COMPLETION (cloze) tier. Marian
+reads a 3–4 word sentence with one word gapped and taps the written-word
+chip that fills the gap. The teaching
 goal is syntactic-slot prediction at the sentence level, NOT phonics
 decoding (every word in every sentence is already taught). So:
 
