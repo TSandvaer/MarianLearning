@@ -81,6 +81,10 @@ export type WordSongNode =
   | 'digraphs-th-voiceless'
   | 'sight-words'
   | 'simple-sentences'
+  // Content wave 1 (design/native/content-wave-1.md § 3–§ 4): land 6,
+  // "Big words". ck/ng at the end, then start blends.
+  | 'duck-words'
+  | 'crab-words'
 
 export type SkillNode = NumberGardenNode | WordSongNode
 

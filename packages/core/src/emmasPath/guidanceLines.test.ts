@@ -37,14 +37,14 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'session-review': 1,
       'session-warmup': 1,
       'session-knew': 1,
-      'session-peek-open': 22,
-      'session-peek-close': 22,
+      'session-peek-open': 24,
+      'session-peek-close': 24,
       'session-hiding': 1,
     })
-    expect(GUIDANCE_LINES).toHaveLength(68)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(68)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(68)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(68)
+    expect(GUIDANCE_LINES).toHaveLength(72)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(72)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(72)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(72)
   })
 
   it('bakes each world and count variant', () => {
@@ -153,6 +153,15 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     expect(peekLines('blending-cv')?.close.text).toBe(
       'Blending sounds is for later. You will learn it!',
     )
+    // Content wave 1 (design/native/content-wave-1.md § 6.2 rows 3-6).
+    expect(peekLines('duck-words')).toMatchObject({
+      open: { text: "Let's look at duck words!", world: 'word-song' },
+      close: { text: 'Duck words are for later. You will learn it!' },
+    })
+    expect(peekLines('crab-words')).toMatchObject({
+      open: { text: "Let's look at crab words!", world: 'word-song' },
+      close: { text: 'Crab words are for later. You will learn it!' },
+    })
     // Plural noun phrases take "are"; activity (gerund) names take "is".
     const ARE = new Set([
       'two-digit-addsub-no-regroup',
@@ -169,6 +178,8 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'digraphs-ch',
       'digraphs-th-voiceless',
       'sight-words',
+      'duck-words',
+      'crab-words',
     ])
     // Every step but a world's first (a peek never reaches it) has both.
     for (const tree of [MATH_TREE, LITERACY_TREE]) {
@@ -201,7 +212,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(68)
+    ).toHaveLength(72)
   })
 
   it('repeats no Emma’s Path line', () => {

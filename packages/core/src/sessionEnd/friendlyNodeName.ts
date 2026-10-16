@@ -89,6 +89,8 @@ export const FRIENDLY_NODE_NAMES: Record<SkillNode, string> = {
   'digraphs-th-voiceless': 'reading words',
   'sight-words': 'reading words',
   'simple-sentences': 'reading sentences',
+  'duck-words': 'reading words',
+  'crab-words': 'reading words',
 }
 
 /**
@@ -154,6 +156,10 @@ export const STAGE_SPOKEN_NAMES: Record<SkillNode, string> = {
   'digraphs-th-voiceless': 'thumb words',
   'sight-words': 'star words',
   'simple-sentences': 'reading sentences',
+  // Content wave 1 (design/native/content-wave-1.md § 3.1 / § 4.1, K7):
+  // named after the stop picture, as "cat words" and "ship words".
+  'duck-words': 'duck words',
+  'crab-words': 'crab words',
 }
 
 /**
@@ -191,6 +197,8 @@ export const STAGE_SPOKEN_NAME_VERBS: Record<SkillNode, 'is' | 'are'> = {
   'digraphs-th-voiceless': 'are',
   'sight-words': 'are',
   'simple-sentences': 'is',
+  'duck-words': 'are',
+  'crab-words': 'are',
 }
 
 /** "adding to ten" → "Adding to ten" (sentence-start form). */

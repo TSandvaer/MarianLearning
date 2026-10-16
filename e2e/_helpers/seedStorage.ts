@@ -170,6 +170,8 @@ const DEFAULT_SKILL_LEVELS = {
   'digraphs-th-voiceless': 'locked',
   'sight-words': 'intro',
   'simple-sentences': 'locked',
+  'duck-words': 'locked',
+  'crab-words': 'locked',
 } as const
 
 export interface SeedSessionHistoryOptions {

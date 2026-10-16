@@ -30,6 +30,8 @@
  *     swaps to `<img src=...>` without touching this file.
  */
 
+import { BIG_WORDS_STEPS, BIG_WORDS_STEP_IDS } from './bigWordsSteps'
+
 /** A picture-pack entry — target word OR distractor-only picture. */
 export interface WordEntry {
   /** The word, lowercase, no punctuation. Identifier across the pack. */
@@ -1132,6 +1134,23 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     phoneme: '/θ/',
     hybridMode: true,
   },
+  // ── Land 6 "Big words": duck words + crab words (content wave 1) ──────
+  // 16 picture targets from `bigWordsSteps.ts` (the one place their words
+  // live), in canon order. `vowel` is set (every word keeps a short vowel),
+  // so the CVC-axis and cross-vowel test scans exclude them by name, as
+  // they do the ch and th words. No `phoneme` tag: ck / ng / start blends
+  // share no grapheme with a pack word that says something else.
+  ...BIG_WORDS_STEP_IDS.flatMap((step) =>
+    BIG_WORDS_STEPS[step].map(
+      (row): WordEntry => ({
+        word: row.word,
+        pictureKey: row.word,
+        vowel: row.vowel,
+        category: row.category,
+        isTarget: true,
+      }),
+    ),
+  ),
   // ── Sight-words tier (Wave 11, ticket 86ca7xmr8) ──────────────────────
   // 20 high-frequency sight-word targets — Dave's W11-01 starter set
   // (Dolch Pre-Primer + Primer subset), aligned 1:1 with
@@ -1753,6 +1772,24 @@ export const FORBIDDEN_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['thin', 'thick'],
   ['path', 'moth'],
   ['bath', 'box'],
+  // Land 6 "Big words" (content wave 1, `design/native/content-wave-1.md`
+  // § 4.5). Picture-silhouette hygiene against words already in the pack;
+  // Thomas's picture review may add more. The spec's two `cab` pairs
+  // (cab–van, cab–bus) went with `cab` itself (Dave's D4, 2026-10-16).
+  ['duck', 'hen'], // both birds in side view
+  ['sack', 'bag'], // both bags
+  ['lock', 'bag'], // a padlock's shackle reads as a bag handle
+  ['ring', 'gem'], // the ring carries a gem
+  ['king', 'man'], // both human figures
+  ['king', 'dad'], // both human figures
+  ['king', 'mom'], // both human figures
+  ['rock', 'egg'], // both rounded lumps
+  ['clock', 'fan'], // a round face on a stand, both
+  ['drum', 'can'], // both cylinders
+  ['drum', 'tub'], // both cylinders
+  ['plum', 'fig'], // both purple fruits with a stem
+  ['flag', 'net'], // both a pole with something at the top
+  ['brick', 'box'], // both rectangular blocks
 ] as const
 
 /** True if `a` and `b` are a forbidden silhouette-similar pair. */
@@ -2114,6 +2151,14 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   // comment.
   moth: { gentle: ['bath', 'cloth'], trap: ['thin', 'math'] }, // th-pool only; path avoided (FORBIDDEN_PAIR); spec's [thin,thick] is itself a FORBIDDEN_PAIR — see deviation note above
   cloth: { gentle: ['bath', 'math'], trap: ['thin', 'moth'] }, // th-pool only
+  // ── Land 6 "Big words" (content wave 1) — rows from `bigWordsSteps.ts`.
+  ...Object.fromEntries(
+    BIG_WORDS_STEP_IDS.flatMap((step) =>
+      BIG_WORDS_STEPS[step].map(
+        (row) => [row.word, { gentle: row.gentle, trap: row.trap }] as const,
+      ),
+    ),
+  ),
   // ── Sight-words tier (Wave 11, ticket 86ca7xmr8) ──────────────────────
   // Per Dave's W11-01 §"Distractor pairing reference". GENTLE distractors
   // (P1-3) are visually + categorically distinct from the target

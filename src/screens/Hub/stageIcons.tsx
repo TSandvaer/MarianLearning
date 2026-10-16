@@ -189,6 +189,9 @@ const STAGE_LABEL: Record<StageId, string> = {
   'digraphs-th-voiceless': 'th',
   'sight-words': 'the',
   'simple-sentences': 'I',
+  // Content wave 1 (frozen web: typecheck only; Marian plays native).
+  'duck-words': 'duck',
+  'crab-words': 'crab',
 }
 
 function stageAriaLabel(stage: StageId, kind: StageIconKind): string {

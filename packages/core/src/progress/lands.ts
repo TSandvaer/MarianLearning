@@ -74,6 +74,15 @@ export const LANDS: readonly Land[] = [
     name: 'Sentences',
     nodes: ['sight-words', 'simple-sentences'],
   },
+  // Content wave 1 (design/native/content-wave-1.md § 5.1). A new land,
+  // not land 5 "Sentences": the land name is spoken, and these steps
+  // aren't sentences. Dave's next two phonics steps join this land.
+  {
+    world: 'word-song',
+    number: 6,
+    name: 'Big words',
+    nodes: ['duck-words', 'crab-words'],
+  },
 ]
 
 /** The lands of one world, in order. */

@@ -130,6 +130,8 @@ const WORD_SONG_LABELS: Record<WordSongNode, string> = {
   'digraphs-th-voiceless': 'digraphs (th)',
   'sight-words': 'sight words',
   'simple-sentences': 'simple sentences',
+  'duck-words': 'duck words',
+  'crab-words': 'crab words',
 }
 
 export function labelForSkillNode(node: SkillNode): string {

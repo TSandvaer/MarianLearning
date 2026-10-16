@@ -118,6 +118,8 @@ const SCHEMA_FLOOR_NODES: readonly SkillNode[] = [
   'digraphs-th-voiceless',
   'sight-words',
   'simple-sentences',
+  'duck-words',
+  'crab-words',
 ] as const
 
 /**
@@ -219,6 +221,9 @@ const DEFAULT_SKILL_LEVELS: SkillLevels = {
   'digraphs-th-voiceless': 'locked',
   'sight-words': 'intro', // introduce gradually
   'simple-sentences': 'locked',
+  // Content wave 1 (design/native/content-wave-1.md § 3.1 / § 4.1).
+  'duck-words': 'locked',
+  'crab-words': 'locked',
 }
 
 export function defaultProgress(childName = 'Marian'): Progress {

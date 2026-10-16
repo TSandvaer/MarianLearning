@@ -133,6 +133,8 @@ export const WORD_SONG_NODES_IN_ORDER: readonly WordSongNode[] = [
   'digraphs-th-voiceless',
   'sight-words',
   'simple-sentences',
+  'duck-words',
+  'crab-words',
 ]
 
 /**
