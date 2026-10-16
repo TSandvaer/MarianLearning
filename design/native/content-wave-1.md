@@ -245,3 +245,115 @@ export function pickMixBlocks(
 - **Peek:** `pickPeekBlocks('mult-mix')` = its canon P1–P3 (5×3, 4×5, 6×4). Opener "Let's look at all the groups!", closer "All the groups are for later. You will learn it!".
 - **Review:** once mastered, `mult-mix` is in the review pool with its own 8 canon blocks.
 - **Warm-up:** unchanged. `blockFor(fact, [C, ...S])` searches `mult-mix`'s canon first, then the mastered steps.
+
+## 3. WS-A: duck words (`duck-words`)
+
+### 3.1 The step
+
+- **SkillNode `duck-words`**, after `simple-sentences` in `LITERACY_TREE` and `WORD_SONG_NODES_IN_ORDER`. Default `'locked'`.
+- **Spoken name** "duck words", verb **are** (the pattern of "cat words", "ship words": the step is named after its stop picture). Recap phrase: "reading words".
+- **Map:** the 1st stop of the new land 6, "Big words" (§ 5).
+- **Format:** the `cvc-word` content type as it is: "Read the duck.", a word card with the letter row, three picture chips. The 1500 ms silent beat, the chip gate, the hint, the given answer and the sounds are all today's.
+- **Words: exactly 8**, one per problem (K9). Word Song sessions are served from canon every time (only `add-to-10` ever reaches the live planner), so each step is the same 8 words in the same order, and reviews copy those blocks.
+- **Mastery, fast track, pace guard, peek:** the sibling rules. No graduation gate (`WORD_SONG_GRADUATION_GATED_NODES` stays `{ 'cvc-words' }`).
+
+### 3.2 Word list and distractor matrix (canon order)
+
+The table order is the canon order: P1–P3 use the gentle pair, P4–P8 the trap pair. Every word still needs both pairs, because a review moves blocks to other positions.
+
+| P   | Word | Ending | Vowel | Category  | Gentle (P1–P3) | Trap (P4–P8) | Why the trap                                         |
+| --- | ---- | ------ | ----- | --------- | -------------- | ------------ | ---------------------------------------------------- |
+| 1   | duck | ck     | u     | animal    | pen, box       | dog, sock    | dog: same first letter; sock: same ending            |
+| 2   | rock | ck     | o     | object    | hen, cup       | sock, rug    | sock: rhyme; rug: same first letter                  |
+| 3   | ring | ng     | i     | object    | dog, hat       | king, rock   | king: rhyme; rock: same first letter                 |
+| 4   | sock | ck     | o     | clothing  | fan, bug       | sack, rock   | sack: Dave's vowel neighbour; rock: rhyme            |
+| 5   | wing | ng     | i     | body-part | box, pan       | wig, king    | **wig: the same word without the n**; king: rhyme    |
+| 6   | king | ng     | i     | person    | bus, pot       | ring, wing   | both rhymes: read the first letter                   |
+| 7   | lock | ck     | o     | household | fan, web       | log, rock    | **log: the same start, g for ck**; rock: rhyme       |
+| 8   | sack | ck     | a     | object    | pig, jet       | sock, sun    | sock: Dave's vowel neighbour; sun: same first letter |
+
+- **Gentle pairs** follow the CVC rule: another category, another first sound, another vowel. (king's gentle pair avoids `cup`, whose /k/ matches.)
+- **Traps:** Dave suggests the vowel neighbour (sock / sack). A vowel neighbour needs a picture too, and only sock / sack has one that reads. The other traps share the ending (rhymes) or swap the new ending for a known one (lock / log, wing / wig), so she has to read to the end of the word, which is this step's new skill.
+- **Dropped from Dave's examples:** _neck_. No picture of a neck reads as "neck" rather than "giraffe" or "scarf" at 96 pt.
+- **Every word takes "Yes! That's a <word>."**, so the celebration exception list doesn't grow.
+
+### 3.3 Intro lead
+
+"Two letters, one sound!" plays before P1's silent beat in every forward session on the step until it is mastered (§ 6.1). While Emma says it, the word's last two cells (c k / n g) light together on the rose spotlight (`LetterRow`'s lit state, both cells, 120 ms fade in, out 200 ms after the line ends). [Reduce Motion: the spotlight still shows, without the pulse.] Then the 1500 ms silent beat, then "Read the duck."
+
+### 3.4 No blend clip
+
+The CVC blend ("c - a - t ... cat") is 3 sounds and the word, cut by 4 measured marks (`word-song-native.md` § 5). Duck words have 4 letters for 3 sounds, and an isolated /ŋ/ has never been ear-tested. So, like the digraph steps, there is no `word.p*.blend`: the letters pulse silently, and the 2nd wrong plays the hint line ("Let's look. Duck."). A blend for these words is wave-2 work with its own ear test.
+
+### 3.5 Pictures
+
+All 8 words are new pictures (none is in `mobile/assets/pictures/`, checked with `ls` on 2026-10-16). Every distractor above already has one there: pen, box, dog, hen, cup, rug, hat, fan, bug, wig, pan, bus, pot, web, log, pig, jet, sun. Prompts: § 8.
+
+## 4. WS-B: crab words (`crab-words`)
+
+### 4.1 The step
+
+- **SkillNode `crab-words`**, after `duck-words`. Default `'locked'`.
+- **Spoken name** "crab words", verb **are**. Not "frog words": the frog is skip counting's stop picture, and no picture repeats on the path (`emmas-path-spec.md` § 5). The crab is new, and _crab_ has short **a**, her strongest vowel. Recap phrase: "reading words".
+- **Map:** the 2nd stop of land 6 (§ 5).
+- **Format, mastery, fast track, peek:** as duck words (§ 3.1). Start blends only, short vowels only (Dave). Every word is a short vowel in British English too: the voice is British, which is why _sled_ is out (§ 4.2).
+
+### 4.2 Word list and distractor matrix (canon order)
+
+| P   | Word  | Blend | Vowel | Category  | Gentle (P1–P3) | Trap (P4–P8) | Why the trap                                                  |
+| --- | ----- | ----- | ----- | --------- | -------------- | ------------ | ------------------------------------------------------------- |
+| 1   | flag  | fl    | a     | object    | cup, web       | frog, bag    | frog: f with r for l; bag: rhyme with one first letter        |
+| 2   | drum  | dr    | u     | object    | hat, fox       | plum, dog    | plum: rhyme with another blend; dog: d without the r          |
+| 3   | brick | br    | i     | object    | sun, hat       | crab, clock  | crab: the same r; clock: the same ending                      |
+| 4   | crab  | cr    | a     | animal    | sun, pen       | cab, frog    | **cab: crab without the r** (Dave, R4); frog: another r-blend |
+| 5   | swing | sw    | i     | structure | pot, bug       | wing, king   | **wing: swing without the s**; king: rhyme                    |
+| 6   | plum  | pl    | u     | food      | cat, hen       | drum, pig    | drum: rhyme with another blend; pig: p without the l          |
+| 7   | clock | cl    | o     | household | bun, jet       | lock, sock   | **lock: clock without the c**; sock: rhyme                    |
+| 8   | frog  | fr    | o     | animal    | cup, bed       | dog, flag    | dog: rhyme without the blend; flag: f with l for r            |
+
+- **Dave's dropped-consonant twin** (R4: frog read as "fog") is the trap wherever its picture reads: crab / cab, swing / wing, clock / lock. _wing_ and _lock_ arrive with duck words, one step earlier.
+- **Twins left out:**
+  - _fog_ (a fog picture reads as a cloud).
+  - _rib_ (and with it _crib_; neither picture reads at 96 pt).
+  - _flag_'s twin without the l, never (Dave).
+  - For frog, the trap is _dog_: the rhyme without the blend tests the same thing.
+- **Dropped from Dave's list:**
+  - _swim_ (a verb, so "Yes! That's a swim." breaks; _swing_ takes its sw).
+  - _sled_ (the British word is "sledge").
+  - _crib_ and _clam_ (weak vocabulary, no twin with a picture).
+- **Added:** _flag_, _clock_ and _swing_ (each with a twin or a strong rhyme).
+- **cab is distractor-only** (`DISTRACTOR_ONLY_WORDS`, `isTarget: false`). It is never a target, never spoken and needs no `TARGET_PAIRINGS` row.
+- **Every target takes "Yes! That's a <word>."**
+
+### 4.3 Intro lead
+
+"Read all the letters!" plays before P1's silent beat in every forward session on the step until it is mastered. While Emma says it, the cells light one after another from the left, 150 ms apart (each a 120 ms fade in), and all go dark 200 ms after the line ends. [Reduce Motion: they light at once.] **Why:** the trap this step sets is skipping the second letter. "All the letters" says what to do about it in words she knows.
+
+### 4.4 Pictures
+
+All 8 targets and _cab_ are new pictures (9; none is in `mobile/assets/pictures/`, checked with `ls` on 2026-10-16). Already there: cup, web, bag, hat, fox, dog, sun, pen, pot, bug, cat, hen, pig, bun, jet, bed. Ready by then from duck words: wing, king, lock, sock. No blend clip (§ 3.4).
+
+### 4.5 New forbidden pairs (both steps)
+
+Added to `FORBIDDEN_PAIRS` before the matrix is coded. Thomas's picture review may add more.
+
+| Pair        | Why                                       |
+| ----------- | ----------------------------------------- |
+| duck – hen  | both birds in side view                   |
+| sack – bag  | both bags                                 |
+| lock – bag  | a padlock's shackle reads as a bag handle |
+| ring – gem  | the ring carries a gem                    |
+| king – man  | both human figures                        |
+| king – dad  | both human figures                        |
+| king – mom  | both human figures                        |
+| rock – egg  | both rounded lumps                        |
+| clock – fan | a round face on a stand, both             |
+| drum – can  | both cylinders                            |
+| drum – tub  | both cylinders                            |
+| plum – fig  | both purple fruits with a stem            |
+| flag – net  | both a pole with something at the top     |
+| brick – box | both rectangular blocks                   |
+| cab – van   | vehicles in side view                     |
+| cab – bus   | vehicles in side view                     |
+
+No trio in § 3.2 or § 4.2 contains a forbidden pair, old or new.
