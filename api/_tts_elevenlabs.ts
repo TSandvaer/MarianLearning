@@ -12,9 +12,9 @@
  * pronunciation. The IPA is a render-time substitution only: canon `text`
  * and on-screen captions keep the mnemonic spelling ("vvv").
  *
- * Not wired as the default yet: `synthesizeUtterance` in `_tts.ts` routes
- * here only when `TTS_PROVIDER=elevenlabs`, so production stays on Azure
- * until the re-voice (4/6) and live-path (5/6) tickets land.
+ * The default backend: `synthesizeUtterance` in `_tts.ts` routes here unless
+ * `TTS_PROVIDER=azure` (see `ttsProvider`), and a failure here never falls
+ * back to Azure.
  */
 import type { BackoffPolicy, FetchFn, TtsRequest, TtsResult } from './_tts.js'
 import {

@@ -4,7 +4,7 @@
  * ElevenLabs backend (voice migration 1/6, ClickUp 123jpnbc33e).
  */
 import { describe, expect, it, vi } from 'vitest'
-import { synthesizeUtterance, type TtsRequest } from './_tts.js'
+import { synthesizeUtterance, ttsProvider, type TtsRequest } from './_tts.js'
 import {
   ELEVENLABS_MODEL_ID,
   ELEVENLABS_OUTPUT_FORMAT,
@@ -182,8 +182,39 @@ describe('synthesizeElevenLabs', () => {
   })
 })
 
+describe('ttsProvider', () => {
+  it('is ElevenLabs when TTS_PROVIDER is unset, empty or unknown', () => {
+    expect(ttsProvider({} as NodeJS.ProcessEnv)).toBe('elevenlabs')
+    expect(ttsProvider({ TTS_PROVIDER: '' } as NodeJS.ProcessEnv)).toBe(
+      'elevenlabs',
+    )
+    expect(ttsProvider({ TTS_PROVIDER: 'polly' } as NodeJS.ProcessEnv)).toBe(
+      'elevenlabs',
+    )
+    expect(
+      ttsProvider({ TTS_PROVIDER: 'elevenlabs' } as NodeJS.ProcessEnv),
+    ).toBe('elevenlabs')
+  })
+
+  it('is Azure only for the exact opt-in TTS_PROVIDER=azure', () => {
+    expect(ttsProvider({ TTS_PROVIDER: 'azure' } as NodeJS.ProcessEnv)).toBe(
+      'azure',
+    )
+    expect(ttsProvider({ TTS_PROVIDER: 'Azure' } as NodeJS.ProcessEnv)).toBe(
+      'elevenlabs',
+    )
+  })
+})
+
 describe('synthesizeUtterance provider switch', () => {
-  it('routes to ElevenLabs only when TTS_PROVIDER=elevenlabs', async () => {
+  /** Every env a production or preview function has had: both keys. */
+  const BOTH_KEYS = {
+    ELEVENLABS_API_KEY: 'k',
+    AZURE_SPEECH_KEY: 'a',
+    AZURE_SPEECH_REGION: 'westeurope',
+  }
+
+  it('routes to ElevenLabs when TTS_PROVIDER=elevenlabs', async () => {
     const fetchFn = okFetch()
     await synthesizeUtterance(req('Hi!'), {
       fetchFn,
@@ -196,25 +227,32 @@ describe('synthesizeUtterance provider switch', () => {
     expect(url.startsWith('https://api.elevenlabs.io/')).toBe(true)
   })
 
-  it('falls back to Azure for one utterance when ElevenLabs fails', async () => {
+  it('defaults to ElevenLabs when TTS_PROVIDER is unset, even with Azure keys', async () => {
+    const fetchFn = okFetch()
+    await synthesizeUtterance(req('Hi!'), {
+      fetchFn,
+      env: { ...BOTH_KEYS } as NodeJS.ProcessEnv,
+    })
+    expect(fetchFn).toHaveBeenCalledTimes(1)
+    const [url] = fetchFn.mock.calls[0] as unknown as [string]
+    expect(url.startsWith('https://api.elevenlabs.io/')).toBe(true)
+  })
+
+  it('never falls back to Azure when ElevenLabs fails, even with Azure keys', async () => {
     const fetchFn = vi.fn(async (url: string) =>
       url.startsWith('https://api.elevenlabs.io/')
         ? new Response('quota exceeded', { status: 401 })
         : new Response(new Uint8Array([9]), { status: 200 }),
     )
-    const out = await synthesizeUtterance(req('Hi!'), {
-      fetchFn: fetchFn as unknown as typeof fetch,
-      backoff: { maxAttempts: 0 },
-      env: {
-        TTS_PROVIDER: 'elevenlabs',
-        ELEVENLABS_API_KEY: 'k',
-        AZURE_SPEECH_KEY: 'a',
-        AZURE_SPEECH_REGION: 'westeurope',
-      } as NodeJS.ProcessEnv,
-    })
-    expect(Array.from(out.audio)).toEqual([9])
-    expect(fetchFn).toHaveBeenCalledTimes(2)
-    expect(String(fetchFn.mock.calls[1][0])).toContain(
+    await expect(
+      synthesizeUtterance(req('Hi!'), {
+        fetchFn: fetchFn as unknown as typeof fetch,
+        backoff: { maxAttempts: 0 },
+        env: { TTS_PROVIDER: 'elevenlabs', ...BOTH_KEYS } as NodeJS.ProcessEnv,
+      }),
+    ).rejects.toThrow(/elevenlabs tts failed: HTTP 401/)
+    expect(fetchFn).toHaveBeenCalledTimes(1)
+    expect(String(fetchFn.mock.calls[0][0])).not.toContain(
       'tts.speech.microsoft.com',
     )
   })
@@ -233,15 +271,13 @@ describe('synthesizeUtterance provider switch', () => {
     ).rejects.toThrow(/elevenlabs tts failed: HTTP 503/)
   })
 
-  it('stays on Azure by default', async () => {
+  it('reaches Azure only behind the explicit TTS_PROVIDER=azure', async () => {
     const fetchFn = okFetch()
     await synthesizeUtterance(req('Hi!'), {
       fetchFn,
-      env: {
-        AZURE_SPEECH_KEY: 'k',
-        AZURE_SPEECH_REGION: 'westeurope',
-      } as NodeJS.ProcessEnv,
+      env: { TTS_PROVIDER: 'azure', ...BOTH_KEYS } as NodeJS.ProcessEnv,
     })
+    expect(fetchFn).toHaveBeenCalledTimes(1)
     const [url] = fetchFn.mock.calls[0] as unknown as [string]
     expect(url).toContain('tts.speech.microsoft.com')
   })

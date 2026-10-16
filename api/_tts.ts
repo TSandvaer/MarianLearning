@@ -1,4 +1,7 @@
-// Server-side TTS using Azure Speech REST.
+// Server-side TTS dispatch: ElevenLabs (Lily) by default, Azure Speech REST
+// only behind the explicit opt-in TTS_PROVIDER=azure. See `ttsProvider`.
+// Most of this file is the Azure SSML path (kept for that opt-in and the
+// legacy audition scripts); the ElevenLabs backend is `_tts_elevenlabs.ts`.
 //
 // Why this exists
 // ---------------
@@ -36,9 +39,15 @@
 //    declared in api/_session.ts (EMMA_VOICE_CONFIG); see that file's
 //    header for full rationale. Phase 3b ships the visual pivot
 //    (manhwa-style art) and the broader rename of "Melody" symbols.
+//  - 2026-10-04 (voice migration): ElevenLabs Lily behind
+//    TTS_PROVIDER=elevenlabs, with a per-utterance Azure fallback.
+//  - 2026-10-16 (Thomas: "only use elevenlabs for voice consistency"):
+//    ElevenLabs is the default; the Azure fallback is removed; Azure only
+//    behind TTS_PROVIDER=azure.
 //
 // IMPORTANT: this is a server-side module ONLY. It reads
-// `process.env.AZURE_SPEECH_KEY` and `process.env.AZURE_SPEECH_REGION`.
+// `process.env.TTS_PROVIDER`, `process.env.AZURE_SPEECH_KEY` and
+// `process.env.AZURE_SPEECH_REGION`.
 // Never import from the browser bundle — `tsconfig.api.json` keeps it
 // scoped to `api/`.
 
@@ -1856,57 +1865,60 @@ export interface SynthesizeOptions {
    * Pass-5 blend-fidelity flag (ticket 86ca…blend-pass5). When `true`, a CVC
    * `blend` utterance renders through the FULL per-class segmented path
    * (fricative nested-prosody onset, stop `<stop>ə` release, /h/ fric-rel,
-   * voiced-onset whole-word floor). Set ONLY by the canon BAKE path —
-   * `scripts/generateSessionCanon.ts` threads `renderOptions.synthOptions =
-   * { blendFullFidelity: true }`. The runtime handler (`api/_session.ts` via
-   * the cache-miss / graduation live-render) leaves it UNSET so the blend
-   * renders as the resource-safe whole-word floor: the production runtime
-   * Azure resource REJECTS (HTTP 400) the full-fidelity fricative onset, but
-   * accepts plain whole-word text. Default = false (fail-safe).
+   * voiced-onset whole-word floor). Azure path only (`TTS_PROVIDER=azure`);
+   * ElevenLabs ignores it. Set only by the legacy Azure splice script
+   * `scripts/rebakeBlendCandidateF.ts` (the canon bake set it until
+   * 2026-10-16; the bake is now text-only). The runtime handler
+   * (`api/_session.ts` via the cache-miss / graduation live-render) leaves
+   * it UNSET so the blend renders as the resource-safe whole-word floor: the
+   * production runtime Azure resource REJECTS (HTTP 400) the full-fidelity
+   * fricative onset, but accepts plain whole-word text. Default = false.
    */
   blendFullFidelity?: boolean
 }
 
+/** Which TTS backend renders Emma's voice. */
+export type TtsProvider = 'elevenlabs' | 'azure'
+
 /**
- * Synthesize one utterance via Azure Speech REST. POSTs an SSML body to
- * `https://{region}.tts.speech.microsoft.com/cognitiveservices/v1` with
- * `Ocp-Apim-Subscription-Key` auth and the standard 24kHz/48kbps mono MP3
- * output format header. Resolves with the response body bytes; rejects on
- * non-2xx with a named error (`describeAzureFailure`) or on timeout.
+ * The TTS backend for this environment. ElevenLabs (Lily) is the only voice
+ * Marian hears (Thomas, 2026-10-16: "only use elevenlabs for voice
+ * consistency"), so it is the default: unset, empty or unknown
+ * `TTS_PROVIDER` values all resolve to ElevenLabs. Azure is reachable only
+ * behind the exact opt-in `TTS_PROVIDER=azure` (kept for the legacy SSML
+ * audition tooling); nothing falls back to it.
+ */
+export function ttsProvider(env: NodeJS.ProcessEnv = process.env): TtsProvider {
+  return env.TTS_PROVIDER === 'azure' ? 'azure' : 'elevenlabs'
+}
+
+/**
+ * Synthesize one utterance. Routes by `ttsProvider(env)`:
  *
- * One HTTPS call per utterance — same dispatch shape as the prior WSS
- * implementation. The fan-out / concurrency cap lives in `_session.ts`.
+ * - ElevenLabs (default): `synthesizeElevenLabs`. A failure (outage, quota,
+ *   timeout) rejects; there is NO Azure fallback, so a voice other than
+ *   Lily can never reach Marian. `_session.renderSessionAudio` soft-fails
+ *   that one utterance and the session continues.
+ * - Azure (`TTS_PROVIDER=azure` only): POSTs an SSML body to
+ *   `https://{region}.tts.speech.microsoft.com/cognitiveservices/v1` with
+ *   `Ocp-Apim-Subscription-Key` auth and the 24kHz/48kbps mono MP3 output
+ *   format header. Rejects on non-2xx with a named error
+ *   (`describeAzureFailure`) or on timeout.
+ *
+ * One HTTPS call per utterance. The fan-out / concurrency cap lives in
+ * `_session.ts`.
  */
 export async function synthesizeUtterance(
   req: TtsRequest,
   opts: SynthesizeOptions = {},
 ): Promise<TtsResult> {
-  // Voice migration (design/voice-migration-elevenlabs.md): opt-in
-  // ElevenLabs backend. Azure stays the default until the re-voice and
-  // live-path tickets switch production over.
-  const providerEnv = opts.env ?? process.env
-  if (providerEnv.TTS_PROVIDER === 'elevenlabs') {
-    try {
-      return await synthesizeElevenLabs(req, {
-        fetchFn: opts.fetchFn,
-        timeoutMs: opts.timeoutMs,
-        env: opts.env,
-        backoff: opts.backoff,
-      })
-    } catch (err) {
-      // Live-path safety (voice migration 5/6): an ElevenLabs outage,
-      // quota or timeout must not leave Marian with a silent line. Fall
-      // back to Azure for this one utterance when Azure is configured;
-      // otherwise surface the original error.
-      if (!providerEnv.AZURE_SPEECH_KEY || !providerEnv.AZURE_SPEECH_REGION)
-        throw err
-      if (process.env.NODE_ENV !== 'test') {
-        console.warn({
-          event: 'tts-elevenlabs-fallback',
-          error: err instanceof Error ? err.message.slice(0, 200) : String(err),
-        })
-      }
-    }
+  if (ttsProvider(opts.env ?? process.env) === 'elevenlabs') {
+    return synthesizeElevenLabs(req, {
+      fetchFn: opts.fetchFn,
+      timeoutMs: opts.timeoutMs,
+      env: opts.env,
+      backoff: opts.backoff,
+    })
   }
   const fetchFn = opts.fetchFn ?? globalThis.fetch
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS

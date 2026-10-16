@@ -865,7 +865,9 @@ function fakeFailResponse(status: number, body = ''): Response {
   return new Response(body, { status })
 }
 
+// Azure is opt-in only (TTS_PROVIDER=azure); ElevenLabs is the default.
 const TEST_ENV: NodeJS.ProcessEnv = {
+  TTS_PROVIDER: 'azure',
   AZURE_SPEECH_KEY: 'test-key-not-real',
   AZURE_SPEECH_REGION: 'westeurope',
 }
@@ -976,7 +978,10 @@ describe('synthesizeUtterance', () => {
     await expect(
       synthesizeUtterance(HAPPY_REQ, {
         fetchFn: fetchFn as unknown as typeof fetch,
-        env: { AZURE_SPEECH_REGION: 'westeurope' } as NodeJS.ProcessEnv,
+        env: {
+          TTS_PROVIDER: 'azure',
+          AZURE_SPEECH_REGION: 'westeurope',
+        } as NodeJS.ProcessEnv,
       }),
     ).rejects.toThrow(/AZURE_SPEECH_KEY/)
     expect(fetchFn).not.toHaveBeenCalled()
@@ -987,7 +992,10 @@ describe('synthesizeUtterance', () => {
     await expect(
       synthesizeUtterance(HAPPY_REQ, {
         fetchFn: fetchFn as unknown as typeof fetch,
-        env: { AZURE_SPEECH_KEY: 'k' } as NodeJS.ProcessEnv,
+        env: {
+          TTS_PROVIDER: 'azure',
+          AZURE_SPEECH_KEY: 'k',
+        } as NodeJS.ProcessEnv,
       }),
     ).rejects.toThrow(/AZURE_SPEECH_REGION/)
     expect(fetchFn).not.toHaveBeenCalled()
