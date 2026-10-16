@@ -446,3 +446,149 @@ Wave 1's mechanism (`content-wave-1.md` § 6.1): `createManifestLinePlayer('sess
   - pot: gift, hand, pond · rock: bone, rope · sun: belt, bone, desk, gift, hen, jet, kite, rope · tap: nest, tent · top: tub, tube · tub: top, tube
 - **The build check's word set** grows from 73 to 89 words. `picture-manifest.md` gets the two tiers in its `tier` row and batches 9 and 10 in its table.
 - **Don't append before Thomas approves (T4).** The generator reads the whole file, so an early append could start the spend.
+
+## 8. States and edge cases
+
+- **Error path:** a wrong tap gets the poof, the shake, `puzzled-tilt` and "Hmm... try again?". The hints come at 2 wrongs and the given answer at 3. Never a red X.
+- **First visit:** the Map's unlock beat, then the lead before P1 of each forward session until mastery.
+- **Peek:** P1–P3 with the step's opener and closer, no lead, and nothing written.
+  - Sharing: 6, 8 and 10 flowers on 2 plates, each dealt on its own.
+  - Tent words: tent, hand, gift. Cake words: cake, kite, bone.
+- **Review:**
+  - A sharing block auto-deals at session positions 1–3, and its chips use M = 10.
+  - A cake-words block keeps its quiet-E hint.
+- **A tap during the auto-deal:** a right tap plays the fast deal and the fill. After a wrong tap the deal carries on underneath.
+- **Return user who finished a world:** wave 1's load rule (K13), with no new code.
+- **Rotation, background, Reduce Motion:** § 2.5, § 3.3 and § 4.3; otherwise as the host screens. Transition in and out unchanged.
+- **Ship order:** the deployed server doesn't know the three nodes until `yarn release`, so release before the device check (wave 1 § 2.4).
+
+## 9. Wiring checklist (Kevin, Devon)
+
+**Each new SkillNode** goes through `.claude/docs/sibling-tier-checklist.md`:
+
+- **All three:** rows 1–10 and 12.
+- **`tent-words`, `cake-words` only:** row 11. Rows 13–15: `VALID_WORD_SONG_FOCUS_NODES`, `WORD_SONG_FIRST_CLASS_FOCUS_NODES`, `WORD_SONG_FOCUS_NODES`.
+- **`div-share` instead:** `VALID_MATH_FOCUS_NODES` (`api/_planner.ts`) and `MATH_FOCUS_NODES` (`scripts/generateSessionCanon.ts`).
+- **Skipped:** row 16, the web debug seeds (the web is frozen).
+
+**From the list's "does not cover" section, these apply:**
+
+- the math read-line template (8/8);
+- `CANON_FILES` in `public/voice-qa.html` (3 stems);
+- the word-pack content and the `WORD_SONG_TRACK_GUIDE` tier block;
+- the committed canon JSON;
+- the sibling-spec audit: e2e specs whose seeds end at `crab-words` or `mult-mix`.
+
+**Plus these surfaces, as in wave 1 § 9:**
+
+- **Names:**
+  - `STAGE_SPOKEN_NAMES`, `STAGE_SPOKEN_NAME_VERBS` and `FRIENDLY_NODE_NAMES`.
+  - The recap-phrase list in `api/_planner.ts` (div-share → "sharing"; tent and cake → "reading words").
+  - `scripts/recapFocusCopy.ts`.
+- **Map and lines:** `LANDS`, `PATH_LINES` (+15 baked), `PATH_ART_SET` (+3), and `GUIDANCE_LINES` (3 peek pairs, plus 3 texts in the intro map).
+- **Math:**
+  - `DivideProblem`, its template and range check.
+  - `extendedMathLayout(…, 'divide')`, `ShareStage`, and `buildExtendedChipOrder` for `'divide'`.
+  - `CANON_MATH_FACTS` regenerated (8 nulls for `div-share`).
+- **Word Song:**
+  - `BIG_WORDS_STEPS`: 2 steps, 16 rows. `BigWordsStep` and `BIG_WORDS_STEP_IDS` widen too.
+  - `BigWordRow.vowel` gains `'e'`, `BigWordCategory` gains `'nature'` and `'vehicle'`, and `WordCategory` gains `'nature'`.
+  - `wordPack.ts`: 16 targets, 16 `TARGET_PAIRINGS` rows, 5 `FORBIDDEN_PAIRS`.
+  - `_plannerWordList.ts`, and `bigWordsCanonCheck.ts` for the two files.
+  - `wordDistractors.test.ts`: the CVC-axis treatment wave 1 gave land 6.
+  - `LetterRow`'s `'quiet'` state and the two lead animations.
+- **Canon:** a splice script for the three files, and `PENDING_CANON_NODES` + 3 (§ 6.2).
+
+**Unchanged on purpose:**
+
+- `isLeitnerDirectiveActive`, `MULTIPLICATION_FOCUS_NODES`, `MIX_SOURCE_STEPS`;
+- `WORD_SONG_GRADUATION_GATED_NODES`, `CVC_CROSS_VOWEL_NODES`, `FIRST_ENCOUNTER_GATED_NODES`;
+- the celebration exception list;
+- both `withDefaultedSkillLevels` copies (wave 1's rule is generic).
+
+## 10. Acceptance criteria
+
+**Core (vitest):**
+
+1. **Parser:**
+   - "Twelve flowers, three plates. How many on each plate?" parses to `{ kind: 'divide', total: 12, plates: 3, correct: 4 }`.
+   - Seven on two plates (uneven), twelve on six (more than 5 plates) and thirty on three (more than 20 flowers) are rejected.
+   - Without `extendedKinds` it throws.
+2. `div-share.json` equals § 2.7 (8/8 reads parse), and the bake lint enforces § 2.7's rules.
+3. `pickDistractors(correct, index, 10)` returns § 2.7's chips for all 8 problems.
+4. A `div-share` session-end write has no `mathFacts` entry and no Leitner outcome, and `perProblemAnswerValue` holds the tapped shares.
+5. **Lines and lands:**
+   - `LANDS` flattened equals both trees. Groups has 5 steps and Big words 4.
+   - `GUIDANCE_LINES` and `PATH_LINES` hold § 6.2's 24 texts exactly, and the baked path count is +15.
+   - The `STAGE_SPOKEN_NAMES` values stay unique.
+6. **`wordPack`:**
+   - The 16 rows equal § 3.2 and § 4.2.
+   - No trio contains a forbidden pair, and the 5 new pairs exist.
+   - Every picture key resolves through native `pictureAsset`.
+7. **Loading:**
+   - A doc with `crab-words` mastered and no `tent-words` key loads `tent-words: 'intro'` and `cake-words: 'locked'`.
+   - A doc with `mult-mix` mastered and no `div-share` key loads `div-share: 'intro'`.
+
+**Native (jest):**
+
+8. **Sharing P1:**
+   - About 300 ms after the read ends, 6 flowers deal onto 2 plates in the order plate 1, 2, 1, 2, 1, 2, taken from the pile's end.
+   - The tags read "?" until a right tap, then "3".
+   - The chips are 1, 3 and 10.
+9. **Sharing P4:**
+   - Nothing deals before the hints. hint2 deals exactly 3 flowers (one per plate), and hint3 deals the other 9.
+   - A right tap with flowers left deals them all and fills every tag with "4".
+   - The given answer lands every flower and rings every tag.
+10. In one plan, every plate on every problem has the same size (the size for a share of 6).
+11. **Reduce Motion:** the deal has no travel and no scale, only fades, and the tags crossfade.
+12. **Tent words:**
+    - P1's lead lights the cells left to right and pulses the last two.
+    - The silent beat counts from the lead's end.
+    - No lead plays on P2–P8, in reviews, on warm-up hearts or in peeks.
+13. **Cake words:**
+    - In P1's lead, cell 4 goes `'quiet'` at "quiet" and cell 2 lights at "A". Both are normal 200 ms after the line.
+    - On any cake-words card, the 2nd wrong sets cell 4 quiet and cell 2 lit until the advance.
+    - No cell is quiet at reveal.
+
+**Device** (Expo Go, `EXPO_PUBLIC_QA_STEP`):
+
+14. **Each new step from the QA picker:**
+    - Emma speaks every line, with no silent caption walk once the render has shipped.
+    - Word steps show three pictures on every problem.
+    - At 375×667 portrait and 667×375 landscape, the sharing deal reads as one flower for each plate in turn, and nothing leaves the problem rect.
+15. **Map, 375×667 and 744×1133 portrait:**
+    - Groups shows 5 stops and Big words 4, and no two stops overlap.
+    - A peek at sharing says "Let's look at sharing!" and deals P1.
+16. **Return user:** a QA doc with `crab-words` mastered and no `tent-words` key. After launch, the Map plays "You learned crab words! Now you can do tent words!" once.
+
+## 11. Thomas decides
+
+One team recommendation each.
+
+- **T1. The names:** "sharing", "tent words" (not "jump words", K7) and "cake words". Recommendation: approve.
+- **T2. The new lines (§ 6.2),** chiefly the three leads: "Let's share the flowers!", "Read to the end!" and "The E is quiet. It makes the A say its name.". Recommendation: approve. The ear test settles "the A"; the fallback text is in § 4.3.
+- **T3. The 3 clay pieces (§ 1):** two plates of sweets, a tent, a cake. Recommendation: approve the subjects. The look is judged when they are made.
+- **T4. The picture spend:** 16 pictures, about $1.25, or about $1.56 with retakes on the four riskiest. Recommendation: approve, and top up the OpenAI balance first, because it is low.
+- **T5. Dave's check** (roadmap § 4): after a reading-sentences session, ask Marian "Who sat on the mat?" about a sentence she has just read.
+  - If she reads it but can't say who, little stories move up. They replace this wave's Word Song half (in their own spec), and tent and cake words wait.
+  - Recommendation: do the check before the Word Song build starts. Sharing doesn't depend on it.
+
+## 12. Pedagogy assumptions for Dave (D1…)
+
+The spec had to fill these in. Each says what was assumed; mark them ✅ / ⚠️ / ❌.
+
+- **D1. "How many on each plate?" only.** "How many plates?" waits for a later deepening with its own picture (§ 2.8).
+- **D2. The range and order:**
+  - 2–5 plates, 2–6 on each, at most 20 flowers.
+  - P1–P3 have 2 plates and deal on their own every session (the concrete model).
+  - P4–P8 have 3–5 plates, the plate count is never the answer, and the five shares all differ (§ 2.7).
+- **D3. No equation and no division sign in this step.** The digits ride on tags: the total on the pile, "?" then the share on each plate.
+  - The sign waits for a later step. It may be the Danish ":" rather than "÷". Hypothesis, not checked: Danish schools write division with a colon.
+- **D4. Off-by-one chips only.** The alternative: swap one off-by-one chip for the plate count, which catches a misheard "each".
+- **D5. No Leitner fact for sharing,** so the × facts' boxes and slow-fact times stay clean.
+- **D6. The hint ladder:**
+  - "Look at the flowers.", then "One for each plate." (deals one round), then "How many on each plate?" (deals the rest).
+  - The correct line is "Yes! Four on each plate!", so it ends on _each_.
+- **D7. Tent words** are Dave's 10 minus _jump_ and _milk_. _mask_ and _raft_ are kept out (long vowel in British English). Where his twin has no picture (had, ten, bet), the trap has the same start and a short vowel (§ 3.2). The lead is "Read to the end!".
+- **D8. Cake words** are 8 of Dave's 12 (§ 4.2). The trap is the short twin where it has a picture. The lead plays before P1 only. The quiet-E cue shows on the lead and on the hint, never from reveal.
+- **D9. Leads every session until mastery**, as wave 1's D5 confirmed for its steps.
