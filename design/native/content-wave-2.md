@@ -388,12 +388,12 @@ Wave 1's mechanism (`content-wave-1.md` § 6.1): `createManifestLinePlayer('sess
 
 ### 6.3 Vocabulary check (the ~200-word cap)
 
-- **New core words: 6.**
+- **New core words: 7.**
   - **share** (also _sharing_), **plate** (also _plates_): the step's own words.
   - **end**: the tent lead.
-  - **quiet**, **say**, **its**: the cake lead.
+  - **quiet**, **say**, **its**, **name**: the cake lead. No existing spoken line uses _name_.
   - _makes_ is a form of wave 1's _make_. _each_ is already in use ("We add two each time.").
-  - That brings wave 1's count of about 162 to about 168, still under ~200.
+  - That brings wave 1's count of about 162 to about 169, still under ~200.
 - **Target words:** the 16 step words. _tent_ and _cake_ also name the steps.
 - **Zero-cost choices, made on purpose:**
   - "Let's share the flowers!", not "divide", "equal" or "fair".
@@ -575,20 +575,21 @@ One team recommendation each.
 
 ## 12. Pedagogy assumptions for Dave (D1…)
 
-The spec had to fill these in. Each says what was assumed; mark them ✅ / ⚠️ / ❌.
+The spec had to fill these in. **All nine were confirmed by Dave on 2026-10-16, and nothing blocks the build.**
 
-- **D1. "How many on each plate?" only.** "How many plates?" waits for a later deepening with its own picture (§ 2.8).
-- **D2. The range and order:**
+- **D1. "How many on each plate?" only.** "How many plates?" waits for a later deepening with its own picture (§ 2.8). **Confirmed (Dave, 2026-10-16).**
+- **D2. The range and order:** **Confirmed (Dave, 2026-10-16).**
   - 2–5 plates, 2–6 on each, at most 20 flowers.
   - P1–P3 have 2 plates and deal on their own every session (the concrete model).
   - P4–P8 have 3–5 plates, the plate count is never the answer, and the five shares all differ (§ 2.7).
-- **D3. No equation and no division sign in this step.** The digits ride on tags: the total on the pile, "?" then the share on each plate.
+- **D3. No equation and no division sign in this step.** The digits ride on tags: the total on the pile, "?" then the share on each plate. **Confirmed (Dave, 2026-10-16).**
   - The sign waits for a later step. It may be the Danish ":" rather than "÷". Hypothesis, not checked: Danish schools write division with a colon.
-- **D4. Off-by-one chips only.** The alternative: swap one off-by-one chip for the plate count, which catches a misheard "each".
-- **D5. No Leitner fact for sharing,** so the × facts' boxes and slow-fact times stay clean.
-- **D6. The hint ladder:**
+  - **Dave's note:** before any future division-sign spec, check her school workbook for ":" vs "÷".
+- **D4. Off-by-one chips only.** The alternative: swap one off-by-one chip for the plate count, which catches a misheard "each". **Confirmed (Dave, 2026-10-16).**
+- **D5. No Leitner fact for sharing,** so the × facts' boxes and slow-fact times stay clean. **Confirmed (Dave, 2026-10-16).**
+- **D6. The hint ladder:** **Confirmed (Dave, 2026-10-16).**
   - "Look at the flowers.", then "One for each plate." (deals one round), then "How many on each plate?" (deals the rest).
   - The correct line is "Yes! Four on each plate!", so the answer is said with _each_ again.
-- **D7. Tent words** are Dave's 10 minus _jump_ and _milk_. _mask_ and _raft_ are kept out (long vowel in British English). Where his twin has no picture (had, ten, bet), the trap has the same start and a short vowel (§ 3.2). The lead is "Read to the end!".
-- **D8. Cake words** are 8 of Dave's 12 (§ 4.2). The trap is the short twin where it has a picture. The lead plays before P1 only. The quiet-E cue shows on the lead and on the hint, never from reveal.
-- **D9. Leads every session until mastery**, as wave 1's D5 confirmed for its steps.
+- **D7. Tent words** are Dave's 10 minus _jump_ and _milk_. _mask_ and _raft_ are kept out (long vowel in British English). Where his twin has no picture (had, ten, bet), the trap has the same start and a short vowel (§ 3.2). The lead is "Read to the end!". **Confirmed (Dave, 2026-10-16).**
+- **D8. Cake words** are 8 of Dave's 12 (§ 4.2). The trap is the short twin where it has a picture. The lead plays before P1 only. The quiet-E cue shows on the lead and on the hint, never from reveal. **Confirmed (Dave, 2026-10-16).**
+- **D9. Leads every session until mastery**, as wave 1's D5 confirmed for its steps. **Confirmed (Dave, 2026-10-16).**
