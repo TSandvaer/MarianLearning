@@ -657,7 +657,7 @@ When adding a new `SkillNode`:
 2. Add the literal to `SKILL_NODES` in `guards.ts`.
 3. Add the literal to `SCHEMA_FLOOR_NODES` in `defaults.ts` — the schema-floor-coverage test fails here first if missed.
 4. Add the literal to `DEFAULT_SKILL_LEVELS` in `e2e/_helpers/seedStorage.ts` — e2e specs fail at seed-time if missed (the production read-path defaulter is NOT in the seed path).
-5. Update `cloudSync.ts`'s private `withDefaultedSkillLevels` mirror so cloud-installed blobs default new keys identically to locally-loaded blobs. The `cloudSync.test.ts` `withDefaultedSkillLevels parity` case catches drift here.
+5. Nothing to edit in `cloudSync.ts`: `installCloudBlob` imports `storage.ts:withDefaultedSkillLevels` (the private mirror was deleted in PR #572), so cloud-installed blobs default new keys exactly as locally-loaded blobs do. The `cloudSync.test.ts` `withDefaultedSkillLevels parity` tests pin the two paths equal.
 
 **Load-ordering invariant**: `withDefaultedSkillLevels` MUST run before `isProgressV1` in BOTH the `loadProgress` pipeline AND `cloudSync.ts`'s install path; same ordering as `withDefaultedSettings`. If reversed, the strict guard rejects under-keyed blobs before the defaulter can fill them.
 

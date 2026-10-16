@@ -276,8 +276,9 @@ describe('reconcileWithCloud — cloud doc from a build that knows more steps', 
     const doc = installed[0]!
     const levels = doc.skillLevels as unknown as Doc
     expect(levels[FUTURE_MATH_STEP]).toBe('practicing')
-    expect(doc.history.map((h) => h.skillFocus as string[])).toContainEqual([
-      FUTURE_MATH_STEP,
+    expect(doc.history.map((h) => h.skillFocus as string[])).toEqual([
+      ['add-to-10'],
+      [FUTURE_MATH_STEP],
     ])
     expect(doc.lifetimeFirstEncounters).toEqual(['cvc-words', FUTURE_WORD_STEP])
     expect(doc.pendingPromotion).toBeUndefined()
