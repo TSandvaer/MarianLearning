@@ -392,4 +392,21 @@ describe('the step intro lead line (content wave 1 § 6.1)', () => {
       sessionIntroFor(p, 'add-to-10', { kind: 'review', blocks: [] }),
     ).toBeNull()
   })
+
+  it('times mix: its intro until it is mastered', () => {
+    const p = progressAtStep('mult-mix')
+    expect(sessionIntroFor(p, 'mult-mix', FWD)).toBe(
+      'guide.session.intro.mult-mix',
+    )
+    const done = progressAtStep('mult-mix')
+    done.skillLevels['mult-mix'] = 'mastered'
+    expect(sessionIntroFor(done, 'mult-mix', FWD)).toBeNull()
+  })
+
+  it('reaches the Math screen: a forward session on times mix carries it', () => {
+    saveProgress(progressAtStep('mult-mix'))
+    expect(readMathProgressHints().intro).toBe('guide.session.intro.mult-mix')
+    saveProgress(progressAtStep('mult-6-9'))
+    expect(readMathProgressHints().intro).toBeNull()
+  })
 })

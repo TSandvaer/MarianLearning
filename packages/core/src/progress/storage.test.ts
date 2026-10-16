@@ -23,8 +23,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { progressAtStep } from '../debug/stepProgress'
+import { STAGE_SPOKEN_NAMES } from '../sessionEnd/friendlyNodeName'
 import { defaultProgress } from './defaults'
 import { isProgressV1 } from './guards'
+import { MATH_TREE } from './mastery'
+import { pendingUnlock } from './pathBeats'
 import { STORAGE_KEY, loadProgress } from './storage'
 import type { Progress, SkillLevels, SkillNode } from './types'
 
@@ -625,6 +629,50 @@ describe('loadProgress — a missing step whose predecessor is mastered opens (c
     const loaded = loadProgress()
     expect(loaded?.skillLevels['mult-3-4']).toBe('intro')
     expect(loaded?.skillLevels['mult-6-9']).toBe('locked')
+  })
+
+  it('AC 7: no mult-mix key with mult-6-9 mastered → intro, and the map owes "big groups → all the groups"', () => {
+    const at6to9 = progressAtStep('mult-6-9')
+    const skillLevels: Record<string, unknown> = {
+      ...at6to9.skillLevels,
+      'mult-6-9': 'mastered',
+    }
+    delete skillLevels['mult-mix']
+    // Every step before it already celebrated (not mult-mix).
+    const seen = MATH_TREE.slice(1, MATH_TREE.indexOf('mult-mix'))
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...at6to9, skillLevels, unlocksCelebrated: seen }),
+    )
+    const loaded = loadProgress()!
+    expect(loaded.skillLevels['mult-mix']).toBe('intro')
+    expect(pendingUnlock(loaded, 'math')).toEqual({
+      world: 'math',
+      mastered: 'mult-6-9',
+      unlocked: 'mult-mix',
+      land: null,
+    })
+    expect(STAGE_SPOKEN_NAMES['mult-6-9']).toBe('big groups')
+    expect(STAGE_SPOKEN_NAMES['mult-mix']).toBe('all the groups')
+  })
+
+  it("AC 7: mult-6-9 practicing → mult-mix locked; a stored 'locked' stays", () => {
+    expect(
+      load('mult-mix', { 'mult-6-9': 'practicing' })?.skillLevels['mult-mix'],
+    ).toBe('locked')
+    const seed = defaultProgress('Marian')
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...seed,
+        skillLevels: {
+          ...seed.skillLevels,
+          'mult-6-9': 'mastered',
+          'mult-mix': 'locked',
+        },
+      }),
+    )
+    expect(loadProgress()?.skillLevels['mult-mix']).toBe('locked')
   })
 
   it("a world's first step has no predecessor: 'locked'", () => {

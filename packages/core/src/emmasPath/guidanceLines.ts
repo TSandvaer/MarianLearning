@@ -203,7 +203,9 @@ function buildLines(): GuidanceLine[] {
  * no intro. Each text is the step's own, not a template: "Two letters, one
  * sound!" names duck words' idea, not their name.
  */
-const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {}
+const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {
+  'mult-mix': "Let's play all the groups!",
+}
 
 const sessionIntroId = (n: SkillNode) => `guide.session.intro.${n}`
 const SESSION_HIDING_ID = 'guide.session.hiding'
@@ -229,6 +231,9 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * Now: content wave 1's lead lines (§ 6.1).
  */
 export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
+  peekOpenId('mult-mix'),
+  peekCloseId('mult-mix'),
+  sessionIntroId('mult-mix'),
   SESSION_HIDING_ID,
 ]
 

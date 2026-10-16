@@ -68,6 +68,8 @@ export interface RoundShape {
   review: boolean
   /** The first `warmupCount` problems of the plan are the warm-up. */
   warmupCount: number
+  /** A times-mix session (content wave 1 § 2.4). */
+  mix?: boolean
 }
 
 const FORWARD_ROUND: RoundShape = { review: false, warmupCount: 0 }
@@ -128,6 +130,11 @@ export function mathSessionEndPayload(
     ...(sessionFocus !== null ? { sessionFocus } : {}),
     ...(round.review
       ? { review: true as const, problemFacts: scored.map(problemFact) }
+      : {}),
+    // A times mix's 8 blocks come from several files: their facts, per
+    // problem (content wave 1 § 2.4).
+    ...(round.mix === true && !round.review
+      ? { problemFacts: scored.map(problemFact) }
       : {}),
     ...(warmup.length > 0
       ? {

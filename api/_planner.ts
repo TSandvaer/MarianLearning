@@ -155,6 +155,10 @@ export const VALID_MATH_FOCUS_NODES: readonly string[] = [
   'mult-2-5-10',
   'mult-3-4',
   'mult-6-9',
+  // Content wave 1 § 2: times mix. Its sessions are composed by core
+  // from canon blocks (`payload.mix`, api/_review.ts); a request without
+  // `mix` is served the step's own canon.
+  'mult-mix',
 ]
 
 export const VALID_WORD_SONG_FOCUS_NODES: readonly string[] = [
@@ -1585,7 +1589,7 @@ Session-End utterances (REQUIRED — append to the same flat utterances array):
 After the per-problem utterances (8 × 7 = 56 for MATH, 8 × 5 = 40 for WORD-SONG — or 8 × 6 = 48 on the cvc-word tier, which adds the optional "blend" slot per problem), append the following Session-End utterances. The Session-End screen looks them up by exact id at runtime and degrades gracefully on a miss, but every id below MUST be emitted so the celebration never falls back to silent captions.
 
   - "session.end.opener" — text: "You did it!"
-  - "session.end.recap.focus" — text: "You worked on <spoken-focus-name> today!" where <spoken-focus-name> is a short, warm, CHILD-FACING phrase for the focus skill node named in the user message. Spell any numbers out as words and drop curriculum jargon — Emma is speaking to an 8-year-old, not a parent. Use exactly these phrases per focus node: add-to-10 -> "adding to ten"; add-to-20 -> "adding to twenty"; sub-to-10 -> "taking away to ten"; sub-to-20 -> "taking away to twenty"; number-recog -> "your numbers"; two-digit-addsub-no-regroup / two-digit-addsub-with-regroup -> "bigger numbers"; skip-counting -> "skip counting"; mult-2-5-10 / mult-3-4 / mult-6-9 -> "counting in groups"; letter-names -> "your letters"; letter-sounds -> "letter sounds"; blending-cv -> "blending sounds"; any cvc-words* tier, any digraphs* tier, and sight-words -> "reading words"; simple-sentences -> "reading sentences". Exactly one line; never use digits; one exclamation mark.
+  - "session.end.recap.focus" — text: "You worked on <spoken-focus-name> today!" where <spoken-focus-name> is a short, warm, CHILD-FACING phrase for the focus skill node named in the user message. Spell any numbers out as words and drop curriculum jargon — Emma is speaking to an 8-year-old, not a parent. Use exactly these phrases per focus node: add-to-10 -> "adding to ten"; add-to-20 -> "adding to twenty"; sub-to-10 -> "taking away to ten"; sub-to-20 -> "taking away to twenty"; number-recog -> "your numbers"; two-digit-addsub-no-regroup / two-digit-addsub-with-regroup -> "bigger numbers"; skip-counting -> "skip counting"; mult-2-5-10 / mult-3-4 / mult-6-9 / mult-mix -> "counting in groups"; letter-names -> "your letters"; letter-sounds -> "letter sounds"; blending-cv -> "blending sounds"; any cvc-words* tier, any digraphs* tier, and sight-words -> "reading words"; simple-sentences -> "reading sentences". Exactly one line; never use digits; one exclamation mark.
   - "session.end.recap.1" through "session.end.recap.11" — one entry per N in 1..11. The N=1 line is "You earned one star!"; for N >= 2 the line is "You earned <number-word> stars!" with the number spelled out (one, two, three, four, five, six, seven, eight, nine, ten, eleven). Never use digits; never use "stars" with N=1.
   - "session.end.streak.3" through "session.end.streak.8" — one entry per N in 3..8. Each line is "<number-word> in a row! Wow!" with the number spelled out (three, four, five, six, seven, eight). Capitalise the leading word.
   - "session.end.goodbye" — text: "See you soon."
@@ -2133,12 +2137,13 @@ The user message names a focus skill node. Generate problems specifically for th
 - mult-2-5-10: multiplication by 2, 5, or 10. read: "Two times <X>. How many?" Answer is the product.
 - mult-3-4: multiplication by 3 or 4. read: same template.
 - mult-6-9: multiplication by 6, 7, 8, or 9. read: same template.
+- mult-mix: mixed multiplication, any group size 2-9 with 2-5 groups (answers up to 36). read: same template.
 
 Per-problem utterance template (any focus node):
 - read: see the focus-node-specific shape above.
 - correct: "Yes! <answer>!" e.g. "Yes! Five!"
 - reprompt: "Hmm... try again?"  (verbatim)
-THE HINT IS THREE escalating sub-step utterances (hint1/hint2/hint3) for EVERY math problem, NOT one — emit all three. Each ramps one cognitive sub-step at a time: hint1 directs attention, hint2 names the first quantity/cue, hint3 completes the operation and poses the question. Focus nodes WITH a dedicated PER-PROBLEM SHAPE block above (add-to-10, add-to-20, sub-to-10, sub-to-20, two-digit-addsub-no-regroup, two-digit-addsub-with-regroup) use THAT block's hint1/hint2/hint3 templates. For the remaining math nodes (number-recog, skip-counting, mult-2-5-10, mult-3-4, mult-6-9), use the per-tier DETERMINISTIC templates below (Wave 12, ticket 86ca8704f — Dave's generic-tier hint templates, design/research/w12-generic-tier-hint-templates.md). Each is a pure function of the problem's read-line operands; do NOT improvise scaffold prose.
+THE HINT IS THREE escalating sub-step utterances (hint1/hint2/hint3) for EVERY math problem, NOT one — emit all three. Each ramps one cognitive sub-step at a time: hint1 directs attention, hint2 names the first quantity/cue, hint3 completes the operation and poses the question. Focus nodes WITH a dedicated PER-PROBLEM SHAPE block above (add-to-10, add-to-20, sub-to-10, sub-to-20, two-digit-addsub-no-regroup, two-digit-addsub-with-regroup) use THAT block's hint1/hint2/hint3 templates. For the remaining math nodes (number-recog, skip-counting, mult-2-5-10, mult-3-4, mult-6-9, mult-mix), use the per-tier DETERMINISTIC templates below (Wave 12, ticket 86ca8704f — Dave's generic-tier hint templates, design/research/w12-generic-tier-hint-templates.md). Each is a pure function of the problem's read-line operands; do NOT improvise scaffold prose.
 
   GENERIC-TIER HINT TEMPLATES (number-recog / skip-counting / mult-*):
 
@@ -2152,7 +2157,7 @@ THE HINT IS THREE escalating sub-step utterances (hint1/hint2/hint3) for EVERY m
     - hint2: "We add <step-word> each time." where step-word is the common difference (second term minus first term) spelled as a word — "two" / "five" / "ten"
     - hint3: "<last-term-word> and <step-word> more is what?" where last-term-word is the final number word in the sequence before ". What is next?" e.g. "Fourteen and two more is what?"
 
-  · mult-2-5-10 / mult-3-4 / mult-6-9 (read "<factor-a-word> times <factor-b-word>. How many?"):
+  · mult-2-5-10 / mult-3-4 / mult-6-9 / mult-mix (read "<factor-a-word> times <factor-b-word>. How many?"):
     - hint1: "Look at the groups." (verbatim)
     - hint2: a repeated-addition chain, CASE-SPLIT on factor-b (the number of copies; read-line operand order — factor-b copies of factor-a, NO commutative flip): factor-b 1 -> "One group of <factor-a-word>." ; factor-b 2 -> "<factor-a-word> and <factor-a-word> more." ; factor-b 3 -> "<factor-a-word>, then <factor-a-word>, then <factor-a-word>." ; factor-b 4 -> "<factor-a-word>, <factor-a-word>, <factor-a-word>, <factor-a-word>." ; factor-b 5 -> "<factor-a-word>, <factor-a-word>, <factor-a-word>, <factor-a-word>, <factor-a-word>."
     - hint3: "How many?" (verbatim — the read-line question clause)

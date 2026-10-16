@@ -503,14 +503,14 @@ describe('reconcileWithCloud', () => {
     ['mastered', 'intro'],
     ['practicing', 'locked'],
   ] as const)(
-    'K13 parity — no mult-6-9 key and mult-3-4 %s installs mult-6-9 %s, matching a local load',
+    'K13 parity (AC 7) — no mult-mix key and mult-6-9 %s installs mult-mix %s, matching a local load',
     async (before, expected) => {
       const seed = defaultProgress()
       const skillLevels: Record<string, unknown> = {
         ...seed.skillLevels,
-        'mult-3-4': before,
+        'mult-6-9': before,
       }
-      delete skillLevels['mult-6-9']
+      delete skillLevels['mult-mix']
       const cloudBlob = {
         ...seed,
         profile: { ...seed.profile, lastPlayedISO: '2026-10-16T11:00:00.000Z' },
@@ -528,7 +528,7 @@ describe('reconcileWithCloud', () => {
         pushImpl: vi.fn(async () => 'sent' as const),
       })
       expect(outcome.kind).toBe('installed-from-cloud')
-      expect(installed[0]!.skillLevels['mult-6-9']).toBe(expected)
+      expect(installed[0]!.skillLevels['mult-mix']).toBe(expected)
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudBlob))
       expect(loadProgress()!.skillLevels).toEqual(installed[0]!.skillLevels)
     },

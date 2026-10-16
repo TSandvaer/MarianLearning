@@ -12,7 +12,7 @@ import {
   ANSWER_RANGE_MAX_TO_20,
   chipMaxAnswerForCorrects,
 } from '@marian/core/math/distractors'
-import { multiplyChipCeiling } from '@marian/core/math/extendedDistractors'
+import { multiplyChipCeilingFor } from '@marian/core/math/extendedDistractors'
 import type { ExtendedMathProblem } from '@marian/core/math/extendedProblems'
 import type { MathProblem } from '@marian/core/math/sessionPlans'
 import type { SkillNode } from '@marian/core/progress'
@@ -96,7 +96,8 @@ export function problemChips(
       node,
     )
   }
-  const ceiling = multiplyChipCeiling(
+  const ceiling = multiplyChipCeilingFor(
+    node,
     sameStep.filter((q) => q.kind === 'multiply').map((q) => q.correct),
   )
   return buildExtendedChipOrder(p, ceiling)

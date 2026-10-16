@@ -297,6 +297,20 @@ describe('multiplication', () => {
     expect(chipValues().sort((a, b) => a - b)).toEqual([5, 6, 7])
   })
 
+  it('times mix (content wave 1 § 2.1, AC 12): tags + "+" from the reveal on all 8 problems', async () => {
+    const h = await setup(canon('mult-mix'), { planFocusNode: 'mult-mix' })
+    for (let i = 0; i < 8; i++) {
+      const p = h.plan.problems[i]!
+      if (p.kind !== 'multiply') throw new Error('not multiply')
+      for (let k = 0; k < p.factorB; k++) {
+        expect(group(`math-group-tag-${k}`)).toBeTruthy()
+      }
+      expect(chipValues()).toContain(p.correct)
+      expect(Math.max(...chipValues())).toBeLessThanOrEqual(40)
+      if (i < 7) await answerRight(h, i)
+    }
+  })
+
   it('mult-3-4: tags hidden at the reveal; hint 2 lights plate k at the k-th "two"', async () => {
     const h = await setup(canon('mult-3-4'), { planFocusNode: 'mult-3-4' })
     // P1: "Two times three." → 3 plates of 2.

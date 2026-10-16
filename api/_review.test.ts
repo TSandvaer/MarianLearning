@@ -467,3 +467,98 @@ describe('Map peek (payload.peek, fast-track-native § 6.2)', () => {
     )
   })
 })
+
+describe('times mix (payload.mix, content wave 1 § 2.4)', () => {
+  const MIX_REFS = [
+    { node: 'mult-3-4', problem: 3 },
+    { node: 'mult-2-5-10', problem: 5 },
+    { node: 'mult-3-4', problem: 8 },
+    { node: 'mult-6-9', problem: 5 },
+    { node: 'mult-mix', problem: 2 },
+    { node: 'mult-6-9', problem: 8 },
+    { node: 'mult-mix', problem: 7 },
+    { node: 'mult-2-5-10', problem: 3 },
+  ]
+  const ends = (r: SessionStartResponse) => ({
+    plan: planLines(r).filter((u) => u.id.startsWith('session.end.')),
+    audio: r.utterances
+      .filter((u) => u.id.startsWith('session.end.'))
+      .map((u) => [u.id, u.text, u.audio.base64]),
+  })
+
+  it("AC9: 8 refs → mix-math, math.p1–p8 copied from the canon blocks plus mult-mix's session-end lines; no Anthropic, no TTS, no limiter", async () => {
+    const anthropicClient = anthropicSpy()
+    const rateLimiter = limiterSpy()
+    const res = await handler(
+      request({
+        ...base,
+        progress: { focusNode: 'mult-mix' },
+        mix: { blocks: MIX_REFS },
+      }),
+      {
+        anthropicClient,
+        rateLimiter,
+        sessionCache: createSessionCache({ ttlMs: 60_000 }),
+      },
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as SessionStartResponse
+    expect((body.plan as { id: string }).id).toBe('mix-math')
+    expect((body.plan as { label: string }).label).toBe('Times mix')
+    MIX_REFS.forEach((ref, i) => {
+      const want = block(ref.node, ref.problem)
+      expect(want.plan).toHaveLength(7)
+      expect(blockOf(body, `p${i + 1}`)).toEqual(want)
+    })
+    const own = canon('mult-mix')
+    expect(ends(body)).toEqual(ends(own))
+    expect(ends(body).plan.length).toBeGreaterThan(10)
+    // The plan reads as 8 multiplication problems.
+    const plan = mathSessionPlanFromServer(body.plan, { extendedKinds: true })
+    expect(plan.problems.map((p) => p.kind)).toEqual(Array(8).fill('multiply'))
+    expect(anthropicClient.messages.create).not.toHaveBeenCalled()
+    expect(mockedRender).not.toHaveBeenCalled()
+    expect(rateLimiter.check).not.toHaveBeenCalled()
+  })
+
+  it('AC9: warm-up refs are appended as math.w<i>', async () => {
+    const res = await handler(
+      request({
+        ...base,
+        progress: { focusNode: 'mult-mix' },
+        mix: { blocks: MIX_REFS },
+        warmup: { blocks: [{ node: 'mult-6-9', problem: 1 }] },
+      }),
+      { anthropicClient: anthropicSpy() },
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as SessionStartResponse
+    expect((body.plan as { id: string }).id).toBe('mix-math')
+    expect(blockOf(body, 'w1')).toEqual(block('mult-6-9', 1))
+  })
+
+  it('AC10: 7 refs, a step outside the times-mix sources, problem 9, or the Word Song track → 400 invalid-request', async () => {
+    for (const [track, blocks] of [
+      ['math', MIX_REFS.slice(0, 7)],
+      ['math', [...MIX_REFS.slice(0, 7), { node: 'add-to-10', problem: 1 }]],
+      ['math', [...MIX_REFS.slice(0, 7), { node: 'mult-6-9', problem: 9 }]],
+      ['word-song', MIX_REFS],
+    ] as const) {
+      const res = await handler(request({ ...base, track, mix: { blocks } }), {
+        anthropicClient: anthropicSpy(),
+      })
+      expect(res.status).toBe(400)
+      expect(await res.json()).toMatchObject({ error: 'invalid-request' })
+    }
+  })
+
+  it('without mix, a mult-mix request is served its own canon (an older client)', async () => {
+    const res = await handler(
+      request({ ...base, progress: { focusNode: 'mult-mix' } }),
+      { anthropicClient: anthropicSpy() },
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as SessionStartResponse
+    expect(planLines(body)).toEqual(planLines(canon('mult-mix')))
+  })
+})

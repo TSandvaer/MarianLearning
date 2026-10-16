@@ -16,6 +16,11 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  PENDING_CANON_NODES,
+  activeCombos,
+  combosToBakeFor,
+} from './generateSessionCanon.ts'
+import {
   MATH_CANON_DIR,
   WAVE_1_PLANS,
   missingNumberLines,
@@ -120,6 +125,43 @@ describe('the kept problems keep their lines and bytes (§ 1.8)', () => {
     expect(now.filter((u) => u.id.startsWith('session.end.'))).toEqual(
       old.filter((u) => u.id.startsWith('session.end.')),
     )
+  })
+})
+
+// The Vercel `prebuild` runs the incremental bake with the build env's
+// keys on every preview build. These three files are spliced, never
+// Haiku-baked: neither the prebuild nor a `--force` regen may touch them.
+describe('the pending-canon gate keeps every bake off the spliced files', () => {
+  const MINE = ['add-to-10', 'add-to-20', 'mult-mix']
+  const combos = activeCombos()
+  const math = (n: string) => combos.some((c) => c.focusNode === n)
+
+  it('all three are combos, and pending', () => {
+    for (const n of MINE) {
+      expect(math(n)).toBe(true)
+      expect(PENDING_CANON_NODES.has(n)).toBe(true)
+    }
+  })
+
+  it('an incremental run with the files missing, and --force, bake none of them', () => {
+    for (const force of [false, true]) {
+      const baked = combosToBakeFor(
+        combos,
+        { force, includePending: false },
+        () => false,
+      ).map((c) => c.focusNode)
+      expect(baked.filter((n) => MINE.includes(n))).toEqual([])
+    }
+  })
+
+  it('with the files committed, even --include-pending bakes none of them (no --force)', () => {
+    expect(
+      combosToBakeFor(combos, { force: false, includePending: true }, (c) =>
+        MINE.includes(c.focusNode),
+      )
+        .map((c) => c.focusNode)
+        .filter((n) => MINE.includes(n)),
+    ).toEqual([])
   })
 })
 

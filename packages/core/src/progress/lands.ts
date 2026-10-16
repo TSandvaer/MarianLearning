@@ -41,7 +41,7 @@ export const LANDS: readonly Land[] = [
     world: 'math',
     number: 4,
     name: 'Groups',
-    nodes: ['mult-2-5-10', 'mult-3-4', 'mult-6-9'],
+    nodes: ['mult-2-5-10', 'mult-3-4', 'mult-6-9', 'mult-mix'],
   },
   {
     world: 'word-song',

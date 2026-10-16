@@ -61,7 +61,7 @@ describe('nodeProgress — basic fields', () => {
 
   it('last step of each tree unlocks nothing', () => {
     const p = build(levels())
-    expect(nodeProgress(p, 'mult-6-9').unlocksNext).toBeNull()
+    expect(nodeProgress(p, 'mult-mix').unlocksNext).toBeNull()
     expect(nodeProgress(p, 'simple-sentences').unlocksNext).toBeNull()
   })
 

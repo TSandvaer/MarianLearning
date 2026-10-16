@@ -105,4 +105,14 @@ export const CANON_MATH_FACTS: Readonly<
     { a: 8, b: 3, op: '*' },
     { a: 9, b: 3, op: '*' },
   ],
+  'mult-mix': [
+    { a: 5, b: 3, op: '*' },
+    { a: 4, b: 5, op: '*' },
+    { a: 6, b: 4, op: '*' },
+    { a: 3, b: 5, op: '*' },
+    { a: 7, b: 4, op: '*' },
+    { a: 5, b: 5, op: '*' },
+    { a: 8, b: 4, op: '*' },
+    { a: 9, b: 4, op: '*' },
+  ],
 }

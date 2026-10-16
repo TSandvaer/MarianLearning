@@ -10,6 +10,8 @@ import {
   extendedDistractors,
   extendedOfferedClass,
   multiplyChipCeiling,
+  MULT_MIX_CHIP_CEILING,
+  multiplyChipCeilingFor,
   multiplyDistractors,
   skipCountDistractors,
 } from './extendedDistractors'
@@ -137,11 +139,24 @@ const CANON_CHIPS: Record<string, [number, [number, number]][]> = {
     [24, [11, 23]],
     [27, [12, 28]],
   ],
+  // Content wave 1 § 2.2: times mix under its fixed M = 40. P1–P3 are the
+  // gentle tier's (pinned here, as the spec asks); P4–P8 the spec's.
+  'mult-mix': [
+    [15, [1, 40]],
+    [20, [1, 40]],
+    [24, [1, 40]],
+    [15, [8, 16]],
+    [28, [11, 27]],
+    [25, [10, 26]],
+    [32, [12, 31]],
+    [36, [13, 37]],
+  ],
 }
 
 describe.each(Object.keys(CANON_CHIPS))('canon chips — %s', (node) => {
   const problems = canonProblems(node)
-  const ceiling = multiplyChipCeiling(
+  const ceiling = multiplyChipCeilingFor(
+    node,
     problems.filter(isMultiplyProblem).map((p) => p.correct),
   )
 
@@ -253,5 +268,15 @@ describe('skipCountDistractors — repair', () => {
   it('canon kinds are told apart by their guards', () => {
     expect(canonProblems('skip-counting').every(isSkipCountProblem)).toBe(true)
     expect(canonProblems('number-recog').every(isNumberRecogProblem)).toBe(true)
+  })
+})
+
+describe('times mix chip ceiling (content wave 1 § 2.1)', () => {
+  it('is 40 for mult-mix whatever its answers; other steps keep their answers’ ceiling', () => {
+    expect(MULT_MIX_CHIP_CEILING).toBe(40)
+    expect(multiplyChipCeilingFor('mult-mix', [4, 6, 8])).toBe(40)
+    expect(multiplyChipCeilingFor('mult-mix', [36])).toBe(40)
+    expect(multiplyChipCeilingFor('mult-6-9', [12, 27])).toBe(30)
+    expect(multiplyChipCeilingFor(undefined, [16])).toBe(20)
   })
 })
