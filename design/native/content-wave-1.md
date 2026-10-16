@@ -36,7 +36,7 @@ Marian gets more to learn in both worlds. The adding steps practise number bonds
 | K7  | **Spoken names: "all the groups", "duck words", "crab words".** WS-B is "crab words", not "frog words": every stop has a distinct picture, and the frog is already skip counting's stop picture (`design/emmas-path/emmas-path-spec.md` § 5) (§ 5.1).                                                                         |
 | K8  | **Times mix joins land 4 (Groups). Duck and crab words open a new Word Song land 6, "Big words".** A layout run shows the 6th land fits every portrait form (§ 5.2).                                                                                                                                                          |
 | K9  | **Exactly 8 words per Word Song step.** A new Word Song step is served from canon on every session, the same 8 words every time, so a 9th word would never appear (§ 3.1).                                                                                                                                                    |
-| K10 | **Traps test the new letters.** Duck words use ending twins (lock / log, wing / wig) plus Dave's vowel neighbour (sock / sack). Crab words use Dave's dropped-consonant twin where a picture can carry it (crab / cab, clock / lock, swing / wing) (§ 3.2, § 4.2).                                                            |
+| K10 | **Traps test the new letters.** Duck words use ending twins (lock / log, wing / wig) plus Dave's vowel neighbour (sock / sack). Crab words use Dave's dropped-consonant twin where a picture can carry it (clock / lock, swing / wing) (§ 3.2, § 4.2).                                                                        |
 | K11 | **No blend clips for duck and crab words**, as for the digraph steps: the letters pulse silently, and the 2nd wrong plays the hint line (§ 3.4).                                                                                                                                                                              |
 | K12 | **One short lead line before a problem's read** introduces each new thing: each new step's P1, and the first missing-number problem of a round. It reuses the warm-up line's player and timing (§ 6.1).                                                                                                                       |
 | K13 | **A new step opens on load when the step before it is already mastered.** Without this it would stay `'locked'` forever, because the mastery rule never touches a locked step (§ 5.3).                                                                                                                                        |
@@ -300,19 +300,20 @@ All 8 words are new pictures (none is in `mobile/assets/pictures/`, checked with
 
 ### 4.2 Word list and distractor matrix (canon order)
 
-| P   | Word  | Blend | Vowel | Category  | Gentle (P1–P3) | Trap (P4–P8) | Why the trap                                                  |
-| --- | ----- | ----- | ----- | --------- | -------------- | ------------ | ------------------------------------------------------------- |
-| 1   | flag  | fl    | a     | object    | cup, web       | frog, bag    | frog: f with r for l; bag: rhyme with one first letter        |
-| 2   | drum  | dr    | u     | object    | hat, fox       | plum, dog    | plum: rhyme with another blend; dog: d without the r          |
-| 3   | brick | br    | i     | object    | sun, hat       | crab, clock  | crab: the same r; clock: the same ending                      |
-| 4   | crab  | cr    | a     | animal    | sun, pen       | cab, frog    | **cab: crab without the r** (Dave, R4); frog: another r-blend |
-| 5   | swing | sw    | i     | structure | pot, bug       | wing, king   | **wing: swing without the s**; king: rhyme                    |
-| 6   | plum  | pl    | u     | food      | cat, hen       | drum, pig    | drum: rhyme with another blend; pig: p without the l          |
-| 7   | clock | cl    | o     | household | bun, jet       | lock, sock   | **lock: clock without the c**; sock: rhyme                    |
-| 8   | frog  | fr    | o     | animal    | cup, bed       | dog, flag    | dog: rhyme without the blend; flag: f with l for r            |
+| P   | Word  | Blend | Vowel | Category  | Gentle (P1–P3) | Trap (P4–P8) | Why the trap                                                          |
+| --- | ----- | ----- | ----- | --------- | -------------- | ------------ | --------------------------------------------------------------------- |
+| 1   | flag  | fl    | a     | object    | cup, web       | frog, bag    | frog: f with r for l; bag: rhyme with one first letter                |
+| 2   | drum  | dr    | u     | object    | hat, fox       | plum, dog    | plum: rhyme with another blend; dog: d without the r                  |
+| 3   | brick | br    | i     | object    | sun, hat       | crab, clock  | crab: the same r; clock: the same ending                              |
+| 4   | crab  | cr    | a     | animal    | sun, pen       | clock, frog  | clock: cl for cr, so the second letter decides; frog: another r-blend |
+| 5   | swing | sw    | i     | structure | pot, bug       | wing, king   | **wing: swing without the s**; king: rhyme                            |
+| 6   | plum  | pl    | u     | food      | cat, hen       | drum, pig    | drum: rhyme with another blend; pig: p without the l                  |
+| 7   | clock | cl    | o     | household | bun, jet       | lock, sock   | **lock: clock without the c**; sock: rhyme                            |
+| 8   | frog  | fr    | o     | animal    | cup, bed       | dog, flag    | dog: rhyme without the blend; flag: f with l for r                    |
 
-- **Dave's dropped-consonant twin** (R4: frog read as "fog") is the trap wherever its picture reads: crab / cab, swing / wing, clock / lock. _wing_ and _lock_ arrive with duck words, one step earlier.
+- **Dave's dropped-consonant twin** (R4: frog read as "fog") is the trap wherever its picture reads: swing / wing, clock / lock. _wing_ and _lock_ arrive with duck words, one step earlier.
 - **Twins left out:**
+  - _cab_ (Dave, 2026-10-16). It is never spoken, and an L2 child calls it "taxi". crab's trap is _clock_ instead, which tests the second letter as flag / frog does.
   - _fog_ (a fog picture reads as a cloud).
   - _rib_ (and with it _crib_; neither picture reads at 96 pt).
   - _flag_'s twin without the l, never (Dave).
@@ -322,7 +323,6 @@ All 8 words are new pictures (none is in `mobile/assets/pictures/`, checked with
   - _sled_ (the British word is "sledge").
   - _crib_ and _clam_ (weak vocabulary, no twin with a picture).
 - **Added:** _flag_, _clock_ and _swing_ (each with a twin or a strong rhyme).
-- **cab is distractor-only** (`DISTRACTOR_ONLY_WORDS`, `isTarget: false`). It is never a target, never spoken and needs no `TARGET_PAIRINGS` row.
 - **Every target takes "Yes! That's a <word>."**
 
 ### 4.3 Intro lead
@@ -331,7 +331,7 @@ All 8 words are new pictures (none is in `mobile/assets/pictures/`, checked with
 
 ### 4.4 Pictures
 
-All 8 targets and _cab_ are new pictures (9; none is in `mobile/assets/pictures/`, checked with `ls` on 2026-10-16). Already there: cup, web, bag, hat, fox, dog, sun, pen, pot, bug, cat, hen, pig, bun, jet, bed. Ready by then from duck words: wing, king, lock, sock. No blend clip (§ 3.4).
+All 8 targets are new pictures (none is in `mobile/assets/pictures/`, checked with `ls` on 2026-10-16). Already there: cup, web, bag, hat, fox, dog, sun, pen, pot, bug, cat, hen, pig, bun, jet, bed. Ready by then from duck words: wing, king, lock, sock. No blend clip (§ 3.4).
 
 ### 4.5 New forbidden pairs (both steps)
 
@@ -353,8 +353,6 @@ Added to `FORBIDDEN_PAIRS` before the matrix is coded. Thomas's picture review m
 | plum – fig  | both purple fruits with a stem            |
 | flag – net  | both a pole with something at the top     |
 | brick – box | both rectangular blocks                   |
-| cab – van   | vehicles in side view                     |
-| cab – bus   | vehicles in side view                     |
 
 No trio in § 3.2 or § 4.2 contains a forbidden pair, old or new.
 
@@ -592,7 +590,7 @@ A **lead line** plays before a problem's read, with the stage up. It reuses the 
 
 - **Today:** a word scan of every existing line (guidance, path and level-1 canon) finds 288 distinct words. 25 are number words, 72 are target words (the "Read / Tap the <word>." words), and 40 are letter names or sound tokens ("mmm", "puh"). That leaves about 159 core words. The split is rough: a few step words, such as "thumb" and "mat", land in the core count.
 - **This wave adds 3 core words:** **make** (the bond sentence), **some** and **hiding** (the hiding line). All three are everyday words. That brings the count to about 162, still under ~200.
-- **Target words:** the 16 step words. _cab_ is never spoken.
+- **Target words:** the 16 step words.
 - **Zero-cost choices, made on purpose:**
   - "Big words", not "Long words", for the land.
   - "Let's play all the groups!", not "mixed".
@@ -616,7 +614,7 @@ A **lead line** plays before a problem's read, with the stage up. It reuses the 
 
 ## 8. Picture prompt sheet (Midjourney v7)
 
-**17 new pictures:** the 8 duck words, the 8 crab words, and _cab_. None is in `mobile/assets/pictures/` today (checked with `ls` on 2026-10-16: the folder holds 57 WebPs, all short-vowel CVC words). Every gentle and trap partner in § 3.2 and § 4.2 that isn't one of the 17 is already there.
+**16 new pictures:** the 8 duck words and the 8 crab words. None is in `mobile/assets/pictures/` today (checked with `ls` on 2026-10-16: the folder holds 57 WebPs, all short-vowel CVC words). Every gentle and trap partner in § 3.2 and § 4.2 that isn't one of the 16 is already there.
 
 **Style:** the picture-pack style anchor (`design/word-song/picture-pack-style-anchor.md` § 2–§ 3), distilled into the v7 four-pattern template of `design/word-song/picture-pack-iteration-plan.md` § 2–§ 3.
 
@@ -628,30 +626,29 @@ A **lead line** plays before a problem's read, with the stage up. It reuses the 
 **Workflow:**
 
 - One prompt at a time: generate, pick, upscale, remove.bg, save. Only then the next prompt (the standing rule for Thomas's MJ sessions).
-- Save the transparent PNGs to `design/references/picture-pack/transparent-duck-words/` and `transparent-crab-words/` (new per-tier folders, each with a `.gitkeep`). `cab` goes in the crab folder.
+- Save the transparent PNGs to `design/references/picture-pack/transparent-duck-words/` and `transparent-crab-words/` (new per-tier folders, each with a `.gitkeep`).
 - Then `npm run embed-pictures <folder> public/assets/pictures`, and `npm run export-assets` in `mobile/` bakes the 500 px WebPs.
 
 **Order:** the highest risk first (iteration plan § 4). If one of the first three won't read at 96 pt after two rounds, stop and tell Matt before going on.
 
-| #   | Word  | Step | Main risk                                       |
-| --- | ----- | ---- | ----------------------------------------------- |
-| 1   | wing  | duck | a lone wing reads as a feather or a whole bird  |
-| 2   | sack  | duck | collapses into `bag`                            |
-| 3   | rock  | duck | grey-on-cream contrast; reads as `egg`          |
-| 4   | clock | crab | MJ writes garbled numerals; pedestal-fan shape  |
-| 5   | cab   | crab | reads as `van` / `bus`; "TAXI" text on the sign |
-| 6   | lock  | duck | modern combination lock; bag-like shape         |
-| 7   | swing | crab | MJ adds a child or a whole playground           |
-| 8   | king  | duck | a busy face; must not read as `man` / `dad`     |
-| 9   | brick | crab | brand look; reads as `box`                      |
-| 10  | ring  | duck | the gem takes over (reads as `gem`)             |
-| 11  | drum  | crab | a drum kit; a plain cylinder reads as `can`     |
-| 12  | plum  | crab | reads as `fig`                                  |
-| 13  | sock  | duck | product-photo attractor; a pair instead of one  |
-| 14  | flag  | crab | a national flag; symbols                        |
-| 15  | duck  | duck | yellow duckling (the chick icon); hen-like      |
-| 16  | frog  | crab | painterly; lily-pad scene                       |
-| 17  | crab  | crab | painterly; lobster                              |
+| #   | Word  | Step | Main risk                                      |
+| --- | ----- | ---- | ---------------------------------------------- |
+| 1   | wing  | duck | a lone wing reads as a feather or a whole bird |
+| 2   | sack  | duck | collapses into `bag`                           |
+| 3   | rock  | duck | grey-on-cream contrast; reads as `egg`         |
+| 4   | clock | crab | MJ writes garbled numerals; pedestal-fan shape |
+| 5   | lock  | duck | modern combination lock; bag-like shape        |
+| 6   | swing | crab | MJ adds a child or a whole playground          |
+| 7   | king  | duck | a busy face; must not read as `man` / `dad`    |
+| 8   | brick | crab | brand look; reads as `box`                     |
+| 9   | ring  | duck | the gem takes over (reads as `gem`)            |
+| 10  | drum  | crab | a drum kit; a plain cylinder reads as `can`    |
+| 11  | plum  | crab | reads as `fig`                                 |
+| 12  | sock  | duck | product-photo attractor; a pair instead of one |
+| 13  | flag  | crab | a national flag; symbols                       |
+| 14  | duck  | duck | yellow duckling (the chick icon); hen-like     |
+| 15  | frog  | crab | painterly; lily-pad scene                      |
+| 16  | crab  | crab | painterly; lobster                             |
 
 ### 8.1 wing
 
@@ -685,15 +682,7 @@ A flat illustrated cartoon DRAWING of a round alarm clock with two bells on top 
 
 **Pass if:** the bells, the hands and the tick marks are there, with **no numerals** (garbled digits count as text), and it doesn't read as a pedestal fan.
 
-### 8.5 cab
-
-```
-A flat illustrated cartoon DRAWING of a small yellow taxi car, soft yellow #F4D89B body, a cream and dark-brown checked stripe along the side, a plain roof light block with no writing, three-quarter front-side view, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, photorealistic, 3d render, text, letters, logo, bus, van, smiling car, shadow, drop shadow, ground shadow
-```
-
-**Pass if:** the roof light and the checks say "taxi" at 96 pt. It is a car, not a van or a bus, with no letters anywhere. **If it fails:** an empty roof sign is acceptable; any visible letters are not.
-
-### 8.6 lock
+### 8.5 lock
 
 ```
 A flat illustrated cartoon DRAWING of a closed padlock, a rounded warm-brass body with a keyhole in the middle and a curved silver shackle on top, front view, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, product photography, 3d render, key, combination dial, digital lock, smiling padlock, shadow, drop shadow, ground shadow
@@ -701,7 +690,7 @@ A flat illustrated cartoon DRAWING of a closed padlock, a rounded warm-brass bod
 
 **Pass if:** the keyhole and the shackle are clear, with no key and no number dial, and the shackle doesn't look like a bag handle.
 
-### 8.7 swing
+### 8.6 swing
 
 ```
 A flat illustrated cartoon DRAWING of a playground swing, one empty wooden seat hanging on two ropes from a simple wooden A-frame, three-quarter view, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, 3d render, child, person, slide, playground, tree, grass, smiling swing, shadow, drop shadow, ground shadow
@@ -709,7 +698,7 @@ A flat illustrated cartoon DRAWING of a playground swing, one empty wooden seat 
 
 **Pass if:** the seat is empty, the whole frame is in view and there is nothing else.
 
-### 8.8 king
+### 8.7 king
 
 ```
 A flat illustrated cartoon DRAWING of a friendly cartoon king standing, a big gold crown with small rose-pink gems, a soft red robe with a cream collar, eyes as two small dots, no nose, three-quarter view, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, 3d render, detailed face, big anime eyes, cheek blush, throne, castle, scepter, shadow, drop shadow, ground shadow
@@ -717,7 +706,7 @@ A flat illustrated cartoon DRAWING of a friendly cartoon king standing, a big go
 
 **Pass if:** the crown leads the read, the face is the pack's minimal face (`man` and `dad` convention), and it doesn't read as `man` or `dad`.
 
-### 8.9 brick
+### 8.8 brick
 
 ```
 A flat illustrated cartoon DRAWING of one toy building brick, a rectangular rose-red block with four round studs on top, three-quarter view from above, plain studs with no marks, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, product photography, 3d render, logo, text, wall, many bricks, smiling brick, shadow, drop shadow, ground shadow
@@ -725,7 +714,7 @@ A flat illustrated cartoon DRAWING of one toy building brick, a rectangular rose
 
 **Pass if:** it is one brick, the studs are visible, and the studs carry no logo. It reads as a toy brick, not as `box`.
 
-### 8.10 ring
+### 8.9 ring
 
 ```
 A flat illustrated cartoon DRAWING of a gold finger ring with one small rose-pink gem on top, the round band clearly visible as a circle, three-quarter view, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, product photography, 3d render, hand, finger, jewellery box, smiling ring, shadow, drop shadow, ground shadow
@@ -733,7 +722,7 @@ A flat illustrated cartoon DRAWING of a gold finger ring with one small rose-pin
 
 **Pass if:** the band is the main shape and the gem is small (so it doesn't read as `gem`).
 
-### 8.11 drum
+### 8.10 drum
 
 ```
 A flat illustrated cartoon DRAWING of a toy drum, a cream top skin, rose-pink sides with a zigzag cord pattern, two drumsticks crossed on top, three-quarter view, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, 3d render, drum kit, cymbals, smiling drum, shadow, drop shadow, ground shadow
@@ -741,7 +730,7 @@ A flat illustrated cartoon DRAWING of a toy drum, a cream top skin, rose-pink si
 
 **Pass if:** the zigzag cords and the sticks are there (without them it reads as `can` or `tub`), and it is one drum, not a kit.
 
-### 8.12 plum
+### 8.11 plum
 
 ```
 A flat illustrated cartoon DRAWING of one round plum, deep plum-purple skin with a soft groove down one side, a short brown stem and one green leaf, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, photorealistic, 3d render, fig, grapes, cut fruit, smiling plum, shadow, drop shadow, ground shadow
@@ -749,7 +738,7 @@ A flat illustrated cartoon DRAWING of one round plum, deep plum-purple skin with
 
 **Pass if:** it is round with a groove and a leaf, not `fig`'s teardrop.
 
-### 8.13 sock
+### 8.12 sock
 
 ```
 A flat illustrated cartoon DRAWING of one striped sock, rose-pink and cream stripes, a rounded heel and toe, side view, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, product photography, fabric texture, pair of socks, shoe, foot, smiling sock, shadow, drop shadow, ground shadow
@@ -757,7 +746,7 @@ A flat illustrated cartoon DRAWING of one striped sock, rose-pink and cream stri
 
 **Pass if:** it is a single sock with a clear heel bend.
 
-### 8.14 flag
+### 8.13 flag
 
 ```
 A flat illustrated cartoon DRAWING of a small rectangular flag on a thin wooden pole, plain rose-pink cloth waving, no symbols on the cloth, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, 3d render, country flag, stars, stripes, text, symbols, smiling flag, shadow, drop shadow, ground shadow
@@ -765,7 +754,7 @@ A flat illustrated cartoon DRAWING of a small rectangular flag on a thin wooden 
 
 **Pass if:** the cloth is plain and waving on a pole. No country's flag, and not `net` (no mesh, no hoop).
 
-### 8.15 duck
+### 8.14 duck
 
 ```
 A flat illustrated cartoon DRAWING of a duck standing in side view, soft green head, warm-brown chest, grey-cream body, orange bill and orange webbed feet, thick clean dark outlines, flat solid color fills, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, simple flat cel-shading, slice-of-life Korean webtoon look, single subject --no photo, photorealistic, 3d render, painterly, fuzzy feathers, duckling, chick, hen, water, smiling duck, shadow, drop shadow, ground shadow
@@ -773,7 +762,7 @@ A flat illustrated cartoon DRAWING of a duck standing in side view, soft green h
 
 **Pass if:** the bill and the webbed feet are clear. No comb (so not `hen`), and not yellow (the chick stop is yellow). **If it fails:** keep the green head, which marks it as a duck at a glance.
 
-### 8.16 frog
+### 8.15 frog
 
 ```
 A flat illustrated cartoon DRAWING of a green frog sitting, eyes bulging on top of its head, pale yellow-green tummy, long folded back legs, three-quarter front view, thick clean dark outlines, flat solid color fills, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, simple flat cel-shading, slice-of-life Korean webtoon look, single subject --no photo, photorealistic, 3d render, painterly, lily pad, water, toad, crown, smiling frog with cartoon eyebrows, shadow, drop shadow, ground shadow
@@ -781,7 +770,7 @@ A flat illustrated cartoon DRAWING of a green frog sitting, eyes bulging on top 
 
 **Pass if:** it is a frog alone, with no lily pad, clean lines and soft green.
 
-### 8.17 crab
+### 8.16 crab
 
 ```
 A flat illustrated cartoon DRAWING of a coral-red crab seen from the front, two big claws held up, six thin legs, eyes on short stalks, thick clean dark outlines, flat solid color fills, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, simple flat cel-shading, slice-of-life Korean webtoon look, single subject --no photo, photorealistic, 3d render, painterly, lobster, sand, beach, smiling crab, shadow, drop shadow, ground shadow
@@ -806,7 +795,7 @@ A flat illustrated cartoon DRAWING of a coral-red crab seen from the front, two 
   - `parseReadOperands` / the extended parser: 8/8 on all three re-baked math files.
 - **Times mix plumbing:** `pickMixBlocks`, `MIX_SOURCE_STEPS`, the `mix` field in `sessionPlanKind`, `MIX_*` in `wire/types.ts`, and the `api/_review.ts` branch (§ 2.3–§ 2.4).
 - **Word Song:**
-  - `wordPack.ts`: 16 targets, `cab` in `DISTRACTOR_ONLY_WORDS`, 16 `TARGET_PAIRINGS` rows and 16 `FORBIDDEN_PAIRS`.
+  - `wordPack.ts`: 16 targets, 16 `TARGET_PAIRINGS` rows and 14 `FORBIDDEN_PAIRS`. No new distractor-only word.
   - The per-tier lists in `api/_plannerWordList.ts` and the two tier blocks in `WORD_SONG_TRACK_GUIDE`.
   - In `wordDistractors.test.ts`, give the two tiers the digraph tiers' treatment (`ALL_DIGRAPH_TIER_WORDS`) wherever a CVC-axis test rejects an ending-twin or blend pair.
 - **Loading:** both `withDefaultedSkillLevels` copies (§ 5.3).
@@ -816,7 +805,7 @@ A flat illustrated cartoon DRAWING of a coral-red crab seen from the front, two 
 
 ## 10. Assets required
 
-- **Pictures:** 17 new (§ 8). Thomas generates them; the integration bakes them.
+- **Pictures:** 16 new (§ 8). Thomas generates them; the integration bakes them.
 - **Path art:** 4 clay pieces (§ 5.4).
 - **Audio:** 132 distinct texts (§ 6.2): 10 guidance, 18 path and 104 canon (add-to-10 7, add-to-20 9, times mix 24, duck words 32, crab words 32). Thomas ear-tests them on `/voice-qa.html` before the native build ships (bar 2).
 - **Prediction for the soak (Predict-Before-Soak):** the "Read the <word>." lines sound like the CVC steps. The 5-letter clusters (brick, clock, swing) keep their onsets. The bond lines ("Yes! Seven and three make ten!") run about 2.2–2.8 s and land on "ten", and "Some flowers are hiding!" about 1.5–1.9 s. The intro lines keep their comma pause. **Not predicted:** how Lily says "make" inside "and what make", which the ear test settles.
@@ -857,8 +846,7 @@ A flat illustrated cartoon DRAWING of a coral-red crab seen from the front, two 
 8. **`wordPack`:**
    - The 16 targets and their pairs match § 3.2 and § 4.2 exactly.
    - No trio contains a forbidden pair.
-   - `cab` is distractor-only.
-   - Every one of the 17 picture keys resolves through native `pictureAsset`.
+   - Every one of the 16 picture keys resolves through native `pictureAsset`.
 
 **Server (vitest):**
 
@@ -916,24 +904,24 @@ A flat illustrated cartoon DRAWING of a coral-red crab seen from the front, two 
 - **T2. The names.** "all the groups", "duck words", "crab words" (not "frog words", whose picture skip counting already has), and land 6 "Big words". Team recommendation: approve.
 - **T3. The 4 clay pictures** (§ 5.4): a fruit basket, a green-headed duck on water, a crab, a toy train. Team recommendation: approve the subjects. The look is judged when they are generated, as for the 33 before them.
 
-**For Dave, via Matt (pedagogy this spec had to fill in; the build can start, and his marks are folded in before the canon bake):**
+**For Dave, via Matt (pedagogy this spec had to fill in). All five are resolved; the build can start:**
 
-- **D1.** Missing numbers:
+- **D1.** Missing numbers. **Resolved: Dave confirmed it unchanged (2026-10-16).** The questions were:
   - Are 3 of 8, at P4, P6 and P8, the right share?
   - Should add-to-10 use bonds in both orders (A 1–9)?
   - Is add-to-20's range right (A 6–9, part 2–5)?
   - Should the buds stay hidden until hint 3?
   - Should the chips stay off-by-one only? The alternative is adding the "tapped the whole" trap (10).
-- **D2.** Times mix:
+- **D2.** Times mix. **Resolved: Dave confirmed it unchanged (2026-10-16).** The questions were:
   - Up to 5 groups (answers ≤ 36) instead of his ≤ 90, with 6×5–9×5 left for wave 2.
   - Opening on 3 known facts.
   - Tags shown from reveal.
-- **D3.** Duck word traps: ending twins plus one vowel neighbour, instead of vowel neighbours throughout. _neck_ is dropped.
-- **D4.** Crab words: _swim_, _sled_, _crib_ and _clam_ are dropped, and _flag_, _clock_ and _swing_ added. frog's trap is _dog_, not _fog_.
-- **D5.** The intro lead in every session until mastery, not only the first.
+- **D3.** Duck word traps: ending twins plus one vowel neighbour, instead of vowel neighbours throughout. _neck_ is dropped. **Resolved: Dave confirmed it unchanged (2026-10-16).**
+- **D4.** Crab words: _swim_, _sled_, _crib_ and _clam_ are dropped, and _flag_, _clock_ and _swing_ added. frog's trap is _dog_, not _fog_. **Resolved: Dave confirmed it with one change (2026-10-16), applied in § 4.2: crab's trap is {clock, frog}, and _cab_ is dropped entirely.**
+- **D5.** The intro lead in every session until mastery, not only the first. **Resolved: Dave confirmed it unchanged (2026-10-16).**
 
 **For Matt:**
 
 - The web consequence in § 1.9.
 - The server needs `yarn release` before the times-mix device check (§ 2.4).
-- The picture pack (17) and the clay pieces (4) gate the Word Song build's device check, not its code. The words can be coded and tested while Thomas generates.
+- The picture pack (16) and the clay pieces (4) gate the Word Song build's device check, not its code. The words can be coded and tested while Thomas generates.
