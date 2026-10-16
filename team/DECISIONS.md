@@ -221,3 +221,15 @@ _The four 2026-08-02 entries are archived verbatim in [`log/decisions-archive-20
   8. Kill switch re-armed (Marian has been on the native app since 2026-10-14); `CLAUDE.md § Kill switch`.
 - **Reverses:** the kill-switch pause in 2026-10-08 "React Native (Expo) migration: GO" (item 2). Item 6 pauses the Midjourney half of 2026-10-05 "Codex for icons, Midjourney for heroes".
 - **Decided by:** Thomas.
+
+## 2026-10-16 (later) — Pictures by OpenAI Flare; ElevenLabs only; tools worktree; content wave 1 shipped
+
+- **Decided:**
+  1. The picture tool is OpenAI `gpt-image-2.5-flare`, chosen from the bake-off sheet. All 73 pack pictures were redone in one style (#583, #575) from three anchors (hen, sack, wing), with Thomas approving each batch from a contact sheet. The 4 clay path pieces were made the same way.
+  2. Voice is ElevenLabs Lily only (Thomas: "yes only use elevenlabs for voice consistency"). The Azure runtime fallback and the build-time canon bake are removed (#581). Azure runs only if `TTS_PROVIDER=azure` is set.
+  3. Voice-QA gets a "New / changed" filter against a baseline taken from main (#582). Rule: regenerate the baseline right after each release (#584).
+  4. Test runs are capped at 4 workers in Vitest and Jest (#578), after an uncapped run exhausted the Mac's memory.
+  5. Credentialed jobs (renders, picture generation, EAS builds, releases) run in the tools worktree `~/DEV/MarianLearning-tools`. The main checkout is the orchestrator's.
+  6. Content wave 1 shipped: #576 and #575 merged after Thomas's ear tests (49/49 and 84/84 passed). TestFlight build 9 went on the iPad before the production release af804cb, and Thomas's device check passed.
+- **Reverses:** the Midjourney half of 2026-10-05 "Codex for icons, Midjourney for heroes", for the picture pack. It supersedes the 2026-10-16 item 6 bake-off.
+- **Decided by:** Thomas.
