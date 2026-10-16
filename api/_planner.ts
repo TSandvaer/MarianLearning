@@ -75,6 +75,10 @@ import {
   WORD_SONG_SIMPLE_SENTENCES_TRAP_FOR_PROMPT,
 } from './_plannerWordList.js'
 import { renderSessionAudio, type RenderSessionOptions } from './_session.js'
+import {
+  MISSING_NUMBER_RANGES,
+  MISSING_NUMBER_SLOTS,
+} from '../packages/core/src/wire/missingNumbers.js'
 import type { SessionStartResponse } from './_types.js'
 
 /** What kind of session we're generating. */
@@ -153,6 +157,10 @@ export const VALID_MATH_FOCUS_NODES: readonly string[] = [
   'mult-2-5-10',
   'mult-3-4',
   'mult-6-9',
+  // Content wave 1 § 2: times mix. Its sessions are composed by core
+  // from canon blocks (`payload.mix`, api/_review.ts); a request without
+  // `mix` is served the step's own canon.
+  'mult-mix',
 ]
 
 export const VALID_WORD_SONG_FOCUS_NODES: readonly string[] = [
@@ -1592,12 +1600,18 @@ Session-End utterances (REQUIRED — append to the same flat utterances array):
 After the per-problem utterances (8 × 7 = 56 for MATH, 8 × 5 = 40 for WORD-SONG — or 8 × 6 = 48 on the cvc-word tier, which adds the optional "blend" slot per problem), append the following Session-End utterances. The Session-End screen looks them up by exact id at runtime and degrades gracefully on a miss, but every id below MUST be emitted so the celebration never falls back to silent captions.
 
   - "session.end.opener" — text: "You did it!"
-  - "session.end.recap.focus" — text: "You worked on <spoken-focus-name> today!" where <spoken-focus-name> is a short, warm, CHILD-FACING phrase for the focus skill node named in the user message. Spell any numbers out as words and drop curriculum jargon — Emma is speaking to an 8-year-old, not a parent. Use exactly these phrases per focus node: add-to-10 -> "adding to ten"; add-to-20 -> "adding to twenty"; sub-to-10 -> "taking away to ten"; sub-to-20 -> "taking away to twenty"; number-recog -> "your numbers"; two-digit-addsub-no-regroup / two-digit-addsub-with-regroup -> "bigger numbers"; skip-counting -> "skip counting"; mult-2-5-10 / mult-3-4 / mult-6-9 -> "counting in groups"; letter-names -> "your letters"; letter-sounds -> "letter sounds"; blending-cv -> "blending sounds"; any cvc-words* tier, any digraphs* tier, sight-words, duck-words and crab-words -> "reading words"; simple-sentences -> "reading sentences". Exactly one line; never use digits; one exclamation mark.
+  - "session.end.recap.focus" — text: "You worked on <spoken-focus-name> today!" where <spoken-focus-name> is a short, warm, CHILD-FACING phrase for the focus skill node named in the user message. Spell any numbers out as words and drop curriculum jargon — Emma is speaking to an 8-year-old, not a parent. Use exactly these phrases per focus node: add-to-10 -> "adding to ten"; add-to-20 -> "adding to twenty"; sub-to-10 -> "taking away to ten"; sub-to-20 -> "taking away to twenty"; number-recog -> "your numbers"; two-digit-addsub-no-regroup / two-digit-addsub-with-regroup -> "bigger numbers"; skip-counting -> "skip counting"; mult-2-5-10 / mult-3-4 / mult-6-9 / mult-mix -> "counting in groups"; letter-names -> "your letters"; letter-sounds -> "letter sounds"; blending-cv -> "blending sounds"; any cvc-words* tier, any digraphs* tier, sight-words, duck-words and crab-words -> "reading words"; simple-sentences -> "reading sentences". Exactly one line; never use digits; one exclamation mark.
   - "session.end.recap.1" through "session.end.recap.11" — one entry per N in 1..11. The N=1 line is "You earned one star!"; for N >= 2 the line is "You earned <number-word> stars!" with the number spelled out (one, two, three, four, five, six, seven, eight, nine, ten, eleven). Never use digits; never use "stars" with N=1.
   - "session.end.streak.3" through "session.end.streak.8" — one entry per N in 3..8. Each line is "<number-word> in a row! Wow!" with the number spelled out (three, four, five, six, seven, eight). Capitalise the leading word.
   - "session.end.goodbye" — text: "See you soon."
 
 Total Session-End utterances: 1 opener + 1 focus-recap + 11 recap + 6 streak + 1 goodbye = 20. The full flat utterances array therefore has 8 × 7 + 20 = 76 entries for the MATH track, or 8 × 5 + 20 = 60 entries for the WORD-SONG track (8 × 6 + 20 = 68 on the cvc-word tier, which carries the optional "blend" slot per problem). Do not invent extra Session-End ids; do not skip any of the listed Session-End ids.`
+
+/** "P4, P6 and P8": the missing-number slots (content wave 1 § 1.2). */
+const MISSING_SLOT_LIST = MISSING_NUMBER_SLOTS.map((n) => `P${n}`)
+  .join(', ')
+  .replace(/, ([^,]*)$/, ' and $1')
+const MISSING_TEN = MISSING_NUMBER_RANGES['add-to-10']
 
 export const MATH_TRACK_GUIDE = `Track: Math.
 
@@ -1653,7 +1667,7 @@ The user message names a focus skill node. Generate problems specifically for th
      · The ONLY facts allowed at P1, P2, P3 are: 1+2, 2+1, 1+3, 3+1, 1+4, 4+1, 2+2, 2+3, 3+2.
   3. Problems 4-8 (discriminate): draw from MEDIUM + HARD bands. Recent-score modulation: low score (< 0.5) -> bias toward MEDIUM and avoid HARD-band sums-to-10; high score (>= 0.85) -> push into HARD and ensure a sums-to-10 anchor; mid score -> balanced mix. HARD-band facts (sum 9-10) appear at P5 or later only.
   4. HIGH-LEVERAGE COVERAGE RULE <rule band="hard">: at least one sums-to-10 fact (1+9, 9+1, 2+8, 8+2, 3+7, 7+3, 4+6, 6+4, 5+5) MUST appear somewhere in problems 4-8. This is the highest-leverage category — Marian's April diagnostic flags sums-to-10 automaticity as the top priority; it bridges to add-to-20's make-10 mental model. <self-check>Scan P4, P5, P6, P7, P8. If zero have category=sums-to-10, REJECT and SWAP one P4-P8 fact for a sums-to-10 fact (respecting the sums-to-10 cap of 2 and band-by-slot rules — sums-to-10 facts are HARD band, so they fit P5-P8 only).</self-check>
-  5. NO duplicate (a, b) ordered pairs within the 8-problem set. "2+3" and "3+2" are NOT duplicates — they are distinct ordered pairs.
+  5. NO bond twice in one session, in either shape or order (see NO BOND TWICE under MISSING-NUMBER PROBLEMS below): "2+3" and "3+2" are the same bond, so at most one of them.
   6. DOUBLES-CAP SELF-CHECK <rule band="hard">re-statement of CATEGORY-MIX BUDGET above</rule>: AT MOST TWO problems across the 8-problem session may carry the doubles category (drawn from {2+2, 3+3, 4+4}). CATEGORY-CARVE-OUT — 5+5 is sums-to-10 by priority, NOT doubles; do NOT count 5+5 toward the doubles cap. Before emitting a third doubles fact, REJECT it. NEGATIVE ANCHOR: it is FORBIDDEN to place 2+2 AND 3+3 AND 4+4 in the same session (the full doubles trifecta — known failure mode per PR #266 attempts 1-2, both bakes shipped all three before composition-lint caught them). <self-check>After placing all 8 facts, count {2+2, 3+3, 4+4} occurrences. If > 2, REJECT and SWAP the surplus for a sums-to-10 or near-doubles fact at the same slot.</self-check>
   7. SUMS-TO-10-CAP SELF-CHECK <rule band="hard">re-statement</rule>: AT MOST TWO problems across the 8-problem session may carry the sums-to-10 category (drawn from {1+9, 9+1, 2+8, 8+2, 3+7, 7+3, 4+6, 6+4, 5+5}). Before emitting a third sums-to-10 fact, REJECT it. This cap interacts with the HIGH-LEVERAGE COVERAGE RULE above: place EXACTLY 1 or 2 sums-to-10 facts in P5-P8; never 0 (violates coverage rule), never 3+ (violates this cap).
   8. PLUS-ONE-CAP SELF-CHECK <rule band="hard">re-statement</rule>: AT MOST TWO problems across the 8-problem session may carry the plus-one category. The plus-one pool is the LARGEST (14 facts: 1+2, 2+1, 1+3, 3+1, 1+4, 4+1, 1+5, 5+1, 1+6, 6+1, 1+7, 7+1, 1+8, 8+1) so Haiku's attention drifts there when other caps bind — this cap is load-bearing against plus-one-saturation. Before emitting a third plus-one fact, REJECT it.
@@ -1674,6 +1688,18 @@ The user message names a focus skill node. Generate problems specifically for th
   - giveAnswer: "This one is <answer>." e.g. "This one is eight."
 
   PROSODY: numbers are spelled out as words ("one", "two", ... "ten"). Capitalize the first word of each sentence. The "plus" template renders cleanly on en-GB-OliviaNeural rate -10%; no SSML overrides required for any value in [1, 10].
+
+  MISSING-NUMBER PROBLEMS (content wave 1, design/native/content-wave-1.md § 1.2-1.3) <rule band="hard">OVERRIDES the rules above for problems ${MISSING_SLOT_LIST}</rule>: problems ${MISSING_SLOT_LIST} are MISSING-NUMBER problems. Emma names one part and the whole; the child finds the other part. The whole is ALWAYS ${MISSING_TEN.totalMin} (bonds to ten); the given part is ${MISSING_TEN.givenMin}-${MISSING_TEN.givenMax}. The other five problems are PLAIN additions: the FACT POOL, the CATEGORY-MIX BUDGET, BAND-BY-SLOT, the SESSION COMPOSITION RULES and the WORKED EXAMPLE above govern those five only. The three missing-number bonds to ten SATISFY the HIGH-LEVERAGE COVERAGE RULE (rule 4) and rule 7's "never 0": the plain problems need NO sums-to-10 fact (P5 4+4 and P7 4+5 in the worked example below are right), and rule 7's cap of 2 and the other category caps count the plain problems only. A due Leitner fact may be written in either shape, but its FIRST addend is always the part Emma names: 3+7 -> "Three and what make ten?", 7+3 -> "Seven and what make ten?". Never reverse it: "Seven and what make ten?" records 7+3, so a due 3+7 written that way never gets its answer recorded.
+  NO BOND TWICE <rule band="hard">: no bond may appear twice in one session, in either shape or order. {7, 3} as "Seven plus three", "Three plus seven" or "Seven and what make ten?" counts once. <self-check>List the 8 bonds as unordered pairs (a missing number's bond is its given part and its missing part). If any pair appears twice, REJECT and re-pick that problem.</self-check>
+  PER-PROBLEM SHAPE for a missing-number problem (the whole T, the given part A, the missing part B = T - A; op: "+" on the wire):
+  - read: "<A> and what make <T>?" e.g. "Seven and what make ten?"
+  - correct: "Yes! <A> and <B> make <T>!" e.g. "Yes! Seven and three make ten!" (the whole bond, not just the answer)
+  - reprompt: "Hmm... try again?" (verbatim)
+  - hint1: "Look at the flowers." (verbatim)
+  - hint2: "<A> flowers." e.g. "Seven flowers." (singular "One flower." when A is 1)
+  - hint3: "How many more make <T>?" e.g. "How many more make ten?"
+  - giveAnswer: "This one is <B>." e.g. "This one is three."
+  WORKED EXAMPLE with missing numbers: P1 "One plus two. How many?", P2 "Two plus two. How many?", P3 "Three plus two. How many?", P4 "Seven and what make ten?", P5 "Four plus four. How many?", P6 "Six and what make ten?", P7 "Four plus five. How many?", P8 "Eight and what make ten?". Eight different bonds.
 - add-to-20: addition with sums STRICTLY in [11, 20] and BOTH addends in [1, 9]. NO TEN-PLUS-SINGLE (10+n, n+10 FORBIDDEN — that's two-digit-addsub territory); NO sums <= 10 (that's add-to-10's territory). read: "<addend-A> plus <addend-B>. How many?" e.g. "Eight plus five. How many?"
 
   SUM-RANGE SELF-CHECK (apply before emitting every problem): for chosen (addendA a, addendB b), COMPUTE a + b and CONFIRM that 11 <= a + b <= 18. (V1 pool excludes 19 and 20 — see addend range below.) If the sum is < 11, the problem belongs in add-to-10 and is FORBIDDEN here; if > 18, the (a, b) pair is OUT of the v1 pool. Worked example: 8+3=11 is OK (11 in range). 5+5=10 is FORBIDDEN (sum < 11). 9+10=19 is FORBIDDEN (addend = 10 violates next check).
@@ -2122,12 +2148,13 @@ The user message names a focus skill node. Generate problems specifically for th
 - mult-2-5-10: multiplication by 2, 5, or 10. read: "Two times <X>. How many?" Answer is the product.
 - mult-3-4: multiplication by 3 or 4. read: same template.
 - mult-6-9: multiplication by 6, 7, 8, or 9. read: same template.
+- mult-mix: mixed multiplication, any group size 2-9 with 2-5 groups (answers up to 36). read: same template.
 
 Per-problem utterance template (any focus node):
 - read: see the focus-node-specific shape above.
 - correct: "Yes! <answer>!" e.g. "Yes! Five!"
 - reprompt: "Hmm... try again?"  (verbatim)
-THE HINT IS THREE escalating sub-step utterances (hint1/hint2/hint3) for EVERY math problem, NOT one — emit all three. Each ramps one cognitive sub-step at a time: hint1 directs attention, hint2 names the first quantity/cue, hint3 completes the operation and poses the question. Focus nodes WITH a dedicated PER-PROBLEM SHAPE block above (add-to-10, add-to-20, sub-to-10, sub-to-20, two-digit-addsub-no-regroup, two-digit-addsub-with-regroup) use THAT block's hint1/hint2/hint3 templates. For the remaining math nodes (number-recog, skip-counting, mult-2-5-10, mult-3-4, mult-6-9), use the per-tier DETERMINISTIC templates below (Wave 12, ticket 86ca8704f — Dave's generic-tier hint templates, design/research/w12-generic-tier-hint-templates.md). Each is a pure function of the problem's read-line operands; do NOT improvise scaffold prose.
+THE HINT IS THREE escalating sub-step utterances (hint1/hint2/hint3) for EVERY math problem, NOT one — emit all three. Each ramps one cognitive sub-step at a time: hint1 directs attention, hint2 names the first quantity/cue, hint3 completes the operation and poses the question. Focus nodes WITH a dedicated PER-PROBLEM SHAPE block above (add-to-10, add-to-20, sub-to-10, sub-to-20, two-digit-addsub-no-regroup, two-digit-addsub-with-regroup) use THAT block's hint1/hint2/hint3 templates. For the remaining math nodes (number-recog, skip-counting, mult-2-5-10, mult-3-4, mult-6-9, mult-mix), use the per-tier DETERMINISTIC templates below (Wave 12, ticket 86ca8704f — Dave's generic-tier hint templates, design/research/w12-generic-tier-hint-templates.md). Each is a pure function of the problem's read-line operands; do NOT improvise scaffold prose.
 
   GENERIC-TIER HINT TEMPLATES (number-recog / skip-counting / mult-*):
 
@@ -2141,7 +2168,7 @@ THE HINT IS THREE escalating sub-step utterances (hint1/hint2/hint3) for EVERY m
     - hint2: "We add <step-word> each time." where step-word is the common difference (second term minus first term) spelled as a word — "two" / "five" / "ten"
     - hint3: "<last-term-word> and <step-word> more is what?" where last-term-word is the final number word in the sequence before ". What is next?" e.g. "Fourteen and two more is what?"
 
-  · mult-2-5-10 / mult-3-4 / mult-6-9 (read "<factor-a-word> times <factor-b-word>. How many?"):
+  · mult-2-5-10 / mult-3-4 / mult-6-9 / mult-mix (read "<factor-a-word> times <factor-b-word>. How many?"):
     - hint1: "Look at the groups." (verbatim)
     - hint2: a repeated-addition chain, CASE-SPLIT on factor-b (the number of copies; read-line operand order — factor-b copies of factor-a, NO commutative flip): factor-b 1 -> "One group of <factor-a-word>." ; factor-b 2 -> "<factor-a-word> and <factor-a-word> more." ; factor-b 3 -> "<factor-a-word>, then <factor-a-word>, then <factor-a-word>." ; factor-b 4 -> "<factor-a-word>, <factor-a-word>, <factor-a-word>, <factor-a-word>." ; factor-b 5 -> "<factor-a-word>, <factor-a-word>, <factor-a-word>, <factor-a-word>, <factor-a-word>."
     - hint3: "How many?" (verbatim — the read-line question clause)

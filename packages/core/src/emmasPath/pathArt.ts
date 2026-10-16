@@ -62,6 +62,7 @@ const PATH_ART_SET: Readonly<Record<PathArtId, true>> = {
   'mult-2-5-10': true,
   'mult-3-4': true,
   'mult-6-9': true,
+  'mult-mix': true,
   // Word Song stages
   'letter-names': true,
   'letter-sounds': true,

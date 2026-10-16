@@ -97,7 +97,11 @@ afterEach(() => {
   jest.useRealTimers()
 })
 
-/** The spec's § 7.2 warm-up example: defaults, Monday's session, Tuesday 08:00. */
+/**
+ * The spec's § 7.2 warm-up example: defaults, Monday's session, Tuesday
+ * 08:00, on the content wave 1 canon (its box-2 fact is 7+3, add-to-10 #4
+ * "Seven and what make ten?", where 2+4 was).
+ */
 function seedWarmupExample() {
   saveProgress({
     ...defaultProgress(),
@@ -115,7 +119,7 @@ function seedWarmupExample() {
           lastSeen: at(MON, 18, 5).getTime(),
         },
         {
-          item: { a: 2, b: 4, op: '+' },
+          item: { a: 7, b: 3, op: '+' },
           box: 2,
           lastSeen: at(MON, 17).getTime(),
         },
@@ -270,7 +274,7 @@ describe('review request', () => {
 
 describe('warm-up round and its Leitner outcomes (AC 14)', () => {
   const WARMUP = [
-    { node: 'add-to-10' as const, problem: 4 }, // 2+4
+    { node: 'add-to-10' as const, problem: 4 }, // 7 + ? = 10 (bond 7+3)
     { node: 'add-to-10' as const, problem: 3 }, // 3+2
   ]
   const forward = canonPlan('math', 'add-to-10')
@@ -295,7 +299,7 @@ describe('warm-up round and its Leitner outcomes (AC 14)', () => {
       ...Array(8).fill(null),
     ])
     expect(round.plan.problems[0]!.utterances.read).toBe(
-      'Two plus four. How many?',
+      'Seven and what make ten?',
     )
   })
 
@@ -303,8 +307,9 @@ describe('warm-up round and its Leitner outcomes (AC 14)', () => {
     const round = mathRoundFromServer(response, {
       planKind: { kind: 'forward', warmup: WARMUP },
     })
-    // Warm-up: 2+4 wrong first, 3+2 right. Scored (canon add-to-10, in
-    // order 1+2, 2+2, 3+2, 2+4, ...): all right, but the repeats differ.
+    // Warm-up: 7 + ? = 10 wrong first, 3+2 right. Scored (canon add-to-10,
+    // in order 1+2, 2+2, 3+2, 7 + ? = 10, ...): all right, but the repeats
+    // differ.
     const result: MathSessionResult = {
       totalCorrect: 8,
       totalStardust: 20,
@@ -327,7 +332,7 @@ describe('warm-up round and its Leitner outcomes (AC 14)', () => {
     )
     expect(payload.mathFacts).toHaveLength(8)
     expect(payload.warmupFacts).toEqual([
-      { a: 2, b: 4, op: '+' },
+      { a: 7, b: 3, op: '+' },
       { a: 3, b: 2, op: '+' },
     ])
     expect(payload).not.toHaveProperty('review')
@@ -335,16 +340,16 @@ describe('warm-up round and its Leitner outcomes (AC 14)', () => {
     expect(outcomes).toHaveLength(8)
     const keys = outcomes.map((o) => `${o.fact.a}${o.fact.op}${o.fact.b}`)
     expect(new Set(keys).size).toBe(8)
-    expect(keys.filter((k) => k === '2+4')).toHaveLength(1)
+    expect(keys.filter((k) => k === '7+3')).toHaveLength(1)
     expect(keys.filter((k) => k === '3+2')).toHaveLength(1)
     expect(
-      outcomes.find((o) => o.fact.a === 2 && o.fact.b === 4)!.correct,
+      outcomes.find((o) => o.fact.a === 7 && o.fact.b === 3)!.correct,
     ).toBe(false)
     expect(
       outcomes.find((o) => o.fact.a === 3 && o.fact.b === 2)!.correct,
     ).toBe(true)
     // Warm-up outcomes come first.
-    expect(keys.slice(0, 2)).toEqual(['2+4', '3+2'])
+    expect(keys.slice(0, 2)).toEqual(['7+3', '3+2'])
   })
 })
 
@@ -386,5 +391,22 @@ describe('the step intro lead line (content wave 1 § 6.1)', () => {
     expect(
       sessionIntroFor(p, 'add-to-10', { kind: 'review', blocks: [] }),
     ).toBeNull()
+  })
+
+  it('times mix: its intro until it is mastered', () => {
+    const p = progressAtStep('mult-mix')
+    expect(sessionIntroFor(p, 'mult-mix', FWD)).toBe(
+      'guide.session.intro.mult-mix',
+    )
+    const done = progressAtStep('mult-mix')
+    done.skillLevels['mult-mix'] = 'mastered'
+    expect(sessionIntroFor(done, 'mult-mix', FWD)).toBeNull()
+  })
+
+  it('reaches the Math screen: a forward session on times mix carries it', () => {
+    saveProgress(progressAtStep('mult-mix'))
+    expect(readMathProgressHints().intro).toBe('guide.session.intro.mult-mix')
+    saveProgress(progressAtStep('mult-6-9'))
+    expect(readMathProgressHints().intro).toBeNull()
   })
 })

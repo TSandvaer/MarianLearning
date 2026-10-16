@@ -41,6 +41,9 @@ export type NumberGardenNode =
   | 'mult-2-5-10'
   | 'mult-3-4'
   | 'mult-6-9'
+  // Content wave 1 § 2 (times mix): mixed × facts across the three
+  // multiplication steps, composed from canon blocks by core.
+  | 'mult-mix'
 
 // cvc-words = short-a CVC. Subsequent vowels get sibling nodes
 // (cvc-words-short-o, cvc-words-short-u, cvc-words-short-i,

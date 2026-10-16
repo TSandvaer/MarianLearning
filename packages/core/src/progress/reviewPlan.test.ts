@@ -113,8 +113,8 @@ describe('reviewBaseline / reviewPool (D2)', () => {
     expect(
       reviewPool(progressAtStep('cvc-words-short-o'), 'word-song'),
     ).toEqual(['letter-sounds', 'blending-cv', 'cvc-words'])
-    const done = progressAtStep('mult-6-9')
-    done.skillLevels['mult-6-9'] = 'mastered'
+    const done = progressAtStep('mult-mix')
+    done.skillLevels['mult-mix'] = 'mastered'
     expect(reviewPool(done, 'math')).toEqual([])
   })
 })
@@ -254,15 +254,20 @@ describe('isFirstSessionToday (§ 7.3)', () => {
 })
 
 describe('pickWarmupBlocks (§ 7.2, D4)', () => {
-  /** The § 7.2 example: defaults (current add-to-10, no review steps). */
+  /**
+   * The § 7.2 example: defaults (current add-to-10, no review steps), on
+   * the content wave 1 canon: its 2+4 and 5+5 blocks became missing
+   * numbers, so the box-2 fact is 7+3 (#4, "Seven and what make ten?") and
+   * the not-yet-due box-3 fact 6+4 (#6).
+   */
   const example = () =>
     withBox(
       withHistory(defaultProgress(), entry('add-to-10', at(MON, 18))),
       item(3, '+', 2, 1, at(MON, 18)),
       item(4, '+', 5, 1, at(MON, 18, 5)),
-      item(2, '+', 4, 2, at(MON, 17)),
+      item(7, '+', 3, 2, at(MON, 17)),
       // Box 3 promoted Monday: not due until Thursday.
-      item(5, '+', 5, 3, at(MON, 17)),
+      item(6, '+', 4, 3, at(MON, 17)),
     )
 
   it('AC5 (math): the spec example gives add-to-10 #4 then #3', () => {
@@ -275,17 +280,17 @@ describe('pickWarmupBlocks (§ 7.2, D4)', () => {
   it('AC5 (math): heart 1 is a box ≥ 2 fact whenever one is a candidate; never a not-yet-due fact', () => {
     const p = withBox(
       example(),
-      // Two more overdue box-1 facts rank above 2+4 (box 2, overdue 0).
+      // Two more overdue box-1 facts rank above 7+3 (box 2, overdue 0).
       item(1, '+', 2, 1, at(TUE - 3, 9)),
       item(2, '+', 2, 1, at(TUE - 3, 9)),
-      item(2, '+', 4, 2, at(MON, 17)),
-      item(5, '+', 5, 3, at(MON, 17)),
+      item(7, '+', 3, 2, at(MON, 17)),
+      item(6, '+', 4, 3, at(MON, 17)),
     )
     const refs = pickWarmupBlocks(p, 'math', NOW_MS, TODAY, 0)
     expect(refs).toHaveLength(WARMUP_PROBLEMS)
-    expect(refs[0]).toEqual({ node: 'add-to-10', problem: 4 }) // 2+4, box 2
+    expect(refs[0]).toEqual({ node: 'add-to-10', problem: 4 }) // 7+3, box 2
     expect(refs[1]).toEqual({ node: 'add-to-10', problem: 1 }) // top box 1
-    expect(refs.map(refKey)).not.toContain('add-to-10#6') // 5+5, not due
+    expect(refs.map(refKey)).not.toContain('add-to-10#6') // 6+4, not due
   })
 
   it('AC5 (math): with no box ≥ 2 candidate, heart 1 is the top candidate; one candidate → one heart', () => {
@@ -294,7 +299,7 @@ describe('pickWarmupBlocks (§ 7.2, D4)', () => {
       item(4, '+', 5, 1, at(MON, 18)),
     )
     expect(pickWarmupBlocks(one, 'math', NOW_MS, TODAY, 0)).toEqual([
-      { node: 'add-to-10', problem: 8 },
+      { node: 'add-to-10', problem: 7 },
     ])
     expect(
       pickWarmupBlocks(defaultProgress(), 'math', NOW_MS, TODAY, 0),
@@ -386,8 +391,8 @@ describe('sessionPlanKind (§ 2)', () => {
   })
 
   it('a complete world is a forward session (no sleeping flower)', () => {
-    const done = progressAtStep('mult-6-9')
-    done.skillLevels['mult-6-9'] = 'mastered'
+    const done = progressAtStep('mult-mix')
+    done.skillLevels['mult-mix'] = 'mastered'
     const p = withHistory(done, entry('mult-6-9', at(TUE, 7), 8))
     expect(sessionPlanKind(p, 'math', NOW_MS, TODAY, 0).kind).toBe('forward')
   })

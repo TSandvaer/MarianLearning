@@ -94,7 +94,10 @@ describe('no chip above 99', () => {
   ]
   const problems = mathSessionPlanFromServer(serverPlan(reads), {
     extendedKinds: true,
-  }).problems as readonly Exclude<ExtendedMathProblem, { kind: 'arithmetic' }>[]
+  }).problems as readonly Exclude<
+    ExtendedMathProblem,
+    { kind: 'arithmetic' | 'missing-addend' }
+  >[]
   const ceiling = multiplyChipCeiling(
     problems.filter((p) => p.kind === 'multiply').map((p) => p.correct),
   )

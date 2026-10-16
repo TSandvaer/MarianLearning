@@ -153,7 +153,8 @@ describe('nextNode', () => {
   })
 
   it('returns null for the last node in a track', () => {
-    expect(nextNode('math', 'mult-6-9')).toBeNull()
+    expect(nextNode('math', 'mult-6-9')).toBe('mult-mix')
+    expect(nextNode('math', 'mult-mix')).toBeNull()
     expect(nextNode('word-song', 'simple-sentences')).toBe('duck-words')
     expect(nextNode('word-song', 'duck-words')).toBe('crab-words')
     expect(nextNode('word-song', 'crab-words')).toBeNull()

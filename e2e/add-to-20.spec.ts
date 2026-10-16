@@ -316,9 +316,14 @@ function isInPool(
  * `process.cwd()`" for the established pattern from
  * `sub-to-10-distractor-class-2.spec.ts`.
  */
+// Content wave 1 (design/native/content-wave-1.md § 1.9): the committed
+// add-to-20 canon now carries missing-number problems the frozen web does not
+// read (it falls back to its static plan). This web spec keeps testing the
+// plain-addition canon, frozen from main 11ac65e in
+// e2e/fixtures/canon-web-plain-addition/.
 const ADD_TO_TWENTY_CANON_PATH = resolve(
   process.cwd(),
-  'public/canon/math/level-1/add-to-20.json',
+  'e2e/fixtures/canon-web-plain-addition/add-to-20.json',
 )
 
 // ── Seed builder ─────────────────────────────────────────────────────────

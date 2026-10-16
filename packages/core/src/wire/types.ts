@@ -141,6 +141,35 @@ export const PEEK_BLOCK_COUNT = 3
  */
 export const PEEK_PLAN_ID_PREFIX = 'peek-'
 
+// --- Times mix ----------------------------------------------------------------
+//
+// Content wave 1 `design/native/content-wave-1.md` § 2.4. A session on the
+// times-mix step (`mult-mix`) is composed by core (`pickMixBlocks`): the
+// session-start track payload carries `mix: { blocks: CanonBlockRef[] }`,
+// exactly `MIX_BLOCK_COUNT` refs, each a step of `MIX_SOURCE_STEPS`. The
+// server answers it like a review (step 0, the blocks copied with their
+// baked audio, renamed `math.p1..p8.`, plus mult-mix's `session.end.*`
+// lines), with a plan id starting `MIX_PLAN_ID_PREFIX`. Warm-up refs are
+// appended as for any forward response.
+
+/** `payload.mix.blocks` carries exactly this many refs. */
+export const MIX_BLOCK_COUNT = 8
+
+/**
+ * A times-mix response's `plan.id` starts with this. An older server
+ * ignores `payload.mix` and serves mult-mix's own canon: still times mix,
+ * the same 8 every day, which the client accepts too.
+ */
+export const MIX_PLAN_ID_PREFIX = 'mix-'
+
+/** The steps whose canon blocks a times mix draws on, in pool order. */
+export const MIX_SOURCE_STEPS: readonly string[] = [
+  'mult-2-5-10',
+  'mult-3-4',
+  'mult-6-9',
+  'mult-mix',
+]
+
 /** Error response shape. `error` is a stable machine-readable code; `message`
  *  is optional human-readable detail (never echoes the request body, never
  *  leaks env state). */
@@ -165,7 +194,9 @@ export interface ClaudeErrorResponse {
      *  exactly 8 refs, a step of another track, a problem outside 1..8, or a
      *  missing canon entry (native spec review-mode-and-warmup-native.md
      *  § 7.4). Likewise a `payload.peek` that is not exactly 3 refs of one
-     *  step of the track (fast-track-native.md § 6.2). */
+     *  step of the track (fast-track-native.md § 6.2), and a `payload.mix`
+     *  that is not exactly 8 refs of `MIX_SOURCE_STEPS` (content wave 1
+     *  § 2.4). */
     | 'invalid-request'
   message?: string
 }

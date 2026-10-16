@@ -12,22 +12,23 @@ import {
   pathStepsOf,
 } from './pathLines'
 
-/** Spec §4.5 word list (carrier + name + land-name words), lower-case. */
+/** Spec §4.5 word list (carrier + name + land-name words), lower-case;
+ *  plus "the" of "all the groups" (content wave 1 K7, Thomas 2026-10-16). */
 const SPEC_VOCAB = new Set(
   `here is your path you are on did all of it look at flowers flower a new for
   learned now can do land first then this not yet numbers adding taking away to
   ten twenty big making tens skip counting groups two three four five and letter
   letters names sounds blending words reading sentences cat dog sun pig bed ship
-  chick thumb star sound pairs duck crab`.split(/\s+/),
+  chick thumb star sound pairs the duck crab`.split(/\s+/),
 )
 const NUMERALS = new Set(['1', '2', '3', '4', '5', '6'])
 
 describe('STAGE_SPOKEN_NAMES (spec §4.3)', () => {
-  it('gives all 26 stages a name and no two the same', () => {
+  it('gives all 27 stages a name and no two the same', () => {
     const nodes = [...MATH_TREE, ...LITERACY_TREE]
-    expect(nodes).toHaveLength(26)
+    expect(nodes).toHaveLength(27)
     const names = nodes.map((n) => STAGE_SPOKEN_NAMES[n])
-    expect(new Set(names).size).toBe(26)
+    expect(new Set(names).size).toBe(27)
   })
 })
 
@@ -53,15 +54,15 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
     const counts: Record<string, number> = {}
     for (const l of PATH_LINES) counts[l.kind] = (counts[l.kind] ?? 0) + 1
     expect(counts).toEqual({
-      open: 26,
+      open: 27,
       'open-done': 2,
-      stop: 26,
+      stop: 27,
       land: 10,
-      'locked-next': 24,
-      'locked-later': 136,
+      'locked-next': 25,
+      'locked-later': 146,
       'gate-locked': 51,
-      'end-bud': 26,
-      'end-unlock': 24,
+      'end-bud': 27,
+      'end-unlock': 25,
       'end-land': 8,
       'end-land-no-number': 8,
     })
@@ -128,9 +129,10 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
   it('bakes every non-deferred line and none of the deferred ones', () => {
     for (const l of PATH_LINES)
       expect(l.src === null).toBe(DEFERRED_PATH_LINE_KINDS.has(l.kind))
-    // Content wave 1, Word Song half: + 13 (duck words, crab words, land 6).
-    expect(BAKED_PATH_LINES).toHaveLength(154)
-    expect(new Set(BAKED_PATH_LINES.map((l) => l.text)).size).toBe(153)
+    // Content wave 1: + 5 (all the groups) + 13 (duck words, crab words,
+    // land 6) = 159, the spec's § 6.2 count.
+    expect(BAKED_PATH_LINES).toHaveLength(159)
+    expect(new Set(BAKED_PATH_LINES.map((l) => l.text)).size).toBe(158)
   })
 
   it('has a bundled MP3 for every baked line', () => {

@@ -94,7 +94,8 @@ describe('native asset registry', () => {
   })
 
   it("has the map's bake: a locked copy of every step's sticker, and nothing else", () => {
-    // Derived from the trees, so a new step needs no edit here.
+    // Every step of both trees, from the tree data (the count grows with
+    // each content wave).
     const steps = LANDS.flatMap((land) => land.nodes)
     expect(steps).toEqual([...MATH_TREE, ...LITERACY_TREE])
     for (const node of steps) {

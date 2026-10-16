@@ -37,15 +37,15 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'session-review': 1,
       'session-warmup': 1,
       'session-knew': 1,
-      'session-peek-open': 24,
-      'session-peek-close': 24,
-      'session-intro': 2,
+      'session-peek-open': 25,
+      'session-peek-close': 25,
+      'session-intro': 3,
       'session-hiding': 1,
     })
-    expect(GUIDANCE_LINES).toHaveLength(74)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(74)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(74)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(74)
+    expect(GUIDANCE_LINES).toHaveLength(77)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(77)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(77)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(77)
   })
 
   it('bakes each world and count variant', () => {
@@ -124,6 +124,19 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     }
     // A step with no intro text has no line.
     expect(sessionIntroLine('add-to-10')).toBeUndefined()
+    // Times mix (§ 6.2 rows 1, 2, 7).
+    expect(sessionIntroLine('mult-mix')).toMatchObject({
+      id: 'guide.session.intro.mult-mix',
+      world: 'math',
+      text: "Let's play all the groups!",
+      src: '/assets/audio/path/guide-session-intro-mult-mix.mp3',
+    })
+    expect(peekLines('mult-mix')?.open.text).toBe(
+      "Let's look at all the groups!",
+    )
+    expect(peekLines('mult-mix')?.close.text).toBe(
+      'All the groups are for later. You will learn it!',
+    )
     // Word Song land 6 (§ 6.2 rows 8-9).
     expect(sessionIntroLine('duck-words')).toMatchObject({
       id: 'guide.session.intro.duck-words',
@@ -138,7 +151,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       text: 'Read all the letters!',
       src: '/assets/audio/path/guide-session-intro-crab-words.mp3',
     })
-    // Rendered in Lily with the peek pairs (§ 6.2 rows 3-6, 8-10).
+    // All rendered in Lily (§ 6.2 rows 1-10).
     expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
   })
 
@@ -183,6 +196,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'mult-2-5-10',
       'mult-3-4',
       'mult-6-9',
+      'mult-mix',
       'letter-sounds',
       'cvc-words',
       'cvc-words-short-o',
@@ -227,7 +241,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(74)
+    ).toHaveLength(77)
   })
 
   it('repeats no Emma’s Path line', () => {

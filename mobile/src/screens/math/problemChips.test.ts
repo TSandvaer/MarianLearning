@@ -110,6 +110,9 @@ function chipsBeforeFix(
   node: SkillNode | undefined,
 ): ProblemChips {
   const p = problems[i]
+  if (p.kind === 'missing-addend') {
+    throw new Error('missing-addend problems came after the fix')
+  }
   if (p.kind === 'arithmetic') {
     const max = chipMaxAnswerForCorrects(
       problems.filter((q) => q.kind === 'arithmetic').map((q) => q.correct),
@@ -238,8 +241,12 @@ describe('an 8-problem forward session: chips byte-identical to before the fix',
   it.each(MATH_TREE.map((n) => [n]))('%s canon', (node) => {
     const problems = forwardProblems(node)
     expect(problems).toHaveLength(8)
-    expect(chipsOfEvery(problems, node)).toEqual(
-      problems.map((_, i) => chipsBeforeFix(problems, i, node)),
+    // Missing numbers (content wave 1) have their own chip rule, below.
+    const old = problems.flatMap((p, i) =>
+      p.kind === 'missing-addend' ? [] : [i],
+    )
+    expect(old.map((i) => problemChips(problems, i, node))).toEqual(
+      old.map((i) => chipsBeforeFix(problems, i, node)),
     )
   })
 
@@ -258,4 +265,73 @@ describe('an 8-problem forward session: chips byte-identical to before the fix',
       }
     },
   )
+})
+
+describe('missing numbers (content wave 1 § 1.6)', () => {
+  /** A plan of plain reads with `missing` at the given problems (1-based). */
+  function plan(missing: Record<number, string>): ExtendedMathProblem[] {
+    const reads = Array.from(
+      { length: 8 },
+      (_, i) => missing[i + 1] ?? 'Three plus two. How many?',
+    )
+    return mathSessionPlanFromServer(
+      {
+        id: 'x',
+        label: 'x',
+        utterances: reads.flatMap((read, i) =>
+          ['read', 'correct', 'reprompt', 'hint', 'giveAnswer'].map((slot) => ({
+            id: `math.p${i + 1}.${slot}`,
+            text: slot === 'read' ? read : slot,
+          })),
+        ),
+      },
+      { extendedKinds: true },
+    ).problems as ExtendedMathProblem[]
+  }
+
+  it('P4 7 + ? = 10: the missing part and its off-by-one neighbours, 2 3 4 (AC 11)', () => {
+    const problems = plan({ 4: 'Seven and what make ten?' })
+    const chips = problemChips(problems, 3, 'add-to-10')
+    expect([...chips.values].sort((a, b) => a - b)).toEqual([2, 3, 4])
+    expect(chips.offeredClass).toBe('off-by-one')
+  })
+
+  it('is `buildChipOrder` over the bond (same pickDistractors, LCG and seed)', () => {
+    const problems = plan({
+      4: 'Seven and what make ten?',
+      6: 'Six and what make ten?',
+      8: 'Eight and what make ten?',
+    })
+    for (const i of [3, 5, 7]) {
+      const p = problems[i]
+      if (p.kind !== 'missing-addend') throw new Error('not missing')
+      expect(problemChips(problems, i, 'add-to-10')).toEqual(
+        buildChipOrder(
+          {
+            index: p.index,
+            addendA: p.addendA,
+            addendB: p.correct,
+            correct: p.correct,
+            op: '+',
+            utterances: p.utterances,
+          },
+          10,
+          'add-to-10',
+        ),
+      )
+    }
+  })
+
+  it('add-to-20 9 + ? = 13: the parts stay in the count-on band (3 4 5)', () => {
+    const problems = plan({ 4: 'Nine and what make thirteen?' })
+    const chips = problemChips(problems, 3, 'add-to-20')
+    expect([...chips.values].sort((a, b) => a - b)).toEqual([3, 4, 5])
+  })
+
+  it('on P1–P3 (a review block can land there) the gentle ramp, no offered class', () => {
+    const problems = plan({ 1: 'Nine and what make ten?' })
+    const chips = problemChips(problems, 0, 'add-to-10')
+    expectWellFormed(chips, 1)
+    expect(chips.offeredClass).toBeNull()
+  })
 })

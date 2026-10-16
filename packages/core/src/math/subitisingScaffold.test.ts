@@ -39,6 +39,7 @@ import {
   shouldShowSubitisingSubScaffold,
 } from './subitisingScaffold'
 import type { Progress } from '../progress'
+import type { MissingAddendProblem } from './extendedProblems'
 import type { MathProblem } from './sessionPlans'
 
 // ── Test fixtures ────────────────────────────────────────────────────────
@@ -740,5 +741,25 @@ describe('sub-to-10 vocabulary contract (spec §13.5 drift-guards)', () => {
 
   it('contains NO addition facts (op-isolation drift-guard)', () => {
     expect(SUB_EASY_BAND_FACTS.some((f) => f.op === '+')).toBe(false)
+  })
+})
+
+describe('missing-addend problems (content wave 1 § 1.4, AC 11)', () => {
+  const missing: MissingAddendProblem = {
+    kind: 'missing-addend',
+    index: 4,
+    addendA: 3,
+    total: 5,
+    correct: 2,
+    utterances: {
+      read: 'Three and what make five?',
+      correct: 'Yes! Three and two make five!',
+      reprompt: 'Hmm... try again?',
+      hint: 'Look.',
+      giveAnswer: 'This one is two.',
+    },
+  }
+  it('never shows the scaffold, even in a session with it on', () => {
+    expect(shouldShowSubitisingScaffold('add-to-10', missing, true)).toBe(false)
   })
 })

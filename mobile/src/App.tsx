@@ -395,7 +395,11 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
           snapshot.plan ?? mathDefaults.plan,
           mathSession.sessionFocus,
           snapshot.plan !== null
-            ? { review: snapshot.review, warmupCount: snapshot.warmupCount }
+            ? {
+                review: snapshot.review,
+                warmupCount: snapshot.warmupCount,
+                mix: snapshot.mix,
+              }
             : undefined,
         ),
       )

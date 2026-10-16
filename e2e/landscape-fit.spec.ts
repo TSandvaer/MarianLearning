@@ -56,6 +56,7 @@ const MATH = [
   'mult-2-5-10',
   'mult-3-4',
   'mult-6-9',
+  'mult-mix',
 ] as const
 
 function pastDayISO(daysAgo: number): string {

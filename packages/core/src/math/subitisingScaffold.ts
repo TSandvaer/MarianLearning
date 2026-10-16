@@ -64,6 +64,7 @@
  * encounter window," which is the only signal anyone consumes.
  */
 
+import type { MissingAddendProblem } from './extendedProblems'
 import type { MathProblem } from './sessionPlans'
 import type { LeitnerBox, MathFact, Progress } from '../progress'
 import { shouldShowDotCard, shouldShowSubMinuendCell } from './dotCard'
@@ -264,7 +265,7 @@ export function shouldScaffoldThisSession(
  */
 export function shouldShowSubitisingScaffold(
   focusNode: string,
-  problem: MathProblem,
+  problem: MathProblem | MissingAddendProblem,
   scaffoldActiveThisSession: boolean,
 ): boolean {
   if (focusNode !== SCAFFOLD_FOCUS_NODE) return false

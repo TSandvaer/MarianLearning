@@ -21,16 +21,23 @@ export function wireRef(r: CanonBlockRef): WireCanonBlockRef {
   return { node: r.node, problem: r.problem }
 }
 
-/** The payload fields of a session's plan kind: `review` or `warmup`. */
+/** The payload fields of a session's plan kind: `review`, or `warmup` and
+ *  (a times mix) `mix`. */
 export function planKindFields(
   planKind: SessionPlanKind,
 ): Record<string, unknown> {
   if (planKind.kind === 'review') {
     return { review: { blocks: planKind.blocks.map(wireRef) } }
   }
-  return planKind.warmup.length > 0
-    ? { warmup: { blocks: planKind.warmup.map(wireRef) } }
-    : {}
+  return {
+    ...(planKind.warmup.length > 0
+      ? { warmup: { blocks: planKind.warmup.map(wireRef) } }
+      : {}),
+    // Content wave 1 § 2.4: a times mix names its 8 blocks.
+    ...(planKind.mix !== undefined
+      ? { mix: { blocks: planKind.mix.map(wireRef) } }
+      : {}),
+  }
 }
 
 /**
@@ -42,9 +49,11 @@ export function planModeOf(hints: {
   planKind: SessionPlanKind
 }): string | undefined {
   if (hints.planKind.kind === 'review') return 'review'
-  return hints.planKind.warmup.length > 0
-    ? `${hints.focusMode}+warmup`
-    : hints.focusMode
+  const warm = hints.planKind.warmup.length > 0 ? '+warmup' : ''
+  const mix = hints.planKind.mix !== undefined ? '+mix' : ''
+  return warm === '' && mix === ''
+    ? hints.focusMode
+    : `${hints.focusMode}${warm}${mix}`
 }
 
 /** Is `plan` a review response's plan (`plan.id` starts `review-`)? */

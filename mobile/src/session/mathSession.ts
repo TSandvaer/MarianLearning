@@ -113,6 +113,9 @@ export interface MathProgressHints {
 
 const FORWARD: SessionPlanKind = { kind: 'forward', warmup: [] }
 
+/** The times-mix step (content wave 1 § 2). */
+const MIX_STEP: SkillNode = 'mult-mix'
+
 /** Read the hints from the persisted progress, exactly as the web does. */
 export function readMathProgressHints(): MathProgressHints {
   const progress = loadProgress()
@@ -136,7 +139,11 @@ export function readMathProgressHints(): MathProgressHints {
     now.getTime(),
     localDateKey(now),
     sessionCount,
+    node,
   )
+  // A times mix (content wave 1 § 2.4) sends no Leitner or slow-fact hint:
+  // its blocks already carry the due facts.
+  const mix = planKind.kind === 'forward' && planKind.mix !== undefined
   // The due box without the warm-up's facts, then the multiplication rule
   // (core `leitnerBoxForFocus`: the planner's add-to-10 Leitner directive
   // would plan "Two times three" into an addition session), capped at 3
@@ -147,13 +154,13 @@ export function readMathProgressHints(): MathProgressHints {
     node,
     planKind.kind === 'forward' ? planKind.warmup : [],
   )
-  const slowFacts = buildSlowFactSessionHint(progress)
+  const slowFacts = mix ? [] : buildSlowFactSessionHint(progress)
   return {
     intro: sessionIntroFor(progress, node, planKind),
     focusNode: node,
     focusMode: mode,
     recentSuccessRate: pickRecentSuccessRate(progress, 'math'),
-    leitner: leitner.length > 0 ? leitner : undefined,
+    leitner: !mix && leitner.length > 0 ? leitner : undefined,
     slowFacts: slowFacts.length > 0 ? slowFacts : undefined,
     lifetimeFirstEncounters: progress.lifetimeFirstEncounters ?? [],
     planKind,
@@ -166,6 +173,7 @@ export function readMathProgressHints(): MathProgressHints {
  */
 export function hasCanonBypassingHints(hints: MathProgressHints): boolean {
   if (hints.planKind.kind === 'review') return false
+  if (hints.planKind.mix !== undefined) return false
   return (hints.leitner?.length ?? 0) > 0 || (hints.slowFacts?.length ?? 0) > 0
 }
 
@@ -249,6 +257,9 @@ export interface MathRound {
   problemNodes: readonly (SkillNode | null)[]
   /** The step intro before the scored problem 1 (§ 6.1); `null` = none. */
   intro: IntroGuideLineId | null
+  /** A times-mix session (content wave 1 § 2.4): every scored problem is
+   *  the times-mix step's, whichever canon file its block came from. */
+  mix: boolean
 }
 
 /**
@@ -271,9 +282,14 @@ export function mathRoundFromServer(
       warmupCount: 0,
       problemNodes: hints.planKind.blocks.map((b) => b.node),
       intro: null,
+      mix: false,
     }
   }
+  // A times mix accepts a `mix-` plan (the 8 blocks core picked) and any
+  // other forward plan as-is: an older server serves mult-mix's own canon,
+  // still times mix, the same 8 every day.
   const forward = mathSessionPlanFromServer(serverPlan, { extendedKinds: true })
+  const mix = hints.planKind.mix !== undefined
   const refs = hints.planKind.warmup
   const warmup = mathWarmupFromServer(serverPlan)
     .filter((w) => w.block >= 1 && w.block <= refs.length)
@@ -287,9 +303,10 @@ export function mathRoundFromServer(
     warmupCount: warmup.length,
     problemNodes: [
       ...warmup.map((w) => refs[w.block - 1]!.node),
-      ...forward.problems.map(() => null),
+      ...forward.problems.map(() => (mix ? MIX_STEP : null)),
     ],
     intro: hints.intro ?? null,
+    mix,
   }
 }
 
@@ -346,6 +363,8 @@ export interface MathSessionSnapshot {
   /** The step intro before the scored problem 1 (content wave 1 § 6.1);
    *  `null` without one, and without a server plan. */
   intro: IntroGuideLineId | null
+  /** A times-mix session (only once its plan settled). */
+  mix: boolean
 }
 
 export interface MathSessionFocus {
@@ -394,6 +413,7 @@ const IDLE: MathSessionSnapshot = {
   warmupCount: 0,
   problemNodes: null,
   intro: null,
+  mix: false,
 }
 
 /** Settled without a server plan: the static plan, silent captions. */
@@ -516,6 +536,7 @@ export function createMathSessionController(
             warmupCount: prepared.warmupCount,
             problemNodes: prepared.problemNodes,
             intro: prepared.intro,
+            mix: prepared.mix,
           })
         },
         (err: unknown) => {

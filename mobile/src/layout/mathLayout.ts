@@ -574,6 +574,7 @@ export type MathLayoutKind =
   | 'recognize'
   | 'skip-count'
   | 'multiply'
+  | 'missing-addend'
 
 export interface ExtendedMathLayout extends MathLayout {
   /** The chips' row (Math's) or the right-edge column (Word Song's L). */
@@ -590,7 +591,8 @@ const COLUMN_CHIP_GAP = 16
 /**
  * Math's layout for a plan of `kind` (spec § 6):
  *
- * - arithmetic, number recognition, and every tablet form: `mathLayout`.
+ * - arithmetic, missing numbers, number recognition, and every tablet
+ *   form: `mathLayout`.
  * - Phone portrait, skip / multiply: Math's P frame; the ribbon is capped at
  *   4 lines (they end at 253 pt on the 375×667 floor, above the problem's
  *   top at 259).
@@ -606,7 +608,13 @@ export function extendedMathLayout(
   kind: MathLayoutKind,
 ): ExtendedMathLayout {
   const m = mathLayout(v)
-  if (kind === 'arithmetic' || kind === 'recognize' || m.tablet) {
+  // A missing number keeps Math's arithmetic frames (content wave 1 § 1.1).
+  if (
+    kind === 'arithmetic' ||
+    kind === 'missing-addend' ||
+    kind === 'recognize' ||
+    m.tablet
+  ) {
     return { ...m, chipsAxis: 'row', ribbonLines: undefined }
   }
   if (m.form === 'phone-portrait') {

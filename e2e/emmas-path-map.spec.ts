@@ -42,6 +42,7 @@ const MATH = [
   'mult-2-5-10',
   'mult-3-4',
   'mult-6-9',
+  'mult-mix',
 ] as const
 const WORD = [
   'letter-names',
@@ -304,8 +305,8 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
       'data-node',
       'add-to-10',
     )
-    await expect(page.getByTestId('map-stop')).toHaveCount(11)
-    await expect(page.getByTestId('map-plinth')).toHaveCount(11)
+    await expect(page.getByTestId('map-stop')).toHaveCount(12)
+    await expect(page.getByTestId('map-plinth')).toHaveCount(12)
     await expect(page.getByTestId('map-band')).toHaveCount(4)
     await expect(page.getByTestId('map-gate')).toHaveCount(3)
     await expect(page.getByTestId('map-land-pill')).toHaveCount(4)
@@ -477,10 +478,12 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     await expect(
       stop(page, current).locator('[data-testid="map-bud"][data-open="true"]'),
     ).toHaveCount(2)
-    // Mastered stops carry the bloom badge; locked ones are pale + padlock.
+    // Mastered stops carry the bloom badge; locked ones are pale + padlock
+    // (every stop after the current one: 6 since times mix, content wave 1).
+    const lockedStops = MATH.length - 6
     await expect(page.getByTestId('map-flower-badge')).toHaveCount(5)
-    await expect(page.getByTestId('map-stop-frost')).toHaveCount(5)
-    await expect(page.getByTestId('map-stop-padlock')).toHaveCount(5)
+    await expect(page.getByTestId('map-stop-frost')).toHaveCount(lockedStops)
+    await expect(page.getByTestId('map-stop-padlock')).toHaveCount(lockedStops)
     const frost = await page
       .getByTestId('map-stop-frost')
       .first()
@@ -658,7 +661,7 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     )
     await expect(page.getByTestId('map-emma')).toHaveAttribute(
       'data-node',
-      'mult-6-9',
+      'mult-mix',
     )
     await expect(page.getByTestId('map-emma')).toHaveAttribute(
       'data-pose',
@@ -709,7 +712,7 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     await openMapFromHub(page, 'math')
     await expect(page.getByTestId('map-land-pill')).toHaveCount(4)
     await expect(page.getByTestId('map-land-number')).toHaveCount(0)
-    await expect(page.getByTestId('map-stop')).toHaveCount(11)
+    await expect(page.getByTestId('map-stop')).toHaveCount(12)
     await expect(page.getByTestId('map-gate')).toHaveCount(3)
   })
 })

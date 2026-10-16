@@ -628,10 +628,12 @@
       // (404) is skipped with a console note, so a new step can be listed
       // before its render lands (content wave 1: duck-words, crab-words).
       // Unique canon renders (deduped by audio hash) the committed canon
-      // should produce. 760 before content wave 1; duck-words + crab-words
-      // add their 64 new texts (design/native/content-wave-1.md § 10).
-      // Every PR that adds or re-voices canon updates this number.
-      const EXPECTED_CANON_UNIQUE = 824
+      // should produce. 760 before content wave 1; the Number Garden half
+      // (#576: missing numbers, mult-mix) adds 33 and duck-words +
+      // crab-words add 64 (design/native/content-wave-1.md § 10). Computed
+      // from the committed files, not by hand. Every PR that adds or
+      // re-voices canon updates this number.
+      const EXPECTED_CANON_UNIQUE = 857
       const CANON_FILES = [
         // math/level-1
         ['math', 'add-to-10'],
@@ -639,6 +641,7 @@
         ['math', 'mult-2-5-10'],
         ['math', 'mult-3-4'],
         ['math', 'mult-6-9'],
+        ['math', 'mult-mix'],
         ['math', 'number-recog'],
         ['math', 'skip-counting'],
         ['math', 'sub-to-10'],
@@ -761,6 +764,10 @@
               'path-open-mult-6-9.mp3',
               'Here is your path! You are on big groups.',
             ],
+            [
+              'path-open-mult-mix.mp3',
+              'Here is your path! You are on all the groups.',
+            ],
             ['path-open-done.mp3', 'You did all of it! Look at your flowers!'],
             [
               'path-open-letter-names.mp3',
@@ -838,6 +845,7 @@
             ['path-stop-mult-2-5-10.mp3', 'Groups of two, five and ten.'],
             ['path-stop-mult-3-4.mp3', 'Groups of three and four.'],
             ['path-stop-mult-6-9.mp3', 'Big groups.'],
+            ['path-stop-mult-mix.mp3', 'All the groups.'],
             ['path-stop-letter-names.mp3', 'Letter names.'],
             ['path-stop-letter-sounds.mp3', 'Letter sounds.'],
             ['path-stop-blending-cv.mp3', 'Blending sounds.'],
@@ -912,6 +920,10 @@
             [
               'path-locked-next-mult-6-9.mp3',
               'Big groups! First, groups of three and four. Then this!',
+            ],
+            [
+              'path-locked-next-mult-mix.mp3',
+              'All the groups! First, big groups. Then this!',
             ],
             [
               'path-locked-next-letter-sounds.mp3',
@@ -1009,6 +1021,7 @@
               'Look! A new flower for groups of three and four!',
             ],
             ['end-bud-mult-6-9.mp3', 'Look! A new flower for big groups!'],
+            ['end-bud-mult-mix.mp3', 'Look! A new flower for all the groups!'],
             [
               'end-bud-letter-names.mp3',
               'Look! A new flower for letter names!',
@@ -1095,6 +1108,10 @@
             [
               'end-unlock-mult-6-9.mp3',
               'You learned groups of three and four! Now you can do big groups!',
+            ],
+            [
+              'end-unlock-mult-mix.mp3',
+              'You learned big groups! Now you can do all the groups!',
             ],
             [
               'end-unlock-letter-sounds.mp3',
@@ -1275,6 +1292,10 @@
         ],
         ['guide-session-peek-open-mult-6-9.mp3', "Let's look at big groups!"],
         [
+          'guide-session-peek-open-mult-mix.mp3',
+          "Let's look at all the groups!",
+        ],
+        [
           'guide-session-peek-open-letter-sounds.mp3',
           "Let's look at letter sounds!",
         ],
@@ -1362,6 +1383,10 @@
           'Big groups are for later. You will learn it!',
         ],
         [
+          'guide-session-peek-close-mult-mix.mp3',
+          'All the groups are for later. You will learn it!',
+        ],
+        [
           'guide-session-peek-close-letter-sounds.mp3',
           'Letter sounds are for later. You will learn it!',
         ],
@@ -1419,6 +1444,7 @@
         ],
         ['guide-session-intro-duck-words.mp3', 'Two letters, one sound!'],
         ['guide-session-intro-crab-words.mp3', 'Read all the letters!'],
+        ['guide-session-intro-mult-mix.mp3', "Let's play all the groups!"],
         ['guide-session-hiding.mp3', 'Some flowers are hiding!'],
       ]
 

@@ -1,9 +1,11 @@
 /**
  * Math's inline vector glyphs, drawn exactly as the web's inline SVGs in
  * `src/screens/Math/Math.tsx` (`SparkleGlyph`, `FlowerGlyph`, the back
- * chevron) and `DotCardCell.tsx` / `TenFrameCell.tsx`.
+ * chevron) and `DotCardCell.tsx` / `TenFrameCell.tsx`; plus the native
+ * `BudGlyph` (content wave 1 § 1.4).
  */
 import Svg, { Circle, Path, Rect } from 'react-native-svg'
+import { colors } from '../../theme'
 
 /** Web `SparkleGlyph`: a gold four-point star, 1em square. */
 export function SparkleGlyph({ size }: { size: number }) {
@@ -47,6 +49,40 @@ export function FlowerGlyph({ size }: { size: number }) {
         fill="#FFD966"
         stroke="#E0B800"
         strokeWidth={0.6}
+      />
+    </Svg>
+  )
+}
+
+/**
+ * A flower that hasn't opened (content wave 1 § 1.4): `FlowerGlyph`'s
+ * geometry, white petals with a rose outline, a cream centre with a gold
+ * one. A missing number's hidden part shows as these from hint 3.
+ */
+export function BudGlyph({ size }: { size: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 32 32">
+      {PETAL_ANGLES.map((angle) => {
+        const rad = (angle * Math.PI) / 180
+        return (
+          <Circle
+            key={angle}
+            cx={16 + Math.cos(rad - Math.PI / 2) * 7}
+            cy={16 + Math.sin(rad - Math.PI / 2) * 7}
+            r={6}
+            fill="#FFFFFF"
+            stroke="#F48FB1"
+            strokeWidth={1.2}
+          />
+        )
+      })}
+      <Circle
+        cx={16}
+        cy={16}
+        r={4}
+        fill={colors.myCream}
+        stroke="#E0B800"
+        strokeWidth={0.8}
       />
     </Svg>
   )

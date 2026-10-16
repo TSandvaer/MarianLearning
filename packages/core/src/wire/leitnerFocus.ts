@@ -24,6 +24,8 @@ export const MULTIPLICATION_FOCUS_NODES: readonly string[] = [
   'mult-2-5-10',
   'mult-3-4',
   'mult-6-9',
+  // Content wave 1 § 2.1: times mix rides `*` facts too.
+  'mult-mix',
 ]
 
 /** May a fact with `op` ride on a request for `focusNode`? */

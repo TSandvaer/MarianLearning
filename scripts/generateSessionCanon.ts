@@ -245,6 +245,9 @@ const MATH_FOCUS_NODES: readonly string[] = [
   'mult-2-5-10',
   'mult-3-4',
   'mult-6-9',
+  // Content wave 1: written by scripts/spliceContentWave1Canon.ts, not
+  // baked (the file exists, so the incremental bake skips it).
+  'mult-mix',
 ]
 
 // Word-song first-class content modes — must match the
@@ -337,17 +340,28 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
 ]
 
 /**
- * Combos whose canon is NOT baked by an ordinary incremental run while its
- * file is missing (content wave 1: duck-words, crab-words). Their bake is a
- * deliberate render (Thomas OKs the credit use; the lines are then revoiced
- * in Lily by `revoiceCanonLily.ts` and ear-tested), so an ordinary
- * `yarn canon:generate` may not spend on them by the way. (Before #581 the
- * Vercel `prebuild` ran this script on every preview build and baked them
- * three times.) The render runs `npx tsx scripts/generateSessionCanon.ts
- * --include-pending`. Keep the entries after the file is committed:
- * `--force` must not re-draw a hand-checked Lily canon.
+ * Combos an ordinary run never bakes (content wave 1). An ordinary
+ * `yarn canon:generate` may not spend Haiku credit on them by the way, and
+ * `--force` must not re-draw them. (Before #581 the Vercel `prebuild` ran
+ * this script on every preview build and baked duck-words and crab-words
+ * three times.)
+ *
+ * - add-to-10, add-to-20, mult-mix: written by
+ *   `scripts/spliceContentWave1Canon.ts` (problems kept byte-for-byte from
+ *   main, the § 1.8 / § 2.2 lines), never Haiku-baked; their new lines are
+ *   rendered by `scripts/revoiceCanonLily.ts --unrendered`. A Haiku bake
+ *   would re-draw the kept problems.
+ * - duck-words, crab-words: a deliberate bake (Thomas OKs the credit use),
+ *   held to the spec by `bigWordsCanonCheck.ts`, then the Lily render and
+ *   the ear test. Their committed files are hand-checked.
+ *
+ * The deliberate render runs `npx tsx scripts/generateSessionCanon.ts
+ * --include-pending`; an existing file is still skipped without `--force`.
  */
 export const PENDING_CANON_NODES: ReadonlySet<string> = new Set([
+  'add-to-10',
+  'add-to-20',
+  'mult-mix',
   'duck-words',
   'crab-words',
 ])

@@ -10,7 +10,7 @@
  *   group scale 1 → 1.1 → 1 over 300 ms, 150 ms after the previous one,
  *   so the group ripples in order. Reduce Motion: no scaling.
  */
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Animated, {
   Easing,
@@ -101,6 +101,12 @@ export interface CountingRowProps {
   metrics: CountingMetrics
   visible: boolean
   hintBeat: 'group-a' | 'group-b' | null
+  /**
+   * Drawn in group B's place: a missing number's stone and buds
+   * (`MissingNumber.tsx`, content wave 1 § 1.4). The row keeps the
+   * matching addition's `metrics`, so nothing moves when it changes.
+   */
+  groupB?: ReactNode
 }
 
 export function CountingRow({
@@ -109,6 +115,7 @@ export function CountingRow({
   metrics,
   visible,
   hintBeat,
+  groupB,
 }: CountingRowProps) {
   const reducedMotion = useReducedMotion()
   const opacity = useSharedValue(visible ? 1 : 0)
@@ -145,12 +152,14 @@ export function CountingRow({
           +
         </Text>
       </View>
-      <Group
-        side="b"
-        count={addendB}
-        metrics={metrics}
-        pulsing={hintBeat === 'group-b'}
-      />
+      {groupB ?? (
+        <Group
+          side="b"
+          count={addendB}
+          metrics={metrics}
+          pulsing={hintBeat === 'group-b'}
+        />
+      )}
     </Animated.View>
   )
 }

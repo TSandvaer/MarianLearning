@@ -413,7 +413,7 @@ describe('bootNative', () => {
     expect(currentStepOf(loadProgress()!, 'word-song')).toBe('cvc-words')
   })
 
-  it('every step (11 + 15): qaStep lands the Hub and the session start on it', () => {
+  it('every step (12 + 15): qaStep lands the Hub and the session start on it', () => {
     jest.spyOn(console, 'log').mockImplementation(() => {})
     const landed: string[] = []
     for (const { node, world } of QA_STEPS) {
@@ -432,7 +432,7 @@ describe('bootNative', () => {
       landed.push(node)
     }
     expect(landed).toEqual(QA_STEPS.map((s) => s.node))
-    expect(landed).toHaveLength(26)
+    expect(landed).toHaveLength(27)
   })
 
   it('release safety: without debug 1, a qaStep from either source writes nothing', () => {

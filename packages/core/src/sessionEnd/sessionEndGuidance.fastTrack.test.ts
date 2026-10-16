@@ -90,9 +90,9 @@ describe('AC7 the fast-track Tuesday', () => {
   })
 
   it('a world’s last step: world-done', () => {
-    saveProgress(progressAtStep('mult-6-9'))
-    end('mult-6-9', 12, ALL)
-    const g = end('mult-6-9', 13, ALL)
+    saveProgress(progressAtStep('mult-mix'))
+    end('mult-mix', 12, ALL)
+    const g = end('mult-mix', 13, ALL)
     expect(g.day).toBe('world-done')
     expect(g.bonusSlots).toEqual([2])
     expect(ids(g)).toEqual([

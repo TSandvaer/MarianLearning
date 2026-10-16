@@ -103,6 +103,7 @@ const SCHEMA_FLOOR_NODES: readonly SkillNode[] = [
   'mult-2-5-10',
   'mult-3-4',
   'mult-6-9',
+  'mult-mix',
   // Word Song
   'letter-names',
   'letter-sounds',
@@ -179,6 +180,9 @@ const DEFAULT_SKILL_LEVELS: SkillLevels = {
   'mult-2-5-10': 'intro', // repeated addition concept, no x symbol
   'mult-3-4': 'locked',
   'mult-6-9': 'locked',
+  // Content wave 1 § 2.1: opens when mult-6-9 masters (or on load, when it
+  // is already mastered: the read-path defaulter, § 5.3).
+  'mult-mix': 'locked',
 
   // Word Song — literacy
   'letter-names': 'mastered', // alphabet mastered (minor b/d confusion)
