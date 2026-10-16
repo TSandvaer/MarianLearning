@@ -35,7 +35,7 @@ Marian gets more to learn in both worlds. The adding steps practise number bonds
 | K6  | **Times mix stays within 5 groups (answers up to 36), not Dave's "answers ≤ 90".** The plates picture holds at most 5 plates (`math-skip-counting-multiplication-native.md` § 1). Facts with 6–10 groups need a new picture (§ 9).                                                                                            |
 | K7  | **Spoken names: "all the groups", "duck words", "crab words".** WS-B is "crab words", not "frog words": every stop has a distinct picture, and the frog is already skip counting's stop picture (`design/emmas-path/emmas-path-spec.md` § 5) (§ 5.1).                                                                         |
 | K8  | **Times mix joins land 4 (Groups). Duck and crab words open a new Word Song land 6, "Big words".** A layout run shows the 6th land fits every portrait form (§ 5.2).                                                                                                                                                          |
-| K9  | **Exactly 8 words per Word Song step.** Word Song sessions are always served from canon, the same 8 words every time, so a 9th word would never appear (§ 3.1).                                                                                                                                                               |
+| K9  | **Exactly 8 words per Word Song step.** A new Word Song step is served from canon on every session, the same 8 words every time, so a 9th word would never appear (§ 3.1).                                                                                                                                                    |
 | K10 | **Traps test the new letters.** Duck words use ending twins (lock / log, wing / wig) plus Dave's vowel neighbour (sock / sack). Crab words use Dave's dropped-consonant twin where a picture can carry it (crab / cab, clock / lock, swing / wing) (§ 3.2, § 4.2).                                                            |
 | K11 | **No blend clips for duck and crab words**, as for the digraph steps: the letters pulse silently, and the 2nd wrong plays the hint line (§ 3.4).                                                                                                                                                                              |
 | K12 | **One short lead line before a problem's read** introduces each new thing: each new step's P1, and the first missing-number problem of a round. It reuses the warm-up line's player and timing (§ 6.1).                                                                                                                       |
@@ -254,7 +254,7 @@ export function pickMixBlocks(
 - **Spoken name** "duck words", verb **are** (the pattern of "cat words", "ship words": the step is named after its stop picture). Recap phrase: "reading words".
 - **Map:** the 1st stop of the new land 6, "Big words" (§ 5).
 - **Format:** the `cvc-word` content type as it is: "Read the duck.", a word card with the letter row, three picture chips. The 1500 ms silent beat, the chip gate, the hint, the given answer and the sounds are all today's.
-- **Words: exactly 8**, one per problem (K9). Word Song sessions are served from canon every time (only `add-to-10` ever reaches the live planner), so each step is the same 8 words in the same order, and reviews copy those blocks.
+- **Words: exactly 8**, one per problem (K9). A Word Song step is served from canon on every session. The live planner runs only for the cvc-words graduation session and per-vowel letter sounds (`api/claude.ts`, `bypassCanonAndCache`). So each step is the same 8 words in the same order, and reviews copy those blocks.
 - **Mastery, fast track, pace guard, peek:** the sibling rules. No graduation gate (`WORD_SONG_GRADUATION_GATED_NODES` stays `{ 'cvc-words' }`).
 
 ### 3.2 Word list and distractor matrix (canon order)
@@ -357,3 +357,259 @@ Added to `FORBIDDEN_PAIRS` before the matrix is coded. Thomas's picture review m
 | cab – bus   | vehicles in side view                     |
 
 No trio in § 3.2 or § 4.2 contains a forbidden pair, old or new.
+
+## 5. Map, lands and path art
+
+### 5.1 Placement
+
+| Step         | World         | Land                   | Stop in its land | New path art            |
+| ------------ | ------------- | ---------------------- | ---------------- | ----------------------- |
+| `mult-mix`   | Number Garden | 4, Groups              | 4th of 4         | stop picture            |
+| `duck-words` | Word Song     | **6, Big words (new)** | 1st of 2         | stop picture            |
+| `crab-words` | Word Song     | 6, Big words           | 2nd of 2         | stop picture            |
+| (land 6)     | Word Song     | —                      | —                | land emblem `land-ws-6` |
+
+- `LANDS` (`packages/core/src/progress/lands.ts`): land 4 gets `'mult-mix'` at the end, and a new entry follows land 5: `{ world: 'word-song', number: 6, name: 'Big words', nodes: ['duck-words', 'crab-words'] }`. `lands.test.ts` locks it against the trees.
+- **Why a new land, not land 5 "Sentences":** the land name is spoken ("Land 6: Big words."), and these steps aren't sentences. Dave's next two phonics steps (jump words, cake words) join this land, which then holds 4 stops. "Big words" uses only words she already hears: these words are longer than the 3-letter ones.
+- **Why times mix stays in Groups:** it is the groups' last step, and Dave's next step (sharing) uses the same plates, which would make 5 stops, the most a land has today (Word Song land 3).
+
+### 5.2 Does the map still fit? (layout run)
+
+Measured with core's `layoutMap`, native `mapScreenLayout` and `mapPathScale` on the real models, with a 2-stop 6th land or a 4th Groups stop added (a scratch script, not committed). The clearance is the smallest box-to-box gap between two stops, in pt.
+
+| Device (insets)    | World         | Today: stop / tightest gap between lands | Wave 1: stop / tightest gap between lands |
+| ------------------ | ------------- | ---------------------------------------- | ----------------------------------------- |
+| 375×667            | Word Song     | 40.2 / 40.4                              | 40.2 / 24.8                               |
+| 430×932 (t59 b34)  | Word Song     | 51.9 / 63.3                              | 46.1 / 48.0                               |
+| 820×1180 (t24 b20) | Word Song     | 88 / 67.2                                | 88 / 36.9                                 |
+| 744×1133 (t24 b20) | Word Song     | 79.8 / 68.9                              | 79.8 / 39.9                               |
+| 375×667            | Number Garden | 46.6 / 57.1                              | 46.6 / 57.1                               |
+
+- Worst case shown: current = `simple-sentences`, the last stop of land 5.
+- No stop overlaps another on any portrait form, and every stop keeps a ≥ 44 pt hit area (stops under 44 pt already get `hitSlop`).
+- Within a land, the tightest Number Garden gap goes from 20.4 to 15.9 pt at 375×667.
+- Phone landscape already scrolls; it scrolls further.
+
+### 5.3 A new step opens on load when the step before it is mastered (K13)
+
+**Rule.** In both read-path defaulters (`withDefaultedSkillLevels` in `progress/storage.ts` and its copy in `progress/cloudSync.ts`):
+
+- When a step's key is **missing** from the stored `skillLevels` and its tree predecessor's stored level is `'mastered'`, fill `'intro'` instead of `'locked'`.
+- A key that is already stored is never touched.
+
+**Why:**
+
+- The mastery rule's passes walk `'intro'` and `'practicing'` steps only. A step leaves `'locked'` only when its predecessor masters.
+- A world finished before this build would therefore put Marian on a locked step with no way forward. The Hub and the focus picker both pick the first step that isn't mastered.
+
+**What she sees:**
+
+- The new step is open and not in `unlocksCelebrated`, so the Map plays the existing unlock beat on its next visit:
+  - "You learned big groups! Now you can do all the groups!"
+  - For duck words it is the land beat, "A new land! Land 6: Big words!", with the gate opening.
+- The Hub card shows the new step with an empty tray.
+- A world that was complete isn't any more. Its "You did all of it!" map line stops, and "You grew your whole garden!" moves to the new last step.
+- A doc with no `unlocksCelebrated` list plays nothing (the existing rule in `pathBeats.ts`).
+
+### 5.4 New path art (4 pieces, clay set)
+
+Same pipeline as the 24 stops and 9 emblems: a source PNG → `scripts/build-path-art.ts` → `public/assets/path/<id>-256.webp` and `-512.webp` → `npm run export-assets` in `mobile/` (it writes the `-muted` and `-locked` copies). `PATH_ART_SET` gets the three step ids, and `LandArtId` gets `'land-ws-6'`. `pathArt.test.ts` fails until the files exist. Pictures only: no digits, letters or signs (`emmas-path-spec.md` § 5).
+
+| Id           | Picture                                                                                                                            | Must not look like                                 |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `mult-mix`   | A clay fruit basket holding a pair of cherries, a bunch of three bananas and a bunch of grapes: groups of different sizes together | the octopus (`mult-6-9`), the clovers, the socks   |
+| `duck-words` | A clay white duck with an orange bill, floating on a small blue water ripple                                                       | the yellow chick (`digraphs-ch`): **never yellow** |
+| `crab-words` | A clay coral-red crab with both claws up                                                                                           | —                                                  |
+| `land-ws-6`  | A clay toy train, an engine and two carriages, with no letters or numbers                                                          | the block tower (`land-ws-1`)                      |
+
+Generate them as the clay set was made (Thomas's tool choice), with the matching sibling icon as the style reference. They are not part of the v7 picture pack in § 8.
+
+## 6. Copy / TTS script
+
+### 6.1 Lead lines (one mechanism for K12)
+
+A **lead line** plays before a problem's read, with the stage up. It reuses the warm-up line's player and timing (`review-mode-and-warmup-native.md` § 4: `createManifestLinePlayer('session-guide', …)`, a caption walk at 165 wpm when there is no clip, Emma `listening`, the back button cancels it).
+
+- **Timing:** the lead ends → 400 ms → the read. On a `cvc-word` problem, the 1500 ms silent beat starts when the lead ends and replaces the 400 ms, so the decode-first beat is kept in full.
+- **At most one lead per problem.** Priority: a warm-up heart's "Remember this one?", then a step intro, then the hiding line.
+- **Never in a peek** (a peek has its own opener) and never on a warm-up heart other than its own line.
+
+| Line id                          | Text                         | Before which problem                           | In which rounds                                       |
+| -------------------------------- | ---------------------------- | ---------------------------------------------- | ----------------------------------------------------- |
+| `guide.session.intro.mult-mix`   | "Let's play all the groups!" | scored P1                                      | forward sessions on `mult-mix` until it is mastered   |
+| `guide.session.intro.duck-words` | "Two letters, one sound!"    | scored P1 (with the last two cells lit, § 3.3) | forward sessions on `duck-words` until it is mastered |
+| `guide.session.intro.crab-words` | "Read all the letters!"      | scored P1 (cells lit left to right, § 4.3)     | forward sessions on `crab-words` until it is mastered |
+| `guide.session.hiding`           | "Some flowers are hiding!"   | the first missing-number problem of the round  | forward and review rounds                             |
+
+**Why every session until mastered, not only the first:** the step lasts 2–3 days at most, and a short, predictable line each time is a ritual, not a nag. The line names the step's idea right before she needs it. New kinds in `GUIDANCE_LINES`: `'session-intro'` and `'session-hiding'`.
+
+### 6.2 Every new spoken line (for the Lily render)
+
+132 distinct texts, 3049 characters: one row per distinct text, and a text several slots share is rendered once. Generated from the line lists in this spec and compared against every existing text in `GUIDANCE_LINES`, `PATH_LINES` and `public/canon/*/level-1/*.json` on 2026-10-16 (scratch script, not committed). 42 slots reuse an existing text and its audio, for example "Look at the flowers.", "Seven flowers.", "This one is three.", "How many?", "Yes! Fifteen!" and "Hmm... try again?".
+
+- **Guidance rows** render with `scripts/renderGuidanceLinesLily.ts`.
+- **Path rows** render with `scripts/renderPathLinesLily.ts`. Rows 13, 18 and 23 (`path.locked.next.*`) have not played since #568, but `pathLines.test.ts` requires an MP3 for every baked path line, so they are rendered too. The test's count goes from 141 to 159.
+- **Canon rows** come from the canon bake (`scripts/generateSessionCanon.ts`, then `scripts/revoiceCanonLily.ts`). Unchanged texts keep their bytes.
+
+**New words** (bold = a new core word, italic = a new target word):
+
+| #   | Surface            | Line id                               | Text                                                        | New words                        |
+| --- | ------------------ | ------------------------------------- | ----------------------------------------------------------- | -------------------------------- |
+| 1   | guidance           | `guide.session.peek-open.mult-mix`    | "Let's look at all the groups!"                             | –                                |
+| 2   | guidance           | `guide.session.peek-close.mult-mix`   | "All the groups are for later. You will learn it!"          | –                                |
+| 3   | guidance           | `guide.session.peek-open.duck-words`  | "Let's look at duck words!"                                 | _duck_ (target)                  |
+| 4   | guidance           | `guide.session.peek-close.duck-words` | "Duck words are for later. You will learn it!"              | _duck_ (target)                  |
+| 5   | guidance           | `guide.session.peek-open.crab-words`  | "Let's look at crab words!"                                 | _crab_ (target)                  |
+| 6   | guidance           | `guide.session.peek-close.crab-words` | "Crab words are for later. You will learn it!"              | _crab_ (target)                  |
+| 7   | guidance           | `guide.session.intro.mult-mix`        | "Let's play all the groups!"                                | –                                |
+| 8   | guidance           | `guide.session.intro.duck-words`      | "Two letters, one sound!"                                   | –                                |
+| 9   | guidance           | `guide.session.intro.crab-words`      | "Read all the letters!"                                     | –                                |
+| 10  | guidance           | `guide.session.hiding`                | "Some flowers are hiding!"                                  | **some**, **hiding**             |
+| 11  | path               | `path.open.mult-mix`                  | "Here is your path! You are on all the groups."             | –                                |
+| 12  | path               | `path.stop.mult-mix`                  | "All the groups."                                           | –                                |
+| 13  | path               | `path.locked.next.mult-mix`           | "All the groups! First, big groups. Then this!"             | –                                |
+| 14  | path               | `end.bud.mult-mix`                    | "Look! A new flower for all the groups!"                    | –                                |
+| 15  | path               | `end.unlock.mult-mix`                 | "You learned big groups! Now you can do all the groups!"    | –                                |
+| 16  | path               | `path.open.duck-words`                | "Here is your path! You are on duck words."                 | _duck_ (target)                  |
+| 17  | path               | `path.stop.duck-words`                | "Duck words."                                               | _duck_ (target)                  |
+| 18  | path               | `path.locked.next.duck-words`         | "Duck words! First, reading sentences. Then this!"          | _duck_ (target)                  |
+| 19  | path               | `end.bud.duck-words`                  | "Look! A new flower for duck words!"                        | _duck_ (target)                  |
+| 20  | path               | `end.unlock.duck-words`               | "You learned reading sentences! Now you can do duck words!" | _duck_ (target)                  |
+| 21  | path               | `path.open.crab-words`                | "Here is your path! You are on crab words."                 | _crab_ (target)                  |
+| 22  | path               | `path.stop.crab-words`                | "Crab words."                                               | _crab_ (target)                  |
+| 23  | path               | `path.locked.next.crab-words`         | "Crab words! First, duck words. Then this!"                 | _crab_ (target), _duck_ (target) |
+| 24  | path               | `end.bud.crab-words`                  | "Look! A new flower for crab words!"                        | _crab_ (target)                  |
+| 25  | path               | `end.unlock.crab-words`               | "You learned duck words! Now you can do crab words!"        | _duck_ (target), _crab_ (target) |
+| 26  | path               | `path.land.word-song.6`               | "Land 6: Big words."                                        | –                                |
+| 27  | path               | `end.land.word-song.6`                | "A new land! Land 6: Big words!"                            | –                                |
+| 28  | path               | `end.land.word-song.6.no-number`      | "A new land: Big words!"                                    | –                                |
+| 29  | canon `add-to-10`  | `math.p4.read`                        | "Seven and what make ten?"                                  | **make**                         |
+| 30  | canon `add-to-10`  | `math.p4.correct`                     | "Yes! Seven and three make ten!"                            | **make**                         |
+| 31  | canon `add-to-10`  | `math.p4.hint3`                       | "How many more make ten?"                                   | **make**                         |
+| 32  | canon `add-to-10`  | `math.p6.read`                        | "Six and what make ten?"                                    | **make**                         |
+| 33  | canon `add-to-10`  | `math.p6.correct`                     | "Yes! Six and four make ten!"                               | **make**                         |
+| 34  | canon `add-to-10`  | `math.p8.read`                        | "Eight and what make ten?"                                  | **make**                         |
+| 35  | canon `add-to-10`  | `math.p8.correct`                     | "Yes! Eight and two make ten!"                              | **make**                         |
+| 36  | canon `add-to-20`  | `math.p4.read`                        | "Nine and what make thirteen?"                              | **make**                         |
+| 37  | canon `add-to-20`  | `math.p4.correct`                     | "Yes! Nine and four make thirteen!"                         | **make**                         |
+| 38  | canon `add-to-20`  | `math.p4.hint3`                       | "How many more make thirteen?"                              | **make**                         |
+| 39  | canon `add-to-20`  | `math.p6.read`                        | "Seven and what make twelve?"                               | **make**                         |
+| 40  | canon `add-to-20`  | `math.p6.correct`                     | "Yes! Seven and five make twelve!"                          | **make**                         |
+| 41  | canon `add-to-20`  | `math.p6.hint3`                       | "How many more make twelve?"                                | **make**                         |
+| 42  | canon `add-to-20`  | `math.p8.read`                        | "Six and what make eleven?"                                 | **make**                         |
+| 43  | canon `add-to-20`  | `math.p8.correct`                     | "Yes! Six and five make eleven!"                            | **make**                         |
+| 44  | canon `add-to-20`  | `math.p8.hint3`                       | "How many more make eleven?"                                | **make**                         |
+| 45  | canon `mult-mix`   | `math.p1.read`                        | "Five times three. How many?"                               | –                                |
+| 46  | canon `mult-mix`   | `math.p1.hint2`                       | "Five, then five, then five."                               | –                                |
+| 47  | canon `mult-mix`   | `math.p2.read`                        | "Four times five. How many?"                                | –                                |
+| 48  | canon `mult-mix`   | `math.p2.hint2`                       | "Four, four, four, four, four."                             | –                                |
+| 49  | canon `mult-mix`   | `math.p3.read`                        | "Six times four. How many?"                                 | –                                |
+| 50  | canon `mult-mix`   | `math.p3.hint2`                       | "Six, six, six, six."                                       | –                                |
+| 51  | canon `mult-mix`   | `math.p4.read`                        | "Three times five. How many?"                               | –                                |
+| 52  | canon `mult-mix`   | `math.p4.hint2`                       | "Three, three, three, three, three."                        | –                                |
+| 53  | canon `mult-mix`   | `math.p5.read`                        | "Seven times four. How many?"                               | –                                |
+| 54  | canon `mult-mix`   | `math.p5.correct`                     | "Yes! Twenty-eight!"                                        | –                                |
+| 55  | canon `mult-mix`   | `math.p5.hint2`                       | "Seven, seven, seven, seven."                               | –                                |
+| 56  | canon `mult-mix`   | `math.p5.giveAnswer`                  | "This one is twenty-eight."                                 | –                                |
+| 57  | canon `mult-mix`   | `math.p6.read`                        | "Five times five. How many?"                                | –                                |
+| 58  | canon `mult-mix`   | `math.p6.correct`                     | "Yes! Twenty-five!"                                         | –                                |
+| 59  | canon `mult-mix`   | `math.p6.hint2`                       | "Five, five, five, five, five."                             | –                                |
+| 60  | canon `mult-mix`   | `math.p6.giveAnswer`                  | "This one is twenty-five."                                  | –                                |
+| 61  | canon `mult-mix`   | `math.p7.read`                        | "Eight times four. How many?"                               | –                                |
+| 62  | canon `mult-mix`   | `math.p7.correct`                     | "Yes! Thirty-two!"                                          | –                                |
+| 63  | canon `mult-mix`   | `math.p7.hint2`                       | "Eight, eight, eight, eight."                               | –                                |
+| 64  | canon `mult-mix`   | `math.p7.giveAnswer`                  | "This one is thirty-two."                                   | –                                |
+| 65  | canon `mult-mix`   | `math.p8.read`                        | "Nine times four. How many?"                                | –                                |
+| 66  | canon `mult-mix`   | `math.p8.correct`                     | "Yes! Thirty-six!"                                          | –                                |
+| 67  | canon `mult-mix`   | `math.p8.hint2`                       | "Nine, nine, nine, nine."                                   | –                                |
+| 68  | canon `mult-mix`   | `math.p8.giveAnswer`                  | "This one is thirty-six."                                   | –                                |
+| 69  | canon `duck-words` | `word.p1.read`                        | "Read the duck."                                            | _duck_ (target)                  |
+| 70  | canon `duck-words` | `word.p1.correct`                     | "Yes! That's a duck."                                       | _duck_ (target)                  |
+| 71  | canon `duck-words` | `word.p1.hint`                        | "Let's look. Duck."                                         | _duck_ (target)                  |
+| 72  | canon `duck-words` | `word.p1.giveAnswer`                  | "This one is duck."                                         | _duck_ (target)                  |
+| 73  | canon `duck-words` | `word.p2.read`                        | "Read the rock."                                            | _rock_ (target)                  |
+| 74  | canon `duck-words` | `word.p2.correct`                     | "Yes! That's a rock."                                       | _rock_ (target)                  |
+| 75  | canon `duck-words` | `word.p2.hint`                        | "Let's look. Rock."                                         | _rock_ (target)                  |
+| 76  | canon `duck-words` | `word.p2.giveAnswer`                  | "This one is rock."                                         | _rock_ (target)                  |
+| 77  | canon `duck-words` | `word.p3.read`                        | "Read the ring."                                            | _ring_ (target)                  |
+| 78  | canon `duck-words` | `word.p3.correct`                     | "Yes! That's a ring."                                       | _ring_ (target)                  |
+| 79  | canon `duck-words` | `word.p3.hint`                        | "Let's look. Ring."                                         | _ring_ (target)                  |
+| 80  | canon `duck-words` | `word.p3.giveAnswer`                  | "This one is ring."                                         | _ring_ (target)                  |
+| 81  | canon `duck-words` | `word.p4.read`                        | "Read the sock."                                            | _sock_ (target)                  |
+| 82  | canon `duck-words` | `word.p4.correct`                     | "Yes! That's a sock."                                       | _sock_ (target)                  |
+| 83  | canon `duck-words` | `word.p4.hint`                        | "Let's look. Sock."                                         | _sock_ (target)                  |
+| 84  | canon `duck-words` | `word.p4.giveAnswer`                  | "This one is sock."                                         | _sock_ (target)                  |
+| 85  | canon `duck-words` | `word.p5.read`                        | "Read the wing."                                            | _wing_ (target)                  |
+| 86  | canon `duck-words` | `word.p5.correct`                     | "Yes! That's a wing."                                       | _wing_ (target)                  |
+| 87  | canon `duck-words` | `word.p5.hint`                        | "Let's look. Wing."                                         | _wing_ (target)                  |
+| 88  | canon `duck-words` | `word.p5.giveAnswer`                  | "This one is wing."                                         | _wing_ (target)                  |
+| 89  | canon `duck-words` | `word.p6.read`                        | "Read the king."                                            | _king_ (target)                  |
+| 90  | canon `duck-words` | `word.p6.correct`                     | "Yes! That's a king."                                       | _king_ (target)                  |
+| 91  | canon `duck-words` | `word.p6.hint`                        | "Let's look. King."                                         | _king_ (target)                  |
+| 92  | canon `duck-words` | `word.p6.giveAnswer`                  | "This one is king."                                         | _king_ (target)                  |
+| 93  | canon `duck-words` | `word.p7.read`                        | "Read the lock."                                            | _lock_ (target)                  |
+| 94  | canon `duck-words` | `word.p7.correct`                     | "Yes! That's a lock."                                       | _lock_ (target)                  |
+| 95  | canon `duck-words` | `word.p7.hint`                        | "Let's look. Lock."                                         | _lock_ (target)                  |
+| 96  | canon `duck-words` | `word.p7.giveAnswer`                  | "This one is lock."                                         | _lock_ (target)                  |
+| 97  | canon `duck-words` | `word.p8.read`                        | "Read the sack."                                            | _sack_ (target)                  |
+| 98  | canon `duck-words` | `word.p8.correct`                     | "Yes! That's a sack."                                       | _sack_ (target)                  |
+| 99  | canon `duck-words` | `word.p8.hint`                        | "Let's look. Sack."                                         | _sack_ (target)                  |
+| 100 | canon `duck-words` | `word.p8.giveAnswer`                  | "This one is sack."                                         | _sack_ (target)                  |
+| 101 | canon `crab-words` | `word.p1.read`                        | "Read the flag."                                            | _flag_ (target)                  |
+| 102 | canon `crab-words` | `word.p1.correct`                     | "Yes! That's a flag."                                       | _flag_ (target)                  |
+| 103 | canon `crab-words` | `word.p1.hint`                        | "Let's look. Flag."                                         | _flag_ (target)                  |
+| 104 | canon `crab-words` | `word.p1.giveAnswer`                  | "This one is flag."                                         | _flag_ (target)                  |
+| 105 | canon `crab-words` | `word.p2.read`                        | "Read the drum."                                            | _drum_ (target)                  |
+| 106 | canon `crab-words` | `word.p2.correct`                     | "Yes! That's a drum."                                       | _drum_ (target)                  |
+| 107 | canon `crab-words` | `word.p2.hint`                        | "Let's look. Drum."                                         | _drum_ (target)                  |
+| 108 | canon `crab-words` | `word.p2.giveAnswer`                  | "This one is drum."                                         | _drum_ (target)                  |
+| 109 | canon `crab-words` | `word.p3.read`                        | "Read the brick."                                           | _brick_ (target)                 |
+| 110 | canon `crab-words` | `word.p3.correct`                     | "Yes! That's a brick."                                      | _brick_ (target)                 |
+| 111 | canon `crab-words` | `word.p3.hint`                        | "Let's look. Brick."                                        | _brick_ (target)                 |
+| 112 | canon `crab-words` | `word.p3.giveAnswer`                  | "This one is brick."                                        | _brick_ (target)                 |
+| 113 | canon `crab-words` | `word.p4.read`                        | "Read the crab."                                            | _crab_ (target)                  |
+| 114 | canon `crab-words` | `word.p4.correct`                     | "Yes! That's a crab."                                       | _crab_ (target)                  |
+| 115 | canon `crab-words` | `word.p4.hint`                        | "Let's look. Crab."                                         | _crab_ (target)                  |
+| 116 | canon `crab-words` | `word.p4.giveAnswer`                  | "This one is crab."                                         | _crab_ (target)                  |
+| 117 | canon `crab-words` | `word.p5.read`                        | "Read the swing."                                           | _swing_ (target)                 |
+| 118 | canon `crab-words` | `word.p5.correct`                     | "Yes! That's a swing."                                      | _swing_ (target)                 |
+| 119 | canon `crab-words` | `word.p5.hint`                        | "Let's look. Swing."                                        | _swing_ (target)                 |
+| 120 | canon `crab-words` | `word.p5.giveAnswer`                  | "This one is swing."                                        | _swing_ (target)                 |
+| 121 | canon `crab-words` | `word.p6.read`                        | "Read the plum."                                            | _plum_ (target)                  |
+| 122 | canon `crab-words` | `word.p6.correct`                     | "Yes! That's a plum."                                       | _plum_ (target)                  |
+| 123 | canon `crab-words` | `word.p6.hint`                        | "Let's look. Plum."                                         | _plum_ (target)                  |
+| 124 | canon `crab-words` | `word.p6.giveAnswer`                  | "This one is plum."                                         | _plum_ (target)                  |
+| 125 | canon `crab-words` | `word.p7.read`                        | "Read the clock."                                           | _clock_ (target)                 |
+| 126 | canon `crab-words` | `word.p7.correct`                     | "Yes! That's a clock."                                      | _clock_ (target)                 |
+| 127 | canon `crab-words` | `word.p7.hint`                        | "Let's look. Clock."                                        | _clock_ (target)                 |
+| 128 | canon `crab-words` | `word.p7.giveAnswer`                  | "This one is clock."                                        | _clock_ (target)                 |
+| 129 | canon `crab-words` | `word.p8.read`                        | "Read the frog."                                            | _frog_ (target)                  |
+| 130 | canon `crab-words` | `word.p8.correct`                     | "Yes! That's a frog."                                       | _frog_ (target)                  |
+| 131 | canon `crab-words` | `word.p8.hint`                        | "Let's look. Frog."                                         | _frog_ (target)                  |
+| 132 | canon `crab-words` | `word.p8.giveAnswer`                  | "This one is frog."                                         | _frog_ (target)                  |
+
+### 6.3 Vocabulary check (the ~200-word cap)
+
+- **Today:** a word scan of every line above finds 288 distinct words. 25 are number words, 72 are target words (the "Read / Tap the <word>." words), and 40 are letter names or sound tokens ("mmm", "puh"), which leaves about 159 core words.
+- **This wave adds 3 core words:** **make** (the bond sentence), **some** and **hiding** (the hiding line). All three are everyday words. That brings the count to about 162, still under ~200.
+- **Target words:** the 16 step words. _cab_ is never spoken.
+- **Zero-cost choices, made on purpose:**
+  - "Big words", not "Long words", for the land.
+  - "Let's play all the groups!", not "mixed".
+  - "Two letters, one sound!" and "Read all the letters!", not "end" or "start".
+- Every text is ASCII-7, with no IPA and no sound demonstration inside a sentence (`planner-and-canon.md` § "Tier-specific opener pattern").
+
+## 7. States and edge cases
+
+- **Idle:** as each step's existing screen.
+- **Happy path:** right answer → the celebration of its kind, with no change in timing. Missing numbers add the "?" fill and the bloom (§ 1.5).
+- **Error path:** a wrong tap gets the poof, the shake, Emma's `puzzled-tilt` and "Hmm... try again?". The hint comes at 2 wrongs and the given answer at 3. Never a red X.
+- **First visit to a new step:** the Map's unlock beat (or land beat), then the intro lead before P1 of each session until mastery.
+- **Return user who already finished a world:** § 5.3. **Return user past add-to-20:** missing numbers only through reviews and warm-ups (§ 1.7).
+- **Peek at a new step:** its canon P1–P3, with the per-step opener and closer. No intro lead, and a peek writes nothing (`fast-track-native.md` § 6.5).
+- **Times mix before any `*` fact is boxed:** every strength is 0, so P1–P3 are the 3 smallest products and P4–P8 rotate through the pool by seed. A doc that skipped the times steps (diagnostic baseline or QA) works the same.
+- **Times mix on an old server:** the `mult-mix` canon 8 (§ 2.4).
+- **Hiding line in a review that has no missing-number block:** it doesn't play.
+- **A planner-written add-to-10 session that repeats a bond:** Leitner records the first occurrence only (§ 1.7). The bake lint and the planner's directive should make this impossible in practice.
+- **Rotation, background, Reduce Motion:** as the host screens. Every new animation has its Reduce Motion form in § 1.5, § 3.3 and § 4.3.
+- **Transition in / out:** unchanged per screen. The stage fade, the 250 ms exit and Emma's frame spring are today's.
