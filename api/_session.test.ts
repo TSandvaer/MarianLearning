@@ -1,7 +1,14 @@
 /**
  * @vitest-environment node
  */
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+// The default canon-audio index reads ~39 MB of public/canon; keep these
+// tests hermetic. Each test that needs reuse passes `canonAudio` or sets
+// this map.
+const canonIndex = vi.hoisted(() => new Map<string, string>())
+vi.mock('./_canon.js', () => ({ getCanonAudioIndex: () => canonIndex }))
+
 import {
   extractUtteranceTexts,
   EMMA_VOICE_CONFIG,
@@ -339,5 +346,64 @@ describe('renderSessionAudio canon audio reuse (live-path speed fix)', () => {
     )
     expect(synth).toHaveBeenCalledTimes(1)
     expect(out.utterances).toHaveLength(2)
+  })
+})
+
+describe('renderSessionAudio defaults follow the ElevenLabs-default provider', () => {
+  const saved = process.env.TTS_PROVIDER
+  afterEach(() => {
+    if (saved === undefined) delete process.env.TTS_PROVIDER
+    else process.env.TTS_PROVIDER = saved
+    canonIndex.clear()
+  })
+
+  /** Max synth calls in flight over a 9-line plan, default concurrency. */
+  async function observedConcurrency(): Promise<number> {
+    let inFlight = 0
+    let observedMax = 0
+    const synth = vi.fn(async () => {
+      inFlight += 1
+      observedMax = Math.max(observedMax, inFlight)
+      await new Promise((r) => setTimeout(r, 5))
+      inFlight -= 1
+      return { audio: new Uint8Array([1]) }
+    })
+    const plan = {
+      utterances: Array.from({ length: 9 }, (_, i) => ({
+        id: `u${i}`,
+        text: `line ${i}`,
+      })),
+    }
+    await renderSessionAudio(plan, { synth })
+    return observedMax
+  }
+
+  it('caps at 3 parallel renders (ElevenLabs Starter) when TTS_PROVIDER is unset', async () => {
+    delete process.env.TTS_PROVIDER
+    expect(await observedConcurrency()).toBe(3)
+  })
+
+  it('reuses the canon audio index when TTS_PROVIDER is unset', async () => {
+    delete process.env.TTS_PROVIDER
+    canonIndex.set('Hmm... try again?', 'TElMWQ==')
+    const synth = vi.fn(async () => ({ audio: new Uint8Array([1]) }))
+    const out = await renderSessionAudio(
+      { utterances: [{ id: 'p1.reprompt', text: 'Hmm... try again?' }] },
+      { synth },
+    )
+    expect(synth).not.toHaveBeenCalled()
+    expect(out.utterances.map((u) => u.audio.base64)).toEqual(['TElMWQ=='])
+  })
+
+  it('keeps the Azure defaults (6 parallel, no canon reuse) only for TTS_PROVIDER=azure', async () => {
+    process.env.TTS_PROVIDER = 'azure'
+    expect(await observedConcurrency()).toBe(6)
+    canonIndex.set('Hmm... try again?', 'TElMWQ==')
+    const synth = vi.fn(async () => ({ audio: new Uint8Array([1]) }))
+    await renderSessionAudio(
+      { utterances: [{ id: 'p1.reprompt', text: 'Hmm... try again?' }] },
+      { synth },
+    )
+    expect(synth).toHaveBeenCalledTimes(1)
   })
 })

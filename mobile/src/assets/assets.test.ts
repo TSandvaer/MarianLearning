@@ -117,13 +117,18 @@ describe('native asset registry', () => {
             '/assets/path/$1.webp',
           )
     // The probe pictures are baked from the web's inline SVG
-    // (`src/screens/WordSong/wordPictures.tsx`), not from a file.
+    // (`src/screens/WordSong/wordPictures.tsx`), not from a file, unless a
+    // pack picture (`picture-<key>.svg`) exists for them: then only that one
+    // is exported (export-assets.mjs), so each probe word has exactly one.
     const probes = Object.keys(WEB_ASSET_MODULES).filter((k) =>
       k.startsWith('/native/pictures/'),
     )
-    expect(
-      probes.map((k) => k.slice('/native/pictures/'.length)).sort(),
-    ).toEqual([...NOVEL_PROBE_WORDS].sort())
+    const baked = probes.map((k) => k.slice('/native/pictures/'.length))
+    expect(baked.filter((key) => !NOVEL_PROBE_WORDS.includes(key))).toEqual([])
+    for (const key of NOVEL_PROBE_WORDS) {
+      const packed = `/assets/pictures/picture-${key}.svg` in WEB_ASSET_MODULES
+      expect([key, packed !== baked.includes(key)]).toEqual([key, true])
+    }
     for (const key of Object.keys(WEB_ASSET_MODULES)) {
       if (key.startsWith('/native/pictures/')) continue
       const webPath = key.startsWith('/native/') ? source(key) : key

@@ -149,6 +149,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // Default is one worker per core (17 on this 18-core Mac); each grew to
+    // 3-4 GB and a full run exhausted memory on 2026-10-16.
+    maxWorkers: 4,
     setupFiles: ['./src/test/setup.ts'],
     css: false,
     // Vitest's default include picks up `**/*.spec.ts`. The Playwright e2e

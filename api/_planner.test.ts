@@ -3415,7 +3415,9 @@ describe('generateSessionStartResponse — combined planner + TTS callable (D, 8
       level: 1,
       childName: 'Marian',
       focusNode: 'add-to-10',
-      renderOptions: { synth: fakeSynth },
+      // Empty canon index: this pins the render seam, not canon reuse (the
+      // ElevenLabs default would reuse this line's committed canon audio).
+      renderOptions: { synth: fakeSynth, canonAudio: new Map() },
     })
 
     expect(response.ok).toBe(true)
@@ -3445,7 +3447,7 @@ describe('generateSessionStartResponse — combined planner + TTS callable (D, 8
       childName: 'Marian',
       focusNode: 'add-to-20',
       recentSuccessRate: 0.7,
-      renderOptions: { synth: fakeSynth },
+      renderOptions: { synth: fakeSynth, canonAudio: new Map() },
     })
 
     const args = capture.lastArgs as {

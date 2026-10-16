@@ -12,6 +12,17 @@ branch="$(git rev-parse --abbrev-ref HEAD)"
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || {
   echo "release: local main differs from origin/main — push or pull first"; exit 1; }
 
+# Voice-QA baseline (public/voice-qa-baseline.json). Rule: regenerate it right
+# after each release, from the released SHA. Production then lists exactly
+# what changed since the last release under "New / changed" on voice-qa.html.
+# Report only: regenerating is a commit, and main only changes through PRs, so
+# this never blocks or edits the release.
+released_sha="$(git rev-parse HEAD)"
+vqa_baseline_stale=0
+if ! npx tsx scripts/voiceQaBaseline.ts --check; then
+  vqa_baseline_stale=1
+fi
+
 echo "Releasing $(git log -1 --format='%h %s') to production…"
 # The first production deploy after a while has twice returned "Not authorized"
 # and succeeded on an immediate retry (2026-10-04 and 2026-10-05), so retry once.
@@ -27,3 +38,9 @@ MSG
 fi
 gh workflow run post-deploy-smoke.yml --ref main
 echo "Smoke check dispatched: gh run list --workflow post-deploy-smoke.yml --limit 1"
+
+if [ "$vqa_baseline_stale" = 1 ]; then
+  echo "release: the voice-QA lines listed above are New / changed on production."
+  echo "release: now regenerate the voice-QA baseline from the released SHA, then open a PR:"
+  echo "  git checkout -b chore/voice-qa-baseline ${released_sha} && yarn voice-qa:baseline"
+fi
