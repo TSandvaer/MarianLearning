@@ -192,11 +192,11 @@ describe('adoptDeviceIdAfterRead (native)', () => {
   it.each<ReconcileOutcome>([
     { kind: 'pushed-to-cloud' },
     { kind: 'noop', reason: 'no-cloud-record' },
-    { kind: 'cloud-blob-rejected' },
+    { kind: 'noop', reason: 'equal' },
   ])('installs the ID after a read that succeeded ($kind)', async (outcome) => {
     const { order, deps } = recordingDeps(outcome)
     await adoptDeviceIdAfterRead(UUID, deps)
-    expect(order).toContain(`write:${UUID}`)
+    expect(order).toEqual(['load', `reconcile:${UUID}`, `write:${UUID}`])
   })
 
   it('a failed or aborted read changes nothing: no ID write', async () => {
@@ -209,6 +209,30 @@ describe('adoptDeviceIdAfterRead (native)', () => {
       reason: 'timeout',
     })
     expect(order).toEqual(['load', `reconcile:${UUID}`])
+  })
+
+  // The other device's copy was read but not installed, so this device
+  // still holds its own progress. Adopting the ID would point its next
+  // session-end push at the other device's record and overwrite it.
+  it('a rejected cloud copy keeps this device on its own ID: no ID write', async () => {
+    const { order, deps } = recordingDeps({ kind: 'cloud-blob-rejected' })
+    await expect(adoptDeviceIdAfterRead(UUID, deps)).resolves.toEqual({
+      kind: 'cloud-blob-rejected',
+    })
+    expect(order).toEqual(['load', `reconcile:${UUID}`])
+  })
+
+  it('a reconcile that throws (install failed) rejects with no ID write', async () => {
+    const order: string[] = []
+    const p = adoptDeviceIdAfterRead(UUID, {
+      writeDeviceId: (id) => order.push(`write:${id}`),
+      loadLocal: () => defaultProgress(),
+      reconcile: async () => {
+        throw new Error('quota')
+      },
+    })
+    await expect(p).rejects.toThrow('quota')
+    expect(order).toEqual([])
   })
 })
 
