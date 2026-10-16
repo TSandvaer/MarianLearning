@@ -340,9 +340,10 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
  * Combos whose canon is NOT baked by an ordinary incremental run while its
  * file is missing (content wave 1: duck-words, crab-words). Their bake is a
  * deliberate render (Thomas OKs the credit use; the lines are then revoiced
- * in Lily by `revoiceCanonLily.ts` and ear-tested), so neither a local
- * `yarn canon:generate` nor the Vercel `prebuild` may spend on them by the
- * way. The render runs `npx tsx scripts/generateSessionCanon.ts
+ * in Lily by `revoiceCanonLily.ts` and ear-tested), so an ordinary
+ * `yarn canon:generate` may not spend on them by the way. (Before #581 the
+ * Vercel `prebuild` ran this script on every preview build and baked them
+ * three times.) The render runs `npx tsx scripts/generateSessionCanon.ts
  * --include-pending`. Keep the entries after the file is committed:
  * `--force` must not re-draw a hand-checked Lily canon.
  */

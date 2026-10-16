@@ -21,6 +21,7 @@ import {
   sceneAsset,
 } from './index'
 import { LANDS } from '@marian/core/progress/lands'
+import { LITERACY_TREE, MATH_TREE } from '@marian/core/progress/mastery'
 import { WEB_ASSET_MODULES } from './registry'
 
 const WEB_ASSETS = join(__dirname, '..', '..', '..', 'public', 'assets')
@@ -92,9 +93,10 @@ describe('native asset registry', () => {
     }
   })
 
-  it("has the map's bake: a locked copy of each of the 24 steps' stickers, and nothing else", () => {
+  it("has the map's bake: a locked copy of every step's sticker, and nothing else", () => {
+    // Derived from the trees, so a new step needs no edit here.
     const steps = LANDS.flatMap((land) => land.nodes)
-    expect(steps).toHaveLength(24)
+    expect(steps).toEqual([...MATH_TREE, ...LITERACY_TREE])
     for (const node of steps) {
       expect([node, pathArtLockedAsset(node) !== undefined]).toEqual([
         node,
@@ -104,7 +106,9 @@ describe('native asset registry', () => {
     const locked = Object.keys(WEB_ASSET_MODULES).filter((k) =>
       k.endsWith('-locked.webp'),
     )
-    expect(locked).toHaveLength(24)
+    expect(locked.sort()).toEqual(
+      steps.map((node) => `/native/path/${node}-256-locked.webp`).sort(),
+    )
   })
 
   it('every registry entry is a web asset that still exists', () => {

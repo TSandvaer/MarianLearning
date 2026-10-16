@@ -135,14 +135,15 @@ describe('voice-QA CANON_FILES', () => {
   })
 })
 
-// The Vercel `prebuild` runs the bake on every preview build with the
-// build env's keys. Without this gate, every push of this branch baked the
-// two steps on Vercel (Haiku + TTS credit, Azure voice, never committed).
+// Before #581 the Vercel `prebuild` ran the bake on every preview build with
+// the build env's keys, and three pushes of this branch baked the two steps
+// on Vercel (Haiku + TTS credit, Azure voice, never committed). The gate
+// still keeps an incremental or `--force` run off them.
 describe('the pending-canon gate', () => {
   const combos = activeCombos()
   const none = () => false
 
-  it('an incremental run (the prebuild) never bakes a pending step, even when its file is missing', () => {
+  it('an incremental run never bakes a pending step, even when its file is missing', () => {
     // Both land-6 steps are pending (other steps may join the set too).
     expect(STEPS.filter((n) => PENDING_CANON_NODES.has(n))).toEqual([...STEPS])
     const baked = combosToBakeFor(
