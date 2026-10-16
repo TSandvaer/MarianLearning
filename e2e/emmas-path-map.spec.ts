@@ -475,10 +475,12 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     await expect(
       stop(page, current).locator('[data-testid="map-bud"][data-open="true"]'),
     ).toHaveCount(2)
-    // Mastered stops carry the bloom badge; locked ones are pale + padlock.
+    // Mastered stops carry the bloom badge; locked ones are pale + padlock
+    // (every stop after the current one: 6 since times mix, content wave 1).
+    const lockedStops = MATH.length - 6
     await expect(page.getByTestId('map-flower-badge')).toHaveCount(5)
-    await expect(page.getByTestId('map-stop-frost')).toHaveCount(5)
-    await expect(page.getByTestId('map-stop-padlock')).toHaveCount(5)
+    await expect(page.getByTestId('map-stop-frost')).toHaveCount(lockedStops)
+    await expect(page.getByTestId('map-stop-padlock')).toHaveCount(lockedStops)
     const frost = await page
       .getByTestId('map-stop-frost')
       .first()
