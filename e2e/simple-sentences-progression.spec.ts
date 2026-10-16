@@ -124,6 +124,7 @@
 
 import { test, expect } from '@playwright/test'
 import type { Page, Request } from '@playwright/test'
+import { returnToHubAfterAllDone } from './_helpers/allDoneToHub'
 import { installClaudeMock } from './_helpers/mockClaude'
 import {
   buildSeedProgress,
@@ -181,8 +182,10 @@ function skipOnWebkitHeadless(testInfo: {
 
 /**
  * Drive one complete word-song session: Hub → Word Song → 8 correct chip
- * taps → SessionEnd → CTA → Hub. Content-agnostic — works against the
- * static stub plan (`failNetwork: true`).
+ * taps → SessionEnd → CTA → Hub (through the Map's unlock beat on the
+ * session that masters simple-sentences and opens duck-words, content
+ * wave 1). Content-agnostic — works against the static stub plan
+ * (`failNetwork: true`).
  */
 async function runOneWordSongSession(page: Page): Promise<void> {
   await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
@@ -206,7 +209,7 @@ async function runOneWordSongSession(page: Page): Promise<void> {
   const cta = page.getByTestId('session-end-cta')
   await expect(cta).toBeVisible({ timeout: 12_000 })
   await cta.click()
-  await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
+  await returnToHubAfterAllDone(page)
 }
 
 /**
