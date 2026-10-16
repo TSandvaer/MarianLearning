@@ -217,6 +217,13 @@ describe('orderByTable: the P4–P8 order (§ 2.3 step 3, Kyle 2026-10-16)', () 
     expect(ids(3, 2, 4, 4, 4, 4)).toEqual([1, 0, 2, 3, 4])
     // All the same table: the pick order itself.
     expect(ids(5, 5, 5, 5, 5, 5)).toEqual([0, 1, 2, 3, 4])
+    // Devon's case (PR #576 review): after a 3, picks 3 3 3 3 5. Greedy gave
+    // 5 3 3 3 3; both that and 3 3 3 5 3 have 3 repeats, and the pick-by-pick
+    // tie-break keeps the 3s' picks first.
+    const devon = order(3, 3, 3, 3, 3, 5)
+    expect(devon).toEqual([3, 3, 3, 5, 3])
+    expect(repeats(3, devon)).toBe(3)
+    expect(ids(3, 3, 3, 3, 3, 5)).toEqual([0, 1, 2, 4, 3])
   })
 })
 

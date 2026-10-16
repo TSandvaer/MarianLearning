@@ -5,7 +5,7 @@
  *
  * - Reveal: group B is a "?" stone (skip counting's), centred in the box
  *   the matching addition would give its flowers, so nothing moves later.
- * - Hint 3: the stone fades out (100 ms); bud k fades in and scales
+ * - Hint 3: the stone fades out (100 ms), then bud k fades in and scales
  *   0.6 → 1 (200 ms, ease-out) at 150 × k ms, then the buds ripple once
  *   (the counting row's pulse). Reduce Motion: fades only.
  * - Guided answer (3rd wrong): the buds show if hint 3 didn't play (a
@@ -76,7 +76,8 @@ function Bud({
       opacity.set(withTiming(1, fadeIn))
       return
     }
-    const delay = STAGGER_MS * index
+    // § 1.5: the stone fades out first (100 ms), then the buds.
+    const delay = GAP_OUT_MS + STAGGER_MS * index
     const grow = { duration: BUD_IN_MS, easing: EASE_OUT }
     const half = { duration: PULSE_HALF_MS, easing: EASE_IN_OUT }
     scale.set(0.6)
