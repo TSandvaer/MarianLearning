@@ -143,14 +143,17 @@ describe('the pending-canon gate', () => {
   const none = () => false
 
   it('an incremental run (the prebuild) never bakes a pending step, even when its file is missing', () => {
-    expect([...PENDING_CANON_NODES]).toEqual([...STEPS])
+    // Both land-6 steps are pending (other steps may join the set too).
+    expect(STEPS.filter((n) => PENDING_CANON_NODES.has(n))).toEqual([...STEPS])
     const baked = combosToBakeFor(
       combos,
       { force: false, includePending: false },
       none,
     ).map((c) => c.focusNode)
     expect(baked.filter((n) => PENDING_CANON_NODES.has(n))).toEqual([])
-    expect(baked).toHaveLength(combos.length - 2)
+    expect(baked).toHaveLength(
+      combos.filter((c) => !PENDING_CANON_NODES.has(c.focusNode)).length,
+    )
     // --force does not include them either.
     expect(
       combosToBakeFor(combos, { force: true, includePending: false }, none)
@@ -160,8 +163,9 @@ describe('the pending-canon gate', () => {
   })
 
   it('--include-pending bakes them (the deliberate render), and an existing file is still skipped', () => {
+    // Only the two land-6 files are missing.
     const exists = (c: { focusNode: string }) =>
-      !PENDING_CANON_NODES.has(c.focusNode)
+      !(STEPS as readonly string[]).includes(c.focusNode)
     expect(
       combosToBakeFor(combos, { force: false, includePending: true }, exists)
         .map((c) => c.focusNode)
