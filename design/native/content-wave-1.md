@@ -32,7 +32,7 @@ Marian gets more to learn in both worlds. The adding steps practise number bonds
 | K3  | **The missing flowers hide until hint 3.** At reveal the counting row shows group A and a "?" stone. At hint 3 the missing flowers appear as empty buds, and a right answer makes them bloom. The dot card never shows on these problems (§ 1.4).                                                                             |
 | K4  | **A missing-number problem records the same fact as plain addition** (`7 + ? = 10` is `{a: 7, b: 3, op: '+'}`). It is the same bond, so one Leitner item covers both shapes (§ 1.7).                                                                                                                                          |
 | K5  | **Times mix is composed from canon blocks, not written by the planner.** The live planner's Leitner directive runs for `add-to-10` only, so a canon step can't follow Leitner. Core picks 8 blocks from the four multiplication canon files, weak facts included, and the server copies them, as it does for reviews (§ 2.3). |
-| K6  | **Times mix stays within 5 groups (answers up to 36), not Dave's "answers ≤ 90".** The plates picture holds at most 5 plates (`math-skip-counting-multiplication-native.md` § 1). Facts with 6–10 groups need a new picture (§ 9).                                                                                            |
+| K6  | **Times mix stays within 5 groups (answers up to 36), not Dave's "answers ≤ 90".** The plates picture holds at most 5 plates (`math-skip-counting-multiplication-native.md` § 1). Facts with 6–10 groups need a new picture, which is wave-2 work (§ 2.2, § 12 D2).                                                           |
 | K7  | **Spoken names: "all the groups", "duck words", "crab words".** WS-B is "crab words", not "frog words": every stop has a distinct picture, and the frog is already skip counting's stop picture (`design/emmas-path/emmas-path-spec.md` § 5) (§ 5.1).                                                                         |
 | K8  | **Times mix joins land 4 (Groups). Duck and crab words open a new Word Song land 6, "Big words".** A layout run shows the 6th land fits every portrait form (§ 5.2).                                                                                                                                                          |
 | K9  | **Exactly 8 words per Word Song step.** A new Word Song step is served from canon on every session, the same 8 words every time, so a 9th word would never appear (§ 3.1).                                                                                                                                                    |
@@ -76,7 +76,7 @@ P  portrait (375×667)
 - **No bond twice in one session**, in either shape or order: `{7, 3}` as "Seven plus three", "Three plus seven" or "Seven and what make ten?" counts once.
 - **Who writes it:**
   - The canon re-bake writes both files to these rules (§ 1.8 gives the suggested plans).
-  - The live planner runs only for `add-to-10` with Leitner or slow facts. Its add-to-10 shape block gets the same three rules plus the templates in § 1.3. A due fact may be written in either shape.
+  - Of the two add steps, only `add-to-10` reaches the live planner, when Leitner or slow facts are due (`isLeitnerDirectiveActive`, `isSlowFactDirectiveActive`). Its add-to-10 shape block gets the same three rules plus the templates in § 1.3. A due fact may be written in either shape.
   - add-to-20 is always served from canon.
 
 ### 1.3 Lines per problem
@@ -173,7 +173,7 @@ The frozen web reads plans without `extendedKinds`, so a missing-number read thr
 - **Spoken name** "all the groups", verb **are** ("All the groups are for later. You will learn it!"). `FRIENDLY_NODE_NAMES` (the recap): "counting in groups", as for the other three times steps.
 - **Map:** the 4th stop of land 4, Groups (§ 5).
 - **What a problem is:** an existing multiply problem, unchanged: "Seven times four. How many?", `7 × 4 = ?` above 4 plates of 7 flowers, three chips (`math-skip-counting-multiplication-native.md` § 3–§ 5).
-- **Tags and "+" show from reveal on every problem**, the `mult-6-9` rule. Most mixed problems have groups of 6–9, which she can't see at a glance.
+- **Tags and "+" show from reveal on every problem**, the `mult-6-9` rule. 12 of the 28 pool facts have groups of 6–9, which she can't see at a glance, and one rule for the whole session keeps the picture the same from problem to problem.
 - **Chips:** today's multiply rule (§ 4 of that spec), with the times-mix ceiling **M = 40** for every problem in the session (largest answer 36, so `10 × ceil(37 / 10)`). `MULTIPLICATION_FOCUS_NODES` (`packages/core/src/wire/leitnerFocus.ts`) gains `mult-mix`, so `*` facts may ride its requests.
 - **Mastery, fast track, pace guard, peek:** the sibling steps' rules, unchanged (math preset).
 
@@ -212,7 +212,7 @@ export function pickMixBlocks(
 
 `strength(f)` = the fact's Leitner box (1–5), or 0 when it isn't in `mathFactsLeitner` (never played).
 
-1. **P1–P3, the gentle opening:** the 3 facts with strength ≥ 2 and the highest strength. Ties go to the smaller product, then the key `${a}*${b}` ascending. If fewer than 3 qualify, fill with the smallest-product facts not yet picked. **Why:** the session opens on facts she got right before, the same reasoning as the warm-up's first heart (Thomas, 2026-10-14).
+1. **P1–P3, the gentle opening:** the 3 facts with strength ≥ 2 and the highest strength. Ties go to the smaller product, then the key `${a}*${b}` ascending. If fewer than 3 qualify, fill with the smallest-product facts not yet picked. The three play in product order, smallest first. **Why:** the session opens on facts she got right before, the same reasoning as the warm-up's first heart (Thomas, 2026-10-14).
 2. **P4–P8, the weak facts:**
    1. Due facts first, ranked exactly as `rankedDueFacts` (overdue days, then box, then key), up to `LEITNER_DUE_PER_SESSION_CAP` minus the warm-up's fact count (the shared cap of 3, `review-mode-and-warmup-native.md` § 7.4). Warm-up facts and P1–P3 picks are skipped.
    2. Then the lowest strength first (never-played facts count as 0). Ties are broken by pool index rotated by the seed, `(index + seed) % pool.length` ascending, so sessions vary.
@@ -222,7 +222,7 @@ export function pickMixBlocks(
 
 **Worked example (a made-up box, for illustration):** she has played the three times steps. 4×4, 2×5 and 3×3 sit in box 3, 9×3 and 7×3 are box 1 (due), and the 8 `mult-mix` facts are unplayed.
 
-- P1–P3 = 3×3, 4×4, 2×5 (box 3, smallest products first).
+- P1–P3 = 3×3, 2×5, 4×4 (all box 3, so product order: 9, 10, 16).
 - P4–P8 = 7×3 and 9×3 (due, box 1), then three unplayed facts by rotated pool index, reordered so no two neighbours share A.
 
 ### 2.4 Wire, server, client
@@ -296,7 +296,7 @@ All 8 words are new pictures (none is in `mobile/assets/pictures/`, checked with
 - **SkillNode `crab-words`**, after `duck-words`. Default `'locked'`.
 - **Spoken name** "crab words", verb **are**. Not "frog words": the frog is skip counting's stop picture, and no picture repeats on the path (`emmas-path-spec.md` § 5). The crab is new, and _crab_ has short **a**, her strongest vowel. Recap phrase: "reading words".
 - **Map:** the 2nd stop of land 6 (§ 5).
-- **Format, mastery, fast track, peek:** as duck words (§ 3.1). Start blends only, short vowels only (Dave). Every word is a short vowel in British English too: the voice is British, which is why _sled_ is out (§ 4.2).
+- **Format, mastery, fast track, peek:** as duck words (§ 3.1). Start blends only, short vowels only (Dave). Every word keeps its short vowel in British English too. The voice is British, and that is also why _sled_ is out (§ 4.2).
 
 ### 4.2 Word list and distractor matrix (canon order)
 
@@ -385,7 +385,7 @@ Measured with core's `layoutMap`, native `mapScreenLayout` and `mapPathScale` on
 | 744×1133 (t24 b20) | Word Song     | 79.8 / 68.9                              | 79.8 / 39.9                               |
 | 375×667            | Number Garden | 46.6 / 57.1                              | 46.6 / 57.1                               |
 
-- Worst case shown: current = `simple-sentences`, the last stop of land 5.
+- Worst case shown: current = `simple-sentences`, the last stop of land 5 (Number Garden: `mult-6-9`; every current step gives the same gap there).
 - No stop overlaps another on any portrait form, and every stop keeps a ≥ 44 pt hit area (stops under 44 pt already get `hitSlop`).
 - Within a land, the tightest Number Garden gap goes from 20.4 to 15.9 pt at 375×667.
 - Phone landscape already scrolls; it scrolls further.
@@ -415,12 +415,12 @@ Measured with core's `layoutMap`, native `mapScreenLayout` and `mapPathScale` on
 
 Same pipeline as the 24 stops and 9 emblems: a source PNG → `scripts/build-path-art.ts` → `public/assets/path/<id>-256.webp` and `-512.webp` → `npm run export-assets` in `mobile/` (it writes the `-muted` and `-locked` copies). `PATH_ART_SET` gets the three step ids, and `LandArtId` gets `'land-ws-6'`. `pathArt.test.ts` fails until the files exist. Pictures only: no digits, letters or signs (`emmas-path-spec.md` § 5).
 
-| Id           | Picture                                                                                                                            | Must not look like                                 |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `mult-mix`   | A clay fruit basket holding a pair of cherries, a bunch of three bananas and a bunch of grapes: groups of different sizes together | the octopus (`mult-6-9`), the clovers, the socks   |
-| `duck-words` | A clay white duck with an orange bill, floating on a small blue water ripple                                                       | the yellow chick (`digraphs-ch`): **never yellow** |
-| `crab-words` | A clay coral-red crab with both claws up                                                                                           | —                                                  |
-| `land-ws-6`  | A clay toy train, an engine and two carriages, with no letters or numbers                                                          | the block tower (`land-ws-1`)                      |
+| Id           | Picture                                                                                                                                 | Must not look like                                                                                          |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `mult-mix`   | A clay fruit basket holding a pair of cherries, a bunch of three bananas and a bunch of grapes: groups of different sizes together      | the octopus (`mult-6-9`), the clovers, the socks                                                            |
+| `duck-words` | A clay duck with a soft green head, a brown body and an orange bill, floating on a small blue water ripple (the picture word's colours) | the yellow chick (`digraphs-ch`): **never yellow**; not white, which the white-background cut-out would eat |
+| `crab-words` | A clay coral-red crab with both claws up                                                                                                | —                                                                                                           |
+| `land-ws-6`  | A clay toy train, an engine and two carriages, with no letters or numbers                                                               | the block tower (`land-ws-1`)                                                                               |
 
 Generate them as the clay set was made (Thomas's tool choice), with the matching sibling icon as the style reference. They are not part of the v7 picture pack in § 8.
 
@@ -441,7 +441,7 @@ A **lead line** plays before a problem's read, with the stage up. It reuses the 
 | `guide.session.intro.crab-words` | "Read all the letters!"      | scored P1 (cells lit left to right, § 4.3)     | forward sessions on `crab-words` until it is mastered |
 | `guide.session.hiding`           | "Some flowers are hiding!"   | the first missing-number problem of the round  | forward and review rounds                             |
 
-**Why every session until mastered, not only the first:** the step lasts 2–3 days at most, and a short, predictable line each time is a ritual, not a nag. The line names the step's idea right before she needs it. New kinds in `GUIDANCE_LINES`: `'session-intro'` and `'session-hiding'`.
+**Why every session until mastered, not only the first:** a step usually takes 2–3 days, and a short, predictable line each time is a ritual, not a nag. The line names the step's idea right before she needs it. New kinds in `GUIDANCE_LINES`: `'session-intro'` and `'session-hiding'`.
 
 ### 6.2 Every new spoken line (for the Lily render)
 
@@ -590,7 +590,7 @@ A **lead line** plays before a problem's read, with the stage up. It reuses the 
 
 ### 6.3 Vocabulary check (the ~200-word cap)
 
-- **Today:** a word scan of every line above finds 288 distinct words. 25 are number words, 72 are target words (the "Read / Tap the <word>." words), and 40 are letter names or sound tokens ("mmm", "puh"), which leaves about 159 core words.
+- **Today:** a word scan of every existing line (guidance, path and level-1 canon) finds 288 distinct words. 25 are number words, 72 are target words (the "Read / Tap the <word>." words), and 40 are letter names or sound tokens ("mmm", "puh"). That leaves about 159 core words. The split is rough: a few step words, such as "thumb" and "mat", land in the core count.
 - **This wave adds 3 core words:** **make** (the bond sentence), **some** and **hiding** (the hiding line). All three are everyday words. That brings the count to about 162, still under ~200.
 - **Target words:** the 16 step words. _cab_ is never spoken.
 - **Zero-cost choices, made on purpose:**
@@ -656,10 +656,10 @@ A **lead line** plays before a problem's read, with the stage up. It reuses the 
 ### 8.1 wing
 
 ```
-A flat illustrated cartoon DRAWING of a single bird wing on its own, spread open like a fan, rows of soft white feathers with rose-pink tips, seen from the side, no bird body, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, photorealistic, 3d render, whole bird, angel, quill, smiling wing, shadow, drop shadow, ground shadow
+A flat illustrated cartoon DRAWING of a single bird wing on its own, spread open like a fan, rows of soft dove-grey feathers with rose-pink tips, seen from the side, no bird body, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, photorealistic, 3d render, whole bird, angel, quill, smiling wing, shadow, drop shadow, ground shadow
 ```
 
-**Pass if:** it reads "wing", not "feather" or "leaf", at 96 pt, with layered rows of feathers in a fan and no head or body. **If it fails:** add "a wide open wing with three clear rows of feathers, the joint at the top left". After two failed rounds, tell Matt: wing carries two traps (wig / wing, swing / wing).
+**Pass if:** it reads "wing", not "feather" or "leaf", at 96 pt, with layered rows of feathers in a fan and no head or body. The feathers are grey, not white: white on the cream background doesn't survive remove.bg (the `egg` lesson). **If it fails:** add "a wide open wing with three clear rows of feathers, the joint at the top left". After two failed rounds, tell Matt: wing carries two traps (wig / wing, swing / wing).
 
 ### 8.2 sack
 
@@ -822,3 +822,118 @@ A flat illustrated cartoon DRAWING of a coral-red crab seen from the front, two 
 - **Prediction for the soak (Predict-Before-Soak):** the "Read the <word>." lines sound like the CVC steps. The 5-letter clusters (brick, clock, swing) keep their onsets. The bond lines ("Yes! Seven and three make ten!") run about 2.2–2.8 s and land on "ten", and "Some flowers are hiding!" about 1.5–1.9 s. The intro lines keep their comma pause. **Not predicted:** how Lily says "make" inside "and what make", which the ear test settles.
 - **Code-drawn:** `BudGlyph` and the counting row's "?" stone (§ 1.4).
 - **Reused:** every existing pose, background, SFX, chip, frame and picture. No new Emma pose.
+
+## 11. Acceptance criteria
+
+**Core (vitest):**
+
+1. **Parser:**
+   - "Seven and what make ten?" parses to `{ kind: 'missing-addend', addendA: 7, total: 10, correct: 3 }`, and "Nine and what make thirteen?" to `{ 9, 13, 4 }`.
+   - "Ten and what make ten?" is rejected.
+   - Without `extendedKinds` the line throws, as the skip and multiply reads do.
+2. **Re-baked add-to-10 and add-to-20 canon:**
+   - All 16 read lines parse.
+   - The missing-number problems sit at exactly P4, P6 and P8.
+   - No unordered bond appears twice in a file.
+   - Every add-to-10 whole is ten. Every add-to-20 one has A 6–9 and a missing part of 2–5.
+3. `CANON_MATH_FACTS['add-to-10'][3]` is `{ a: 7, b: 3, op: '+' }` (with the § 1.8 canon), and the drift test passes.
+4. A session-end write for a plan that holds the fact `7+3` twice applies one Leitner outcome for it.
+5. **`pickMixBlocks`:**
+   - It returns 8 refs with 8 distinct facts, all from the 28-fact pool.
+   - With the box of § 2.3's example, P1–P3 are 3×3, 2×5, 4×4 in that order, and P4–P8 include 7×3 and 9×3.
+   - No two neighbours share A when the picks allow it.
+   - The same inputs give the same refs.
+   - The due picks never include a warm-up fact and never exceed 3 minus the warm-up's fact count.
+6. **Lines and lands:**
+   - `LANDS` flattened equals both trees.
+   - `BAKED_PATH_LINES` has 159 entries.
+   - `GUIDANCE_LINES` holds the § 6.1 lines and the 3 new peek pairs with the exact texts of § 6.2.
+   - The `STAGE_SPOKEN_NAMES` values stay unique.
+7. **Loading (§ 5.3), in `loadProgress` and in `installCloudBlob`:**
+   - A blob with no `mult-mix` key and `mult-6-9: 'mastered'` loads with `mult-mix: 'intro'`.
+   - With `mult-6-9: 'practicing'` it loads `'locked'`.
+   - A stored `mult-mix: 'locked'` stays locked.
+   - After such a load, with an `unlocksCelebrated` list that lacks `mult-mix`, the map's pending unlock is `big groups → all the groups`.
+8. **`wordPack`:**
+   - The 16 targets and their pairs match § 3.2 and § 4.2 exactly.
+   - No trio contains a forbidden pair.
+   - `cab` is distractor-only.
+   - Every one of the 17 picture keys resolves through native `pictureAsset`.
+
+**Server (vitest):**
+
+9. **A valid `mix` request (8 refs):**
+   - It returns plan id `mix-math` and ids `math.p1–p8.*`, whose texts and audio equal the canon blocks, plus `mult-mix`'s `session.end.*` lines.
+   - It makes no Anthropic or TTS call and doesn't touch the rate limiter.
+   - With warm-up refs, the `w` blocks are appended.
+10. A `mix` request with 7 refs, a node outside `MIX_SOURCE_STEPS` or `problem: 9` returns 400.
+
+**Native (jest):**
+
+11. **add-to-10 P4:**
+    - It shows `7 + ? = 10`, 7 flowers, the "?" stone, and chips 2, 3, 4.
+    - "Some flowers are hiding!" plays before P4's read, and not before P6's or P8's.
+    - No dot card shows, even in a session with the subitising scaffold on.
+    - Hint 3 shows 3 buds.
+    - A correct tap fills the "?" with 3 and blooms the buds.
+    - The 3rd wrong shows the buds and rings the "?".
+12. **A `mult-mix` session:**
+    - The request carries `mix` and no `leitner`.
+    - A `mix-` plan is accepted, and a plain `mult-mix` canon plan is accepted too.
+    - Tags show from reveal on all 8 problems.
+    - The chips use M = 40.
+    - The payload has 8 non-null `problemFacts` and `skillFocus: ['mult-mix']`.
+13. **Duck words and crab words:**
+    - P1's lead plays with its lit cells (§ 3.3, § 4.3).
+    - The 1500 ms silent beat counts from the lead's end.
+    - No lead plays on P2–P8, in reviews, on warm-up hearts or in peeks.
+    - Every chip is a picture.
+    - The 2nd wrong plays the hint line.
+14. Reduce Motion: no scaling in § 1.5, § 3.3 or § 4.3, only fades. The spotlight still shows.
+
+**Device** (Expo Go, default settings, `EXPO_PUBLIC_QA_STEP`):
+
+15. **Each new step from the QA picker:**
+    - Emma speaks every line, with no silent caption walk once the render has shipped.
+    - Duck and crab words show three pictures on every problem.
+    - Times mix shows plates on every problem.
+16. **Map, 375×667 and 744×1133 portrait:**
+    - Word Song shows 6 lands, and land 6's pill and emblem show.
+    - Groups has 4 stops.
+    - No two stops overlap.
+    - A Map peek at crab words says "Let's look at crab words!" and plays flag, drum and brick.
+17. **Return user:** a QA doc with `mult-6-9` mastered and no `mult-mix` key. After launch:
+    - The Map plays "You learned big groups! Now you can do all the groups!" once.
+    - The Hub shows all the groups with an empty tray.
+    - The same for Word Song with `simple-sentences` mastered, where the land beat says "A new land! Land 6: Big words!".
+18. add-to-10 at the phone floor, both orientations: the "?" stone, the buds and the bloom stay inside the counting row's reserved box. Nothing moves when the buds appear.
+
+## 12. Open questions
+
+**For Thomas (look, voice, feel; one recommendation each):**
+
+- **T1. The new Emma lines.** The 4 lead lines (§ 6.1) and the 3 peek pairs. Team recommendation: approve as written. "Some flowers are hiding!" turns the "?" into a small story (the flowers come out when she finds the number) and costs two everyday words.
+- **T2. The names.** "all the groups", "duck words", "crab words" (not "frog words", whose picture skip counting already has), and land 6 "Big words". Team recommendation: approve.
+- **T3. The 4 clay pictures** (§ 5.4): a fruit basket, a green-headed duck on water, a crab, a toy train. Team recommendation: approve the subjects. The look is judged when they are generated, as for the 33 before them.
+
+**For Dave, via Matt (pedagogy this spec had to fill in; the build can start, and his marks are folded in before the canon bake):**
+
+- **D1.** Missing numbers:
+  - Are 3 of 8, at P4, P6 and P8, the right share?
+  - Should add-to-10 use bonds in both orders (A 1–9)?
+  - Is add-to-20's range right (A 6–9, part 2–5)?
+  - Should the buds stay hidden until hint 3?
+  - Should the chips stay off-by-one only? The alternative is adding the "tapped the whole" trap (10).
+- **D2.** Times mix:
+  - Up to 5 groups (answers ≤ 36) instead of his ≤ 90, with 6×5–9×5 left for wave 2.
+  - Opening on 3 known facts.
+  - Tags shown from reveal.
+- **D3.** Duck word traps: ending twins plus one vowel neighbour, instead of vowel neighbours throughout. _neck_ is dropped.
+- **D4.** Crab words: _swim_, _sled_, _crib_ and _clam_ are dropped, and _flag_, _clock_ and _swing_ added. frog's trap is _dog_, not _fog_.
+- **D5.** The intro lead in every session until mastery, not only the first.
+
+**For Matt:**
+
+- The web consequence in § 1.9.
+- The server needs `yarn release` before the times-mix device check (§ 2.4).
+- The picture pack (17) and the clay pieces (4) gate the Word Song build's device check, not its code. The words can be coded and tested while Thomas generates.
