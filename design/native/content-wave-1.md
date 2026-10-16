@@ -613,3 +613,212 @@ A **lead line** plays before a problem's read, with the stage up. It reuses the 
 - **A planner-written add-to-10 session that repeats a bond:** Leitner records the first occurrence only (§ 1.7). The bake lint and the planner's directive should make this impossible in practice.
 - **Rotation, background, Reduce Motion:** as the host screens. Every new animation has its Reduce Motion form in § 1.5, § 3.3 and § 4.3.
 - **Transition in / out:** unchanged per screen. The stage fade, the 250 ms exit and Emma's frame spring are today's.
+
+## 8. Picture prompt sheet (Midjourney v7)
+
+**17 new pictures:** the 8 duck words, the 8 crab words, and _cab_. None is in `mobile/assets/pictures/` today (checked with `ls` on 2026-10-16: the folder holds 57 WebPs, all short-vowel CVC words). Every gentle and trap partner in § 3.2 and § 4.2 that isn't one of the 17 is already there.
+
+**Style:** the picture-pack style anchor (`design/word-song/picture-pack-style-anchor.md` § 2–§ 3), distilled into the v7 four-pattern template of `design/word-song/picture-pack-iteration-plan.md` § 2–§ 3.
+
+- Lead with the noun, and use the same style tail on every prompt.
+- Each `--no` is tailored to its word (5–7 groups), and every one carries the drop-shadow negation.
+- Set the aspect ratio to 1:1 in the GUI dropdown. Don't use `--cref`, `--sref` or `--ar`.
+- The animals (duck, frog, crab) carry the clean-line clause and the anti-painterly negatives. v7 renders animals painterly without them (the simple-sentences scene pack, 2026-06-14).
+
+**Workflow:**
+
+- One prompt at a time: generate, pick, upscale, remove.bg, save. Only then the next prompt (the standing rule for Thomas's MJ sessions).
+- Save the transparent PNGs to `design/references/picture-pack/transparent-duck-words/` and `transparent-crab-words/` (new per-tier folders, each with a `.gitkeep`). `cab` goes in the crab folder.
+- Then `npm run embed-pictures <folder> public/assets/pictures`, and `npm run export-assets` in `mobile/` bakes the 500 px WebPs.
+
+**Order:** the highest risk first (iteration plan § 4). If one of the first three won't read at 96 pt after two rounds, stop and tell Matt before going on.
+
+| #   | Word  | Step | Main risk                                       |
+| --- | ----- | ---- | ----------------------------------------------- |
+| 1   | wing  | duck | a lone wing reads as a feather or a whole bird  |
+| 2   | sack  | duck | collapses into `bag`                            |
+| 3   | rock  | duck | grey-on-cream contrast; reads as `egg`          |
+| 4   | clock | crab | MJ writes garbled numerals; pedestal-fan shape  |
+| 5   | cab   | crab | reads as `van` / `bus`; "TAXI" text on the sign |
+| 6   | lock  | duck | modern combination lock; bag-like shape         |
+| 7   | swing | crab | MJ adds a child or a whole playground           |
+| 8   | king  | duck | a busy face; must not read as `man` / `dad`     |
+| 9   | brick | crab | brand look; reads as `box`                      |
+| 10  | ring  | duck | the gem takes over (reads as `gem`)             |
+| 11  | drum  | crab | a drum kit; a plain cylinder reads as `can`     |
+| 12  | plum  | crab | reads as `fig`                                  |
+| 13  | sock  | duck | product-photo attractor; a pair instead of one  |
+| 14  | flag  | crab | a national flag; symbols                        |
+| 15  | duck  | duck | yellow duckling (the chick icon); hen-like      |
+| 16  | frog  | crab | painterly; lily-pad scene                       |
+| 17  | crab  | crab | painterly; lobster                              |
+
+### 8.1 wing
+
+```
+A flat illustrated cartoon DRAWING of a single bird wing on its own, spread open like a fan, rows of soft white feathers with rose-pink tips, seen from the side, no bird body, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, photorealistic, 3d render, whole bird, angel, quill, smiling wing, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** it reads "wing", not "feather" or "leaf", at 96 pt, with layered rows of feathers in a fan and no head or body. **If it fails:** add "a wide open wing with three clear rows of feathers, the joint at the top left". After two failed rounds, tell Matt: wing carries two traps (wig / wing, swing / wing).
+
+### 8.2 sack
+
+```
+A flat illustrated cartoon DRAWING of a plump burlap sack tied shut at the top with a rope, rough woven warm-tan cloth, lumpy rounded bottom, no handles, three-quarter view, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, product photography, fabric texture, handbag, shopping bag, handles, smiling sack, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** the tied neck and the lumpy body are clear, with no handles (`bag` has them). **If it fails:** "a farm sack of potatoes, tied with a rope bow, no potatoes visible".
+
+### 8.3 rock
+
+```
+A flat illustrated cartoon DRAWING of a single chunky grey stone rock, irregular shape wider than tall, a few flat facets and one small crack line, cool grey #A9A6A3 with a darker grey shadow side, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, photorealistic, 3d render, pebbles, mountain, moss, smiling rock, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** it is grey (not tan, which reads as `egg`) and angular rather than oval, and stays visible against cream after remove.bg.
+
+### 8.4 clock
+
+```
+A flat illustrated cartoon DRAWING of a round alarm clock with two bells on top and two little feet, rose-pink case, cream face with short tick marks and two hands, no numbers on the face, front view, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, 3d render, numbers, text, digital clock, wristwatch, smiling clock, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** the bells, the hands and the tick marks are there, with **no numerals** (garbled digits count as text), and it doesn't read as a pedestal fan.
+
+### 8.5 cab
+
+```
+A flat illustrated cartoon DRAWING of a small yellow taxi car, soft yellow #F4D89B body, a cream and dark-brown checked stripe along the side, a plain roof light block with no writing, three-quarter front-side view, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, photorealistic, 3d render, text, letters, logo, bus, van, smiling car, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** the roof light and the checks say "taxi" at 96 pt. It is a car, not a van or a bus, with no letters anywhere. **If it fails:** an empty roof sign is acceptable; any visible letters are not.
+
+### 8.6 lock
+
+```
+A flat illustrated cartoon DRAWING of a closed padlock, a rounded warm-brass body with a keyhole in the middle and a curved silver shackle on top, front view, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, product photography, 3d render, key, combination dial, digital lock, smiling padlock, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** the keyhole and the shackle are clear, with no key and no number dial, and the shackle doesn't look like a bag handle.
+
+### 8.7 swing
+
+```
+A flat illustrated cartoon DRAWING of a playground swing, one empty wooden seat hanging on two ropes from a simple wooden A-frame, three-quarter view, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, 3d render, child, person, slide, playground, tree, grass, smiling swing, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** the seat is empty, the whole frame is in view and there is nothing else.
+
+### 8.8 king
+
+```
+A flat illustrated cartoon DRAWING of a friendly cartoon king standing, a big gold crown with small rose-pink gems, a soft red robe with a cream collar, eyes as two small dots, no nose, three-quarter view, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, 3d render, detailed face, big anime eyes, cheek blush, throne, castle, scepter, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** the crown leads the read, the face is the pack's minimal face (`man` and `dad` convention), and it doesn't read as `man` or `dad`.
+
+### 8.9 brick
+
+```
+A flat illustrated cartoon DRAWING of one toy building brick, a rectangular rose-red block with four round studs on top, three-quarter view from above, plain studs with no marks, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, product photography, 3d render, logo, text, wall, many bricks, smiling brick, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** it is one brick, the studs are visible, and the studs carry no logo. It reads as a toy brick, not as `box`.
+
+### 8.10 ring
+
+```
+A flat illustrated cartoon DRAWING of a gold finger ring with one small rose-pink gem on top, the round band clearly visible as a circle, three-quarter view, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, product photography, 3d render, hand, finger, jewellery box, smiling ring, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** the band is the main shape and the gem is small (so it doesn't read as `gem`).
+
+### 8.11 drum
+
+```
+A flat illustrated cartoon DRAWING of a toy drum, a cream top skin, rose-pink sides with a zigzag cord pattern, two drumsticks crossed on top, three-quarter view, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, 3d render, drum kit, cymbals, smiling drum, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** the zigzag cords and the sticks are there (without them it reads as `can` or `tub`), and it is one drum, not a kit.
+
+### 8.12 plum
+
+```
+A flat illustrated cartoon DRAWING of one round plum, deep plum-purple skin with a soft groove down one side, a short brown stem and one green leaf, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, photorealistic, 3d render, fig, grapes, cut fruit, smiling plum, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** it is round with a groove and a leaf, not `fig`'s teardrop.
+
+### 8.13 sock
+
+```
+A flat illustrated cartoon DRAWING of one striped sock, rose-pink and cream stripes, a rounded heel and toe, side view, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, product photography, fabric texture, pair of socks, shoe, foot, smiling sock, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** it is a single sock with a clear heel bend.
+
+### 8.14 flag
+
+```
+A flat illustrated cartoon DRAWING of a small rectangular flag on a thin wooden pole, plain rose-pink cloth waving, no symbols on the cloth, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, 3d render, country flag, stars, stripes, text, symbols, smiling flag, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** the cloth is plain and waving on a pole. No country's flag, and not `net` (no mesh, no hoop).
+
+### 8.15 duck
+
+```
+A flat illustrated cartoon DRAWING of a duck standing in side view, soft green head, warm-brown chest, grey-cream body, orange bill and orange webbed feet, thick clean dark outlines, flat solid color fills, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, simple flat cel-shading, slice-of-life Korean webtoon look, single subject --no photo, photorealistic, 3d render, painterly, fuzzy feathers, duckling, chick, hen, water, smiling duck, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** the bill and the webbed feet are clear. No comb (so not `hen`), and not yellow (the chick stop is yellow). **If it fails:** keep the green head, which marks it as a duck at a glance.
+
+### 8.16 frog
+
+```
+A flat illustrated cartoon DRAWING of a green frog sitting, eyes bulging on top of its head, pale yellow-green tummy, long folded back legs, three-quarter front view, thick clean dark outlines, flat solid color fills, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, simple flat cel-shading, slice-of-life Korean webtoon look, single subject --no photo, photorealistic, 3d render, painterly, lily pad, water, toad, crown, smiling frog with cartoon eyebrows, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** it is a frog alone, with no lily pad, clean lines and soft green.
+
+### 8.17 crab
+
+```
+A flat illustrated cartoon DRAWING of a coral-red crab seen from the front, two big claws held up, six thin legs, eyes on short stalks, thick clean dark outlines, flat solid color fills, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, simple flat cel-shading, slice-of-life Korean webtoon look, single subject --no photo, photorealistic, 3d render, painterly, lobster, sand, beach, smiling crab, shadow, drop shadow, ground shadow
+```
+
+**Pass if:** the claws are up, the colour is soft coral (not saturated red), and there is no sand.
+
+## 9. Wiring checklist (Kevin, Devon)
+
+**Each new SkillNode** (`mult-mix`, `duck-words`, `crab-words`) goes through rows 1–15 of `.claude/docs/sibling-tier-checklist.md`, with first-class content. Plus these surfaces, which that list doesn't name:
+
+- **Names:** `STAGE_SPOKEN_NAMES`, `STAGE_SPOKEN_NAME_VERBS` and `FRIENDLY_NODE_NAMES` (`friendlyNodeName.ts`), and the recap-phrase list in `api/_planner.ts`.
+- **Map and lines:**
+  - `LANDS`. `PATH_LINES` follow it: baked count 141 → 159.
+  - `PATH_ART_SET` and `LandArtId`.
+  - `GUIDANCE_LINES`: the peek pairs follow `pathStepsOf`; add the 4 lines and 2 kinds of § 6.1.
+- **Math:**
+  - The missing-addend kind, its template and its chips (§ 1.6).
+  - `MATH_TRACK_GUIDE`'s add-to-10 and add-to-20 shape blocks.
+  - `mult-mix` in the generic-tier `mult-*` hint templates and in `MULTIPLICATION_FOCUS_NODES`.
+  - `CANON_MATH_FACTS` regenerated (`scripts/generateCanonMathFacts.ts`).
+  - `parseReadOperands` / the extended parser: 8/8 on all three re-baked math files.
+- **Times mix plumbing:** `pickMixBlocks`, `MIX_SOURCE_STEPS`, the `mix` field in `sessionPlanKind`, `MIX_*` in `wire/types.ts`, and the `api/_review.ts` branch (§ 2.3–§ 2.4).
+- **Word Song:**
+  - `wordPack.ts`: 16 targets, `cab` in `DISTRACTOR_ONLY_WORDS`, 16 `TARGET_PAIRINGS` rows and 16 `FORBIDDEN_PAIRS`.
+  - The per-tier lists in `api/_plannerWordList.ts` and the two tier blocks in `WORD_SONG_TRACK_GUIDE`.
+  - In `wordDistractors.test.ts`, give the two tiers the digraph tiers' treatment (`ALL_DIGRAPH_TIER_WORDS`) wherever a CVC-axis test rejects an ending-twin or blend pair.
+- **Loading:** both `withDefaultedSkillLevels` copies (§ 5.3).
+- **Voice QA:** the three new canon stems in `CANON_FILES` (`public/voice-qa.html`), and the new guide and path lines in its lists.
+
+**Unchanged on purpose:** `isLeitnerDirectiveActive` (add-to-10 only), `WORD_SONG_GRADUATION_GATED_NODES`, `CVC_CROSS_VOWEL_NODES`, `FIRST_ENCOUNTER_GATED_NODES`, and the celebration exception list.
+
+## 10. Assets required
+
+- **Pictures:** 17 new (§ 8). Thomas generates them; the integration bakes them.
+- **Path art:** 4 clay pieces (§ 5.4).
+- **Audio:** 132 distinct texts (§ 6.2): 10 guidance, 18 path and 104 canon (add-to-10 7, add-to-20 9, times mix 24, duck words 32, crab words 32). Thomas ear-tests them on `/voice-qa.html` before the native build ships (bar 2).
+- **Prediction for the soak (Predict-Before-Soak):** the "Read the <word>." lines sound like the CVC steps. The 5-letter clusters (brick, clock, swing) keep their onsets. The bond lines ("Yes! Seven and three make ten!") run about 2.2–2.8 s and land on "ten", and "Some flowers are hiding!" about 1.5–1.9 s. The intro lines keep their comma pause. **Not predicted:** how Lily says "make" inside "and what make", which the ear test settles.
+- **Code-drawn:** `BudGlyph` and the counting row's "?" stone (§ 1.4).
+- **Reused:** every existing pose, background, SFX, chip, frame and picture. No new Emma pose.
