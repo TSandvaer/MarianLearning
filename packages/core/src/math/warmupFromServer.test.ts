@@ -75,14 +75,15 @@ describe('mathWarmupFromServer', () => {
     const warmup = mathWarmupFromServer(plan)
     expect(warmup).toHaveLength(2)
     expect(warmup.map((w) => w.block)).toEqual([1, 2])
+    // add-to-10 #4 is a missing number since content wave 1 (§ 1.7: a
+    // warm-up heart can be one).
     expect(warmup[0]!.problem).toMatchObject({
-      kind: 'arithmetic',
-      addendA: 2,
-      addendB: 4,
-      op: '+',
-      correct: 6,
+      kind: 'missing-addend',
+      addendA: 7,
+      total: 10,
+      correct: 3,
     })
-    expect(warmup[0]!.problem.utterances.read).toBe('Two plus four. How many?')
+    expect(warmup[0]!.problem.utterances.read).toBe('Seven and what make ten?')
     expect(warmup[1]!.problem).toMatchObject({ addendA: 3, addendB: 2 })
   })
 

@@ -73,6 +73,10 @@ import {
   WORD_SONG_SIMPLE_SENTENCES_TRAP_FOR_PROMPT,
 } from './_plannerWordList.js'
 import { renderSessionAudio, type RenderSessionOptions } from './_session.js'
+import {
+  MISSING_NUMBER_RANGES,
+  MISSING_NUMBER_SLOTS,
+} from '../packages/core/src/wire/missingNumbers.js'
 import type { SessionStartResponse } from './_types.js'
 
 /** What kind of session we're generating. */
@@ -1588,6 +1592,12 @@ After the per-problem utterances (8 × 7 = 56 for MATH, 8 × 5 = 40 for WORD-SON
 
 Total Session-End utterances: 1 opener + 1 focus-recap + 11 recap + 6 streak + 1 goodbye = 20. The full flat utterances array therefore has 8 × 7 + 20 = 76 entries for the MATH track, or 8 × 5 + 20 = 60 entries for the WORD-SONG track (8 × 6 + 20 = 68 on the cvc-word tier, which carries the optional "blend" slot per problem). Do not invent extra Session-End ids; do not skip any of the listed Session-End ids.`
 
+/** "P4, P6 and P8": the missing-number slots (content wave 1 § 1.2). */
+const MISSING_SLOT_LIST = MISSING_NUMBER_SLOTS.map((n) => `P${n}`)
+  .join(', ')
+  .replace(/, ([^,]*)$/, ' and $1')
+const MISSING_TEN = MISSING_NUMBER_RANGES['add-to-10']
+
 export const MATH_TRACK_GUIDE = `Track: Math.
 
 THREE-HINT SLOT DIRECTIVE (Wave 12 — ticket 86ca8702v) <rule band="hard">applies to EVERY math problem in EVERY tier</rule>: each problem carries THREE escalating hint utterances — hint1, hint2, hint3 — NOT a single "hint". The ids are "math.p<N>.hint1", "math.p<N>.hint2", "math.p<N>.hint3". The three ramp one cognitive sub-step at a time so the after-2-wrong scaffold delivers one beat per audio clip instead of all three in a single burst: hint1 = attention-direction, hint2 = first quantity / cue, hint3 = complete the operation + pose the question. Per-tier hint1/hint2/hint3 wording lives in each tier's PER-PROBLEM SHAPE block below; tiers without a dedicated block use the generic three-step shape at the end of this guide. NEVER emit a single "math.p<N>.hint" id and NEVER collapse the three beats into one utterance. <self-check>For every problem P1-P8, after composing the utterances, CONFIRM exactly three hint ids are present — math.pN.hint1, math.pN.hint2, math.pN.hint3 — and that NO "math.pN.hint" (no numeric suffix) id was emitted. If a single "hint" id is present, or any of hint1/hint2/hint3 is missing, REJECT and re-emit the full triple.</self-check>
@@ -1642,7 +1652,7 @@ The user message names a focus skill node. Generate problems specifically for th
      · The ONLY facts allowed at P1, P2, P3 are: 1+2, 2+1, 1+3, 3+1, 1+4, 4+1, 2+2, 2+3, 3+2.
   3. Problems 4-8 (discriminate): draw from MEDIUM + HARD bands. Recent-score modulation: low score (< 0.5) -> bias toward MEDIUM and avoid HARD-band sums-to-10; high score (>= 0.85) -> push into HARD and ensure a sums-to-10 anchor; mid score -> balanced mix. HARD-band facts (sum 9-10) appear at P5 or later only.
   4. HIGH-LEVERAGE COVERAGE RULE <rule band="hard">: at least one sums-to-10 fact (1+9, 9+1, 2+8, 8+2, 3+7, 7+3, 4+6, 6+4, 5+5) MUST appear somewhere in problems 4-8. This is the highest-leverage category — Marian's April diagnostic flags sums-to-10 automaticity as the top priority; it bridges to add-to-20's make-10 mental model. <self-check>Scan P4, P5, P6, P7, P8. If zero have category=sums-to-10, REJECT and SWAP one P4-P8 fact for a sums-to-10 fact (respecting the sums-to-10 cap of 2 and band-by-slot rules — sums-to-10 facts are HARD band, so they fit P5-P8 only).</self-check>
-  5. NO duplicate (a, b) ordered pairs within the 8-problem set. "2+3" and "3+2" are NOT duplicates — they are distinct ordered pairs.
+  5. NO bond twice in one session, in either shape or order (see NO BOND TWICE under MISSING-NUMBER PROBLEMS below): "2+3" and "3+2" are the same bond, so at most one of them.
   6. DOUBLES-CAP SELF-CHECK <rule band="hard">re-statement of CATEGORY-MIX BUDGET above</rule>: AT MOST TWO problems across the 8-problem session may carry the doubles category (drawn from {2+2, 3+3, 4+4}). CATEGORY-CARVE-OUT — 5+5 is sums-to-10 by priority, NOT doubles; do NOT count 5+5 toward the doubles cap. Before emitting a third doubles fact, REJECT it. NEGATIVE ANCHOR: it is FORBIDDEN to place 2+2 AND 3+3 AND 4+4 in the same session (the full doubles trifecta — known failure mode per PR #266 attempts 1-2, both bakes shipped all three before composition-lint caught them). <self-check>After placing all 8 facts, count {2+2, 3+3, 4+4} occurrences. If > 2, REJECT and SWAP the surplus for a sums-to-10 or near-doubles fact at the same slot.</self-check>
   7. SUMS-TO-10-CAP SELF-CHECK <rule band="hard">re-statement</rule>: AT MOST TWO problems across the 8-problem session may carry the sums-to-10 category (drawn from {1+9, 9+1, 2+8, 8+2, 3+7, 7+3, 4+6, 6+4, 5+5}). Before emitting a third sums-to-10 fact, REJECT it. This cap interacts with the HIGH-LEVERAGE COVERAGE RULE above: place EXACTLY 1 or 2 sums-to-10 facts in P5-P8; never 0 (violates coverage rule), never 3+ (violates this cap).
   8. PLUS-ONE-CAP SELF-CHECK <rule band="hard">re-statement</rule>: AT MOST TWO problems across the 8-problem session may carry the plus-one category. The plus-one pool is the LARGEST (14 facts: 1+2, 2+1, 1+3, 3+1, 1+4, 4+1, 1+5, 5+1, 1+6, 6+1, 1+7, 7+1, 1+8, 8+1) so Haiku's attention drifts there when other caps bind — this cap is load-bearing against plus-one-saturation. Before emitting a third plus-one fact, REJECT it.
@@ -1663,6 +1673,18 @@ The user message names a focus skill node. Generate problems specifically for th
   - giveAnswer: "This one is <answer>." e.g. "This one is eight."
 
   PROSODY: numbers are spelled out as words ("one", "two", ... "ten"). Capitalize the first word of each sentence. The "plus" template renders cleanly on en-GB-OliviaNeural rate -10%; no SSML overrides required for any value in [1, 10].
+
+  MISSING-NUMBER PROBLEMS (content wave 1, design/native/content-wave-1.md § 1.2-1.3) <rule band="hard">OVERRIDES the rules above for problems ${MISSING_SLOT_LIST}</rule>: problems ${MISSING_SLOT_LIST} are MISSING-NUMBER problems. Emma names one part and the whole; the child finds the other part. The whole is ALWAYS ${MISSING_TEN.totalMin} (bonds to ten); the given part is ${MISSING_TEN.givenMin}-${MISSING_TEN.givenMax}. The other five problems are PLAIN additions: the FACT POOL, the CATEGORY-MIX BUDGET, BAND-BY-SLOT, the SESSION COMPOSITION RULES and the WORKED EXAMPLE above govern those five only, and a missing-number bond to ten counts toward the HIGH-LEVERAGE COVERAGE RULE. A due Leitner fact may be written in either shape (e.g. 7+3 as "Seven and what make ten?" at a missing-number slot).
+  NO BOND TWICE <rule band="hard">: no bond may appear twice in one session, in either shape or order. {7, 3} as "Seven plus three", "Three plus seven" or "Seven and what make ten?" counts once. <self-check>List the 8 bonds as unordered pairs (a missing number's bond is its given part and its missing part). If any pair appears twice, REJECT and re-pick that problem.</self-check>
+  PER-PROBLEM SHAPE for a missing-number problem (the whole T, the given part A, the missing part B = T - A; op: "+" on the wire):
+  - read: "<A> and what make <T>?" e.g. "Seven and what make ten?"
+  - correct: "Yes! <A> and <B> make <T>!" e.g. "Yes! Seven and three make ten!" (the whole bond, not just the answer)
+  - reprompt: "Hmm... try again?" (verbatim)
+  - hint1: "Look at the flowers." (verbatim)
+  - hint2: "<A> flowers." e.g. "Seven flowers." (singular "One flower." when A is 1)
+  - hint3: "How many more make <T>?" e.g. "How many more make ten?"
+  - giveAnswer: "This one is <B>." e.g. "This one is three."
+  WORKED EXAMPLE with missing numbers: P1 "One plus two. How many?", P2 "Two plus two. How many?", P3 "Three plus two. How many?", P4 "Seven and what make ten?", P5 "Four plus four. How many?", P6 "Six and what make ten?", P7 "Four plus five. How many?", P8 "Eight and what make ten?". Eight different bonds.
 - add-to-20: addition with sums STRICTLY in [11, 20] and BOTH addends in [1, 9]. NO TEN-PLUS-SINGLE (10+n, n+10 FORBIDDEN — that's two-digit-addsub territory); NO sums <= 10 (that's add-to-10's territory). read: "<addend-A> plus <addend-B>. How many?" e.g. "Eight plus five. How many?"
 
   SUM-RANGE SELF-CHECK (apply before emitting every problem): for chosen (addendA a, addendB b), COMPUTE a + b and CONFIRM that 11 <= a + b <= 18. (V1 pool excludes 19 and 20 — see addend range below.) If the sum is < 11, the problem belongs in add-to-10 and is FORBIDDEN here; if > 18, the (a, b) pair is OUT of the v1 pool. Worked example: 8+3=11 is OK (11 in range). 5+5=10 is FORBIDDEN (sum < 11). 9+10=19 is FORBIDDEN (addend = 10 violates next check).

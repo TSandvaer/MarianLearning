@@ -60,9 +60,9 @@ function expectAnswerLinesName(
   expect(giveAnswer && num(giveAnswer[1]!)).toBe(correct)
 }
 
+/** The math canon whose 8 problems are all plain arithmetic (add-to-10 and
+ *  add-to-20 carry missing numbers since content wave 1). */
 const ARITHMETIC_CANON = [
-  'add-to-10',
-  'add-to-20',
   'sub-to-10',
   'sub-to-20',
   'two-digit-addsub',
@@ -613,4 +613,102 @@ describe('missing-addend (content wave 1 § 1.6, AC 1)', () => {
       PlanFromServerError,
     )
   })
+})
+
+describe('the re-baked add-to-10 and add-to-20 canon (content wave 1 § 1.2, § 1.8, AC 2)', () => {
+  const wordOf = (n: number) =>
+    Object.entries({
+      one: 1,
+      two: 2,
+      three: 3,
+      four: 4,
+      five: 5,
+      six: 6,
+      seven: 7,
+      eight: 8,
+      nine: 9,
+      ten: 10,
+      eleven: 11,
+      twelve: 12,
+      thirteen: 13,
+      fourteen: 14,
+    }).find(([, v]) => v === n)![0]
+
+  it.each(['add-to-10', 'add-to-20'])(
+    '%s: 8/8 reads parse; missing numbers at exactly P4, P6, P8; no bond twice',
+    (node) => {
+      const plan = mathSessionPlanFromServer(canonPlan(node), {
+        extendedKinds: true,
+      })
+      expect(plan.problems).toHaveLength(8)
+      expect(
+        plan.problems.flatMap((p) =>
+          isMissingAddendProblem(p) ? [p.index] : [],
+        ),
+      ).toEqual([4, 6, 8])
+      expect(
+        plan.problems
+          .filter((p) => !isMissingAddendProblem(p))
+          .every((p) => p.kind === 'arithmetic' && p.op === '+'),
+      ).toBe(true)
+      const bonds = plan.problems.map((p) => {
+        const f = problemFact(p)!
+        return [f.a, f.b].sort((x, y) => x - y).join('+')
+      })
+      expect(new Set(bonds).size).toBe(8)
+      // The web (no extended kinds) falls back on these files (§ 1.9).
+      expect(() => mathSessionPlanFromServer(canonPlan(node))).toThrow(
+        PlanFromServerError,
+      )
+    },
+  )
+
+  it('add-to-10: every whole is ten', () => {
+    const plan = mathSessionPlanFromServer(canonPlan('add-to-10'), {
+      extendedKinds: true,
+    })
+    const missing = plan.problems.filter(isMissingAddendProblem)
+    expect(missing.map((p) => [p.addendA, p.total, p.correct])).toEqual([
+      [7, 10, 3],
+      [6, 10, 4],
+      [8, 10, 2],
+    ])
+  })
+
+  it('add-to-20: A is 6–9 and the missing part 2–5 (every problem crosses ten)', () => {
+    const plan = mathSessionPlanFromServer(canonPlan('add-to-20'), {
+      extendedKinds: true,
+    })
+    for (const p of plan.problems.filter(isMissingAddendProblem)) {
+      expect(p.addendA).toBeGreaterThanOrEqual(6)
+      expect(p.addendA).toBeLessThanOrEqual(9)
+      expect(p.correct).toBeGreaterThanOrEqual(2)
+      expect(p.correct).toBeLessThanOrEqual(5)
+      expect(p.total).toBeGreaterThan(10)
+    }
+  })
+
+  it.each(['add-to-10', 'add-to-20'])(
+    '%s: the missing numbers speak the § 1.3 lines',
+    (node) => {
+      const plan = mathSessionPlanFromServer(canonPlan(node), {
+        extendedKinds: true,
+      })
+      for (const p of plan.problems.filter(isMissingAddendProblem)) {
+        const a = wordOf(p.addendA)
+        const A = a.charAt(0).toUpperCase() + a.slice(1)
+        const b = wordOf(p.correct)
+        const t = wordOf(p.total)
+        expect(p.utterances).toMatchObject({
+          read: `${A} and what make ${t}?`,
+          correct: `Yes! ${A} and ${b} make ${t}!`,
+          reprompt: 'Hmm... try again?',
+          hint1: 'Look at the flowers.',
+          hint2: `${A} flowers.`,
+          hint3: `How many more make ${t}?`,
+          giveAnswer: `This one is ${b}.`,
+        })
+      }
+    },
+  )
 })

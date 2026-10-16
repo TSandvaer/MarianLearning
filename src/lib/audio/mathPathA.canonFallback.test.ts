@@ -37,7 +37,11 @@ function deps(node: string) {
 }
 
 describe('prepareMathPathA — steps 1 and 8–11 canon still fall back on the web', () => {
+  // Content wave 1 § 1.9: add-to-10 and add-to-20 now carry missing-number
+  // problems (P4), which the frozen web does not read either.
   it.each([
+    ['add-to-10', 'Seven and what make ten?'],
+    ['add-to-20', 'Nine and what make thirteen?'],
     ['number-recog', 'Tap the one.'],
     ['skip-counting', 'Two, four, six, eight. What is next?'],
     ['mult-2-5-10', 'Two times two. How many?'],
@@ -61,7 +65,7 @@ describe('prepareMathPathA — steps 1 and 8–11 canon still fall back on the w
   )
 
   it('control: an arithmetic canon file still rehydrates, with no kind tag', async () => {
-    const d = deps('add-to-10')
+    const d = deps('sub-to-10')
     const prepared = await prepareMathPathA(ARGS, d)
     expect(prepared.plan.problems).toHaveLength(8)
     expect(prepared.plan.problems.every((p) => !('kind' in p))).toBe(true)
