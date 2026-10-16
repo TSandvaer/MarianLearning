@@ -12,6 +12,16 @@ branch="$(git rev-parse --abbrev-ref HEAD)"
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || {
   echo "release: local main differs from origin/main — push or pull first"; exit 1; }
 
+# Voice-QA baseline (public/voice-qa-baseline.json) staleness. Report only:
+# regenerating it is a commit, and main only changes through PRs, so this
+# never blocks or edits the release. Stale = audio merged since the baseline;
+# those lines show under "New / changed" on voice-qa.html until it is
+# regenerated (yarn voice-qa:baseline on a branch off main, then a PR).
+if ! npx tsx scripts/voiceQaBaseline.ts --check; then
+  echo "release: note — regenerate the voice-QA baseline after this release:"
+  echo "  git checkout -b chore/voice-qa-baseline origin/main && yarn voice-qa:baseline"
+fi
+
 echo "Releasing $(git log -1 --format='%h %s') to production…"
 # The first production deploy after a while has twice returned "Not authorized"
 # and succeeded on an immediate retry (2026-10-04 and 2026-10-05), so retry once.

@@ -44,7 +44,13 @@
 import { test, expect } from '@playwright/test'
 import type { Page, Request } from '@playwright/test'
 
-const PAGE_URL = '/voice-qa.html'
+// `?filter=all` pins the opening filter. Without it the page opens on
+// "New / changed" whenever the branch differs from the committed baseline
+// (public/voice-qa-baseline.json), which would hide the first row these
+// verdict-flow tests click.
+const PAGE_URL = '/voice-qa.html?filter=all'
+const PAGE_URL_DEFAULT = '/voice-qa.html'
+const BASELINE_ROUTE = '**/voice-qa-baseline.json'
 
 const VERDICTS_KEY = 'vqa-verdicts'
 const SECRET_KEY = 'vqa-secret'
@@ -472,5 +478,142 @@ test.describe('Voice-QA page — objective invariants (VQA.3 / 86ca7eraj)', () =
     // positive membership of the one stale row).
     await page.getByTestId('vqa-filter-needs-retest').click()
     await expect(page.getByTestId(`vqa-item-${itemId}`)).toBeVisible()
+  })
+})
+
+/** itemId -> data-audio-hash for every rendered row. */
+async function harvestRowHashes(page: Page): Promise<Record<string, string>> {
+  return page
+    .locator('[data-testid^="vqa-item-"]')
+    .evaluateAll((els) =>
+      Object.fromEntries(
+        els.map((el) => [
+          (el.getAttribute('data-testid') ?? '').replace(/^vqa-item-/, ''),
+          el.getAttribute('data-audio-hash') ?? '',
+        ]),
+      ),
+    )
+}
+
+/** Serve a synthetic baseline instead of the committed one. */
+async function routeBaseline(
+  page: Page,
+  items: Record<string, string> | null,
+): Promise<void> {
+  await page.route(BASELINE_ROUTE, (route) =>
+    items === null
+      ? route.fulfill({ status: 404, body: 'not found' })
+      : route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            generatedAt: '2026-10-16T00:00:00.000Z',
+            sourceSha: '0123456789abcdef0123456789abcdef01234567',
+            itemCount: Object.keys(items).length,
+            items,
+          }),
+        }),
+  )
+}
+
+// The baseline is synthesised from the page's own rendered hashes, so these
+// tests hold on any branch, whatever the committed baseline says.
+test.describe('Voice-QA page — New / changed chip', () => {
+  test('opens on New / changed and lists exactly the new + changed rows', async ({
+    page,
+  }) => {
+    await page.goto(PAGE_URL)
+    await waitForPageReady(page)
+    const rowCount = await page.locator('[data-testid^="vqa-item-"]').count()
+    const hashes = await harvestRowHashes(page)
+    const [newId, changedId] = Object.keys(hashes)
+    expect(newId).toBeTruthy()
+    expect(changedId).toBeTruthy()
+
+    const baselineItems = { ...hashes }
+    delete baselineItems[newId]
+    baselineItems[changedId] = `stale-${hashes[changedId]}`
+    await routeBaseline(page, baselineItems)
+    await page.goto(PAGE_URL_DEFAULT)
+    await waitForPageReady(page)
+
+    await expect(page.getByTestId('vqa-filter-new')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await expect(page.getByTestId('vqa-filter-all')).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    await expect(page.locator('[data-ct="new"]')).toHaveText('2')
+    const visibleRows = page.locator('[data-testid^="vqa-item-"]:visible')
+    await expect(visibleRows).toHaveCount(2)
+    await expect(page.getByTestId(`vqa-item-${newId}`)).toBeVisible()
+    await expect(page.getByTestId(`vqa-item-${changedId}`)).toBeVisible()
+    await expect(page.getByTestId(`vqa-diff-${newId}`)).toHaveText('new')
+    await expect(page.getByTestId(`vqa-diff-${changedId}`)).toHaveText(
+      'changed',
+    )
+    await expect(page.locator('[data-testid^="vqa-diff-"]')).toHaveCount(2)
+
+    // The other chips are untouched: All brings every row back.
+    await page.getByTestId('vqa-filter-all').click()
+    await expect(visibleRows).toHaveCount(rowCount)
+  })
+
+  test('an explicit ?filter= wins over the New / changed default', async ({
+    page,
+  }) => {
+    // Empty baseline: every row is new, so the page would open on the chip.
+    await routeBaseline(page, {})
+    await page.goto('/voice-qa.html?filter=untested')
+    await waitForPageReady(page)
+
+    await expect(page.getByTestId('vqa-filter-untested')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await expect(page.getByTestId('vqa-filter-new')).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    const rowCount = await page.locator('[data-testid^="vqa-item-"]').count()
+    await expect(page.locator('[data-ct="new"]')).toHaveText(String(rowCount))
+  })
+
+  test('counter-test: a baseline matching every row lists nothing and opens on All', async ({
+    page,
+  }) => {
+    await page.goto(PAGE_URL)
+    await waitForPageReady(page)
+    const rowCount = await page.locator('[data-testid^="vqa-item-"]').count()
+    await routeBaseline(page, await harvestRowHashes(page))
+    await page.goto(PAGE_URL_DEFAULT)
+    await waitForPageReady(page)
+
+    await expect(page.locator('[data-ct="new"]')).toHaveText('0')
+    await expect(page.getByTestId('vqa-filter-all')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await expect(
+      page.locator('[data-testid^="vqa-item-"]:visible'),
+    ).toHaveCount(rowCount)
+    await expect(page.locator('[data-testid^="vqa-diff-"]')).toHaveCount(0)
+  })
+
+  test('a missing baseline switches the chip off and leaves the page on All', async ({
+    page,
+  }) => {
+    await routeBaseline(page, null)
+    await page.goto(PAGE_URL_DEFAULT)
+    await waitForPageReady(page)
+
+    await expect(page.getByTestId('vqa-filter-new')).toBeDisabled()
+    await expect(page.locator('[data-ct="new"]')).toHaveText('n/a')
+    await expect(page.getByTestId('vqa-filter-all')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
   })
 })
