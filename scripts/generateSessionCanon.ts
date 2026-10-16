@@ -163,6 +163,8 @@ interface CliArgs {
    *  aborting the bake. Default false (fail-fast). Use during local
    *  prompt-iteration only — CI never sets this. Ticket 86c9qhr9k. */
   lintWarn: boolean
+  /** Bake the `PENDING_CANON_NODES` combos too (the deliberate render). */
+  includePending: boolean
 }
 
 function parseArgs(argv: readonly string[]): CliArgs {
@@ -170,6 +172,7 @@ function parseArgs(argv: readonly string[]): CliArgs {
     force: argv.includes('--force'),
     dryRun: argv.includes('--dry-run'),
     lintWarn: argv.includes('--lint-warn'),
+    includePending: argv.includes('--include-pending'),
     child: 'Marian',
     out: join(REPO_ROOT, 'public', 'canon'),
   }
@@ -320,6 +323,34 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'duck-words',
   'crab-words',
 ]
+
+/**
+ * Combos whose canon is NOT baked by an ordinary incremental run while its
+ * file is missing (content wave 1: duck-words, crab-words). Their bake is a
+ * deliberate render (Thomas OKs the credit use; the lines are then revoiced
+ * in Lily by `revoiceCanonLily.ts` and ear-tested), so neither a local
+ * `yarn canon:generate` nor the Vercel `prebuild` may spend on them by the
+ * way. The render runs `npx tsx scripts/generateSessionCanon.ts
+ * --include-pending`; once the file is committed the entry is inert (an
+ * existing file is skipped anyway) and can be dropped.
+ */
+export const PENDING_CANON_NODES: ReadonlySet<string> = new Set([
+  'duck-words',
+  'crab-words',
+])
+
+/** The combos a run bakes: missing (or all, with `--force`), minus pending. */
+export function combosToBakeFor(
+  combos: readonly Combo[],
+  args: Pick<CliArgs, 'force' | 'includePending'>,
+  fileExists: (combo: Combo) => boolean,
+): Combo[] {
+  return combos.filter(
+    (combo) =>
+      (args.force || !fileExists(combo)) &&
+      (args.includePending || !PENDING_CANON_NODES.has(combo.focusNode)),
+  )
+}
 
 export function activeCombos(): readonly Combo[] {
   const out: Combo[] = []
@@ -663,9 +694,10 @@ async function main(): Promise<void> {
   // the keys aren't set in the build environment.
   const combosToBake = args.dryRun
     ? combos
-    : args.force
-      ? combos
-      : combos.filter((combo) => !existsSync(canonFilePath(args.out, combo)))
+    : combosToBakeFor(combos, args, (combo) =>
+        existsSync(canonFilePath(args.out, combo)),
+      )
+  const bakeKeys = new Set(combosToBake.map((c) => `${c.track}/${c.focusNode}`))
 
   // ── pre-flight ──
   // Two failure modes for missing keys, depending on context:
@@ -739,6 +771,14 @@ async function main(): Promise<void> {
 
     if (!args.force && existsSync(path)) {
       console.log(`skip   ${label}  (exists; pass --force to regen)`)
+      skipped++
+      continue
+    }
+
+    if (!args.dryRun && !bakeKeys.has(`${combo.track}/${combo.focusNode}`)) {
+      console.log(
+        `skip   ${label}  (pending a deliberate render; pass --include-pending)`,
+      )
       skipped++
       continue
     }

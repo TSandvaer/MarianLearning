@@ -11,7 +11,11 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { canonFileTierFor } from '../api/_canon.js'
-import { activeCombos } from './generateSessionCanon.ts'
+import {
+  PENDING_CANON_NODES,
+  activeCombos,
+  combosToBakeFor,
+} from './generateSessionCanon.ts'
 import { wordSongSessionPlanFromServer } from '@marian/core/wordSong/planFromServer'
 import { bigWordsOf } from '@marian/core/wordSong/bigWordsSteps'
 import {
@@ -128,6 +132,44 @@ describe('voice-QA CANON_FILES', () => {
     expect(baked.filter((key) => !listed.has(key))).toEqual([])
     expect(listed.has('word-song/duck-words')).toBe(true)
     expect(listed.has('word-song/crab-words')).toBe(true)
+  })
+})
+
+// The Vercel `prebuild` runs the bake on every preview build with the
+// build env's keys. Without this gate, every push of this branch baked the
+// two steps on Vercel (Haiku + TTS credit, Azure voice, never committed).
+describe('the pending-canon gate', () => {
+  const combos = activeCombos()
+  const none = () => false
+
+  it('an incremental run (the prebuild) never bakes a pending step, even when its file is missing', () => {
+    expect([...PENDING_CANON_NODES]).toEqual([...STEPS])
+    const baked = combosToBakeFor(
+      combos,
+      { force: false, includePending: false },
+      none,
+    ).map((c) => c.focusNode)
+    expect(baked.filter((n) => PENDING_CANON_NODES.has(n))).toEqual([])
+    expect(baked).toHaveLength(combos.length - 2)
+    // --force does not include them either.
+    expect(
+      combosToBakeFor(combos, { force: true, includePending: false }, none)
+        .map((c) => c.focusNode)
+        .filter((n) => PENDING_CANON_NODES.has(n)),
+    ).toEqual([])
+  })
+
+  it('--include-pending bakes them (the deliberate render), and an existing file is still skipped', () => {
+    const exists = (c: { focusNode: string }) =>
+      !PENDING_CANON_NODES.has(c.focusNode)
+    expect(
+      combosToBakeFor(combos, { force: false, includePending: true }, exists)
+        .map((c) => c.focusNode)
+        .sort(),
+    ).toEqual(['crab-words', 'duck-words'])
+    expect(
+      combosToBakeFor(combos, { force: false, includePending: false }, exists),
+    ).toEqual([])
   })
 })
 
