@@ -386,7 +386,21 @@ Measured with core's `layoutMap`, native `mapScreenLayout` and `mapPathScale` on
 - Worst case shown: current = `simple-sentences`, the last stop of land 5 (Number Garden: `mult-6-9`; every current step gives the same gap there).
 - No stop overlaps another on any portrait form, and every stop keeps a ≥ 44 pt hit area (stops under 44 pt already get `hitSlop`).
 - Within a land, the tightest Number Garden gap goes from 20.4 to 15.9 pt at 375×667.
-- Phone landscape already scrolls; it scrolls further.
+- Phone landscape already scrolls; it scrolls further (667×375: 448 → 527 pt of path).
+- Tablet landscape shrinks with the 6th band (stop / current / badge, pt): 1180×820 goes from 69.3 / 83.4 / 72.4 to 58.9 / 70.9 / 61.5, and 1133×744 from 62.5 / 75.3 / 65.4 to 53.2 / 64.0 / 55.6.
+
+**Measured in the build (PR #575), and the call (Kyle, option (a)): `layoutMap` stays as it is.**
+
+- **Land 1 overhangs the bottom.** With 6 Word Song lands, land 1's bands are shorter than an 88 px stop needs at its row, so land 1's stops end a little below the path pane, toward the caption slot.
+  - Web region 820×928: 1.15 px for a plain stop, 10.15 px for the current one.
+  - Native, worst stop box: 2.9 pt at 375×667, 0 at 430×932, 13.6 pt at 820×1180 (current in land 1), 9.6 pt at 744×1133.
+  - The sticker art fills about 84% of the box, so at most about 5 pt of art crosses the edge (hypothesis; the device check confirms it).
+- **Why not lift the stops instead.** During an unlock beat two lands get Emma's room, and the bands drop to about 69 px at 820×1180. No row height holds an 88 px stop there. A clamp pushes it up past the top of the pane (19.3 px at 820×928, 30.3 pt at 820×1180, into the title row); today's geometry hangs down instead (11.2 px, 15.0 pt). The shipped 5-land map already hangs the current stop's bud tray below the pane (58.0 pt at 820×1180).
+- **The bars the tests hold:**
+  - core `mapModel.test.ts`: land-1 stops end ≤ 12 px below the region; gates and every other stop stay inside.
+  - core landscape badge ≥ 48 px (was the web's iPad-landscape 56; 6 lands measure 49–52 px there, and native phone landscape ships 41.4 pt).
+  - native `mapScreenLayout.test.ts`: on every portrait form the current stop ends ≤ 14 pt below the pane.
+- **Device check (after the clay pieces land):** at 820×1180 and 744×1133 portrait, with the current step `letter-sounds` (land 1), the land-1 stop art covers no caption text. If it does, the fix is native only: move the W caption slot 16 pt lower (its top margin is empty) and give the pane those 16 pt. Don't reopen the geometry.
 
 ### 5.3 A new step opens on load when the step before it is mastered (K13)
 
@@ -428,7 +442,9 @@ Generate them as the clay set was made (Thomas's tool choice), with the matching
 
 A **lead line** plays before a problem's read, with the stage up. It reuses the warm-up line's player and timing (`review-mode-and-warmup-native.md` § 4: `createManifestLinePlayer('session-guide', …)`, a caption walk at 165 wpm when there is no clip, Emma `listening`, the back button cancels it).
 
-- **Timing:** the lead ends → 400 ms → the read. On a `cvc-word` problem, the 1500 ms silent beat starts when the lead ends and replaces the 400 ms, so the decode-first beat is kept in full.
+- **Timing:** the lead ends → 400 ms → the read (on a `cvc-word` card: → its 1500 ms silent beat → the read).
+  - **Only the two new intro leads** (`guide.session.intro.duck-words`, `guide.session.intro.crab-words`) start the 1500 ms silent beat when they end, in place of the 400 ms. The intro introduces the very card that follows, so the decode beat follows it directly.
+  - The warm-up heart's "Remember this one?" and the review and peek openers keep their device-checked rhythm (line → 400 ms → the beat → the read). `guide.session.hiding` is Math only (no silent beat).
 - **At most one lead per problem.** Priority: a warm-up heart's "Remember this one?", then a step intro, then the hiding line.
 - **Never in a peek** (a peek has its own opener) and never on a warm-up heart other than its own line.
 
