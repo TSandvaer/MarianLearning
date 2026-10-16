@@ -25,6 +25,7 @@
     "canon:lint": "tsx scripts/canonLint.ts && tsx scripts/compositionLint.ts",
     "canon:lint:text": "tsx scripts/canonLint.ts",
     "canon:lint:composition": "tsx scripts/compositionLint.ts",
+    "voice-qa:baseline": "tsx scripts/voiceQaBaseline.ts",
     "embed-pictures": "tsx scripts/embed-pictures.ts",
     "path-art": "tsx scripts/build-path-art.ts",
     "e2e": "playwright test",

@@ -236,6 +236,25 @@
         border: 1px solid #c3d4f0;
         margin-top: 0.25rem;
       }
+      /* New / changed since the baseline (voice-qa-baseline.json). */
+      .badge.diff {
+        background: #efe7fb;
+        color: #5b3d99;
+        border: 1px solid #d6c6f2;
+        margin-top: 0.25rem;
+        margin-right: 0.25rem;
+      }
+      button.filter[data-filter='new'] {
+        border-color: #b9a3e3;
+      }
+      button.filter[data-filter='new'][aria-pressed='true'] {
+        background: #5b3d99;
+        border-color: #5b3d99;
+      }
+      button.filter[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
       .meta {
         flex: 1 1 14rem;
         min-width: 11rem;
@@ -404,11 +423,31 @@
       sends the whole set (passes included) to the report endpoint. Unlinked QA
       tooling.
     </p>
+    <p class="sub" data-testid="vqa-baseline-info">
+      <strong>New / changed</strong> = lines that are new, or whose audio was
+      re-rendered, since the baseline snapshot of main
+      (<code>voice-qa-baseline.json</code>). These are the lines to ear-test;
+      the page opens on them when there are any.
+      <span id="vqa-baseline-meta"></span> The baseline is regenerated after
+      each merge to main that changes audio, and at the latest at release:
+      <code>yarn voice-qa:baseline</code> on a branch off main, committed in a
+      PR.
+    </p>
 
     <div id="status" class="status">Loading baked canon&hellip;</div>
 
     <div class="bar" id="bar" hidden>
       <div class="filters" id="filters" role="group" aria-label="Filter rows">
+        <button
+          class="filter"
+          id="vqa-filter-new"
+          data-testid="vqa-filter-new"
+          data-filter="new"
+          aria-pressed="false"
+          title="Lines new or re-rendered since the baseline snapshot of main"
+        >
+          New / changed <span class="ct" data-ct="new">0</span>
+        </button>
         <button
           class="filter"
           id="vqa-filter-all"
@@ -570,6 +609,9 @@
       const LS_SECRET = 'vqa-secret'
       const REPORT_ENDPOINT = '/api/voice-qa-report'
       const STATUS_JSON = '/voice-qa-status.json'
+      // itemId -> audioHash snapshot of main; written by
+      // scripts/voiceQaBaseline.ts. Drives the "New / changed" chip.
+      const BASELINE_JSON = '/voice-qa-baseline.json'
       const FAIL_CATEGORIES = [
         'mispronounced',
         'wrong-speed',
@@ -612,6 +654,17 @@
         ['word-song', 'sight-words'],
         ['word-song', 'simple-sentences'],
       ]
+
+      // Where each asset group's MP3s live, keyed by itemId prefix
+      // (`<prefix>#<filename>`). scripts/voiceQaBaseline.ts evaluates this
+      // manifest block (CANON_FILES through GUIDANCE_FILES) so the baseline
+      // hashes exactly the files this page hashes.
+      const ASSET_BASES = {
+        greet: '/assets/audio/greet/',
+        hub: '/assets/audio/hub/',
+        path: '/assets/audio/path/',
+        guide: '/assets/audio/path/',
+      }
 
       // Greet + Hub MP3 manifests. Text mirrors src/lib/audio/preRecorded.ts
       // (greet) and src/screens/Hub/hubLines.ts (hub) — static, never
@@ -1327,7 +1380,67 @@
       const blobUrlByItem = new Map() // itemId -> objectURL (lazy)
       let verdicts = loadVerdicts() // itemId -> Verdict
       let fixStatus = null // itemId -> { pr, label } from /voice-qa-status.json
+      // { generatedAt, sourceSha, items: { itemId: audioHash } } from
+      // /voice-qa-baseline.json; null when the file is missing or malformed
+      // (the New / changed chip is then disabled, everything else works).
+      let baseline = null
       let activeFilter = 'all'
+
+      // ── Pure helpers BEGIN ───────────────────────────────────────────────
+      // Self-contained: no DOM, no page globals. scripts/voiceQaBaseline.ts
+      // and its unit tests evaluate the text between the BEGIN/END markers
+      // verbatim, so the page, the baseline generator and the tests all run
+      // this exact code. Keep the markers.
+
+      // The canonical itemId of a canon dedup group: its alphabetically-first
+      // (file, id) member. Sorts `members` in place (rows list them in this
+      // order) and returns `<file-stem>#<utteranceId>`.
+      function canonicalItemIdOf(members) {
+        members.sort((a, b) =>
+          a.file === b.file
+            ? a.id < b.id
+              ? -1
+              : a.id > b.id
+                ? 1
+                : 0
+            : a.file < b.file
+              ? -1
+              : 1,
+        )
+        return members[0].file + '#' + members[0].id
+      }
+
+      // 'new' when the baseline has no entry for the item's key, 'changed'
+      // when it has one with a different audio hash, null otherwise (and
+      // null for every item when there is no baseline at all).
+      function baselineDiffOf(item, baselineItems) {
+        if (!baselineItems) return null
+        if (!Object.prototype.hasOwnProperty.call(baselineItems, item.itemId))
+          return 'new'
+        return baselineItems[item.itemId] === item.audioHash ? null : 'changed'
+      }
+
+      // The filter to open on: an explicit ?filter=<known filter> wins; else
+      // 'new' when anything is new or changed; else 'all'.
+      const FILTER_KEYS = [
+        'new',
+        'all',
+        'untested',
+        'passed',
+        'failed',
+        'needs-retest',
+      ]
+      function initialFilterOf(search, newCount) {
+        let requested = null
+        try {
+          requested = new URLSearchParams(search || '').get('filter')
+        } catch {
+          requested = null
+        }
+        if (requested && FILTER_KEYS.includes(requested)) return requested
+        return newCount > 0 ? 'new' : 'all'
+      }
+      // ── Pure helpers END ─────────────────────────────────────────────────
 
       function loadVerdicts() {
         try {
@@ -1529,6 +1642,7 @@
 
       function rowMatchesFilter(item) {
         if (activeFilter === 'all') return true
+        if (activeFilter === 'new') return item.diff != null
         return stateOf(item) === activeFilter
       }
       function applyFilterToRow(item) {
@@ -1575,6 +1689,16 @@
         note.className = 'note'
         note.hidden = true
         meta.appendChild(note)
+
+        // New / changed since the baseline. Fixed for the page's lifetime
+        // (the audio hash does not change after load), so set once here.
+        if (item.diff) {
+          const diffBadge = document.createElement('span')
+          diffBadge.className = 'badge diff'
+          diffBadge.setAttribute('data-testid', 'vqa-diff-' + item.itemId)
+          diffBadge.textContent = item.diff
+          meta.appendChild(diffBadge)
+        }
 
         // Fix-status badge (AC6), filled later when /voice-qa-status.json loads.
         const fixBadge = document.createElement('span')
@@ -1685,18 +1809,23 @@
       // ── Filters + counters ───────────────────────────────────────────────
       function countByState() {
         const c = {
+          new: 0,
           all: items.length,
           untested: 0,
           passed: 0,
           failed: 0,
           'needs-retest': 0,
         }
-        for (const it of items) c[stateOf(it)]++
+        for (const it of items) {
+          c[stateOf(it)]++
+          if (it.diff) c.new++
+        }
         return c
       }
       function refreshCounters() {
         const c = countByState()
         for (const key of [
+          'new',
           'all',
           'untested',
           'passed',
@@ -1704,7 +1833,7 @@
           'needs-retest',
         ]) {
           const el = document.querySelector('[data-ct="' + key + '"]')
-          if (el) el.textContent = c[key]
+          if (el) el.textContent = key === 'new' && !baseline ? 'n/a' : c[key]
         }
         // "decided" = items with a verdict that still matches the current audio
         // (passed | failed). needs-retest is deliberately EXCLUDED: its stored
@@ -1880,6 +2009,42 @@
         }
       }
 
+      // ── Baseline (New / changed) ─────────────────────────────────────────
+      // Resolves to the parsed baseline, or null when it is missing or
+      // malformed. Never throws: the verdict flow must not depend on it.
+      async function loadBaseline() {
+        try {
+          const res = await fetch(BASELINE_JSON, { cache: 'no-store' })
+          if (!res.ok) return null
+          const data = await res.json()
+          if (!data || typeof data !== 'object') return null
+          if (!data.items || typeof data.items !== 'object') return null
+          return data
+        } catch {
+          return null
+        }
+      }
+      function applyBaselineInfo() {
+        const meta = document.getElementById('vqa-baseline-meta')
+        const chip = document.getElementById('vqa-filter-new')
+        if (!baseline) {
+          meta.textContent =
+            'No baseline file was found, so New / changed is switched off.'
+          chip.disabled = true
+          return
+        }
+        const sha =
+          typeof baseline.sourceSha === 'string'
+            ? baseline.sourceSha.slice(0, 7)
+            : 'unknown'
+        const date =
+          typeof baseline.generatedAt === 'string'
+            ? baseline.generatedAt.slice(0, 10)
+            : 'unknown date'
+        meta.textContent =
+          'Current baseline: main at ' + sha + ', made ' + date + '.'
+      }
+
       // ── Canon load + dedup (AC1, AC3, AC8) ───────────────────────────────
       // Returns { groups: [{group,label,renders:[render]}], counts }.
       // A "render" is a dedup group keyed by audioHash. Members collected in
@@ -1935,20 +2100,8 @@
         // dedup group's `group` (tier file) follows that canonical member so
         // a render renders under the file that owns its itemId.
         for (const g of byHash.values()) {
-          g.members.sort((a, b) =>
-            a.file === b.file
-              ? a.id < b.id
-                ? -1
-                : a.id > b.id
-                  ? 1
-                  : 0
-              : a.file < b.file
-                ? -1
-                : 1,
-          )
-          const first = g.members[0]
-          g.itemId = first.file + '#' + first.id
-          g.group = first.file
+          g.itemId = canonicalItemIdOf(g.members) // sorts members in place
+          g.group = g.members[0].file
         }
         return byHash
       }
@@ -1985,10 +2138,10 @@
       // itemId stays the bare filename so stored verdicts still key correctly
       // and the audioHash auto-flip-to-needs-retest contract is preserved.
       const VQA_CACHE_BUST = String(Date.now())
-      async function loadAssetGroup(prefix, basePath, manifest) {
+      async function loadAssetGroup(prefix, manifest) {
         const renders = []
         for (const [filename, text] of manifest) {
-          const url = basePath + filename + '?v=' + VQA_CACHE_BUST
+          const url = ASSET_BASES[prefix] + filename + '?v=' + VQA_CACHE_BUST
           let audioHash = ''
           try {
             const res = await fetch(url, { cache: 'no-store' })
@@ -2047,6 +2200,7 @@
             mime: r.mime,
             assetUrl: r.assetUrl,
           }
+          item.diff = baselineDiffOf(item, baseline && baseline.items)
           items.push(item)
           itemById.set(item.itemId, item)
           body.appendChild(buildRow(item))
@@ -2103,6 +2257,9 @@
           setStatus(
             'Loading + hashing canon (0 / ' + CANON_FILES.length + ' files)…',
           )
+          // Small JSON; fetched alongside the canon hash pass and awaited
+          // before the first row is built (rows carry their diff tag).
+          const baselinePromise = loadBaseline()
           let rawCanon = 0
           const byHash = await loadCanon((done, total, uniq) => {
             setStatus(
@@ -2120,6 +2277,9 @@
           const canonGroups = organizeCanonGroups(byHash)
           const canonUnique = byHash.size
 
+          baseline = await baselinePromise
+          applyBaselineInfo()
+
           // Reveal control bar before appending rows.
           document.getElementById('bar').hidden = false
 
@@ -2128,33 +2288,17 @@
           }
 
           setStatus('Loading Greet + Hub MP3s…')
-          const greetRenders = await loadAssetGroup(
-            'greet',
-            '/assets/audio/greet/',
-            GREET_FILES,
-          )
+          const greetRenders = await loadAssetGroup('greet', GREET_FILES)
           appendGroup('Greet', greetRenders.length + ' clips', greetRenders)
-          const hubRenders = await loadAssetGroup(
-            'hub',
-            '/assets/audio/hub/',
-            HUB_FILES,
-          )
+          const hubRenders = await loadAssetGroup('hub', HUB_FILES)
           appendGroup('Hub', hubRenders.length + ' clips', hubRenders)
           let pathCount = 0
           for (const [label, files] of PATH_GROUPS) {
-            const pathRenders = await loadAssetGroup(
-              'path',
-              '/assets/audio/path/',
-              files,
-            )
+            const pathRenders = await loadAssetGroup('path', files)
             appendGroup(label, pathRenders.length + ' clips', pathRenders)
             pathCount += pathRenders.length
           }
-          const guideRenders = await loadAssetGroup(
-            'guide',
-            '/assets/audio/path/',
-            GUIDANCE_FILES,
-          )
+          const guideRenders = await loadAssetGroup('guide', GUIDANCE_FILES)
           appendGroup('Guidance', guideRenders.length + ' clips', guideRenders)
 
           renderFooter(
@@ -2166,12 +2310,16 @@
             guideRenders.length,
           )
           refreshCounters()
-          setFilter('all')
+          const newCount = countByState().new
+          setFilter(initialFilterOf(location.search, newCount))
 
           const mismatch =
             canonUnique !== 760
               ? ' ⚠ canon unique = ' + canonUnique + ' (expected 760)'
               : ''
+          const newNote = baseline
+            ? ' ' + newCount + ' new or changed since the baseline.'
+            : ''
           setStatus(
             'Ready — ' +
               items.length +
@@ -2184,6 +2332,7 @@
               ' hub + ' +
               pathCount +
               ' path). Tap Play, then Pass / Fail.' +
+              newNote +
               mismatch,
             mismatch ? '' : 'ok',
           )
