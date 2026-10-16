@@ -34,7 +34,7 @@ import {
   readdirSync,
   writeFileSync,
 } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import OpenAI, { toFile } from 'openai'
@@ -154,7 +154,8 @@ function realEditor(root: string): EditImages {
 }
 
 function readManifest(root: string, rel: string): PictureManifestEntry[] {
-  const path = join(root, rel)
+  // resolve, not join: --manifest may be an absolute path.
+  const path = resolve(root, rel)
   if (!existsSync(path)) {
     throw new Error(
       `Manifest not found: ${rel}. Pass --manifest <path> to use another file.`,

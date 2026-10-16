@@ -337,6 +337,19 @@ describe('runGenerate', () => {
     )
     expect(d.createEditor).not.toHaveBeenCalled()
   })
+
+  it('accepts an absolute --manifest path', async () => {
+    const cmd = parseCli([
+      '--batch',
+      '2',
+      '--dry-run',
+      '--manifest',
+      join(root, FIXTURE),
+    ])
+    if (cmd.mode !== 'generate') throw new Error('expected generate')
+    await runGenerate(cmd, deps(vi.fn()))
+    expect(logs.join('\n')).toContain('Images: 2 word(s) x 2 = 4')
+  })
 })
 
 describe('re-runs never overwrite or re-pay', () => {
