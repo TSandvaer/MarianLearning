@@ -264,14 +264,24 @@ export async function runGenerate(
     )
     log(`Spend ledger so far: ${formatUsd(ledgerTotal)} (${PATHS.ledger})`)
     if (cmd.budgetUsd !== undefined) {
-      const fits = budgetAllows({
-        budgetUsd: cmd.budgetUsd,
-        spentUsd: ledgerTotal,
-        reservedUsd: 0,
-        estimateUsd: estTotal,
-      })
+      let fitting = 0
+      let committed = 0
+      for (const j of jobs) {
+        const ok = budgetAllows({
+          budgetUsd: cmd.budgetUsd,
+          spentUsd: ledgerTotal,
+          reservedUsd: committed,
+          estimateUsd: j.estimate.costUsd,
+        })
+        if (!ok) break
+        committed = roundUsd(committed + j.estimate.costUsd)
+        fitting++
+      }
       log(
-        `Budget ${formatUsd(cmd.budgetUsd)}: ledger + estimate = ${formatUsd(roundUsd(ledgerTotal + estTotal))} → ${fits ? 'fits' : 'would stop early'}`,
+        `Budget ${formatUsd(cmd.budgetUsd)}: ledger + estimate = ${formatUsd(roundUsd(ledgerTotal + estTotal))} → ` +
+          (fitting === jobs.length
+            ? 'fits'
+            : `would stop after ${fitting} of ${jobs.length} word(s)`),
       )
     }
     log(
