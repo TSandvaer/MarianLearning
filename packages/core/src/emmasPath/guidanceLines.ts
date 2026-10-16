@@ -228,14 +228,9 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: content wave 1's lead lines (§ 6.1).
+ * Now: none.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
-  peekOpenId('mult-mix'),
-  peekCloseId('mult-mix'),
-  sessionIntroId('mult-mix'),
-  SESSION_HIDING_ID,
-]
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 

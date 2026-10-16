@@ -137,15 +137,8 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     expect(peekLines('mult-mix')?.close.text).toBe(
       'All the groups are for later. You will learn it!',
     )
-    for (const id of [
-      'guide.session.peek-open.mult-mix',
-      'guide.session.peek-close.mult-mix',
-      'guide.session.intro.mult-mix',
-    ]) {
-      expect(GUIDANCE_LINES_AWAITING_RENDER).toContain(id)
-    }
-    // Awaiting their Lily render (the render commit empties the list).
-    expect(GUIDANCE_LINES_AWAITING_RENDER).toContain('guide.session.hiding')
+    // Rendered in Lily with "Some flowers are hiding!" (§ 6.2 rows 1, 2, 7, 10).
+    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
   })
 
   it('names the step in the peek opener and closer (Thomas 2026-10-15), with the path lines’ spoken names and their verb', () => {
