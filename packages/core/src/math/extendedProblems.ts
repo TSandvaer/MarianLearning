@@ -49,12 +49,14 @@ import type { MathFact } from '../progress/types'
 import type { MathProblem, MathProblemUtterances } from './sessionPlans'
 
 /**
- * The largest answer (and chip) an extended problem may have. The progress
- * guard accepts recorded answers in 0..99 only (`progress/guards.ts`,
- * `perProblemAnswerValue`); one recorded 100 makes the whole progress doc
- * fail the guard and load as a fresh start. So the parser sends a problem
- * whose answer is above this to the static fallback, and the chip pickers
- * never offer more.
+ * The largest answer (and chip) an extended problem may have. A build
+ * before content wave 3's G accepts recorded answers in 0..99 only
+ * (`progress/guards.ts`, `perProblemAnswerValue`); one recorded 100 makes
+ * the whole progress doc fail its guard and load as a fresh start. This
+ * build's guard reads any whole number from 0 up, but the cap stays 99
+ * until the hundreds PR (`design/native/content-wave-3.md` § 2, G4). So
+ * the parser sends a problem whose answer is above this to the static
+ * fallback, and the chip pickers never offer more.
  */
 export const EXTENDED_ANSWER_MAX = 99
 
