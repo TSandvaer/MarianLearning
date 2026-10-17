@@ -107,6 +107,8 @@ export interface CanonDoc {
 export interface Verdict {
   n: number
   keep: boolean
+  /** Envelope correlation with take 0. */
+  r0: number
   /** Highest envelope correlation with an anchor or an earlier kept take. */
   r: number
   nearest: string
@@ -245,7 +247,7 @@ export function envelopeCorr(
 }
 
 /** Keep a take only if it is no closer than `maxCorr` to every anchor and to
- *  every take kept before it (in take order). */
+ *  every take kept before it (in take order). `anchors[0]` is take 0. */
 export function pickDistinct(
   anchors: ReadonlyArray<{ label: string; env: ArrayLike<number> }>,
   takes: ReadonlyArray<{ n: number; env: ArrayLike<number> }>,
@@ -263,7 +265,13 @@ export function pickDistinct(
       }
       const keep = r <= maxCorr
       if (keep) pool.push({ label: `take ${t.n}`, env: t.env })
-      return { n: t.n, keep, r, nearest }
+      return {
+        n: t.n,
+        keep,
+        r0: envelopeCorr(anchors[0].env, t.env),
+        r,
+        nearest,
+      }
     })
 }
 
@@ -308,7 +316,7 @@ export function takesPage(
         <td class="n">Take ${t.n}${t.n === 0 ? '<br><small>committed</small>' : ''}</td>
         <td><code>${escapeHtml(t.input)}</code>${t.input === set.input ? '' : ' <small>(variant)</small>'}</td>
         <td>${t.seconds.toFixed(2)} s</td>
-        <td><small>${t.seed === undefined ? '' : `seed ${t.seed}<br>`}${v ? `r ${v.r.toFixed(3)} vs ${escapeHtml(v.nearest)}<br>` : ''}${t.hash}</small></td>
+        <td><small>${t.seed === undefined ? '' : `seed ${t.seed}<br>`}${v ? `r ${v.r0.toFixed(3)} to take 0<br>` : ''}${t.hash}</small></td>
       </tr>`
       })
       .join('\n')
@@ -634,7 +642,7 @@ async function renderMode(args: string[]): Promise<void> {
             const x = v.get(t.n)
             const tag = !x
               ? 'committed'
-              : `${x.keep ? 'KEEP' : 'drop'} r=${x.r.toFixed(3)} vs ${x.nearest}`
+              : `${x.keep ? 'KEEP' : 'drop'} r0=${x.r0.toFixed(3)} max=${x.r.toFixed(3)} vs ${x.nearest}`
             return `  take ${t.n}: ${JSON.stringify(t.input)}${t.seed === undefined ? '' : ` seed ${t.seed}`} ${t.seconds.toFixed(2)} s ${t.hash} ${tag}`
           })
           .join('\n'),

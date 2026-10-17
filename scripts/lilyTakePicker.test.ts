@@ -226,6 +226,12 @@ describe('near-duplicate filter', () => {
       [4, false, 'take 2'],
     ])
     expect(verdicts[0].r).toBeCloseTo(1, 6)
+    // r0 is always against take 0, even when the nearest is a kept take.
+    expect(verdicts[3].r0).toBeCloseTo(
+      envelopeCorr(anchor, env(60, [12, 13, 45])),
+      9,
+    )
+    expect(verdicts[3].r0).toBeLessThan(verdicts[3].r)
   })
 })
 
@@ -264,8 +270,8 @@ describe('takesPage', () => {
           [2, 'Q0ND'],
         ]),
         verdicts: [
-          { n: 1, keep: false, r: 0.991, nearest: 'take 0' },
-          { n: 2, keep: true, r: 0.8, nearest: 'take 0' },
+          { n: 1, keep: false, r0: 0.991, r: 0.991, nearest: 'take 0' },
+          { n: 2, keep: true, r0: 0.812, r: 0.8, nearest: 'take 0' },
         ],
       },
     ],
@@ -286,6 +292,7 @@ describe('takesPage', () => {
       '<code>Let&#39;s look. Fig!</code> <small>(variant)</small>',
     )
     expect(html).toContain('seed 42')
+    expect(html).toContain('r 0.812 to take 0')
     expect(html).toContain('1.25 s')
     expect(html).toContain('take 1 (0.991 vs take 0)')
     expect(html).toContain('1 distinct fresh take(s)')
