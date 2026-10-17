@@ -995,14 +995,15 @@ export function numberStripMetrics(
 // pins its table. The plates are `GroupsRow`'s (`groupsMetrics`,
 // `plateSize`, `groupsRow`), not a fork; every plate of a plan has the size
 // of the plan's largest share, so a plate's size never gives the answer
-// away.
+// away. Kyle's UX calls on #587 (amending § 2.2–§ 2.5): the cloth reserves
+// room left of the pile for the total tag (call 2), and a share of 5 or less
+// is one column centred in its plate (call 3).
 
 /** The pile's flowers are at most this big (pt); tablet {@link SHARE_TABLET_FLOWER_MAX}. */
 export const SHARE_PHONE_FLOWER_MAX = 20
 export const SHARE_TABLET_FLOWER_MAX = 24
-/** The total tag's outer half, reserved left of the cloth when fitting `s`. */
-export const SHARE_TAG_OUTER = 22
-export const SHARE_TABLET_TAG_OUTER = 26
+/** Between the total tag's inner edge and the pile's first flower (call 2). */
+export const SHARE_TAG_CLEARANCE = 4
 /** Pile rows hold this many flowers (P and tablet); L draws one row. */
 export const SHARE_PILE_ROW = 10
 
@@ -1016,10 +1017,16 @@ export interface ShareMetrics {
   pileRowGap: number
   /** Flowers per pile row (10; L: the plan's largest pile, one row). */
   pileRow: number
+  /** The cloth's right, top and bottom padding. */
   clothPad: number
+  /** The cloth's left padding: room for the total tag's inner half plus
+   *  {@link SHARE_TAG_CLEARANCE} (call 2). */
+  clothLeftPad: number
   clothRadius: number
   cloth: { width: number; height: number }
-  /** The total tag's outer half (fitting only). */
+  /** The total tag's width for the plan's largest pile. */
+  tagWidth: number
+  /** The tag's outer half, `ceil(tagWidth / 2)`, reserved left of the cloth. */
   tagOuter: number
   /** The plates: `GroupsRow`'s metrics for the plan's largest share. */
   groups: GroupsMetrics
@@ -1033,6 +1040,12 @@ export interface ShareMetrics {
   block: number
   /** The deal's arc height h. */
   arc: number
+}
+
+/** A tag pill's width for `text` (multiply's tag: 8 pt side padding, at
+ *  least as wide as it is tall). */
+export function pillWidth(text: string, font: number, height: number): number {
+  return Math.max(height, Math.ceil(fredokaBoldWidth(text, font)) + 16)
 }
 
 /** Width of `n` pile flowers in rows of `row` at size `s`. */
@@ -1064,23 +1077,26 @@ export function shareMetrics(
   const pileFifthGap = oneRow ? 6 : tablet ? 16 : 12
   const pileRowGap = tablet ? 6 : 4
   const clothPad = tablet ? 8 : 6
-  const tagOuter = tablet ? SHARE_TABLET_TAG_OUTER : SHARE_TAG_OUTER
-  const pileRow = oneRow ? Math.max(1, maxPile) : SHARE_PILE_ROW
-  const rows = Math.max(1, Math.ceil(maxPile / pileRow))
-  const fits = (s: number) =>
-    pileRowWidth(maxPile, pileRow, s, pileGap, pileFifthGap) +
-      2 * clothPad +
-      tagOuter <=
-    layout.problem.width
-  let s = tablet ? SHARE_TABLET_FLOWER_MAX : SHARE_PHONE_FLOWER_MAX
-  while (s > 8 && !fits(s)) s -= 1
   const groups = groupsMetrics(layout, [
     { factorA: Math.max(1, maxShare), factorB: Math.max(1, maxPlates) },
   ])
   const plate = plateSize(groups, Math.max(1, maxShare))
+  // Call 2: the tag stays centred on the cloth's left edge; the cloth's left
+  // padding clears its inner half, and its outer half is reserved outside.
+  const tagWidth = pillWidth(String(maxPile), groups.tagFont, groups.tagHeight)
+  const tagOuter = Math.ceil(tagWidth / 2)
+  const clothLeftPad = tagOuter + SHARE_TAG_CLEARANCE
+  const pileRow = oneRow ? Math.max(1, maxPile) : SHARE_PILE_ROW
+  const rows = Math.max(1, Math.ceil(maxPile / pileRow))
+  const clothWidth = (s: number) =>
+    clothLeftPad +
+    pileRowWidth(maxPile, pileRow, s, pileGap, pileFifthGap) +
+    clothPad
+  const fits = (s: number) => clothWidth(s) + tagOuter <= layout.problem.width
+  let s = tablet ? SHARE_TABLET_FLOWER_MAX : SHARE_PHONE_FLOWER_MAX
+  while (s > 8 && !fits(s)) s -= 1
   const cloth = {
-    width:
-      pileRowWidth(maxPile, pileRow, s, pileGap, pileFifthGap) + 2 * clothPad,
+    width: clothWidth(s),
     height: rows * s + (rows - 1) * pileRowGap + 2 * clothPad,
   }
   return {
@@ -1090,8 +1106,10 @@ export function shareMetrics(
     pileRowGap,
     pileRow,
     clothPad,
+    clothLeftPad,
     clothRadius: tablet ? 20 : 16,
     cloth,
+    tagWidth,
     tagOuter,
     groups,
     plate,
@@ -1119,8 +1137,9 @@ export interface ShareGeometry {
   plates: readonly { x: number; y: number; width: number; height: number }[]
   /** Each plate's "?" tag centre (on its top edge). */
   plateTags: readonly SharePoint[]
-  /** Each plate's cell centres for `share` flowers: columns of 5, top to
-   *  bottom, left column first. */
+  /** Each plate's cell centres for `share` flowers: top to bottom; a share
+   *  of 5 or less is one column centred in the plate, a larger one columns
+   *  of 5, left column first (call 3). */
   plateCells: readonly (readonly SharePoint[])[]
   /** The plate row's gap. */
   plateGap: number
@@ -1146,7 +1165,7 @@ export function shareGeometry(
     pile.push({
       x:
         clothX +
-        m.clothPad +
+        m.clothLeftPad +
         c * (s + m.pileGap) +
         Math.floor(c / 5) * (m.pileFifthGap - m.pileGap) +
         s / 2,
@@ -1163,13 +1182,17 @@ export function shareGeometry(
     width: m.plate.width,
     height: m.plate.height,
   }))
+  // Call 3: one column (a share of 5 or less) is centred across the plate;
+  // never centred vertically (round 1's height would give the share away).
+  const oneColumn = share <= GROUP_COLUMN
   const plateCells = platesOut.map((p) =>
     Array.from({ length: share }, (_, j) => ({
-      x:
-        p.x +
-        g.pad +
-        Math.floor(j / GROUP_COLUMN) * (g.flower + g.flowerGap) +
-        g.flower / 2,
+      x: oneColumn
+        ? p.x + p.width / 2
+        : p.x +
+          g.pad +
+          Math.floor(j / GROUP_COLUMN) * (g.flower + g.flowerGap) +
+          g.flower / 2,
       y:
         p.y +
         g.pad +

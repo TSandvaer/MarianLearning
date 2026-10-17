@@ -23,10 +23,11 @@ export const DEAL_BREATH_MS = 100
 export const DEAL_FLIGHT_MS = 320
 /** Hint 2's round: one flower per plate, 300 ms apart. */
 export const ROUND_STEP_MS = 300
-/** Fast deal (a right tap with flowers left): every `min(50, 900 / left)`
- *  ms, 220 ms flights, no breath (ends within about 1.1 s). */
-export const FAST_STEP_MAX_MS = 50
-export const FAST_SPAN_MS = 900
+/** Fast deal (a right tap with flowers left): every `min(40, 600 / left)`
+ *  ms, 220 ms flights, no breath, so 20 left end at 19 × 30 + 220 = 790 ms
+ *  (Kyle's call 4 on #587; the spec's first cut was `min(50, 900 / left)`). */
+export const FAST_STEP_MAX_MS = 40
+export const FAST_SPAN_MS = 600
 export const FAST_FLIGHT_MS = 220
 /** The given answer: every flower left moves at once, 200 ms, no arc. */
 export const INSTANT_MS = 200
@@ -38,6 +39,13 @@ export const CROSSFADE_MS = 200
 export const FLOWER_RIPPLE_STAGGER_MS = 60
 /** The tags fill plate by plate, this far apart. */
 export const TAG_FILL_STAGGER_MS = 80
+/** A tag's "?" fades out this long before its numeral springs in. */
+export const TAG_QUESTION_FADE_MS = 100
+/** The numeral's spring (stiffness 260, damping 20) has settled by then. */
+export const TAG_SPRING_SETTLE_MS = 300
+/** The completed picture (every tag showing the share) holds this long
+ *  before Math moves on (call 4). */
+export const FILL_HOLD_MS = 400
 /** Landing: 1 → 1.12 over 80 ms, then a spring back to 1. */
 export const LAND_PEAK = 1.12
 export const LAND_UP_MS = 80
@@ -187,4 +195,24 @@ export function msUntilLanded(plan: FlightPlan, now: number): number {
   for (const f of plan)
     if (f !== null) end = Math.max(end, f.start + f.duration)
   return end - now
+}
+
+/**
+ * When the last plate tag has filled, in ms from the right answer (Kyle's
+ * call 4 on #587): the deal's end (`msUntilLanded` after the fast deal; 0
+ * when every flower has landed), then the last tag's "?" fade, its 80 ms
+ * stagger per plate and the numeral's spring settle:
+ * `dealEnd + 100 + 80 × (B − 1) + 300`. Reduce Motion: the tags crossfade,
+ * `dealEnd + 80 × (B − 1) + 200`. A pure function of the schedule, never a
+ * spring callback. Math holds the advance until this + {@link FILL_HOLD_MS}.
+ */
+export function shareFillEndMs(
+  dealEndMs: number,
+  plates: number,
+  reducedMotion: boolean,
+): number {
+  const stagger = TAG_FILL_STAGGER_MS * Math.max(0, plates - 1)
+  return reducedMotion
+    ? dealEndMs + stagger + CROSSFADE_MS
+    : dealEndMs + TAG_QUESTION_FADE_MS + stagger + TAG_SPRING_SETTLE_MS
 }

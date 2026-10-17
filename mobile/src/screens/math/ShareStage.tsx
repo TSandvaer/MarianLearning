@@ -44,7 +44,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import {
-  fredokaBoldWidth,
+  pillWidth,
   shareGeometry,
   type ShareMetrics,
   type SharePoint,
@@ -53,7 +53,6 @@ import { colors, fonts } from '../../theme'
 import {
   EASE_OUT,
   FADE_MS,
-  GAP_OUT_MS,
   STAGGER_MS,
   useFade,
   useOnRise,
@@ -71,12 +70,23 @@ import {
   LAND_SPRING,
   LAND_UP_MS,
   msUntilLanded,
+  shareFillEndMs,
   TAG_FILL_STAGGER_MS,
+  TAG_QUESTION_FADE_MS,
   undealt,
   type DealMode,
   type Flight,
   type FlightPlan,
 } from './shareDeal'
+
+/**
+ * The cloth: a pale rose fill with a 1 pt `colors.myPink` border, so it shows
+ * on Math's cream background and reads as a tinted cloth, not a 4th plate
+ * (white, 2 pt border). Kyle's call 1 on #587; no dashes on the cloth (dashes
+ * mean "?" in this picture).
+ */
+const SHARE_CLOTH_FILL = '#FFE3E8'
+const SHARE_CLOTH_BORDER = 1
 
 /** Plates and flowers pulse 1 → 1.06 → 1 (multiply's); the total tag 1.1. */
 const PULSE_PEAK = 1.06
@@ -101,6 +111,9 @@ export interface ShareStageProps {
   answered: boolean
   /** The auto-deal sent flowers: the ms until the last one lands. */
   onAutoDeal?: (ms: number) => void
+  /** The right answer's fill is scheduled: the ms until every tag shows
+   *  the share (`shareFillEndMs`); Math holds its advance on it. */
+  onFillScheduled?: (ms: number) => void
   /** Test seam: the clock. */
   now?: () => number
 }
@@ -125,6 +138,7 @@ export function ShareStage({
   guided,
   answered,
   onAutoDeal,
+  onFillScheduled,
   now = clock,
 }: ShareStageProps) {
   const reducedMotion = useReducedMotion()
@@ -177,6 +191,7 @@ export function ShareStage({
     const ms = run('fast')
     setFillDelay(ms)
     setPlatesTogether((p) => ({ n: p.n + 1, delay: ms }))
+    onFillScheduled?.(shareFillEndMs(ms, plates, reducedMotion))
   })
 
   // The read: the total tag pulses on T's word, the plates ripple on B's.
@@ -215,6 +230,7 @@ export function ShareStage({
               width: geometry.cloth.width,
               height: geometry.cloth.height,
               borderRadius: metrics.clothRadius,
+              borderWidth: SHARE_CLOTH_BORDER,
             },
           ]}
         />
@@ -268,12 +284,6 @@ export function ShareStage({
       </View>
     </View>
   )
-}
-
-/** A pill's width for `text` (multiply's tag: 8 pt side padding, at least
- *  as wide as it is tall). */
-function pillWidth(text: string, font: number, height: number): number {
-  return Math.max(height, Math.ceil(fredokaBoldWidth(text, font)) + 16)
 }
 
 function TotalTag({
@@ -533,21 +543,21 @@ function PlateTag({
   const at = (fillDelay ?? 0) + index * TAG_FILL_STAGGER_MS
   const questionStyle = useFadeAt(
     !filled,
-    reducedMotion ? CROSSFADE_MS : GAP_OUT_MS,
+    reducedMotion ? CROSSFADE_MS : TAG_QUESTION_FADE_MS,
     at,
   )
   const borderStyle = useFadeAt(
     !filled,
     reducedMotion ? CROSSFADE_MS : FADE_MS,
-    reducedMotion ? at : at + GAP_OUT_MS,
+    reducedMotion ? at : at + TAG_QUESTION_FADE_MS,
   )
   const pillStyle = useFadeAt(
     filled,
     reducedMotion ? CROSSFADE_MS : FADE_MS,
-    reducedMotion ? at : at + GAP_OUT_MS,
+    reducedMotion ? at : at + TAG_QUESTION_FADE_MS,
   )
   const numeralStyle = useSpringIn(filled, {
-    delayMs: reducedMotion ? at : at + GAP_OUT_MS,
+    delayMs: reducedMotion ? at : at + TAG_QUESTION_FADE_MS,
   })
   const ringStyle = useFade(guided)
   const w = pillWidth(String(share), font, height)
@@ -628,7 +638,11 @@ function useFadeAt(visible: boolean, ms: number, delayMs: number) {
 }
 
 const styles = StyleSheet.create({
-  cloth: { position: 'absolute', backgroundColor: colors.myCream },
+  cloth: {
+    position: 'absolute',
+    backgroundColor: SHARE_CLOTH_FILL,
+    borderColor: colors.myPink,
+  },
   plate: {
     position: 'absolute',
     backgroundColor: colors.white,

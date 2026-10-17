@@ -3,6 +3,11 @@
  * table, for the committed canon (largest pile 20, largest share 6), plus
  * the fit rules on every viewport the multiply/skip table covers, and AC 10
  * (every plate of a plan has one size).
+ *
+ * Kyle's UX calls on #587 amend the table: the cloth's left padding is
+ * `ceil(tagW / 2) + 4` so the total tag clears the pile (call 2; the cloth
+ * widens, and L's `s` drops from 14 to 13, so L's cloth and block lose a
+ * point of height), and a share of 5 or less is one centred column (call 3).
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -63,7 +68,7 @@ const TABLE: Row[] = [
     v: { width: 375, height: 667, insets: inset() },
     area: [343, 272],
     s: 20,
-    cloth: [256, 56],
+    cloth: [274, 56],
     plate: [56, 128],
     row: [340, 15],
     block: 222,
@@ -72,18 +77,18 @@ const TABLE: Row[] = [
     name: 'L 667×375 b21',
     v: { width: 667, height: 375, insets: inset({ bottom: 21 }) },
     area: [376, 189],
-    s: 14,
-    cloth: [342, 26],
+    s: 13,
+    cloth: [340, 25],
     plate: [56, 128],
     row: [376, 24],
-    block: 176,
+    block: 175,
   },
   {
     name: 'TP 744×1133',
     v: { width: 744, height: 1133, insets: inset({ top: 24, bottom: 20 }) },
     area: [712, 530],
     s: 24,
-    cloth: [320, 70],
+    cloth: [338, 70],
     plate: [70, 160],
     row: [478, 32],
     block: 270,
@@ -93,7 +98,7 @@ const TABLE: Row[] = [
     v: { width: 1133, height: 744, insets: inset({ top: 24, bottom: 20 }) },
     area: [892, 317],
     s: 24,
-    cloth: [320, 70],
+    cloth: [338, 70],
     plate: [70, 160],
     row: [478, 32],
     block: 270,
@@ -171,6 +176,33 @@ describe('fit on every viewport of the multiply/skip table', () => {
     // Plate flowers stay full size everywhere; only the pile shrinks.
     expect(m.groups.flower).toBe(layout.tablet ? 24 : 20)
   })
+
+  // Kyle's call 2: the tag clears the pile.
+  it.each(VIEWPORTS)(
+    '$width×$height: no pile cell touches the total tag (largest pile)',
+    (v) => {
+      const layout = extendedMathLayout(v, 'divide')
+      const m = shareMetrics(layout, CANON)
+      const g = shareGeometry(m, 20, 4, layout.problem.width)
+      const tag = {
+        left: g.totalTag.x - m.tagWidth / 2,
+        right: g.totalTag.x + m.tagWidth / 2,
+        top: g.totalTag.y - m.groups.tagHeight / 2,
+        bottom: g.totalTag.y + m.groups.tagHeight / 2,
+      }
+      const s = m.pileFlower
+      const hits = g.pile.filter(
+        (c) =>
+          c.x - s / 2 < tag.right &&
+          c.x + s / 2 > tag.left &&
+          c.y - s / 2 < tag.bottom &&
+          c.y + s / 2 > tag.top,
+      )
+      expect(hits).toEqual([])
+      // The first flower sits 4 pt clear of the tag's inner edge, or more.
+      expect(g.pile[0]!.x - s / 2 - tag.right).toBeGreaterThanOrEqual(4)
+    },
+  )
 })
 
 describe('AC 10: one plate size per plan, the size for a share of 6', () => {
@@ -198,6 +230,15 @@ describe('geometry', () => {
   )
   const m = shareMetrics(layout, CANON)
 
+  it('the cloth’s left padding is ceil(tagW / 2) + 4 for the plan’s largest pile ("20": 39 pt → 24)', () => {
+    expect(m.tagWidth).toBe(39)
+    expect(m.tagOuter).toBe(20)
+    expect(m.clothLeftPad).toBe(24)
+    expect(m.clothPad).toBe(6)
+    const g = shareGeometry(m, 12, 3, layout.problem.width)
+    expect(g.pile[0]!.x - m.pileFlower / 2).toBe(g.cloth.x + 24)
+  })
+
   it('the pile reads in rows of 10, a wider gap after the 5th; the tag sits on the cloth’s left edge', () => {
     const g = shareGeometry(m, 12, 3, layout.problem.width)
     expect(g.pile).toHaveLength(12)
@@ -209,7 +250,19 @@ describe('geometry', () => {
     expect(g.totalTag).toEqual({ x: g.cloth.x, y: m.cloth.height / 2 })
   })
 
-  it('plate cells fill columns of 5, top to bottom, left column first', () => {
+  it('a share of 5 or less is one column centred across the plate, top to bottom (call 3)', () => {
+    const g = shareGeometry(m, 9, 3, layout.problem.width)
+    g.plates.forEach((plate, k) => {
+      const cells = g.plateCells[k]!
+      expect(cells).toHaveLength(3)
+      for (const c of cells) expect(c.x).toBe(plate.x + plate.width / 2)
+      // Not centred vertically: the column starts at the plate's top.
+      expect(cells[0]!.y).toBe(plate.y + m.groups.pad + m.groups.flower / 2)
+      expect(cells[1]!.y - cells[0]!.y).toBe(24)
+    })
+  })
+
+  it('a share of 6 fills columns of 5, top to bottom, left column first', () => {
     const g = shareGeometry(m, 18, 3, layout.problem.width)
     const cells = g.plateCells[0]!
     expect(cells).toHaveLength(6)
@@ -227,8 +280,9 @@ describe('geometry', () => {
     const lm = shareMetrics(l, CANON)
     const g = shareGeometry(lm, 20, 4, l.problem.width)
     expect(new Set(g.pile.map((p) => p.y)).size).toBe(1)
-    expect(g.pile[1]!.x - g.pile[0]!.x).toBe(16)
-    expect(g.pile[5]!.x - g.pile[4]!.x).toBe(20)
-    expect(g.pile[15]!.x - g.pile[14]!.x).toBe(20)
+    // s = 13 (call 2): 2 pt gaps, 6 after every 5th.
+    expect(g.pile[1]!.x - g.pile[0]!.x).toBe(15)
+    expect(g.pile[5]!.x - g.pile[4]!.x).toBe(19)
+    expect(g.pile[15]!.x - g.pile[14]!.x).toBe(19)
   })
 })

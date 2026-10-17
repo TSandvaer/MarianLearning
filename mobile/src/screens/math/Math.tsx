@@ -188,7 +188,7 @@ import type {
 import { NumberStrip } from './NumberStrip'
 import { ScaffoldFlash } from './ScaffoldFlash'
 import { ShareStage } from './ShareStage'
-import { AUTO_DEAL_DELAY_MS } from './shareDeal'
+import { AUTO_DEAL_DELAY_MS, FILL_HOLD_MS } from './shareDeal'
 import { createSilentMathPlayer, type SilentMathPlayer } from './silentPlayer'
 import { SkipTrack } from './SkipTrack'
 
@@ -598,6 +598,13 @@ export function MathScreen({
    *  goes from attentive-pointing back to listening). */
   const autoDealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const dealPoseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Sharing's right answer (Kyle's call 4 on #587): the advance also waits
+   *  until every plate tag shows the share, plus a 400 ms hold. `true` from
+   *  the tap until that timer fires. */
+  const shareHoldRef = useRef(false)
+  const shareHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** The current answer's advance check, for the share hold's timer. */
+  const tryAdvanceRef = useRef<(() => void) | null>(null)
   const minDwellElapsedRef = useRef(false)
   const correctSpeakResolvedRef = useRef(false)
   const advanceFiredRef = useRef(false)
@@ -624,6 +631,7 @@ export function MathScreen({
       closerTimerRef,
       autoDealTimerRef,
       dealPoseTimerRef,
+      shareHoldTimerRef,
     ]) {
       if (ref.current !== null) {
         clearTimeout(ref.current)
@@ -872,6 +880,25 @@ export function MathScreen({
     }, ms)
   }, [])
 
+  /** Sharing's right answer (call 4): the tags fill `ms` from now; Math
+   *  moves on no sooner than that plus a 400 ms hold of the full picture.
+   *  The 4 s advance ceiling still applies. */
+  const onShareFillScheduled = useCallback((ms: number) => {
+    if (!shareHoldRef.current) return
+    if (shareHoldTimerRef.current !== null) {
+      clearTimeout(shareHoldTimerRef.current)
+    }
+    shareHoldTimerRef.current = setTimeout(
+      () => {
+        shareHoldTimerRef.current = null
+        if (unmountedRef.current) return
+        shareHoldRef.current = false
+        tryAdvanceRef.current?.()
+      },
+      Math.ceil(ms + FILL_HOLD_MS),
+    )
+  }, [])
+
   // Fallback-path latency anchor (completion) + re-arm per problem.
   useLayoutEffect(() => {
     if (readAloudPlayed) {
@@ -894,7 +921,13 @@ export function MathScreen({
       setBudReveal('hidden')
       setReadRevealed(0)
       setAutoDeal(false)
-      for (const ref of [autoDealTimerRef, dealPoseTimerRef]) {
+      shareHoldRef.current = false
+      tryAdvanceRef.current = null
+      for (const ref of [
+        autoDealTimerRef,
+        dealPoseTimerRef,
+        shareHoldTimerRef,
+      ]) {
         if (ref.current !== null) {
           clearTimeout(ref.current)
           ref.current = null
@@ -1243,12 +1276,15 @@ export function MathScreen({
       minDwellElapsedRef.current = false
       correctSpeakResolvedRef.current = false
       advanceFiredRef.current = false
+      // Sharing: also hold until the tags have filled (`onShareFillScheduled`).
+      shareHoldRef.current = problem.kind === 'divide'
 
       const tryAdvance = () => {
         if (advanceFiredRef.current) return
         if (!minDwellElapsedRef.current || !correctSpeakResolvedRef.current) {
           return
         }
+        if (shareHoldRef.current) return
         // Live read: the app may have gone to the background a moment ago.
         if (visibility.getIsHidden()) {
           pendingAdvanceRef.current = true
@@ -1266,6 +1302,7 @@ export function MathScreen({
         setCelebrating(false)
         advanceToNext()
       }
+      tryAdvanceRef.current = tryAdvance
 
       /** The 4 s ceiling: the advance fires even if a line never ends. */
       const armCeiling = () => {
@@ -1657,6 +1694,7 @@ export function MathScreen({
                   guided={guidedActive}
                   answered={problemState.resolved}
                   onAutoDeal={onShareAutoDeal}
+                  onFillScheduled={onShareFillScheduled}
                 />
               )}
               {equation !== null && (

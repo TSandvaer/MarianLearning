@@ -13,6 +13,7 @@ import {
   INSTANT_MS,
   msUntilLanded,
   normalLaunchMs,
+  shareFillEndMs,
   undealt,
   type FlightPlan,
 } from './shareDeal'
@@ -96,17 +97,17 @@ describe('the hint deals (P4–P8)', () => {
 })
 
 describe('the fast deal and the given answer', () => {
-  it('a right tap deals every flower not launched yet, within about 1.1 s (20 left)', () => {
+  it('a right tap deals every flower not launched yet, within 790 ms (20 left; Kyle call 4)', () => {
     const plan = deal(emptyPlan(20), 'fast', NOW, 4, false)
-    expect(plan[1]!.start - plan[0]!.start).toBe(45)
+    expect(plan[1]!.start - plan[0]!.start).toBe(30)
     expect(plan[0]!.duration).toBe(FAST_FLIGHT_MS)
-    expect(msUntilLanded(plan, NOW)).toBe(19 * 45 + 220)
-    expect(msUntilLanded(plan, NOW)).toBeLessThanOrEqual(1100)
+    expect(msUntilLanded(plan, NOW)).toBe(19 * 30 + 220)
+    expect(msUntilLanded(plan, NOW)).toBe(790)
   })
 
-  it('the interval caps at 50 ms for a small pile', () => {
+  it('the interval caps at 40 ms for a small pile', () => {
     const plan = deal(emptyPlan(6), 'fast', NOW, 2, false)
-    expect(plan[1]!.start - plan[0]!.start).toBe(50)
+    expect(plan[1]!.start - plan[0]!.start).toBe(40)
   })
 
   it('mid-deal, a right tap re-times only the flowers still in the pile', () => {
@@ -114,7 +115,7 @@ describe('the fast deal and the given answer', () => {
     const at = NOW + 200 // flowers 0 and 1 have launched
     const fast = deal(auto, 'fast', at, 2, false)
     expect(fast.slice(0, 2)).toEqual(auto.slice(0, 2))
-    expect(fast.slice(2).map((f) => f!.start - at)).toEqual([0, 50, 100, 150])
+    expect(fast.slice(2).map((f) => f!.start - at)).toEqual([0, 40, 80, 120])
   })
 
   it('the given answer moves every flower left at once, 200 ms, no arc', () => {
@@ -145,5 +146,25 @@ describe('the fast deal and the given answer', () => {
         ),
       ).toBe(true)
     }
+  })
+})
+
+describe('shareFillEndMs (Kyle call 4: the advance waits for the picture)', () => {
+  it('P6, 15 on 5, tapped before any hint: 780 + 100 + 320 + 300 = 1500 ms', () => {
+    const plan = deal(emptyPlan(15), 'fast', NOW, 5, false)
+    const dealEnd = msUntilLanded(plan, NOW)
+    expect(dealEnd).toBe(780)
+    expect(shareFillEndMs(dealEnd, 5, false)).toBe(1500)
+  })
+
+  it('no flowers left: the fill alone (P1 after its deal: 100 + 80 + 300)', () => {
+    expect(shareFillEndMs(0, 2, false)).toBe(480)
+  })
+
+  it('Reduce Motion: a 200 ms crossfade deal and a 200 ms tag crossfade', () => {
+    const plan = deal(emptyPlan(6), 'fast', NOW, 2, true)
+    expect(shareFillEndMs(msUntilLanded(plan, NOW), 2, true)).toBe(
+      200 + 80 + 200,
+    )
   })
 })

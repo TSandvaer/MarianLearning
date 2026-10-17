@@ -200,6 +200,13 @@ const tagIds = () =>
     .getAllByTestId(/^math-share-tag-\d+(-filled)?$/, HIDDEN)
     .map((n) => String(n.props.testID))
 
+/**
+ * Long enough for any sharing answer to move on: the 1.2 s dwell, and the
+ * fill hold of Kyle's call 4 (at most 1.5 s + 0.4 s in this canon), well
+ * under the 4 s ceiling.
+ */
+const SETTLE_MS = 2500
+
 /** The read plays out; then the right chip, its line and the dwell. */
 async function answerRight(h: H, i: number) {
   const read = h.voice.last()
@@ -210,7 +217,7 @@ async function answerRight(h: H, i: number) {
   )
   await flush()
   await speakAll(h.voice.last())
-  await advance(ADVANCE_AFTER_CORRECT_MS)
+  await advance(SETTLE_MS)
 }
 
 async function toP4(h: H) {
@@ -440,5 +447,58 @@ describe('Reduce Motion (AC 11)', () => {
       'math-share-tag-0-filled',
       'math-share-tag-1-filled',
     ])
+  })
+})
+
+/**
+ * Kyle's call 4 on #587: on a right tap the advance waits until every tag
+ * shows the share, plus a 400 ms hold. P8, 18 on 3, tapped before any hint:
+ * the fast deal ends at 17 × (600 / 18) + 220 ≈ 786.7 ms, the last tag has
+ * filled at + 100 + 2 × 80 + 300 ≈ 1346.7 ms, so Math may not move on
+ * before ≈ 1746.7 ms (1747 on the timer).
+ */
+describe('a right answer holds the filled picture (call 4)', () => {
+  const HOLD_END_MS = 1747
+
+  async function toP8(h: H) {
+    for (let i = 0; i < 7; i++) await answerRight(h, i)
+    const read = h.voice.last()
+    expect(read.text).toBe(
+      'Eighteen flowers, three plates. How many on each plate?',
+    )
+    await speakAll(read)
+  }
+
+  it('a "Yes!" line shorter than the fill: Math moves on at fill end + 400 ms, every tag reading 6', async () => {
+    const h = await setup()
+    await toP8(h)
+    await fireEvent.press(screen.getByTestId('math-chip-6'))
+    await flush()
+    await speakAll(h.voice.last()) // "Yes! Six on each plate!" ends at once
+    await advance(ADVANCE_AFTER_CORRECT_MS)
+    expect(h.onSessionComplete).not.toHaveBeenCalled()
+    await advance(HOLD_END_MS - ADVANCE_AFTER_CORRECT_MS - 1)
+    expect(h.onSessionComplete).not.toHaveBeenCalled()
+    expect(dealtPlates()).toHaveLength(18)
+    expect(tagIds()).toEqual([
+      'math-share-tag-0-filled',
+      'math-share-tag-1-filled',
+      'math-share-tag-2-filled',
+    ])
+    await advance(1)
+    expect(h.onSessionComplete).toHaveBeenCalledTimes(1)
+  })
+
+  it('a "Yes!" line longer than the fill: Math moves on when the line ends', async () => {
+    const h = await setup()
+    await toP8(h)
+    await fireEvent.press(screen.getByTestId('math-chip-6'))
+    await flush()
+    const yes = h.voice.last()
+    expect(yes.text).toBe('Yes! Six on each plate!')
+    await advance(HOLD_END_MS + 500)
+    expect(h.onSessionComplete).not.toHaveBeenCalled()
+    await speakAll(yes)
+    expect(h.onSessionComplete).toHaveBeenCalledTimes(1)
   })
 })
