@@ -791,9 +791,9 @@ function matchSkipCountRead(
   return { sequence, step, next }
 }
 
-/** Throws when an extended problem's answer can't be recorded: the
- *  progress guard holds answers up to {@link EXTENDED_ANSWER_MAX} (99), and
- *  the session falls back rather than lose the progress doc. */
+/** Throws when an extended problem's answer can't be recorded: an older
+ *  build's progress guard holds answers up to {@link EXTENDED_ANSWER_MAX}
+ *  (99), and the session falls back rather than lose the progress doc. */
 function assertRecordableAnswer(read: string, answer: number): void {
   if (answer > EXTENDED_ANSWER_MAX) {
     throw new PlanFromServerError(
