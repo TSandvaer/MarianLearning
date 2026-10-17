@@ -148,17 +148,24 @@ describe('the story lines (§ 5.1, AC 7)', () => {
     )
   })
 
-  it('70 guidance lines and 18 path lines await their render (683 / 614 characters)', () => {
-    const g = GUIDANCE_LINES.filter((l) =>
-      GUIDANCE_LINES_AWAITING_RENDER.includes(l.id),
+  it('70 guidance lines and 18 path lines (683 / 614 characters), rendered in Lily', () => {
+    const g = GUIDANCE_LINES.filter(
+      (l) =>
+        l.kind === 'story-read' ||
+        l.kind === 'story-word' ||
+        STORY_NODES.some((n) => l.id.endsWith(`.${n}`)),
     )
     expect(g).toHaveLength(70)
     expect(g.reduce((n, l) => n + l.text.length, 0)).toBe(683)
-    const p = BAKED_PATH_LINES.filter((l) =>
-      PATH_LINES_AWAITING_RENDER.includes(l.id),
+    const p = BAKED_PATH_LINES.filter(
+      (l) =>
+        /\.word-song\.7(\.|$)/.test(l.id) ||
+        /\.(fox|hen|bug)-stories$/.test(l.id),
     )
     expect(p).toHaveLength(18)
     expect(p.reduce((n, l) => n + l.text.length, 0)).toBe(614)
+    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
+    expect(PATH_LINES_AWAITING_RENDER).toEqual([])
   })
 
   it('the path lines name the land and the steps', () => {

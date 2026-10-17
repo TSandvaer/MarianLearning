@@ -24,7 +24,7 @@ import {
   STAGE_SPOKEN_NAMES,
   capitalizeSpokenName,
 } from '../sessionEnd/friendlyNodeName'
-import { STORY_NODES, STORY_WORDS } from '../wordSong/littleStories'
+import { STORY_WORDS } from '../wordSong/littleStories'
 import { pathLineSrc, pathStepsOf } from './pathLines'
 
 /** A world (`'math'` | `'word-song'`). */
@@ -283,16 +283,9 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: content wave 3's story lines (§ 5.1): the three story steps' peek,
- * intro and replay lines, "Read the story." and the 54 one-word clips.
+ * Now: none.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] =
-  GUIDANCE_LINES.filter(
-    (l) =>
-      l.kind === 'story-read' ||
-      l.kind === 'story-word' ||
-      STORY_NODES.some((n) => l.id.endsWith(`.${n}`)),
-  ).map((l) => l.id)
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 

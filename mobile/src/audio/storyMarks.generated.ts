@@ -19,4 +19,199 @@ export const STORY_MARKS: Readonly<
       segments: readonly (readonly [number, number])[]
     }
   >
-> = {}
+> = {
+  'A pot is on the desk. The hen has a cup.': {
+    bytes: 29883,
+    sha256: 'eae8864d46d690de',
+    segments: [
+      [88, 1672],
+      [2230, 3507],
+    ],
+  },
+  'The bug got a gem. It ran to the tent.': {
+    bytes: 28002,
+    sha256: '032afb169c9a9c2d',
+    segments: [
+      [69, 1555],
+      [1962, 3236],
+    ],
+  },
+  'The bug is in the bag. The bag is in the van.': {
+    bytes: 30510,
+    sha256: 'af1f6dea49a67635',
+    segments: [
+      [89, 1594],
+      [2130, 3550],
+    ],
+  },
+  'The bug is in the cup. It has a fig.': {
+    bytes: 25494,
+    sha256: '02bf72ac4c1c97b6',
+    segments: [
+      [41, 1572],
+      [2020, 2907],
+    ],
+  },
+  'The bug is in the nest. The hen is on a log.': {
+    bytes: 31136,
+    sha256: 'affdc8b162f46221',
+    segments: [
+      [36, 1643],
+      [2138, 3605],
+    ],
+  },
+  'The bug is on a lid. The lid is on the pot.': {
+    bytes: 32599,
+    sha256: '84d0c5f0a448dd9b',
+    segments: [
+      [44, 1594],
+      [2185, 3803],
+    ],
+  },
+  'The bug is on the bed. It has a nut.': {
+    bytes: 24867,
+    sha256: '73ef886a5c878579',
+    segments: [
+      [47, 1457],
+      [1943, 2821],
+    ],
+  },
+  'The bug is on the rug. The cat is on the bed.': {
+    bytes: 31136,
+    sha256: 'ba97c7522231cfe9',
+    segments: [
+      [42, 1671],
+      [2189, 3633],
+    ],
+  },
+  'The dog has a bone. The fox has a fig.': {
+    bytes: 29256,
+    sha256: '50105e4c96210654',
+    segments: [
+      [56, 1439],
+      [2005, 3385],
+    ],
+  },
+  'The dog ran to the pond. The bug hid. It is in the tub.': {
+    bytes: 38869,
+    sha256: 'cb41c141f12554a0',
+    segments: [
+      [44, 1691],
+      [2134, 3042],
+      [3542, 4581],
+    ],
+  },
+  'The fox and the crab sat in the sun. The crab got a plum.': {
+    bytes: 36988,
+    sha256: '68f775c651ae3e99',
+    segments: [
+      [87, 2387],
+      [2913, 4319],
+    ],
+  },
+  'The fox has a hat. The hat is in the box.': {
+    bytes: 31136,
+    sha256: '75f2e9a06ffeecea',
+    segments: [
+      [75, 1502],
+      [2026, 3623],
+    ],
+  },
+  'The fox is in the tent. The tent is on a rock.': {
+    bytes: 31972,
+    sha256: '5cb7ea87e73329e3',
+    segments: [
+      [87, 1703],
+      [2277, 3719],
+    ],
+  },
+  'The fox sat on the bed. The hen ran to the van.': {
+    bytes: 32599,
+    sha256: 'd8700a74615fd810',
+    segments: [
+      [104, 1567],
+      [2112, 3780],
+    ],
+  },
+  'The fox sat on the rug. It has a cup.': {
+    bytes: 25494,
+    sha256: '83a3d202f7f84438',
+    segments: [
+      [66, 1620],
+      [2096, 2901],
+    ],
+  },
+  'The frog sat on a log. The fox hid in the shed.': {
+    bytes: 33853,
+    sha256: '46d140cd5f752430',
+    segments: [
+      [61, 1675],
+      [2253, 3906],
+    ],
+  },
+  'The hen got a jug. Jam is in it. She has a cup.': {
+    bytes: 33226,
+    sha256: '53728f63be9e4318',
+    segments: [
+      [37, 1302],
+      [1756, 2594],
+      [3020, 3905],
+    ],
+  },
+  'The hen has a bag. A plum is in the bag.': {
+    bytes: 31136,
+    sha256: 'f5937afbd38ba11f',
+    segments: [
+      [38, 1460],
+      [2023, 3631],
+    ],
+  },
+  'The hen has a box and a lamp. A ring is in the box.': {
+    bytes: 36361,
+    sha256: '06058bc7c52de5d9',
+    segments: [
+      [35, 2154],
+      [2688, 4256],
+    ],
+  },
+  'The hen has a cake. She is in the van.': {
+    bytes: 28002,
+    sha256: '7aa631a2824fde29',
+    segments: [
+      [51, 1433],
+      [1969, 3220],
+    ],
+  },
+  'The hen has a drum. The pig has a kite.': {
+    bytes: 29883,
+    sha256: 'cd46e111b5b1dbaa',
+    segments: [
+      [50, 1460],
+      [2054, 3481],
+    ],
+  },
+  'The hen has a hat. A wig is in the pond!': {
+    bytes: 28629,
+    sha256: '3624daee4a007a30',
+    segments: [
+      [35, 1466],
+      [1949, 3328],
+    ],
+  },
+  'The hen has a tent. A pen is in the tent.': {
+    bytes: 32599,
+    sha256: 'e25b11d7c65f8d71',
+    segments: [
+      [0, 1518],
+      [2082, 3817],
+    ],
+  },
+  'The pig got a kite. The fox ran to the pig.': {
+    bytes: 31972,
+    sha256: '599d20881e0a033f',
+    segments: [
+      [90, 1553],
+      [2129, 3722],
+    ],
+  },
+}

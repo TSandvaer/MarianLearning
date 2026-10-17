@@ -192,14 +192,9 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
     // Exactly the awaiting list: the render commit adds the clips AND
     // empties `PATH_LINES_AWAITING_RENDER`.
     expect(missing.sort()).toEqual([...PATH_LINES_AWAITING_RENDER].sort())
-    // Content wave 2's tent and cake lines are rendered in Lily (§ 6.2);
-    // content wave 3's 18 await their render (§ 5.1).
-    expect(PATH_LINES_AWAITING_RENDER).toHaveLength(18)
-    expect(
-      PATH_LINES_AWAITING_RENDER.every((id) =>
-        /(-stories|\.word-song\.7(\.no-number)?)$/.test(id),
-      ),
-    ).toBe(true)
+    // Content wave 2's tent and cake lines (§ 6.2) and content wave 3's 18
+    // (§ 5.1) are rendered in Lily.
+    expect(PATH_LINES_AWAITING_RENDER).toEqual([])
   })
 
   it('stays inside the spec §4.5 vocabulary', () => {
