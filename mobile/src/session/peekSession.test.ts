@@ -10,9 +10,12 @@ import { REPO_ROOT } from '../../test/webSource'
 import type { LoadedSessionAudio, PreparedSession } from '../audio'
 import {
   buildPeekPayload,
+  buildReplayPayload,
   peekPlanFromServer,
   PEEK_TIMEOUT_MS,
+  replayPlanFromServer,
   requestPeek,
+  requestReplay,
 } from './peekSession'
 
 function canonPlan(world: 'math' | 'word-song', node: string, count: number) {
@@ -181,4 +184,76 @@ it('requestPeek: the caller’s abort (Home) aborts the request', async () => {
   outer.abort()
   await expect(pending).rejects.toThrow('aborted')
   expect(seen?.aborted).toBe(true)
+})
+
+describe('the Map replay (map-tap-to-play § 3)', () => {
+  const replayOf = (world: 'math' | 'word-song', node: string) => ({
+    ...canonPlan(world, node, 8),
+    id: `replay-${world}`,
+  })
+
+  it('the payload names the step and carries no progress hint', () => {
+    expect(buildReplayPayload('word-song', 'cvc-words')).toEqual({
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      replay: { node: 'cvc-words' },
+    })
+  })
+
+  it('accepts only a replay- plan of exactly 8 readable problems', () => {
+    expect(
+      replayPlanFromServer('math', replayOf('math', 'add-to-10')).plan.problems,
+    ).toHaveLength(8)
+    expect(
+      replayPlanFromServer('word-song', replayOf('word-song', 'cvc-words')).plan
+        .problems,
+    ).toHaveLength(8)
+    // An older server ignores `replay` and answers with the forward plan.
+    expect(() =>
+      replayPlanFromServer('math', canonPlan('math', 'add-to-10', 8)),
+    ).toThrow(/another plan/)
+    // A peek's plan is not a replay.
+    expect(() =>
+      replayPlanFromServer('math', peekOf('math', 'add-to-10')),
+    ).toThrow(/another plan/)
+    expect(() =>
+      replayPlanFromServer('math', {
+        ...canonPlan('math', 'add-to-10', 3),
+        id: 'replay-math',
+      }),
+    ).toThrow()
+  })
+
+  it('requestReplay: loads beside the current session; the result is a replay', async () => {
+    const { start, audio } = fakeStart(replayOf('math', 'add-to-10'))
+    const prepared = await requestReplay({
+      world: 'math',
+      node: 'add-to-10',
+      signal: new AbortController().signal,
+      start,
+      now: () => 7,
+    })
+    const [args, deps] = start.mock.calls[0]!
+    expect(args.sessionId).toBe('replay-add-to-10-7')
+    expect(deps).toEqual({ alongside: true })
+    expect(prepared).toMatchObject({
+      mode: 'replay',
+      world: 'math',
+      node: 'add-to-10',
+    })
+    expect(prepared.plan.problems).toHaveLength(8)
+    expect(prepared.audio).toBe(audio)
+  })
+
+  it('requestPeek still resolves a peek', async () => {
+    const { start } = fakeStart(peekOf('math', 'sub-to-10'))
+    const prepared = await requestPeek({
+      world: 'math',
+      node: 'sub-to-10',
+      signal: new AbortController().signal,
+      start,
+    })
+    expect(prepared.mode).toBe('peek')
+  })
 })
