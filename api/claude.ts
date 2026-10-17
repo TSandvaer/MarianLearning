@@ -104,9 +104,11 @@ import { applyFirstEncounterGate } from './_firstEncounterGate.js'
 import {
   buildMixResponse,
   buildPeekResponse,
+  buildReplayResponse,
   buildReviewResponse,
   hasMixRequest,
   hasPeekRequest,
+  hasReplayRequest,
   hasReviewRequest,
   withWarmupBlocks,
 } from './_review.js'
@@ -855,6 +857,27 @@ export async function handler(
           )
         }
         return jsonResponse(peek, 200, headers)
+      }
+      // Map replay (native spec map-tap-to-play.md § 3): the peek's step 0,
+      // for a mastered step's canon problems 1–8. Free, and it counts
+      // toward nothing.
+      if (hasReplayRequest(body.payload)) {
+        const replay = buildReplayResponse(
+          body.payload,
+          trackPayload.track,
+          canonResolver,
+        )
+        if (replay === null) {
+          return jsonResponse(
+            {
+              error: 'invalid-request',
+              message: 'replay must name one step of the track',
+            },
+            400,
+            headers,
+          )
+        }
+        return jsonResponse(replay, 200, headers)
       }
       // Warm-up (§ 7.4): whichever branch answers the forward request, a
       // `payload.warmup`'s canon blocks are appended to a copy of its

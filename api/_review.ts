@@ -32,6 +32,12 @@
 //   renamed `<ns>.p1..p3.<slot>` and a plan id starting `peek-` (label
 //   `Peek`); same place in the handler, same 400 on a bad ref. A peek counts
 //   toward nothing; the server never sees what the child does with it.
+// - `payload.replay = { node }` (a mastered stop's replay, native spec
+//   design/native/map-tap-to-play.md § 3): the peek's responder for the
+//   step's canon problems 1–8, in canon order. `buildReplayResponse`
+//   answers with plan id `replay-<track>` (label `Replay`); same place in
+//   the handler, a 400 on a node that is not a step of the track. A replay
+//   counts toward nothing.
 // - `payload.mix = { blocks }` (exactly 8 refs, each a step of
 //   `MIX_SOURCE_STEPS`: a times-mix session, content wave 1
 //   design/native/content-wave-1.md § 2.4): core composed the session from
@@ -53,6 +59,8 @@ import {
   MIX_SOURCE_STEPS,
   PEEK_BLOCK_COUNT,
   PEEK_PLAN_ID_PREFIX,
+  REPLAY_BLOCK_COUNT,
+  REPLAY_PLAN_ID_PREFIX,
   REVIEW_BLOCK_COUNT,
   REVIEW_PLAN_ID_PREFIX,
   WARMUP_BLOCK_MAX,
@@ -190,6 +198,47 @@ export function hasReviewRequest(payload: unknown): boolean {
 /** Does the payload ask for a Map peek (`payload.peek` present)? */
 export function hasPeekRequest(payload: unknown): boolean {
   return hasField(payload, PEEK.field)
+}
+
+/** Does the payload ask for a Map replay (`payload.replay` present)? */
+export function hasReplayRequest(payload: unknown): boolean {
+  return hasField(payload, 'replay')
+}
+
+/**
+ * The Map replay's response for `payload.replay = { node }`
+ * (map-tap-to-play § 3): the step's canon problems 1–8 with their baked
+ * audio, in canon order, renamed `<ns>.p1..p8.` (unchanged), plan id
+ * `replay-<track>`. `null` when the request is invalid (no object, a node
+ * that is not a step of the track, a missing canon entry): the handler
+ * answers 400 `invalid-request`. Every other progress hint is ignored. No
+ * Anthropic call, no TTS, no cache write.
+ */
+export function buildReplayResponse(
+  payload: unknown,
+  track: PlannerTrack,
+  resolve: CanonResolver,
+): SessionStartResponse | null {
+  const raw = (payload as Record<string, unknown>).replay
+  if (typeof raw !== 'object' || raw === null) return null
+  const node = (raw as Record<string, unknown>).node
+  if (typeof node !== 'string' || !stepsOf(track).includes(node)) return null
+  const refs = Array.from({ length: REPLAY_BLOCK_COUNT }, (_, i) => ({
+    node,
+    problem: i + 1,
+  }))
+  const blocks = copyRefs(refs, track, resolve)
+  if (blocks === null) return null
+  return {
+    ok: true,
+    kind: 'session-start',
+    plan: {
+      id: `${REPLAY_PLAN_ID_PREFIX}${track}`,
+      label: 'Replay',
+      utterances: blocks.plan,
+    },
+    utterances: blocks.utterances,
+  }
 }
 
 /** Does the payload ask for a times-mix session (`payload.mix` present)? */
