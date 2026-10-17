@@ -5,8 +5,10 @@
  * Why: `--retake` is one blind re-roll, and with one input it is barely a
  * re-roll at all. #558's retake of "Read the fig." came back with an energy
  * envelope 0.994 correlated with the take it replaced, the same "figa", and
- * failed the 2026-10-17 ear test again. Takes only differ when the seed or
- * the input text differs, so this script varies both and measures the result.
+ * failed the 2026-10-17 ear test again. A seed is best effort and in
+ * practice did not vary eleven_v4 takes either (3 seeded takes, r 0.985-
+ * 0.994); input variants are the lever. This script sends a seed anyway,
+ * varies the input, and measures the result.
  *
  * Lines (`--ids`, comma-separated):
  *   <canon>.json:<utteranceId>  a canon utterance, e.g.

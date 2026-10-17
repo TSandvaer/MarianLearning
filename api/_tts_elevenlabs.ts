@@ -188,8 +188,10 @@ export interface ElevenLabsOptions {
   timeoutMs?: number
   env?: NodeJS.ProcessEnv
   backoff?: BackoffPolicy
-  /** Sampling seed (0-4294967295). Unset in production; the take picker
-   *  (scripts/lilyTakePicker.ts) varies it so takes of one line differ. */
+  /** Sampling seed (0-4294967295), best effort per the API. Unset in
+   *  production. scripts/lilyTakePicker.ts sends one per take, but in
+   *  practice it did not vary eleven_v4 takes of one input; input variants
+   *  do. */
   seed?: number
 }
 
