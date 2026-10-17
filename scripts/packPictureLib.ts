@@ -1,7 +1,8 @@
 /**
  * Pure helpers for `scripts/generatePackPictures.ts` (Word Song pack pictures
- * via OpenAI gpt-image-2.5-flare). No file system, no network: everything
- * here is unit-tested in `packPictureLib.test.ts`.
+ * and, with `--scenes`, the little-story scenes, via OpenAI
+ * gpt-image-2.5-flare). No file system, no network: everything here is
+ * unit-tested in `packPictureLib.test.ts`.
  *
  * Covers: manifest parse/validation + selection, prompt building, CLI args,
  * spend math (usage → USD, dry-run estimate, ledger sum, budget gate), the
@@ -32,22 +33,42 @@ export const PATHS = {
   ledger: 'design/references/picture-pack/openai/spend-ledger.jsonl',
   packRoot: 'design/references/picture-pack',
   currentPictures: 'mobile/assets/pictures',
+  // --scenes (content-wave-3.md § 6): its own manifest, variants and ledger,
+  // so --budget caps the scene spend alone (the pack ledger already holds
+  // the pack's spend).
+  sceneManifest: 'design/word-song/scene-manifest.json',
+  sceneOutRoot: 'design/references/picture-pack/openai/scenes',
+  sceneLedger:
+    'design/references/picture-pack/openai/scenes/spend-ledger.jsonl',
+  scenes: 'mobile/assets/scenes',
 } as const
 
 export function anchorRelPaths(): string[] {
   return ANCHOR_WORDS.map((w) => `${PATHS.anchorsDir}/anchor-${w}.png`)
 }
 
-export function batchDirRel(batch: number): string {
-  return `${PATHS.outRoot}/batch-${batch}`
+/** `outRoot` is PATHS.outRoot for the pack, PATHS.sceneOutRoot for scenes. */
+export function batchDirRel(
+  batch: number,
+  outRoot: string = PATHS.outRoot,
+): string {
+  return `${outRoot}/batch-${batch}`
 }
 
-export function variantRelPath(batch: number, word: string, k: number): string {
-  return `${batchDirRel(batch)}/${word}__v${k}.png`
+export function variantRelPath(
+  batch: number,
+  word: string,
+  k: number,
+  outRoot: string = PATHS.outRoot,
+): string {
+  return `${batchDirRel(batch, outRoot)}/${word}__v${k}.png`
 }
 
-export function contactSheetRelPath(batch: number): string {
-  return `${batchDirRel(batch)}/contact-sheet.png`
+export function contactSheetRelPath(
+  batch: number,
+  outRoot: string = PATHS.outRoot,
+): string {
+  return `${batchDirRel(batch, outRoot)}/contact-sheet.png`
 }
 
 export function currentPictureRelPath(word: string): string {
@@ -62,6 +83,14 @@ export function pickDestRelPath(tier: string, word: string): string {
 /** Pack picture size: every shipped pack PNG-in-SVG embeds a 500x500 PNG,
  *  and neither embed-pictures.ts nor mobile's export-assets.mjs resizes. */
 export const PACK_PICTURE_PX = 500
+
+/** A picked scene: an opaque 600 px WebP the app shows as is
+ *  (content-wave-3.md § 4.2, § 6). */
+export const SCENE_PICTURE_PX = 600
+
+export function sceneDestRelPath(scene: string): string {
+  return `${PATHS.scenes}/story-${scene}.webp`
+}
 
 /** Variant indices already on disk for `word`, ascending, from a listing of
  *  its batch dir. */
@@ -100,16 +129,22 @@ function isStringArray(v: unknown): v is string[] {
 }
 
 /**
- * Validates the parsed manifest JSON. Collects every problem and throws one
+ * Validates the rows both manifests share (`<key>`, tier, batch, subject,
+ * avoid) plus `check`'s extra fields. Collects every problem and throws one
  * error listing them all, so a broken manifest is fixed in one pass. Unknown
  * extra keys are ignored (forward-compatible with manifest additions).
  */
-export function parseManifest(raw: unknown): PictureManifestEntry[] {
+function parseRows<T>(
+  raw: unknown,
+  key: 'word' | 'scene',
+  check: (r: Record<string, unknown>, label: string) => string[],
+  build: (r: Record<string, unknown>) => T,
+): T[] {
   if (!Array.isArray(raw)) {
     throw new Error('Manifest must be a JSON array of entries.')
   }
   const errors: string[] = []
-  const entries: PictureManifestEntry[] = []
+  const entries: T[] = []
   const seen = new Set<string>()
 
   raw.forEach((item: unknown, i) => {
@@ -119,13 +154,13 @@ export function parseManifest(raw: unknown): PictureManifestEntry[] {
       return
     }
     const r = item as Record<string, unknown>
-    const label =
-      typeof r.word === 'string' && r.word ? `${at} ("${r.word}")` : at
+    const id = r[key]
+    const label = typeof id === 'string' && id ? `${at} ("${id}")` : at
     const before = errors.length
 
-    if (typeof r.word !== 'string' || !SLUG.test(r.word)) {
+    if (typeof id !== 'string' || !SLUG.test(id)) {
       errors.push(
-        `${label}: "word" must be a lower-case slug (a-z, 0-9, -), got ${JSON.stringify(r.word)}`,
+        `${label}: "${key}" must be a lower-case slug (a-z, 0-9, -), got ${JSON.stringify(id)}`,
       )
     }
     if (typeof r.tier !== 'string' || !SLUG.test(r.tier)) {
@@ -148,23 +183,14 @@ export function parseManifest(raw: unknown): PictureManifestEntry[] {
     if (!isStringArray(r.avoid)) {
       errors.push(`${label}: "avoid" must be an array of strings`)
     }
-    if (!isStringArray(r.distinctFrom)) {
-      errors.push(`${label}: "distinctFrom" must be an array of strings`)
-    }
-    if (typeof r.word === 'string' && SLUG.test(r.word)) {
-      if (seen.has(r.word)) errors.push(`${label}: duplicate word`)
-      seen.add(r.word)
+    errors.push(...check(r, label))
+    if (typeof id === 'string' && SLUG.test(id)) {
+      if (seen.has(id)) errors.push(`${label}: duplicate ${key}`)
+      seen.add(id)
     }
     if (errors.length > before) return
 
-    entries.push({
-      word: r.word as string,
-      tier: r.tier as string,
-      batch: r.batch as number,
-      subject: (r.subject as string).trim(),
-      avoid: (r.avoid as string[]).map((s) => s.trim()).filter(Boolean),
-      distinctFrom: r.distinctFrom as string[],
-    })
+    entries.push(build(r))
   })
 
   if (errors.length > 0) {
@@ -176,37 +202,117 @@ export function parseManifest(raw: unknown): PictureManifestEntry[] {
   return entries
 }
 
+function trimmedList(v: unknown): string[] {
+  return (v as string[]).map((s) => s.trim()).filter(Boolean)
+}
+
+/** Validates the parsed design/word-song/picture-manifest.json. */
+export function parseManifest(raw: unknown): PictureManifestEntry[] {
+  return parseRows(
+    raw,
+    'word',
+    (r, label) =>
+      isStringArray(r.distinctFrom)
+        ? []
+        : [`${label}: "distinctFrom" must be an array of strings`],
+    (r) => ({
+      word: r.word as string,
+      tier: r.tier as string,
+      batch: r.batch as number,
+      subject: (r.subject as string).trim(),
+      avoid: trimmedList(r.avoid),
+      distinctFrom: r.distinctFrom as string[],
+    }),
+  )
+}
+
+/** One row of design/word-song/scene-manifest.json (content-wave-3.md § 6).
+ *  `scene` is the story id ('fox-1'), `refs` the pack words whose chip
+ *  pictures go in as references, in the order the subject names them. */
+export interface SceneManifestEntry {
+  scene: string
+  tier: string
+  batch: number
+  subject: string
+  avoid: string[]
+  refs: string[]
+}
+
+/** The images API takes 16 input images; the spec caps refs at 4. */
+export const MAX_SCENE_REFS = 4
+
+/** Validates the parsed design/word-song/scene-manifest.json. */
+export function parseSceneManifest(raw: unknown): SceneManifestEntry[] {
+  return parseRows(
+    raw,
+    'scene',
+    (r, label) => {
+      const refs = r.refs
+      if (
+        !isStringArray(refs) ||
+        refs.length === 0 ||
+        refs.length > MAX_SCENE_REFS ||
+        !refs.every((w) => SLUG.test(w))
+      ) {
+        return [
+          `${label}: "refs" must be 1-${MAX_SCENE_REFS} pack words (lower-case slugs), got ${JSON.stringify(refs)}`,
+        ]
+      }
+      return new Set(refs).size === refs.length
+        ? []
+        : [`${label}: "refs" names a word twice`]
+    },
+    (r) => ({
+      scene: r.scene as string,
+      tier: r.tier as string,
+      batch: r.batch as number,
+      subject: (r.subject as string).trim(),
+      avoid: trimmedList(r.avoid),
+      refs: r.refs as string[],
+    }),
+  )
+}
+
+/** `all` is the bare `--scenes` run: every scene in the manifest. */
 export type Selection =
   | { kind: 'batch'; batch: number }
   | { kind: 'words'; words: string[] }
+  | { kind: 'all' }
 
-/** Picks the manifest rows to generate, in manifest order for a batch and in
+/** Picks the rows to generate, in manifest order for a batch (or all) and in
  *  the requested order for `--words`. Throws on an empty batch or unknown
- *  words. */
-export function selectEntries(
-  manifest: PictureManifestEntry[],
+ *  keys. */
+export function selectRows<T extends { batch: number }>(
+  rows: readonly T[],
   sel: Selection,
-): PictureManifestEntry[] {
+  keyOf: (row: T) => string,
+): T[] {
+  if (sel.kind === 'all') return [...rows]
   if (sel.kind === 'batch') {
-    const rows = manifest.filter((e) => e.batch === sel.batch)
-    if (rows.length === 0) {
-      const batches = [...new Set(manifest.map((e) => e.batch))].sort(
+    const picked = rows.filter((e) => e.batch === sel.batch)
+    if (picked.length === 0) {
+      const batches = [...new Set(rows.map((e) => e.batch))].sort(
         (a, b) => a - b,
       )
       throw new Error(
         `No manifest entries in batch ${sel.batch}. Batches present: ${batches.join(', ')}`,
       )
     }
-    return rows
+    return picked
   }
-  const byWord = new Map(manifest.map((e) => [e.word, e]))
-  const unknown = sel.words.filter((w) => !byWord.has(w))
+  const byKey = new Map(rows.map((e) => [keyOf(e), e]))
+  const unknown = sel.words.filter((w) => !byKey.has(w))
   if (unknown.length > 0) {
     throw new Error(`Not in the manifest: ${unknown.join(', ')}`)
   }
-  return [...new Set(sel.words)].map(
-    (w) => byWord.get(w) as PictureManifestEntry,
-  )
+  return [...new Set(sel.words)].map((w) => byKey.get(w) as T)
+}
+
+export function selectEntries(
+  manifest: PictureManifestEntry[],
+  sel: Selection,
+): PictureManifestEntry[] {
+  return selectRows(manifest, sel, (e) => e.word)
 }
 
 // ── Prompt ──────────────────────────────────────────────────────────────────
@@ -215,11 +321,28 @@ export function selectEntries(
  * The bake-off STYLE prompt, restructured so the manifest's one-sentence
  * `subject` stands as its own sentence ("Subject: … Draw this subject …").
  */
-export const STYLE_INSTRUCTION =
+const STYLE_BODY =
   "Draw this subject as a single children's picture-book illustration in exactly the same art " +
   'style as the reference pictures: the same soft line weight, the same flat soft colours and ' +
-  'gentle cel-shading, the same simplicity and finish. The references show the style only; do ' +
-  'not copy their subjects.'
+  'gentle cel-shading, the same simplicity and finish.'
+
+export const STYLE_INSTRUCTION = `${STYLE_BODY} The references show the style only; do not copy their subjects.`
+
+/**
+ * The scene form of STYLE_INSTRUCTION. A scene call sends the anchors first
+ * and then each `refs` chip picture, which SCENE_RULES asks the model to
+ * copy, so "show the style only" is scoped to the anchors; otherwise the
+ * prompt would say both "do not copy" and "draw like" of the same images.
+ */
+export const SCENE_STYLE_INSTRUCTION =
+  `${STYLE_BODY} The first ${ANCHOR_WORDS.length} reference pictures show the style only; do not ` +
+  'copy their subjects. The other reference pictures show the characters and objects of this scene.'
+
+/** Scene rules, verbatim from content-wave-3.md § 6. */
+export const SCENE_RULES =
+  'Show exactly the characters and objects named, each drawn like its reference picture, in one ' +
+  'simple scene on a soft cream background that fills the square. Nothing else: no other ' +
+  'animals, people or objects, no text or letters, no faces on objects.'
 
 /**
  * Pack-wide rules every prompt carries (picture-manifest.md § "Assumed in the
@@ -257,6 +380,21 @@ export function buildPrompt(
   return parts.join(' ')
 }
 
+/** A scene's `avoid` names arrangements to leave out ("the fox wearing the
+ *  hat"), so it reads "Do not show", not the pack's "Must not look like". */
+export function buildScenePrompt(
+  entry: Pick<SceneManifestEntry, 'subject' | 'avoid'>,
+): string {
+  const parts = [
+    `Subject: ${asSentence(entry.subject)}`,
+    SCENE_STYLE_INSTRUCTION,
+    SCENE_RULES,
+  ]
+  const avoid = entry.avoid.map((s) => s.trim()).filter(Boolean)
+  if (avoid.length > 0) parts.push(`Do not show: ${avoid.join('; ')}.`)
+  return parts.join(' ')
+}
+
 // ── Spend ───────────────────────────────────────────────────────────────────
 
 /** Published gpt-image-2.5 rates, USD per 1M tokens. */
@@ -266,10 +404,10 @@ export const RATES_PER_1M = {
   imageOutput: 30,
 } as const
 
-/** Measured on 2026-10-16: 3 anchors in = 3,072 image tokens; one 1024x1024
- *  medium image out = 439 tokens. */
+/** Measured on 2026-10-16: 3 anchors in = 3,072 image tokens (1,024 each);
+ *  one 1024x1024 medium image out = 439 tokens. */
 export const MEASURED = {
-  anchorImageInputTokens: 3072,
+  inputImageTokens: 1024,
   outputTokensPerImage: 439,
 } as const
 
@@ -332,30 +470,39 @@ export function costFromUsage(usage: ImageUsage): CallCost {
 }
 
 /**
- * Pre-call estimate for one images.edit call returning `n` images. Input is
- * billed once per call (usage is reported per response); text tokens are
- * approximated as chars / 4, which over-counts English prose (worth well
- * under $0.001 at $5 / 1M).
+ * Pre-call estimate for one images.edit call returning `n` images from
+ * `inputImages` input images (the 3 anchors, plus a scene's refs). Input
+ * images are billed once per image returned: every pack call in the
+ * 2026-10-16 ledger (90 calls, n = 2) reports 6,144 image-in tokens for the
+ * 3 anchors, twice the n = 1 measurement. Each input image is assumed to cost
+ * what a 1024 px anchor did; a scene's refs are 500 px chip pictures, and the
+ * ledger records what they really cost. Text input is billed once per image
+ * returned too: the cake call's 804-char prompt reports 422 text-in tokens,
+ * about 2 x 211. Text tokens per image are approximated as chars / 4.
  */
-export function estimateCallCost(n: number, promptChars: number): CallCost {
+export function estimateCallCost(
+  n: number,
+  promptChars: number,
+  inputImages: number = ANCHOR_WORDS.length,
+): CallCost {
   return priced(
-    MEASURED.anchorImageInputTokens,
-    Math.ceil(promptChars / 4),
+    n * inputImages * MEASURED.inputImageTokens,
+    n * Math.ceil(promptChars / 4),
     n * MEASURED.outputTokensPerImage,
   )
 }
 
-export interface LedgerEntry extends CallCost {
+/** One line of a spend ledger: `word` in the pack's, `scene` in the scenes'. */
+export type LedgerEntry = CallCost & {
   ts: string
   runId: string
-  word: string
   batch: number
   model: string
   size: string
   quality: string
   n: number
   usage: ImageUsage
-}
+} & ({ word: string } | { scene: string })
 
 export function ledgerLine(entry: LedgerEntry): string {
   return `${JSON.stringify(entry)}\n`
@@ -442,6 +589,17 @@ export interface PickCopy {
   dest: string
 }
 
+function lookUpPicks<T>(
+  picks: PickRequest[],
+  byKey: Map<string, T>,
+): (PickRequest & { row: T })[] {
+  const unknown = picks.filter((p) => !byKey.has(p.word)).map((p) => p.word)
+  if (unknown.length > 0) {
+    throw new Error(`--pick: not in the manifest: ${unknown.join(', ')}`)
+  }
+  return picks.map((p) => ({ ...p, row: byKey.get(p.word) as T }))
+}
+
 /** Maps picks to repo-relative copies: openai/batch-N/<word>__vK.png →
  *  transparent-<tier>/picture-<word>.png. Throws on words not in the
  *  manifest. */
@@ -450,25 +608,36 @@ export function planPicks(
   manifest: PictureManifestEntry[],
 ): PickCopy[] {
   const byWord = new Map(manifest.map((e) => [e.word, e]))
-  const unknown = picks.filter((p) => !byWord.has(p.word)).map((p) => p.word)
-  if (unknown.length > 0) {
-    throw new Error(`--pick: not in the manifest: ${unknown.join(', ')}`)
-  }
-  return picks.map((p) => {
-    const e = byWord.get(p.word) as PictureManifestEntry
-    return {
-      word: p.word,
-      src: variantRelPath(e.batch, p.word, p.variant),
-      dest: pickDestRelPath(e.tier, p.word),
-    }
-  })
+  return lookUpPicks(picks, byWord).map((p) => ({
+    word: p.word,
+    src: variantRelPath(p.row.batch, p.word, p.variant),
+    dest: pickDestRelPath(p.row.tier, p.word),
+  }))
+}
+
+/** Scene picks: openai/scenes/batch-N/<scene>__vK.png →
+ *  mobile/assets/scenes/story-<scene>.webp (`word` holds the scene id). */
+export function planScenePicks(
+  picks: PickRequest[],
+  manifest: SceneManifestEntry[],
+): PickCopy[] {
+  const byScene = new Map(manifest.map((e) => [e.scene, e]))
+  return lookUpPicks(picks, byScene).map((p) => ({
+    word: p.word,
+    src: variantRelPath(p.row.batch, p.word, p.variant, PATHS.sceneOutRoot),
+    dest: sceneDestRelPath(p.word),
+  }))
 }
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
+/** `scenes`: the little-story scenes (`--scenes`), else the pack. */
+export type PictureSet = 'pack' | 'scenes'
+
 export type CliCommand =
   | {
       mode: 'generate'
+      set: PictureSet
       selection: Selection
       variants: number
       dryRun: boolean
@@ -481,6 +650,7 @@ export type CliCommand =
     }
   | {
       mode: 'pick'
+      set: PictureSet
       picks: PickRequest[]
       dryRun: boolean
       manifestPath: string
@@ -490,10 +660,15 @@ export const USAGE = `Usage:
   npx tsx scripts/generatePackPictures.ts --batch N [--variants 2] [--budget USD] [--force] [--dry-run]
   npx tsx scripts/generatePackPictures.ts --words a,b [--variants 2] [--budget USD] [--force] [--dry-run]
   npx tsx scripts/generatePackPictures.ts --pick word=v2,word=v1 [--dry-run]
+  npx tsx scripts/generatePackPictures.ts --scenes [--batch N | --words fox-1,hen-2] [--variants 2] [--budget USD] [--force] [--dry-run]
+  npx tsx scripts/generatePackPictures.ts --scenes --pick fox-1=v2,hen-2=v1 [--dry-run]
 Options:
+  --scenes          the little-story scenes (${PATHS.sceneManifest});
+                    alone, every scene; --words takes scene ids
   --force           also generate words that already have variants on disk
                     (adds v3, v4, ...; never overwrites)
-  --manifest PATH   manifest JSON (default ${PATHS.manifest})`
+  --manifest PATH   manifest JSON (default ${PATHS.manifest},
+                    or ${PATHS.sceneManifest} with --scenes)`
 
 export function parseCli(argv: string[]): CliCommand {
   const { values } = parseArgs({
@@ -509,14 +684,22 @@ export function parseCli(argv: string[]): CliCommand {
       budget: { type: 'string' },
       pick: { type: 'string' },
       manifest: { type: 'string' },
+      scenes: { type: 'boolean', default: false },
     },
   })
-  const manifestPath = values.manifest ?? PATHS.manifest
+  const set: PictureSet = values.scenes === true ? 'scenes' : 'pack'
+  const manifestPath =
+    values.manifest ?? (set === 'scenes' ? PATHS.sceneManifest : PATHS.manifest)
   const dryRun = values['dry-run'] === true
   const modes = [values.batch, values.words, values.pick].filter(
     (v) => v !== undefined,
   ).length
-  if (modes !== 1) {
+  if (set === 'scenes' && modes > 1) {
+    throw new Error(
+      'With --scenes, pass at most one of --batch, --words or --pick.',
+    )
+  }
+  if (set === 'pack' && modes !== 1) {
     throw new Error('Pass exactly one of --batch, --words or --pick.')
   }
 
@@ -532,6 +715,7 @@ export function parseCli(argv: string[]): CliCommand {
     }
     return {
       mode: 'pick',
+      set,
       picks: parsePickArg(values.pick),
       dryRun,
       manifestPath,
@@ -539,7 +723,9 @@ export function parseCli(argv: string[]): CliCommand {
   }
 
   let selection: Selection
-  if (values.batch !== undefined) {
+  if (modes === 0) {
+    selection = { kind: 'all' }
+  } else if (values.batch !== undefined) {
     if (!/^\d+$/.test(values.batch) || Number(values.batch) < 1) {
       throw new Error(
         `--batch must be a positive integer, got "${values.batch}"`,
@@ -579,6 +765,7 @@ export function parseCli(argv: string[]): CliCommand {
 
   return {
     mode: 'generate',
+    set,
     selection,
     variants,
     dryRun,

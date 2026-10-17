@@ -1,0 +1,194 @@
+[
+  {
+    "scene": "fox-1",
+    "tier": "fox-stories",
+    "batch": 1,
+    "subject": "The fox sitting on a striped rug, a pink mug on the rug beside it.",
+    "avoid": ["a table"],
+    "refs": ["fox", "rug", "cup"]
+  },
+  {
+    "scene": "fox-2",
+    "tier": "fox-stories",
+    "batch": 1,
+    "subject": "The fox beside an open cardboard box with a hat inside, its top showing.",
+    "avoid": ["the fox wearing the hat"],
+    "refs": ["fox", "hat", "box"]
+  },
+  {
+    "scene": "fox-3",
+    "tier": "fox-stories",
+    "batch": 1,
+    "subject": "A small orange tent on top of a big grey rock, the fox looking out of its door.",
+    "avoid": ["the tent on grass"],
+    "refs": ["fox", "tent", "rock"]
+  },
+  {
+    "scene": "fox-4",
+    "tier": "fox-stories",
+    "batch": 1,
+    "subject": "Left, the fox sitting on a bed; right, the hen running to a peach van.",
+    "avoid": ["the fox running"],
+    "refs": ["fox", "hen", "van"]
+  },
+  {
+    "scene": "fox-5",
+    "tier": "fox-stories",
+    "batch": 1,
+    "subject": "The dog with a bone in its mouth, the fox beside it holding a fig.",
+    "avoid": ["the fox with the bone"],
+    "refs": ["fox", "dog", "bone"]
+  },
+  {
+    "scene": "fox-6",
+    "tier": "fox-stories",
+    "batch": 1,
+    "subject": "A frog on a log in front; behind, a small garden shed with the fox peeking out.",
+    "avoid": ["the fox on the log"],
+    "refs": ["fox", "frog", "log"]
+  },
+  {
+    "scene": "fox-7",
+    "tier": "fox-stories",
+    "batch": 1,
+    "subject": "The pig holding a flying kite's string; the fox running to the pig.",
+    "avoid": ["the fox holding the kite"],
+    "refs": ["pig", "fox", "kite"]
+  },
+  {
+    "scene": "fox-8",
+    "tier": "fox-stories",
+    "batch": 1,
+    "subject": "The fox and the crab side by side under a warm sun; the crab holds a plum.",
+    "avoid": ["the fox with the plum"],
+    "refs": ["crab", "fox", "sun", "plum"]
+  },
+  {
+    "scene": "hen-1",
+    "tier": "hen-stories",
+    "batch": 2,
+    "subject": "The hen inside a peach van, seen through its open side door, a pink-iced cake beside her.",
+    "avoid": ["candles, numbers"],
+    "refs": ["hen", "cake", "van"]
+  },
+  {
+    "scene": "hen-2",
+    "tier": "hen-stories",
+    "batch": 2,
+    "subject": "The hen beside a small orange tent; a pink pen lies inside its open door.",
+    "avoid": ["the hen holding the pen"],
+    "refs": ["hen", "pen", "tent"]
+  },
+  {
+    "scene": "hen-3",
+    "tier": "hen-stories",
+    "batch": 2,
+    "subject": "The hen holding a pink tote bag, a plum peeking out of the top.",
+    "avoid": ["more than one plum"],
+    "refs": ["hen", "plum", "bag"]
+  },
+  {
+    "scene": "hen-4",
+    "tier": "hen-stories",
+    "batch": 2,
+    "subject": "A grey cooking pot on a small wooden desk; the hen beside it holding a pink mug.",
+    "avoid": ["the mug on the desk"],
+    "refs": ["hen", "pot", "cup", "desk"]
+  },
+  {
+    "scene": "hen-5",
+    "tier": "hen-stories",
+    "batch": 2,
+    "subject": "The hen beating a small drum, the pig beside her holding a kite.",
+    "avoid": ["the hen holding the kite"],
+    "refs": ["hen", "drum", "kite", "pig"]
+  },
+  {
+    "scene": "hen-6",
+    "tier": "hen-stories",
+    "batch": 2,
+    "subject": "The hen in a hat at the edge of a small pond; a curly brown wig floats on the water.",
+    "avoid": ["a person"],
+    "refs": ["hen", "wig", "hat", "pond"]
+  },
+  {
+    "scene": "hen-7",
+    "tier": "hen-stories",
+    "batch": 2,
+    "subject": "The hen beside a table lamp and an open cardboard box with a gold ring inside.",
+    "avoid": ["the ring on the lamp"],
+    "refs": ["hen", "ring", "lamp", "box"]
+  },
+  {
+    "scene": "hen-8",
+    "tier": "hen-stories",
+    "batch": 2,
+    "subject": "The hen holding an open jug full of red jam, a pink mug beside her.",
+    "avoid": ["jam in the mug"],
+    "refs": ["hen", "jam", "cup", "jug"]
+  },
+  {
+    "scene": "bug-1",
+    "tier": "bug-stories",
+    "batch": 3,
+    "subject": "The pink bug inside a pink mug, peeking over the rim, holding a fig.",
+    "avoid": ["a drink"],
+    "refs": ["bug", "cup", "fig"]
+  },
+  {
+    "scene": "bug-2",
+    "tier": "bug-stories",
+    "batch": 3,
+    "subject": "The pink bug on a bed's pillow, a walnut beside it.",
+    "avoid": ["a person in the bed"],
+    "refs": ["bug", "bed", "nut"]
+  },
+  {
+    "scene": "bug-3",
+    "tier": "bug-stories",
+    "batch": 3,
+    "subject": "The pink bug walking in at a small orange tent's door, carrying a gem.",
+    "avoid": ["the bug far from the tent"],
+    "refs": ["bug", "tent", "gem"]
+  },
+  {
+    "scene": "bug-4",
+    "tier": "bug-stories",
+    "batch": 3,
+    "subject": "The pink bug on a striped rug in front; behind, the cat lying on a bed.",
+    "avoid": ["the bug on the bed"],
+    "refs": ["bug", "rug", "bed", "cat"]
+  },
+  {
+    "scene": "bug-5",
+    "tier": "bug-stories",
+    "batch": 3,
+    "subject": "A peach van, side door open; inside, a pink tote bag with the bug peeking out.",
+    "avoid": ["the bag outside the van"],
+    "refs": ["bug", "van", "bag"]
+  },
+  {
+    "scene": "bug-6",
+    "tier": "bug-stories",
+    "batch": 3,
+    "subject": "The dog running to a small pond; nearby the pink bug hides in a cream bathtub.",
+    "avoid": ["the dog in the tub"],
+    "refs": ["dog", "pond", "tub", "bug"]
+  },
+  {
+    "scene": "bug-7",
+    "tier": "bug-stories",
+    "batch": 3,
+    "subject": "The pink bug in a bird's nest; the hen sitting on a log beside it.",
+    "avoid": ["eggs", "the hen in the nest"],
+    "refs": ["bug", "nest", "hen", "log"]
+  },
+  {
+    "scene": "bug-8",
+    "tier": "bug-stories",
+    "batch": 3,
+    "subject": "A grey cooking pot with its lid on, the pink bug sitting on the lid.",
+    "avoid": ["steam or fire"],
+    "refs": ["bug", "lid", "pot"]
+  }
+]

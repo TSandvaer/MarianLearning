@@ -1,7 +1,8 @@
 /**
- * Contact sheet for one batch of generated pack pictures: one row per word,
- * the current pack picture first, then each variant, all on the pack's cream
- * so transparent edges read the way they will in the app.
+ * Contact sheet for one batch of generated pictures (pack words, or scenes):
+ * one row per word or scene, the current picture first, then each variant,
+ * all on the pack's cream so transparent edges read the way they will in the
+ * app.
  */
 
 import { existsSync } from 'node:fs'
@@ -9,10 +10,11 @@ import sharp from 'sharp'
 import type { OverlayOptions } from 'sharp'
 
 export interface SheetRow {
-  word: string
-  tier: string
-  distinctFrom: string[]
-  /** Absolute path of the current pack picture, or null if none ships yet. */
+  /** The word or scene id, also the variant label (`<key> = v1`). */
+  key: string
+  /** Small lines under the key (tier, refs, ...), cut to fit the column. */
+  notes: string[]
+  /** Absolute path of the current picture, or null if none ships yet. */
   currentPath: string | null
   /** Absolute paths for v1..vK; null where that variant is not on disk. */
   variantPaths: (string | null)[]
@@ -56,8 +58,15 @@ async function cellImage(path: string | null): Promise<Buffer | null> {
   }
 }
 
+export interface SheetHeader {
+  /** e.g. "Batch 1 · 4 word(s)". */
+  title: string
+  /** e.g. "Pick with: npx tsx scripts/generatePackPictures.ts --pick ...". */
+  hint: string
+}
+
 export async function buildContactSheet(
-  batch: number,
+  header: SheetHeader,
   rows: SheetRow[],
 ): Promise<Buffer> {
   const variantCount = Math.max(1, ...rows.map((r) => r.variantPaths.length))
@@ -69,19 +78,18 @@ export async function buildContactSheet(
   const overlays: OverlayOptions[] = []
 
   svg.push(
-    `<text x="${GAP}" y="34" font-family="${FONT}" font-size="26" font-weight="bold" fill="${INK}">Batch ${batch} · ${rows.length} word(s)</text>`,
-    `<text x="${GAP}" y="58" font-family="${FONT}" font-size="15" fill="${MUTED}">Pick with: npx tsx scripts/generatePackPictures.ts --pick word=v1,word=v2</text>`,
+    `<text x="${GAP}" y="34" font-family="${FONT}" font-size="26" font-weight="bold" fill="${INK}">${esc(header.title)}</text>`,
+    `<text x="${GAP}" y="58" font-family="${FONT}" font-size="15" fill="${MUTED}">${esc(header.hint)}</text>`,
   )
 
   for (const [ri, row] of rows.entries()) {
     const top = HEADER_H + ri * ROW_H
     svg.push(
-      `<text x="${GAP}" y="${top + 44}" font-family="${FONT}" font-size="34" font-weight="bold" fill="${INK}">${esc(row.word)}</text>`,
-      `<text x="${GAP}" y="${top + 72}" font-family="${FONT}" font-size="15" fill="${MUTED}">tier: ${esc(row.tier)}</text>`,
+      `<text x="${GAP}" y="${top + 44}" font-family="${FONT}" font-size="34" font-weight="bold" fill="${INK}">${esc(row.key)}</text>`,
     )
-    if (row.distinctFrom.length > 0) {
+    for (const [li, note] of row.notes.entries()) {
       svg.push(
-        `<text x="${GAP}" y="${top + 96}" font-family="${FONT}" font-size="15" fill="${MUTED}">not like: ${esc(truncate(row.distinctFrom.join(', '), 26))}</text>`,
+        `<text x="${GAP}" y="${top + 72 + li * 24}" font-family="${FONT}" font-size="15" fill="${MUTED}">${esc(truncate(note, 36))}</text>`,
       )
     }
 
@@ -92,7 +100,7 @@ export async function buildContactSheet(
         missing: 'no current picture',
       },
       ...Array.from({ length: variantCount }, (_, k) => ({
-        label: `${row.word} = v${k + 1}`,
+        label: `${row.key} = v${k + 1}`,
         path: row.variantPaths[k] ?? null,
         missing: 'not generated',
       })),
