@@ -1,6 +1,6 @@
 # Content wave 3: hundreds and little stories (native)
 
-**Status:** spec only. Thomas, 2026-10-17: "Spec wave 3 now, build later". Nothing is built, rendered or generated until Thomas approves (§ 10).
+**Status:** spec only. Thomas, 2026-10-17: "Spec wave 3 now, build later". Nothing is built, rendered or generated until Thomas approves (§ 10). Dave confirmed D1–D12 on 2026-10-17 (§ 11).
 
 **Scope:** `@marian/core`, the native app, canon and one generator mode. The web is frozen: a hundreds or story read throws there and the web plays its silent static plan (`content-wave-1.md` § 1.9). Rules follow `content-wave-2.md` (#586) unless stated. Code is anchored by names.
 
@@ -26,7 +26,7 @@ Marian builds and reads numbers to 999, and reads short stories she can decode, 
 - **K4.** Decode first: story card, silent reading beat, question, picture chips, answer, and only then the scene (`phonics-sequence-marian.md` Q6). A tapped word plays itself; Emma reads the whole story only as the 2nd-wrong hint and in the reveal.
 - **K5.** The wire stays utterance-only with 5 slots: the story rides in `hint`; a core table `LITTLE_STORIES` keys chips and scenes by story text.
 - **K6.** Two new lands: Number Garden 5 "Hundreds", Word Song 7 "Stories". Groups is full, and "Big words" isn't stories.
-- **K7.** No Leitner fact in either step. Story blocks are never warm-up hearts (about 20 s each), but join reviews.
+- **K7.** No Leitner fact in either step. Story blocks are never warm-up hearts (about 25–30 s each, estimated), but join reviews.
 
 Mastery, the fast track, the pace guard, reviews, peeks and Map replays (#592, if merged) behave as on the siblings. No timer, currency, streak or loss mechanic; the reading beat is invisible and never ends a problem.
 
@@ -109,7 +109,7 @@ P1, phone portrait (375×667), after the read has built the blocks:
 +----------------------------+
 ```
 
-P6–P8 add a **number tag** with the start number ("243"), above the trays in P and TP and left of them in L and TL; their tray tags show the start digits from the first frame.
+P6–P8 add a **number tag** with the start number ("243"), above the trays in P and TP and left of them in L and TL; their tray tags show the start digits from the first frame. A **"+10" / "+100" pill** sits beside the number tag from the first frame (D11): right of it in P and TP, under it in L and TL.
 
 **Parts** (new `mobile/src/screens/math/PlaceValueStage.tsx`, `testID="math-place-value"`, label = the read, `pointerEvents: 'none'`):
 
@@ -117,7 +117,7 @@ P6–P8 add a **number tag** with the start number ("243"), above the trays in P
 - **Glyphs** in `glyphs.tsx`: `CubeGlyph` u × u, `RodGlyph` u × 10u (10 cells), `FlatGlyph` 10u × 10u (10 × 10 cells); fill `colors.myPink`, 1.5 pt `colors.myRose` outline, 1 pt grid.
 - **Placement:** flats fan up and right from the bottom-left, 1.2u apart, later ones on top, so every edge is countable. Rods side by side, 0.3u apart. Cubes in columns of 5, bottom up, left column first.
 - **Tags:** sharing's pill (wave 2 § 2.2), "?" form then digit form, 8 pt (tablet 10) under each tray. The number tag is multiply's pill.
-- **No "+" or "=" sign;** a block that +10 or +100 adds carries a "+10" / "+100" pill (digits are language-free, M5).
+- **No "=" sign; "+" only in pills:** P6–P8's number tag carries a "+10" / "+100" pill from the read (D11), and a block that +10 or +100 adds carries its own (digits are language-free, M5). The tag's pill fits its row or column; § 3.3's sizes stand.
 
 ### 3.3 Layout and sizes
 
@@ -142,19 +142,20 @@ P6–P8 add a **number tag** with the start number ("243"), above the trays in P
 
 - **Lead** (scored P1, forward sessions until mastered): "Hundreds, tens and ones!"; the trays pulse left to right on its word ticks; 400 ms; the read.
 - **Read, P1–P5, builds the number:** on the word tick of "hundreds" the flats drop in, on "tens" the rods, on "ones" the cubes. P5 reads in Danish order ("Three hundreds, six ones and two tens."), so the cubes land before the rods, each in its own tray. Chips open on `onPlay`.
-- **Read, P6–P8:** the start blocks and filled tags are up from the first frame; the number tag pulses on the first word tick.
+- **Read, P6–P8:** the start blocks, filled tags, number tag and its pill are up from the first frame; the number tag pulses on the first word tick, the pill on the question's "ten" / "hundred".
 - **Wrong 1, 2:** "Hmm... try again?", poof, shake, `puzzled-tilt`; the picture doesn't change.
 - **Hints** (600 ms after the 2nd wrong's reprompt):
   - P1–P5: "Look at the hundreds." / "Look at the tens." / "Look at the ones.": that tray ripples and its tag fills. After hint 3 the tags read the answer.
-  - +10 (P6, P8): "Look at the tens." (rods ripple); "One more ten." (a rod drops in with "+10", the tens tag ticks up); "What is ten more?" (the number tag pulses).
+  - +10 (P6, P8): "Look at the tens." (rods ripple); "One more ten." (a rod drops in with "+10", the tens tag ticks up); "What is ten more?" (the number tag and its pill pulse).
   - +100 (P7): "Look at the hundreds."; "One more hundred." (a flat drops in with "+100"); "What is one hundred more?".
 - **giveAnswer** (3rd wrong): every "?" tag fills at once with sharing's 4 pt `colors.myRose` ring; an added block lands at once; the guided tap plays the correct moment.
-- **Correct** ("Yes! Two hundred and thirty-four!"): open tags fill left to right and the trays pulse once; on P6–P8 the added block drops in fast if it hasn't, its tag ticks, and the number tag shows the answer. Burst, sparkle, plink, `celebration`; 250 ms exit.
+- **Correct** ("Yes! Two hundred and thirty-four!"): open tags fill left to right and the trays pulse once; on P6–P8 the added block drops in fast if it hasn't, its tag ticks, and the number tag shows the answer as its pill fades, so "253 +10" never shows. Burst, sparkle, plink, `celebration`; 250 ms exit.
 
 ### 3.5 Motion brief (Reanimated; Reduce Motion in brackets)
 
 - **Build drop:** a tray's blocks enter 90 ms apart; each drops 16 pt (tablet 24), `translateY` spring 260 / 20, opacity over 120 ms; its tag pulses 1 → 1.1 → 1 (300 ms `EASE_IN_OUT`) as the last lands. Longest: 7 cubes, about 0.9 s. [The tray fades in over 150 ms.]
 - **Added block:** starts 40 pt above its tray, its pill (20 pt, tablet 24) 4 pt above it; spring 220 / 18 to its place; the pill fades (200 ms) 600 ms after landing. On a fast right tap: spring 300 / 22, no pill. [200 ms crossfade; the pill shows 600 ms, still.]
+- **Number-tag pill:** 20 pt (tablet 24), 6 pt from the tag; pulses with it; fades over 200 ms as it ticks to the answer. [Fade only.]
 - **Tag tick, number change:** the old value rises 8 pt and fades (120 ms); the new springs up from 8 pt below, scale 0.6 → 1 (260 / 20). [150 ms crossfade.]
 - **Tag fill:** sharing's, 80 ms stagger. **Ripple, pulse:** multiply's, 1 → 1.06 → 1 over 300 ms, 60 ms stagger. [Crossfade; no scale.]
 - One shared value per block via `withDelay`, at most 15 (P4). Rotation mid-build lands launched blocks at once. No new sounds.
@@ -265,13 +266,13 @@ With the question ("Who sat on the rug?") three picture chips (fox, rug, cup, sh
 - **Measured** (scratch script, 2026-10-17, Fredoka 600 advances from `Fredoka_600SemiBold.ttf`, no kerning, 0.35 em gaps): every story takes 2–3 lines in P, L and on a tablet (measured at 512 pt). The widest sentence, "The fox and the crab sat in the sun.", is 383 pt at 24 pt. Three lines in P: fox 8, hen 7, hen 8, bug 6.
 - **Lines ≥ 44 pt**, so every word's tap area is ≥ 44 pt tall. Word boxes take half the gap each side and touch; short words ("a") are narrower than 44 pt, accepted because a miss only plays the next word (the letter-cell rule).
 - **Reveal rect** (P, tablet): from the card's bottom + 12 to the chips' bottom, stage-wide; scene = min(height, width, 200 phones / 280 tablet), ≥ 120 (the table's scenes are hand-computed; the layout test asserts them). In L the chip column is the reveal rect: small, on the form Marian doesn't use.
-- Questions are ≤ 21 characters (ribbon slot: 3 lines P, 2 L).
+- Questions are ≤ 23 characters (ribbon slot: 3 lines P, 2 L); the 46-character simple-sentence reads already play in the same slot (not measured).
 
 ### 4.4 Beats, problem by problem
 
 1. **Card enters** (after any opener or lead). Emma `listening`.
 2. **"Read the story."** (`guide.story.read`) on every story card, except right after the step's own lead (same opening words). After a peek, review or replay opener: opener, 400 ms, this line.
-3. **Reading beat**, from that line's end: `clamp(6000, 900 × words, 12000)` ms of foreground time (9 s for 10 words, 12 s for 14). A word tap holds the question to ≥ 2000 ms after the tap, never past 20 s from the beat's start. Nothing on screen counts down (`STORY_READ_MS_PER_WORD = 900`).
+3. **Reading beat**, from that line's end: `clamp(12000, 1500 × words, 21000)` ms of foreground time (15 s for 10 words, 21 s for 14: 40 words a minute). A word tap holds the question to ≥ 2000 ms after the tap, never past 30 s from the beat's start. Nothing on screen counts down (`STORY_READ_MS_PER_WORD = 1500`; why: D3).
 4. **Question:** Emma says the `read` line; the chips enter as it starts, closed (0.6), and open when it ends (Word Song's gate). The card stays: she may re-read and tap words.
 5. **Wrong 1:** poof, shake, `puzzled-tilt`, "Hmm... try again?", 400 ms, the question again.
 6. **Wrong 2:** "Hmm... try again?", 600 ms, **Emma reads the story** (the `hint` clip) with the read-along, `attentive-pointing`, 400 ms, the question again.
@@ -339,11 +340,11 @@ Each problem also has "Hmm... try again?" (reused) and "This one is the <answer>
 
 **Hen stories ("What…?")**
 
-1. "The hen has a cake. She is in the van." (38) → "What has the hen got?" (21) → **cake** / hen, van
+1. "The hen has a cake. She is in the van." (38) → "What does the hen have?" (23) → **cake** / hen, van
 2. "The hen has a tent. A pen is in the tent." (41) → "What is in the tent?" (20) → **pen** / hen, tent
 3. "The hen has a bag. A plum is in the bag." (40) → "What is in the bag?" (19) → **plum** / hen, bag
 4. "A pot is on the desk. The hen has a cup." (40) → "What is on the desk?" (20) → **pot** / cup, desk
-5. "The hen has a drum. The pig has a kite." (39) → "What has the hen got?" (21) → **drum** / kite, pig
+5. "The hen has a drum. The pig has a kite." (39) → "What does the hen have?" (23) → **drum** / kite, pig
 6. "The hen has a hat. A wig is in the pond!" (40) → "What is in the pond?" (20) → **wig** / hat, pond
 7. "The hen has a box and a lamp. A ring is in the box." (51) → "What is in the box?" (19) → **ring** / lamp, box
 8. "The hen got a jug. Jam is in it. She has a cup." (47) → "What is in the jug?" (19) → **jam** / cup, jug
@@ -361,7 +362,7 @@ Each problem also has "Hmm... try again?" (reused) and "This one is the <answer>
 
 **Rules** (a splice lint checks them; my scratch check found no breach, 2026-10-17):
 
-- **Taught words only (D2):** a target word of a Word Song canon file, a word read in the sight-words or simple-sentences canon (a, the, is, it, in, on, to, she, has, sat, ran), or one of 3 decodable extras from mastered patterns: _and_ (nd, tent words), _got_, _hid_. No plurals, no -s or -ed. _shed_ is the one noun without a picture, never a chip.
+- **Taught words only (D2):** a target word of a Word Song canon file, a word read in the sight-words or simple-sentences canon (a, the, is, it, in, on, to, she, has, sat, ran), or one of 3 decodable extras from mastered patterns: _and_ (nd, tent words), _got_, _hid_. No plurals, no -s or -ed. _shed_ is the one noun without a picture, never a chip. The rule covers the stories; questions are Emma's lines, under § 5.2's cap.
 - **Shape:** 2–3 sentences (bug 6, hen 8 have three), 10–14 words. _She_ is always the hen; _It_ is the animal of the sentence before, except hen 8's "in it" (the jug).
 - **Chips:** each has a pack picture and is in the story; no trio holds a `FORBIDDEN_PAIRS` pair (cat–dog, duck–hen, bus–van…). **P1–P3:** both wrong chips are another kind than the question asks. **P4–P8:** one wrong chip is the same kind, so she must read who did what (fox 4, 7 and 8 are answered by a friend, not the fox). Longer stories sit at P6–P8.
 
@@ -373,7 +374,7 @@ Characters in brackets, in the order hundreds / fox / hen / bug; canon lines are
 
 **Guidance** (`createManifestLinePlayer('session-guide', …)`, wave 1 § 6.1):
 
-- `guide.session.intro.<node>`, the leads (scored P1 of forward sessions until mastery; never in a peek, review, replay or heart): "Hundreds, tens and ones!" (24), "Read the story. Who did it?" (27), "Read the story. What is it?" (27), "Read the story. Where is it?" (28).
+- `guide.session.intro.<node>`, the leads (scored P1 of forward sessions until mastery; never in a peek, review, replay or heart): "Hundreds, tens and ones!" (24), "Read the story. Who is it?" (26), "Read the story. What is it?" (27), "Read the story. Where is it?" (28).
 - `guide.session.peek-open.<node>` "Let's look at <name>!" (23 / 26 / 26 / 26); `peek-close` "<Name> are for later. You will learn it!" (42 / 45 / 45 / 45).
 - `guide.story.read` (kind `'story-read'`): "Read the story." (15).
 - `guide.story.word.<word>` (kind `'story-word'`), text "<Word>." ("Fox."): **54 clips, 224 characters**, one per distinct word of § 4.7's stories (`LITTLE_STORIES` generates the list).
@@ -385,18 +386,18 @@ Characters in brackets, in the order hundreds / fox / hen / bug; canon lines are
 - `path.locked.next` "<Name>! First, <previous>. Then this!" (36 / 42 / 43 / 43); `end.bud` "Look! A new flower for <name>!" (32 / 35 / 35 / 35); `end.unlock` "You learned <previous>! Now you can do <name>!" (45 / 51 / 52 / 52). Previous: sharing, cake words, fox stories, hen stories.
 - Lands: "Land 5: Hundreds." (17), "A new land! Land 5: Hundreds!" (29), "A new land: Hundreds!" (21), "Land 7: Stories." (16), "A new land! Land 7: Stories!" (28), "A new land: Stories!" (20). Deferred kinds generate unrendered, as today.
 
-**Total: 218 distinct new texts, 4,980 Lily characters** (210 / 4,786 without #592's 8): guidance 13 / 399, replay 8 / 194, path 26 / 842, word clips 54 / 224, canon hundreds 32 / 1,190, fox 25 / 661, hen 31 / 746, bug 29 / 724.
+**Total: 218 distinct new texts, 4,981 Lily characters** (210 / 4,787 without #592's 8): guidance 13 / 398, replay 8 / 194, path 26 / 842, word clips 54 / 224, canon hundreds 32 / 1,190, fox 25 / 661, hen 31 / 748, bug 29 / 724.
 
-- Counted by a scratch script (2026-10-17, not committed) against every `text` in `public/canon/*/level-1/*.json` and every literal in `guidanceLines.ts`: only "Hmm... try again?" is reused; repeats inside the wave count once. The bill holds only if the bake de-duplicates on exact text (`revoiceCanonLily.ts` does; `--dry-run` prints the real number first).
+- Counted by a scratch script (2026-10-17, not committed; recounted after Dave's changes by a second that reproduces 218 / 4,980) against every `text` in `public/canon/*/level-1/*.json` and every literal in `guidanceLines.ts`: only "Hmm... try again?" is reused; repeats inside the wave count once. The bill holds only if the bake de-duplicates on exact text (`revoiceCanonLily.ts` does; `--dry-run` prints the real number first).
 - **Canon is spliced, not Haiku-baked:** `scripts/spliceContentWave3Canon.ts` writes the four files from § 3.7 and `LITTLE_STORIES`; the four nodes join `PENDING_CANON_NODES`. **Render:** `renderGuidanceLinesLily.ts`, `renderPathLinesLily.ts`, `revoiceCanonLily.ts --unrendered`.
 
-**Prediction for the ear test (bar 2):** every story clip pauses ≥ 250 ms at each full stop (the marks need it); "Where did the bug go?" rises; "two hundred and forty-three" is British with a clear "and"; "Two hundreds, three tens…" keeps its plurals; the isolated "A." and "The." come out "ay" and "thee". **Not predicted:** whether "What has the hen got?" stresses _got_.
+**Prediction for the ear test (bar 2):** every story clip pauses ≥ 250 ms at each full stop (the marks need it); "Where did the bug go?" rises; "two hundred and forty-three" is British with a clear "and"; "Two hundreds, three tens…" keeps its plurals; the isolated "A." and "The." come out "ay" and "thee". **Not predicted:** where Lily puts the stress in "What does the hen have?".
 
 ### 5.2 Vocabulary check (the ~200-word cap)
 
-- **5 new core words:** _hundred(s)_, _story/stories_, _who_, and the story verbs _got_, _hid_. _ones_, _tens_, _more_, _number_, _did_, _what_, _where_ are in use. About 169 → 174.
+- **7 new core words:** _hundred(s)_, _story/stories_, _who_, the story verbs _got_, _hid_, and _does_, _have_ (hen 1 and 5; in no guidance, path or level-1 canon line, `grep` 2026-10-17). _ones_, _tens_, _more_, _number_, _did_, _what_, _where_ are in use. About 169 → 176.
 - _fox_, _hen_, _bug_ name the steps; every other story word is a target or sight word, or one of the 3 decodable extras.
-- Zero-cost choices: "Hundreds, tens and ones!" not "place value"; "What is ten more?" not "add ten"; the British "What has the hen got?". All ASCII-7, no IPA.
+- Zero-cost choices: "Hundreds, tens and ones!" not "place value"; "What is ten more?" not "add ten". Not zero-cost: "What does the hen have?" (_does_, _have_) keeps _got_ to one meaning. All ASCII-7, no IPA.
 
 ## 6. Pictures: 24 scenes (OpenAI, a generator scene mode)
 
@@ -471,9 +472,9 @@ The 6 clay pieces (§ 1) are made as the clay set was, with Thomas's tool.
 
 **Native (jest):**
 
-9. Hundreds P1: flats, rods, cubes appear on the ticks of "hundreds", "tens", "ones"; tags "?" until a right tap, then 2, 3, 4; chips 234, 434, 634. P5: cubes land before rods. P6 hint 2: a rod with "+10" drops in and the tens tag goes 4 → 5; a right tap shows 253.
+9. Hundreds P1: flats, rods, cubes appear on the ticks of "hundreds", "tens", "ones"; tags "?" until a right tap, then 2, 3, 4; chips 234, 434, 634. P5: cubes land before rods. P6: the "+10" pill shows beside the number tag from the first frame; hint 2: a rod with "+10" drops in and the tens tag goes 4 → 5; a right tap shows 253 and the number tag's pill fades.
 10. § 3.3's u on the four forms; every numeral fits its chip.
-11. Story P1 (fake timers): the question starts 9,000 ms after "Read the story." ends; a word tap at 8,000 ms moves it to 10,000. No chip or picture before the question; chips open at its end. A right tap: chips fade, the scene enters, the read-along plays, the advance.
+11. Story P1 (fake timers): the question starts 15,000 ms after "Read the story." ends; a word tap at 14,000 ms moves it to 16,000. No chip or picture before the question; chips open at its end. A right tap: chips fade, the scene enters, the read-along plays, the advance.
 12. Story wrongs: the 1st repeats the question; the 2nd plays the read-along then the question; the 3rd the guided answer.
 13. A word tap plays `guide.story.word.<word>` and lights it; inert during Emma's lines; records nothing.
 14. A missing scene shows the answer's picture. Reduce Motion gives § 3.5's and § 4.5's bracketed forms.
@@ -487,7 +488,7 @@ The 6 clay pieces (§ 1) are made as the clay set was, with Thomas's tool.
 ## 10. Thomas decides
 
 - **T1. Names:** "hundreds", "fox stories", "hen stories", "bug stories"; "Land 5: Hundreds", "Land 7: Stories".
-- **T2. Lines (§ 5.1):** 218 texts, 4,980 Lily characters, chiefly the four leads; the 54 one-word clips add 54 short ear-test items.
+- **T2. Lines (§ 5.1):** 218 texts, 4,981 Lily characters, chiefly the four leads (fox's now "Read the story. Who is it?") and hen 1 and 5's "What does the hen have?"; the 54 one-word clips add 54 short ear-test items.
 - **T3. 6 clay pieces (§ 1):** a hundred-flat, a fox, a hen, a bug, an apple tree, a puppet theatre.
 - **T4. Picture spend:** 24 scenes, ~$2.60 (~$3.30 with retakes), after an OpenAI top-up. Recommendation: approve; the scene rewards reading, and the steps ship without it if needed.
 - **T5. Rollout:** build G on the iPad and the iPhone before any hundreds build; no downgrade below it.
@@ -495,17 +496,18 @@ The 6 clay pieces (§ 1) are made as the clay set was, with Thomas's tool.
 
 ## 11. Pedagogy assumptions for Dave (D1…)
 
-All **pending** Dave's check after the PR opens.
+All twelve **confirmed by Dave on 2026-10-17**. D3, D11 and D12 carry his changes, plus one extra (hen 1 and 5's question); all are applied above.
 
 - **D1.** Three steps, one question word each (who → what → where), 8 hero-led stories each. Alternative: mixed question words, growing length.
 - **D2.** The taught-word rule (§ 4.7) with _and_, _got_, _hid_ as decodable extras; no plurals or endings; 10–14 words; 2 of 24 stories have three sentences.
-- **D3.** Story, then question; the story stays during the question (look-back allowed). Beat 900 ms a word (6–12 s), held ≥ 2 s by a word tap, at most 20 s.
+- **D3. Changed by Dave.** Story, then question; the story stays during the question (look-back allowed). Beat **1500 ms a word** (was 900; now 15–21 s), held ≥ 2 s by a word tap, at most **30 s** (was 20). Why: at 900 every story ran at 67–70 words a minute, above the grade-1 spring median of 60 words correct a minute (Hasbrouck & Tindal 2017); the question would come while she still decodes, breaking decode-first and signalling pace.
 - **D4.** Word taps are the only support until the 2nd wrong; then Emma reads the whole story, and again in the reveal. She can't ask for it earlier.
 - **D5.** No picture while she reads: the chips mount with the question, the scene comes after the answer.
 - **D6.** Chips: P1–P3 wrong chips another kind; P4–P8 one same-kind noun from the story; the question's own noun may be a chip (fox 1's rug, hen 7's box).
-- **D7.** Story blocks never as warm-up hearts; they join reviews.
-- **D8.** Hundreds is built by Emma and tapped by Marian; place-value digits 2–9; zeros (305) and "one hundred" wait for a deepening.
+- **D7.** Story blocks never as warm-up hearts; they join reviews. Dave: mastery here means read and remembered.
+- **D8.** Hundreds is built by Emma and tapped by Marian; place-value digits 2–9; zeros and "one hundred" wait for a deepening. Dave: zeros (305, 190) should be the first hundreds deepening (not this wave).
 - **D9.** Chips: P1–P3 hundreds digit only; P4 the tens/ones swap (M6) and tens + 1; P5 in Danish order with the spoken-order chip 362.
 - **D10.** +10 and +100 inside the step (P6–P8, no regrouping). Alternative: a step of their own.
-- **D11.** No Leitner fact and no equation for hundreds; only "+10" / "+100" pills.
-- **D12.** Leads every forward session until mastery (wave 1's D5).
+- **D11. Changed by Dave.** No Leitner fact and no "=" for hundreds; P6–P8 show the "+10" / "+100" pill beside the number tag **from the read**, not only on a block that hint 2 or the answer adds.
+- **D12. Changed by Dave (copy).** Leads every forward session until mastery (wave 1's D5); fox's lead is "Read the story. Who is it?" (was "Who did it?"), so all three share one frame: Who / What / Where is it?
+- **Extra (Dave).** Hen 1 and 5 ask "What does the hen have?" (was "What has the hen got?"): _got_ means "obtained" in the 4 other stories with it. Costs _does_ and _have_ (§ 5.2); questions run to 23 characters (§ 4.3).
