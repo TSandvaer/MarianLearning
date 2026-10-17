@@ -75,12 +75,14 @@
       "drum",
       "fox",
       "gum",
+      "hand",
       "hot",
       "hut",
       "jug",
       "log",
       "mom",
       "nut",
+      "pond",
       "pot",
       "ring",
       "sun"
@@ -103,6 +105,8 @@
       "bat",
       "bug",
       "bus",
+      "cake",
+      "cape",
       "cat",
       "cup",
       "dog",
@@ -188,8 +192,11 @@
       "box",
       "bun",
       "bus",
+      "cake",
       "cap",
+      "cape",
       "cup",
+      "desk",
       "hat",
       "hen",
       "hot",
@@ -204,7 +211,8 @@
       "pot",
       "rug",
       "sun",
-      "tub"
+      "tub",
+      "tube"
     ]
   },
   {
@@ -258,7 +266,7 @@
       "a shower head",
       "a running stream of water"
     ],
-    "distinctFrom": ["cap", "cup", "dog", "pan"]
+    "distinctFrom": ["cap", "cup", "dog", "nest", "pan", "tent"]
   },
   {
     "word": "tag",
@@ -514,12 +522,15 @@
       "cot",
       "dog",
       "fox",
+      "gift",
+      "hand",
       "hat",
       "hot",
       "king",
       "mom",
       "mop",
       "nut",
+      "pond",
       "sun",
       "swing"
     ]
@@ -593,11 +604,14 @@
       "cat",
       "pig",
       "bag",
+      "bike",
       "box",
       "bug",
       "bus",
+      "cake",
       "can",
       "cap",
+      "cape",
       "cup",
       "drum",
       "duck",
@@ -610,6 +624,7 @@
       "hot",
       "jam",
       "jug",
+      "lamp",
       "log",
       "map",
       "mat",
@@ -617,6 +632,7 @@
       "mop",
       "pan",
       "pen",
+      "pine",
       "plum",
       "pot",
       "ring",
@@ -625,6 +641,7 @@
       "sun",
       "tag",
       "tap",
+      "tent",
       "top",
       "tub"
     ]
@@ -643,7 +660,9 @@
     ],
     "distinctFrom": [
       "brick",
+      "gift",
       "bag",
+      "bone",
       "bug",
       "bus",
       "cat",
@@ -661,6 +680,7 @@
       "mom",
       "pan",
       "pen",
+      "rope",
       "sun",
       "tub",
       "wing"
@@ -677,7 +697,7 @@
       "a party hat",
       "a hand"
     ],
-    "distinctFrom": ["dog", "mom", "mop", "pop"]
+    "distinctFrom": ["dog", "mom", "mop", "pop", "tub", "tube"]
   },
   {
     "word": "log",
@@ -718,10 +738,12 @@
     "avoid": ["a dog's floppy ears", "a cat", "a scary or hunting fox"],
     "distinctFrom": [
       "bag",
+      "belt",
       "box",
       "bug",
       "can",
       "cot",
+      "cup",
       "dog",
       "drum",
       "hat",
@@ -731,6 +753,7 @@
       "mat",
       "mom",
       "mop",
+      "nest",
       "pop",
       "pot",
       "rug",
@@ -764,7 +787,9 @@
       "jug",
       "mom",
       "rug",
-      "sun"
+      "sun",
+      "top",
+      "tube"
     ]
   },
   {
@@ -791,6 +816,7 @@
       "dad",
       "dog",
       "flag",
+      "fox",
       "frog",
       "hat",
       "hen",
@@ -800,15 +826,19 @@
       "man",
       "mom",
       "mop",
+      "nest",
       "nut",
       "pan",
       "pen",
+      "pine",
+      "pond",
       "rat",
       "rock",
       "rug",
       "sun",
       "tag",
       "tap",
+      "tent",
       "van",
       "web"
     ]
@@ -974,14 +1004,17 @@
       "box",
       "bug",
       "cap",
+      "cape",
       "cat",
       "cup",
       "dad",
       "dog",
       "fan",
+      "hand",
       "hut",
       "jam",
       "king",
+      "lamp",
       "log",
       "mom",
       "nap",
@@ -1006,6 +1039,8 @@
     "distinctFrom": [
       "bag",
       "bat",
+      "belt",
+      "bone",
       "box",
       "brick",
       "bug",
@@ -1016,14 +1051,19 @@
       "crab",
       "cup",
       "dad",
+      "desk",
       "dog",
       "fan",
       "fox",
+      "gift",
       "gum",
       "hat",
+      "hen",
       "hot",
       "hut",
+      "jet",
       "jug",
+      "kite",
       "man",
       "map",
       "mom",
@@ -1033,6 +1073,7 @@
       "pan",
       "pen",
       "pot",
+      "rope",
       "rug",
       "sack",
       "sock",
@@ -1114,7 +1155,7 @@
       "a bowling pin",
       "a drawing pin in a board"
     ],
-    "distinctFrom": ["bib", "bin", "fig", "lid", "sip", "wig"]
+    "distinctFrom": ["bib", "bin", "fig", "kite", "lid", "pine", "sip", "wig"]
   },
   {
     "word": "sip",
@@ -1155,6 +1196,8 @@
       "plum",
       "bib",
       "bin",
+      "gem",
+      "gift",
       "lid",
       "pig",
       "pin",
@@ -1235,7 +1278,7 @@
       "letters on it",
       "a napkin or a towel"
     ],
-    "distinctFrom": ["fig", "lid", "pig", "pin", "wig"]
+    "distinctFrom": ["bike", "fig", "kite", "lid", "pig", "pin", "wig"]
   },
   {
     "word": "net",
@@ -1249,7 +1292,18 @@
       "a spider web",
       "a fish or butterfly in it"
     ],
-    "distinctFrom": ["bag", "flag", "bed", "gem", "hen", "jet", "leg", "pen"]
+    "distinctFrom": [
+      "bag",
+      "flag",
+      "bed",
+      "gem",
+      "hen",
+      "jet",
+      "leg",
+      "nest",
+      "pen",
+      "tent"
+    ]
   },
   {
     "word": "web",
@@ -1287,7 +1341,17 @@
       "cracks or a chick",
       "a white egg that fades into the cream background"
     ],
-    "distinctFrom": ["nut", "bun", "rock", "bed", "gem", "hen", "leg", "web"]
+    "distinctFrom": [
+      "nut",
+      "bun",
+      "rock",
+      "nest",
+      "bed",
+      "gem",
+      "hen",
+      "leg",
+      "web"
+    ]
   },
   {
     "word": "leg",
@@ -1316,8 +1380,10 @@
     "distinctFrom": [
       "bag",
       "bed",
+      "bike",
       "box",
       "bus",
+      "cake",
       "crab",
       "cup",
       "dog",
@@ -1348,6 +1414,8 @@
       "ring",
       "bed",
       "egg",
+      "fig",
+      "gift",
       "hen",
       "jet",
       "leg",
@@ -1375,11 +1443,16 @@
       "egg",
       "gem",
       "jet",
+      "kite",
       "leg",
       "net",
       "pen",
       "plum",
+      "pond",
       "rock",
+      "rope",
+      "sun",
+      "tube",
       "web"
     ]
   },
@@ -1395,6 +1468,8 @@
       "a bedroom"
     ],
     "distinctFrom": [
+      "desk",
+      "belt",
       "cup",
       "egg",
       "frog",
@@ -1403,6 +1478,7 @@
       "leg",
       "net",
       "pen",
+      "tent",
       "web"
     ]
   },
@@ -1418,6 +1494,7 @@
       "a white plane that fades into the background"
     ],
     "distinctFrom": [
+      "bone",
       "bun",
       "clock",
       "gem",
@@ -1426,6 +1503,7 @@
       "pen",
       "pig",
       "sack",
+      "sun",
       "web"
     ]
   },
@@ -1453,7 +1531,7 @@
       "potatoes or things spilling out",
       "a sock"
     ],
-    "distinctFrom": ["bag", "jet", "pig", "rock", "sock", "sun"]
+    "distinctFrom": ["bag", "rope", "jet", "pig", "rock", "sock", "sun"]
   },
   {
     "word": "rock",
@@ -1468,12 +1546,14 @@
     ],
     "distinctFrom": [
       "egg",
+      "bone",
       "cup",
       "hen",
       "king",
       "lock",
       "log",
       "ring",
+      "rope",
       "rug",
       "sack",
       "sock"
@@ -1485,7 +1565,17 @@
     "batch": 7,
     "subject": "One closed padlock seen from the front, a rounded warm-brass body with a keyhole in the middle and a curved silver shackle on top.",
     "avoid": ["a bag handle", "a key", "a number dial", "a door"],
-    "distinctFrom": ["bag", "clock", "fan", "log", "rock", "sock", "web"]
+    "distinctFrom": [
+      "bag",
+      "clock",
+      "fan",
+      "hand",
+      "lamp",
+      "log",
+      "rock",
+      "sock",
+      "web"
+    ]
   },
   {
     "word": "king",
@@ -1503,7 +1593,9 @@
       "man",
       "dad",
       "mom",
+      "bike",
       "bus",
+      "kite",
       "pot",
       "ring",
       "rock",
@@ -1560,7 +1652,7 @@
       "water",
       "a rubber duck"
     ],
-    "distinctFrom": ["hen", "box", "dog", "pen", "sock"]
+    "distinctFrom": ["hen", "box", "desk", "dog", "nest", "pen", "sock"]
   },
   {
     "word": "clock",
@@ -1637,7 +1729,7 @@
       "a tag on a string",
       "letters or symbols"
     ],
-    "distinctFrom": ["net", "bag", "cup", "dog", "frog", "web"]
+    "distinctFrom": ["net", "kite", "bag", "cup", "dog", "frog", "web"]
   },
   {
     "word": "frog",
@@ -1664,5 +1756,212 @@
       "a spider"
     ],
     "distinctFrom": ["brick", "clock", "frog", "pen", "sun"]
+  },
+  {
+    "word": "pond",
+    "tier": "tent-words",
+    "batch": 9,
+    "subject": "A small round pond seen a little from above: calm blue water in a ring of rounded grey stones, two green reeds at one side and one round green lily pad on the water.",
+    "avoid": [
+      "a frog, a duck or any animal",
+      "a lake with a far shore or hills",
+      "a puddle on a road",
+      "a fountain or a bucket"
+    ],
+    "distinctFrom": ["cup", "hand", "hat", "hen", "pot"]
+  },
+  {
+    "word": "desk",
+    "tier": "tent-words",
+    "batch": 9,
+    "subject": "A child's wooden school desk in three-quarter view: a flat warm-brown top on four straight legs, one small drawer at the front, and nothing on top.",
+    "avoid": [
+      "a lamp, books or a computer on it",
+      "a chair",
+      "a bed's headboard, pillow or blanket",
+      "a table with a cloth"
+    ],
+    "distinctFrom": ["bed", "cat", "duck", "nest", "sun"]
+  },
+  {
+    "word": "belt",
+    "tier": "tent-words",
+    "batch": 9,
+    "subject": "One brown leather belt lying in a loose open curve, with a square silver buckle at one end and a row of small holes near the other end.",
+    "avoid": [
+      "a tight coil or spiral that reads as a snake",
+      "trousers or a person wearing it",
+      "a watch strap"
+    ],
+    "distinctFrom": ["bed", "fox", "sun", "tent"]
+  },
+  {
+    "word": "nest",
+    "tier": "tent-words",
+    "batch": 9,
+    "subject": "A round bird's nest of woven warm-brown twigs, seen from the side and a little above, holding three small pale-blue eggs.",
+    "avoid": [
+      "a bird in or near the nest",
+      "one big tan hen's egg",
+      "a basket with a handle",
+      "a tree or a branch"
+    ],
+    "distinctFrom": ["egg", "cup", "desk", "duck", "fox", "net", "tap", "tent"]
+  },
+  {
+    "word": "gift",
+    "tier": "tent-words",
+    "batch": 9,
+    "subject": "One wrapped present in three-quarter view: a cube-shaped box in soft rose paper, with a cream ribbon crossing it and a big cream bow on top.",
+    "avoid": [
+      "plain brown cardboard, like the box picture",
+      "a tag or a card",
+      "more than one present",
+      "a cake"
+    ],
+    "distinctFrom": ["box", "fig", "gem", "pot", "sun"]
+  },
+  {
+    "word": "lamp",
+    "tier": "tent-words",
+    "batch": 9,
+    "subject": "A table lamp in side view: a round cream base, a short straight stem and a soft rose bell-shaped shade, switched on, with a warm glow under the shade.",
+    "avoid": [
+      "a desk or a table under it",
+      "a street lamp",
+      "a candle or a torch",
+      "a ceiling light"
+    ],
+    "distinctFrom": ["bus", "dog", "hand", "lock"]
+  },
+  {
+    "word": "hand",
+    "tier": "tent-words",
+    "batch": 9,
+    "subject": "One open hand seen from the palm side, fingers together and the thumb out, warm peach skin, cut off cleanly at the wrist.",
+    "avoid": [
+      "fingers spread wide, as if counting five",
+      "a fist or a pointing finger",
+      "an arm or a sleeve",
+      "a glove"
+    ],
+    "distinctFrom": ["bus", "hat", "lamp", "lock", "pond", "pot"]
+  },
+  {
+    "word": "tent",
+    "tier": "tent-words",
+    "batch": 9,
+    "subject": "A small camping tent in three-quarter view: a soft orange triangle with a darker orange door flap tied open and two short guy ropes pegged to the ground.",
+    "avoid": [
+      "a house, a roof or a chimney",
+      "a circus tent",
+      "a flag on top",
+      "people or a campfire"
+    ],
+    "distinctFrom": ["bed", "belt", "cup", "dog", "nest", "net", "tap"]
+  },
+  {
+    "word": "pine",
+    "tier": "cake-words",
+    "batch": 10,
+    "subject": "One small pine tree on its own: a tall, narrow cone of dark-green layered needles on a short brown trunk, with two brown pine cones hanging from the lowest layer.",
+    "avoid": [
+      "decorations, lights or a star, like a Christmas tree",
+      "a round leafy tree",
+      "a forest or a hill",
+      "a pot"
+    ],
+    "distinctFrom": ["cup", "dog", "kite", "pin"]
+  },
+  {
+    "word": "tube",
+    "tier": "cake-words",
+    "batch": 10,
+    "subject": "One soft squeezable tube lying on its side: mint green with a rose band near its round white screw cap, gently squeezed in the middle.",
+    "avoid": [
+      "toothpaste coming out, or a toothbrush",
+      "letters or a logo",
+      "a cardboard roll",
+      "a can or a standing cylinder"
+    ],
+    "distinctFrom": ["cat", "hen", "top", "tub"]
+  },
+  {
+    "word": "cape",
+    "tier": "cake-words",
+    "batch": 10,
+    "subject": "One rose-red cape on its own, spread open in a wide half-circle, with a cream lining and a cream bow at the neck.",
+    "avoid": [
+      "a person or a hood",
+      "a dress with sleeves",
+      "a blanket or a towel",
+      "a logo or a symbol"
+    ],
+    "distinctFrom": ["bus", "cake", "cap", "cat", "dog"]
+  },
+  {
+    "word": "rope",
+    "tier": "cake-words",
+    "batch": 10,
+    "subject": "One length of thick warm-tan rope lying across the picture, tied in a loose single knot in the middle, both ends a little frayed.",
+    "avoid": [
+      "a coil or spiral that reads as a snake",
+      "a lasso loop",
+      "a sack tied with it",
+      "a swing or a boat"
+    ],
+    "distinctFrom": ["sack", "bone", "box", "hen", "rock", "sun"]
+  },
+  {
+    "word": "bone",
+    "tier": "cake-words",
+    "batch": 10,
+    "subject": "One cartoon dog bone lying diagonally: a straight shaft with two rounded knobs at each end, warm ivory with soft tan shading.",
+    "avoid": [
+      "pure white that vanishes on a cream background",
+      "a dog or a bowl",
+      "a skeleton",
+      "a dumbbell"
+    ],
+    "distinctFrom": ["box", "jet", "rock", "rope", "sun"]
+  },
+  {
+    "word": "cake",
+    "tier": "cake-words",
+    "batch": 10,
+    "subject": "A round two-layer cake in three-quarter view: soft pink icing dripping a little over the sides, a cream filling line between the layers, and one red cherry on top.",
+    "avoid": [
+      "candles or numbers",
+      "a cut slice",
+      "a cupcake or a bun",
+      "a plate or a fork"
+    ],
+    "distinctFrom": ["cap", "cape", "cat", "dog", "pen"]
+  },
+  {
+    "word": "kite",
+    "tier": "cake-words",
+    "batch": 10,
+    "subject": "A diamond-shaped kite flying at a tilt, in four triangles of sky blue and rose pink, with a long wavy string and a tail of three small cream bows.",
+    "avoid": [
+      "a flag on a pole",
+      "a person holding it",
+      "a bird",
+      "letters or patterns"
+    ],
+    "distinctFrom": ["flag", "bib", "bike", "hen", "king", "pin", "pine", "sun"]
+  },
+  {
+    "word": "bike",
+    "tier": "cake-words",
+    "batch": 10,
+    "subject": "A child's bicycle in side view: a rose-pink frame, two black tyres with thin spokes, a cream seat, handlebars and pedals.",
+    "avoid": [
+      "a rider",
+      "a motorbike or a scooter",
+      "training wheels",
+      "a car"
+    ],
+    "distinctFrom": ["bib", "dog", "king", "kite", "pen"]
   }
 ]

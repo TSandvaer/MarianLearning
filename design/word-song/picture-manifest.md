@@ -6,20 +6,20 @@ Every Word Song picture is redrawn in one style. Thomas moved the pack from Midj
 
 ## What the file holds
 
-A JSON array of 73 objects, in generation order:
+A JSON array of 89 objects, in generation order:
 
 | Field          | Meaning                                                                                                                                                                                                     |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `word`         | The picture key and file stem (`hen` → `mobile/assets/pictures/hen.webp`).                                                                                                                                  |
-| `tier`         | `short-a`, `short-o`, `short-u`, `short-i`, `short-e` (by the word's vowel in `wordPack.ts`), or the wave-1 step: `duck-words`, `crab-words`.                                                               |
-| `batch`        | 1–8 (table below).                                                                                                                                                                                          |
+| `tier`         | `short-a`, `short-o`, `short-u`, `short-i`, `short-e` (by the word's vowel in `wordPack.ts`), or the wave-1 or wave-2 step: `duck-words`, `crab-words`, `tent-words`, `cake-words`.                         |
+| `batch`        | 1–10 (table below).                                                                                                                                                                                         |
 | `subject`      | One sentence: the object, its pose or view, and its colours. No style words.                                                                                                                                |
 | `avoid`        | What this picture must not look like: its look-alikes, plus the drifts the old prompt sheets recorded for this word.                                                                                        |
 | `distinctFrom` | Every pack word it shares a picture trio with or forms a `FORBIDDEN_PAIRS` entry with. Forbidden partners come first, then trio mates A–Z. The relation is symmetric: if `a` lists `b`, then `b` lists `a`. |
 
 ## Sources
 
-- **`word` (73).** The 57 keys come from `ls mobile/assets/pictures` (2026-10-16). The 16 wave-1 words come from `BIG_WORDS_STEPS` in `packages/core/src/wordSong/bigWordsSteps.ts` on PR #575 (`devon/ws-wave-1`), which matches [`content-wave-1.md`](../native/content-wave-1.md) § 3.2, § 4.2 and § 8.
+- **`word` (89).** The 57 keys come from `ls mobile/assets/pictures` (2026-10-16). The 16 wave-1 words come from `BIG_WORDS_STEPS` in `packages/core/src/wordSong/bigWordsSteps.ts` on PR #575 (`devon/ws-wave-1`), which matches [`content-wave-1.md`](../native/content-wave-1.md) § 3.2, § 4.2 and § 8. The 16 wave-2 words (tent and cake words) and their entries are [`content-wave-2.md`](../native/content-wave-2.md) § 7, verbatim, with § 7's symmetry edits to their partners.
 - **`subject` and `avoid`.** Each word's recognition cue and negatives come from its prompt sheet:
   - short-a, plus the old distractors bus, sun, dog, fox, cup, pen, log and pot: [`picture-pack-prompts.md`](./picture-pack-prompts.md) § 1–§ 2
   - nap, rat, map, tap: [`probe-word-picture-pack.md`](./probe-word-picture-pack.md) § 1 and § 3
@@ -52,8 +52,10 @@ Eight batches, by tier, with wave 1 last. Within a batch, the riskiest words com
 | 6     | short-e    | 9     | net web egg leg pen gem hen bed jet         |
 | 7     | duck-words | 8     | wing sack rock lock king ring sock duck     |
 | 8     | crab-words | 8     | clock swing brick drum plum flag frog crab  |
+| 9     | tent-words | 8     | pond desk belt nest gift lamp hand tent     |
+| 10    | cake-words | 8     | pine tube cape rope bone cake kite bike     |
 
-Short-a is split so that each look-alike group lands in the same batch and can be reviewed side by side: man/dad, cap/hat, map/mat, and rat/cat/bat in batch 1. Batches 7 and 8 keep `content-wave-1.md` § 8's risk order.
+Short-a is split so that each look-alike group lands in the same batch and can be reviewed side by side: man/dad, cap/hat, map/mat, and rat/cat/bat in batch 1. Batches 7 and 8 keep `content-wave-1.md` § 8's risk order, and batches 9 and 10 keep `content-wave-2.md` § 7's (riskiest first).
 
 The anchors hen, sack and wing are in the manifest so that the count is 73. If an anchor image is already the final picture, the script can skip that word.
 
@@ -80,10 +82,10 @@ These rules come from `picture-pack-style-anchor.md` § 3.7: one subject, no sce
 ## How it was checked
 
 1. The build step throws unless:
-   - the word set equals the 57 `ls` keys plus the 16 `BIG_WORDS_STEPS` words exactly;
+   - the word set equals the 57 `ls` keys plus the 32 `BIG_WORDS_STEPS` words exactly (73 before content wave 2, 89 after);
    - every 57-word `tier` matches `getWordEntry(word).vowel`.
-2. After commit, `python3 -c "json.load(...)"` parsed the file and returned 73 entries and 73 unique words, with the batch and tier counts above.
-3. Every `distinctFrom` entry is a pack word, never the word itself, and every link is symmetric.
+2. After commit, `python3 -c "json.load(...)"` parsed the file and returned 89 entries and 89 unique words, with the batch and tier counts above.
+3. Every `distinctFrom` entry is a pack word, never the word itself, and every link is symmetric (re-checked over all 89 for content wave 2).
 
 ## Open questions
 
