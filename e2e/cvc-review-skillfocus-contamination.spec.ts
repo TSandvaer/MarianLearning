@@ -124,8 +124,8 @@ const PERIODIC_REVIEW_SESSION_COUNT = 10
 const EXPECTED_REVIEW_TIER = 'cvc-words-short-u'
 /** The wrong node the BUG records on base (forward fallback, last node). */
 // The LAST word-song node (content wave 1 moved it from simple-sentences;
-// content wave 2 from crab-words).
-const FORWARD_FALLBACK_NODE = 'cake-words'
+// content wave 2 from crab-words; content wave 3 from cake-words).
+const FORWARD_FALLBACK_NODE = 'bug-stories'
 
 const CVC_WORDS_SHORT_U_CANON_PATH = resolve(
   process.cwd(),
@@ -223,7 +223,7 @@ interface ReadbackProgress {
 }
 
 test.describe('periodic CVC-review must not contaminate forward-node mastery (ticket 86ca9atqh) — FAILING-FIRST, RED on main until Kevin threads sessionCount into the session-end pick', () => {
-  test('1. a high-scoring periodic CVC-review session records skillFocus on the REVIEW tier (cvc-words-short-u), NOT the forward fallback (cake-words)', async ({
+  test('1. a high-scoring periodic CVC-review session records skillFocus on the REVIEW tier (cvc-words-short-u), NOT the forward fallback (bug-stories)', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
@@ -258,11 +258,14 @@ test.describe('periodic CVC-review must not contaminate forward-node mastery (ti
         'digraphs-th-voiceless': 'mastered',
         'sight-words': 'mastered',
         'simple-sentences': 'mastered',
-        // Content waves 1 and 2 (land 6): the tree's last four steps.
+        // Content waves 1-3 (lands 6 and 7): the tree's last seven steps.
         'duck-words': 'mastered',
         'crab-words': 'mastered',
         'tent-words': 'mastered',
         'cake-words': 'mastered',
+        'fox-stories': 'mastered',
+        'hen-stories': 'mastered',
+        'bug-stories': 'mastered',
       },
       // Post-graduation Marian — the one-shot graduation review has
       // already fired, so the PERIODIC round-robin is the branch under

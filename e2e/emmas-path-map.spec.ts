@@ -64,6 +64,10 @@ const WORD = [
   'crab-words',
   'tent-words',
   'cake-words',
+  // Content wave 3: land 7, "Stories".
+  'fox-stories',
+  'hen-stories',
+  'bug-stories',
 ] as const
 
 /** Mastered before `current`, practicing at it, locked after (-1 = all mastered). */
@@ -618,8 +622,8 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     await arm(page, seedProgress({ word: 4 }))
     await openMapFromHub(page, 'word-song')
 
-    await expect(page.getByTestId('map-stop')).toHaveCount(17)
-    await expect(page.getByTestId('map-band')).toHaveCount(6)
+    await expect(page.getByTestId('map-stop')).toHaveCount(20)
+    await expect(page.getByTestId('map-band')).toHaveCount(7)
     await expect(page.getByTestId('map-gate')).toHaveCount(5)
     await expect(page.getByTestId('map-emma')).toHaveAttribute(
       'data-node',
