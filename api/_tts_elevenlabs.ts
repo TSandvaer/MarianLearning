@@ -188,6 +188,9 @@ export interface ElevenLabsOptions {
   timeoutMs?: number
   env?: NodeJS.ProcessEnv
   backoff?: BackoffPolicy
+  /** Sampling seed (0-4294967295). Unset in production; the take picker
+   *  (scripts/lilyTakePicker.ts) varies it so takes of one line differ. */
+  seed?: number
 }
 
 /** Synthesize one utterance with ElevenLabs. `req.voice/rate/pitch/volume`
@@ -213,6 +216,7 @@ export async function synthesizeElevenLabs(
         body: JSON.stringify({
           text: renderElevenLabsText(req.text, req.tier),
           model_id: ELEVENLABS_MODEL_ID,
+          ...(opts.seed === undefined ? {} : { seed: opts.seed }),
         }),
         signal: controller.signal,
       },

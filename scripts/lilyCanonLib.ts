@@ -52,11 +52,16 @@ export function canonFiles(dir = join(ROOT, 'public', 'canon')): string[] {
 }
 
 /** One uncached Lily render: eleven_v4, the Lily voice, default model
- *  settings. `text` goes through renderElevenLabsText(text, tier) inside. */
-export async function synthLily(text: string, tier?: string): Promise<Buffer> {
+ *  settings. `text` goes through renderElevenLabsText(text, tier) inside.
+ *  `seed` is for the take picker only; production renders send none. */
+export async function synthLily(
+  text: string,
+  tier?: string,
+  seed?: number,
+): Promise<Buffer> {
   const { audio } = await synthesizeElevenLabs(
     { text, tier, voice: '', rate: '', pitch: '', volume: '' },
-    { backoff: { maxAttempts: 5 } },
+    { backoff: { maxAttempts: 5 }, seed },
   )
   return Buffer.from(audio)
 }

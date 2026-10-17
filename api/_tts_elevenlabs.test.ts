@@ -164,6 +164,21 @@ describe('synthesizeElevenLabs', () => {
     })
   })
 
+  it('sends a seed only when one is given', async () => {
+    const fetchFn = okFetch()
+    await synthesizeElevenLabs(req('Read the fig.'), { fetchFn, env, seed: 7 })
+    await synthesizeElevenLabs(req('Read the fig.'), { fetchFn, env })
+    const bodies = fetchFn.mock.calls.map((c) =>
+      JSON.parse((c as unknown as [string, RequestInit])[1].body as string),
+    )
+    expect(bodies[0]).toEqual({
+      text: 'Read the fig.',
+      model_id: ELEVENLABS_MODEL_ID,
+      seed: 7,
+    })
+    expect(Object.keys(bodies[1])).toEqual(['text', 'model_id'])
+  })
+
   it('throws a named error on a non-2xx response', async () => {
     const fetchFn = vi.fn(async () => new Response('bad key', { status: 401 }))
     await expect(
