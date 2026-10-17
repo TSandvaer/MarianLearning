@@ -22,6 +22,7 @@ export type StageCard =
   | 'letter-sound'
   | 'sentence'
   | 'none'
+  | 'story'
 
 export interface NativeRound extends Omit<WordRound, 'card' | 'chipFace'> {
   card: StageCard

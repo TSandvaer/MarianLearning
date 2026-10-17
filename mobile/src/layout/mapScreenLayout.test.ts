@@ -9,6 +9,7 @@ import {
   landscapeNeed,
   landscapeScale,
   layoutMap,
+  PORTRAIT_FIT_LANDS,
 } from '@marian/core/map/mapLayout'
 import { buildMapModel } from '@marian/core/map/mapModel'
 import {
@@ -72,7 +73,11 @@ const close = (a: number, b: number) => Math.abs(a - b) <= 0.051
 // § 1 sizes table (Word Song, the worst world). Content wave 1 added Word
 // Song land 6 (`design/native/content-wave-1.md` § 5.2): the 430×932 row
 // and the L / TL rows shrink with the 6th band; 375×667 and both W rows
-// keep their sizes.
+// keep their sizes. Content wave 3 added land 7 (`content-wave-3.md` § 1):
+// the 7 bands miss the portrait bars, so (T6) the P and W forms lay Word
+// Song out on landscape's bands and scroll (their sizes stay; the last
+// column is the scrolled path's height), L scrolls further, and TL shrinks
+// again (measured, 2026-10-17).
 const TABLE: [
   string,
   Viewport,
@@ -83,7 +88,7 @@ const TABLE: [
   number,
   number | null,
 ][] = [
-  ['375×667', vp(375, 667), 'P', 0.457, 40.2, 48.5, 42.1, null],
+  ['375×667', vp(375, 667), 'P', 0.457, 40.2, 48.5, 42.1, 617],
   [
     '430×932 (t59 b34)',
     vp(430, 932, 59, 34),
@@ -92,10 +97,10 @@ const TABLE: [
     46.15,
     55.6,
     48.2,
-    null,
+    707,
   ],
-  ['667×375', vp(667, 375), 'L', 0.45, 39.6, 47.7, 41.4, 527],
-  ['820×1180 (t24 b20)', vp(820, 1180, 24, 20), 'W', 1, 88, 106, 92, null],
+  ['667×375', vp(667, 375), 'L', 0.45, 39.6, 47.7, 41.4, 607],
+  ['820×1180 (t24 b20)', vp(820, 1180, 24, 20), 'W', 1, 88, 106, 92, 1348],
   [
     '744×1133 (t24 b20)',
     vp(744, 1133, 24, 20),
@@ -104,19 +109,10 @@ const TABLE: [
     79.8,
     96.2,
     83.5,
-    null,
+    1223,
   ],
-  ['1180×820 (b20)', vp(1180, 820, 0, 20), 'TL', 0.669, 58.9, 70.9, 61.5, null],
-  [
-    '1133×744 (b20)',
-    vp(1133, 744, 0, 20),
-    'TL',
-    0.604,
-    53.15,
-    64.0,
-    55.6,
-    null,
-  ],
+  ['1180×820 (b20)', vp(1180, 820, 0, 20), 'TL', 0.582, 51.2, 61.6, 53.5, null],
+  ['1133×744 (b20)', vp(1133, 744, 0, 20), 'TL', 0.525, 46.2, 55.7, 48.3, null],
 ]
 
 describe('mapPathScale: the § 1 sizes table', () => {
@@ -135,10 +131,54 @@ describe('mapPathScale: the § 1 sizes table', () => {
     expect(Math.round(worst(vp(667, 375), 'math').scroll!)).toBe(369)
   })
 
-  it('only phone landscape scrolls', () => {
+  it('Word Song scrolls on every form but tablet landscape (T6); Number Garden only in phone landscape', () => {
     for (const [, v] of TABLE) {
       const w = worst(v, 'word-song')
-      expect(w.scroll !== null).toBe(w.form === 'L')
+      expect(w.scroll !== null).toBe(w.form !== 'TL')
+      const m = worst(v, 'math')
+      expect(m.scroll !== null).toBe(m.form === 'L')
+    }
+  })
+
+  it('T6: a portrait world scrolls only past PORTRAIT_FIT_LANDS lands, and keeps its portrait scale', () => {
+    expect(PORTRAIT_FIT_LANDS).toBe(6)
+    const layout = mapScreenLayout(vp(375, 667))
+    const ws = buildMapModel(seed(LITERACY_TREE, 0), 'word-song')
+    const ng = buildMapModel(seed(MATH_TREE, 0), 'math')
+    expect(ws.lands).toHaveLength(7)
+    const k = mapPathScale(layout.pane, ws, [], false)
+    expect(k.scrolls).toBe(true)
+    expect(k.s).toBeCloseTo(375 / 820)
+    expect(k.contentH).toBeGreaterThan(layout.pane.height)
+    expect(mapPathScale(layout.pane, ng, [], false).scrolls).toBe(false)
+    // A 6-land world fits, as before content wave 3.
+    const six = { ...ws, lands: ws.lands.slice(0, 6) }
+    expect(mapPathScale(layout.pane, six, [], false).scrolls).toBe(false)
+  })
+
+  it('T6: the portrait path opens with the current stop in its middle third', () => {
+    for (const v of [vp(375, 667), vp(820, 1180, 24, 20)]) {
+      const layout = mapScreenLayout(v)
+      for (let cur = 0; cur < LITERACY_TREE.length; cur++) {
+        const model = buildMapModel(seed(LITERACY_TREE, cur), 'word-song')
+        const k = mapPathScale(layout.pane, model, [], false)
+        const geo = layoutMap(model, k.virtualW, k.virtualH)
+        const at = geo.stops.find((x) => x.node === model.current)!
+        const y = openingOffset(
+          [focusBox(at)],
+          k.s,
+          layout.pane.height,
+          k.contentH,
+        )
+        const onScreen = at.y * k.s - y
+        expect(onScreen).toBeGreaterThanOrEqual(0)
+        expect(onScreen).toBeLessThanOrEqual(layout.pane.height)
+        // Clamped at the path's ends only; else the middle third.
+        if (y > 0 && y < k.contentH - layout.pane.height) {
+          expect(onScreen).toBeGreaterThanOrEqual(layout.pane.height / 3)
+          expect(onScreen).toBeLessThanOrEqual((2 * layout.pane.height) / 3)
+        }
+      }
     }
   })
 
@@ -146,13 +186,15 @@ describe('mapPathScale: the § 1 sizes table', () => {
   // 6th land, land 1's bands are too short for the stop at its row, so on
   // the portrait forms the current stop's box may end a little below the
   // pane (toward the caption slot). Worst measured: 13.6 pt at 820×1180,
-  // current in land 1. Device check: no caption text covered.
+  // current in land 1. Device check: no caption text covered. Content wave
+  // 3's 7th land would make it 22 pt; with T6's scroll every current stop
+  // ends inside the path (worst -4.1 pt at 820×1180, measured 2026-10-17).
   it('portrait: the current stop never ends more than 14 pt below the pane', () => {
     const overhangs: Record<string, number> = {}
     for (const [name, v] of TABLE) {
       const layout = mapScreenLayout(v)
       if (layout.form !== 'P' && layout.form !== 'W') continue
-      let worstPt = 0
+      let worstPt = -Infinity
       for (let cur = 0; cur < LITERACY_TREE.length; cur++) {
         const model = buildMapModel(seed(LITERACY_TREE, cur), 'word-song')
         const k = mapPathScale(layout.pane, model, [], layout.landscape)
@@ -165,7 +207,7 @@ describe('mapPathScale: the § 1 sizes table', () => {
     expect(Object.keys(overhangs)).toHaveLength(4)
     for (const pt of Object.values(overhangs))
       expect(pt).toBeLessThanOrEqual(14)
-    expect(overhangs['820×1180 (t24 b20)']).toBe(13.6)
+    expect(overhangs['820×1180 (t24 b20)']).toBe(-4.1)
   })
 })
 

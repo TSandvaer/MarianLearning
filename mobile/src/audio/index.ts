@@ -73,6 +73,21 @@ export {
   wordWindow,
 } from './blendMarks'
 export type { Segment } from './blendMarks'
+export {
+  sentenceOfWord,
+  STORY_MARK_LEAD_MS,
+  STORY_READ_ALONG,
+  storyLitAt,
+  storyMarksFor,
+  storyWordStarts,
+} from './storyMarks'
+export {
+  STORY_READ_LINE,
+  storyGuidePlayer,
+  storyWordLineId,
+  storyWordPlayer,
+} from './storyGuide'
+export type { StoryGuideLineId, StoryGuidePlayer } from './storyGuide'
 export { useAudioEngine, configureAudioSession, AUDIO_MODE } from './lifecycle'
 export { isAudioMuted } from './mute'
 export { readAudioLog, recordAudio } from './audioLog'

@@ -65,6 +65,12 @@ import {
   type WordSongSessionExtras,
 } from './wordSongHints'
 
+/**
+ * The native app plays content wave 3's little stories (content-wave-3.md
+ * § 4.6); the frozen web parses without this, so a story throws there.
+ */
+const NATIVE_PARSE = { littleStories: true } as const
+
 export interface WordSongSessionSnapshot extends WordSongSessionExtras {
   /** The server plan (warm-ups first); `null` until resolved, and on any
    *  failure. */
@@ -139,15 +145,15 @@ export function wordSongRoundFromServer(
       throw new Error('the review request was answered with a forward plan')
     }
     return {
-      plan: wordSongSessionPlanFromServer(serverPlan),
+      plan: wordSongSessionPlanFromServer(serverPlan, NATIVE_PARSE),
       review: true,
       warmupCount: 0,
       intro: null,
     }
   }
-  const forward = wordSongSessionPlanFromServer(serverPlan)
+  const forward = wordSongSessionPlanFromServer(serverPlan, NATIVE_PARSE)
   const refs = hints.planKind.warmup
-  const warmup = wordSongWarmupFromServer(serverPlan)
+  const warmup = wordSongWarmupFromServer(serverPlan, NATIVE_PARSE)
     .filter((w) => w.block >= 1 && w.block <= refs.length)
     .slice(0, WARMUP_PROBLEMS)
   return {

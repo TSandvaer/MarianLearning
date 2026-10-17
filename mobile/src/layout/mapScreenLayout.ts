@@ -5,7 +5,9 @@
  * - **W** (tablet portrait): the web portrait 1:1. Header 124 (Home 96,
  *   title 52 pt), the path, a 128 pt caption row.
  * - **P** (phone portrait): Home 56 and a 28 pt title, the path, a
- *   reserved 4-line caption slot. Never scrolls.
+ *   reserved 4-line caption slot.
+ * - P and W scroll only a world of more than `PORTRAIT_FIT_LANDS` lands
+ *   (Word Song's 7, content wave 3 T6), as phone landscape does.
  * - **L** (phone landscape): a Home rail, no title, a path pane that may
  *   scroll, a 2-line caption across the base.
  * - **TL** (tablet landscape): the web landscape with a 350 pt column.
@@ -20,6 +22,7 @@ import {
   landscapeNeed,
   landscapeScale,
   LANDSCAPE_TRAY_ROOM,
+  PORTRAIT_FIT_LANDS,
   type StopLayout,
 } from '@marian/core/map/mapLayout'
 import type { MapModel } from '@marian/core/map/mapModel'
@@ -225,8 +228,23 @@ export function mapPathScale(
   alsoBadged: readonly SkillNode[],
   landscape: boolean,
 ): MapPathScale {
+  const lands = model.lands.length
+  const rooms = badgeLands(model, alsoBadged).size
   if (!landscape) {
     const s = Math.min(1, pane.width / MAP_REF_W)
+    // Content wave 3 T6: a world of more than PORTRAIT_FIT_LANDS lands is
+    // laid out on landscape's bands and scrolls, opened on the focus box
+    // (the current stop in the pane's middle third).
+    const need = landscapeNeed(lands, rooms)
+    if (lands > PORTRAIT_FIT_LANDS && need > pane.height / s) {
+      return {
+        s,
+        virtualW: pane.width / s,
+        virtualH: need - LANDSCAPE_TRAY_ROOM,
+        contentH: need * s,
+        scrolls: true,
+      }
+    }
     return {
       s,
       virtualW: pane.width / s,
@@ -235,8 +253,6 @@ export function mapPathScale(
       scrolls: false,
     }
   }
-  const lands = model.lands.length
-  const rooms = badgeLands(model, alsoBadged).size
   const fit = landscapeScale(lands, pane.height, rooms)
   if (fit >= MAP_MIN_SCALE) {
     return {

@@ -5,7 +5,8 @@
  * order. Core's `layoutMap` lays it out in virtual px; every value is
  * drawn × s (no `transform: scale`, so hit areas stay real-size).
  *
- * Phone landscape may scroll (`mapPathScale`): a vertical ScrollView opened
+ * Phone landscape may scroll (`mapPathScale`), and so may a portrait world
+ * of more than 6 lands (content wave 3 T6): a vertical ScrollView opened
  * on the focus box, not animated, with one indicator flash; no scrolling
  * until the unlock beat reaches Emma's line.
  */
