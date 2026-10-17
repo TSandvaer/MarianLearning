@@ -204,15 +204,17 @@ function isHistoryEntry(v: unknown): v is SessionHistoryEntry {
   // perProblemAnswerValue is optional (Kevin schema-first PR,
   // 2026-05-21 — additive, no schemaVersion bump; same precedent as
   // `latencyMs` and `mathFacts`). When present each entry must be
-  // either `null` (no chip tapped) or a finite integer in [0, 99]
-  // (the legitimate chip-value range — current tiers cap at 20, but
-  // the future two-digit-addsub tier extends the upper bound; we
-  // mirror `mathFacts.a / .b` bounds for forward compatibility).
+  // either `null` (no chip tapped) or a safe whole number from 0 up.
+  // No upper bound (content wave 3, G — `design/native/content-wave-3.md`
+  // § 2): hundreds records answers such as 234, and a build that reads
+  // only 0..99 rejects the whole doc, so this guard reads them before any
+  // build writes them. Nothing reads the value for a decision. The
+  // `mathFacts` bounds above stay 0..99 (no 3-digit fact exists).
   if ('perProblemAnswerValue' in v && v.perProblemAnswerValue !== undefined) {
     if (!Array.isArray(v.perProblemAnswerValue)) return false
     for (const n of v.perProblemAnswerValue) {
       if (n === null) continue
-      if (typeof n !== 'number' || !Number.isInteger(n) || n < 0 || n > 99) {
+      if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 0) {
         return false
       }
     }
