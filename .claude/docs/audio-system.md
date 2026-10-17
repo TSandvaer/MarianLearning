@@ -60,6 +60,8 @@ Since 2026-10-16 Lily (ElevenLabs) is the only voice. The Azure-era scripts are 
 
 **Rule: any PR claiming "voice swap complete" must enumerate both surfaces in its ACs and ship both artifact sets.** The `revoiceCanon*` path touches only canon JSON — it silently leaves the static MP3s on the old voice. This bit for real: PR #356's en-GB-OliviaNeural rollout re-voiced baked canon only; voice-QA round-2 (issue #377, 2026-06-11) found all 22 static greet/hub files still on the old voice (HASH-SAME verdicts after PR #373's cache-bust proved live bytes were being ear-tested). Re-render tracked in ticket `86ca7y0gw`.
 
+**A clip that fails an ear test twice gets ear-picked, not re-rolled:** `scripts/lilyTakePicker.ts` renders N production-Lily takes of a canon line (plus optional `--input-variant` inputs) onto one self-contained A/B page with take 0 = the committed clip, and `--apply` splices the pick into canon and `tmp/revoice-cache`. **Incident:** #558's `--retake` of "Read the fig." (short-i) still said "figa" and failed Thomas's 2026-10-17 ear test again — **Cost:** two ear-test rounds.
+
 ## Per-session MP3s — sessionAudio
 
 [src/lib/audio/sessionAudio.ts](MarianLearning/src/lib/audio/sessionAudio.ts) plays Claude-generated lines (Math problem reads, Word Song reads, hint/correct/reprompt/giveAnswer slots, all 19 Session-End utterances).

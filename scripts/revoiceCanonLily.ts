@@ -16,7 +16,8 @@
  *    without calling the API.
  *  - `--only <substring>` restricts to canon files whose path contains it.
  *  - `--retake <utterance-text>` (repeatable) drops that line's cache entry
- *    first, so the next render is a fresh take.
+ *    first, so the next render is a fresh take. A line that still fails the
+ *    ear test goes to scripts/lilyTakePicker.ts instead (pick from N takes).
  *  - `--unrendered` renders only the canon lines whose audio is still empty
  *    (new lines a splice added, e.g. `scripts/spliceContentWave1Canon.ts`)
  *    and leaves every other clip's bytes as they are; no bundled clips.
@@ -24,25 +25,25 @@
  * Run: npx tsx scripts/revoiceCanonLily.ts [--dry-run] [--only x] [--retake "text"]
  * Reads ELEVENLABS_API_KEY from .env.local.
  */
-import { createHash } from 'node:crypto'
 import {
   existsSync,
   mkdirSync,
   readFileSync,
-  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
-import { dirname, join, relative } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join, relative } from 'node:path'
+import { renderElevenLabsText, stripId3v2 } from '../api/_tts_elevenlabs.js'
 import {
-  renderElevenLabsText,
-  stripId3v2,
-  synthesizeElevenLabs,
-} from '../api/_tts_elevenlabs.js'
+  CACHE,
+  ROOT,
+  cachePath,
+  canonFiles,
+  loadEnvLocal,
+  synthLily,
+  tierFor,
+} from './lilyCanonLib.js'
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const CACHE = join(ROOT, 'tmp', 'revoice-cache')
 const CONCURRENCY = 3
 
 const args = process.argv.slice(2)
@@ -56,34 +57,7 @@ const UNRENDERED = args.includes('--unrendered')
 const inScope = (u: { audio: { base64: string } }) =>
   !UNRENDERED || u.audio.base64 === ''
 
-for (const line of readFileSync(join(ROOT, '.env.local'), 'utf8').split(
-  /\r?\n/,
-)) {
-  const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
-  if (m && process.env[m[1]] === undefined)
-    process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2')
-}
-
-/** Production tier filter for a canon file (mirrors revoiceCanon.ts):
- *  math → none; word-song → basename; both letter-sounds files → letter-sounds. */
-function tierFor(rel: string): string | undefined {
-  if (rel.includes('/math/')) return undefined
-  const base = rel
-    .split('/')
-    .pop()!
-    .replace(/\.json$/, '')
-  return base.startsWith('letter-sounds') ? 'letter-sounds' : base
-}
-
-function canonFiles(dir = join(ROOT, 'public', 'canon')): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-    e.isDirectory()
-      ? canonFiles(join(dir, e.name))
-      : e.name.endsWith('.json')
-        ? [join(dir, e.name)]
-        : [],
-  )
-}
+loadEnvLocal()
 
 /** {file, text} pairs from an Azure render script's LINES array. */
 function bundleLines(script: string): Array<{ file: string; text: string }> {
@@ -96,25 +70,13 @@ function bundleLines(script: string): Array<{ file: string; text: string }> {
 }
 
 type Job = { input: string; text: string; tier?: string }
-const key = (input: string) =>
-  createHash('sha256').update(`lily|eleven_v4|${input}`).digest('hex')
 
 async function render(job: Job): Promise<Buffer> {
-  const path = join(CACHE, `${key(job.input)}.mp3`)
+  const path = cachePath(job.input)
   if (existsSync(path)) return Buffer.from(stripId3v2(readFileSync(path)))
-  const { audio } = await synthesizeElevenLabs(
-    {
-      text: job.text,
-      tier: job.tier,
-      voice: '',
-      rate: '',
-      pitch: '',
-      volume: '',
-    },
-    { backoff: { maxAttempts: 5 } },
-  )
+  const audio = await synthLily(job.text, job.tier)
   writeFileSync(path, audio)
-  return Buffer.from(audio)
+  return audio
 }
 
 async function main() {
@@ -153,14 +115,11 @@ async function main() {
 
   for (const t of RETAKES) {
     for (const j of jobs.values()) {
-      if (j.text === t)
-        rmSync(join(CACHE, `${key(j.input)}.mp3`), { force: true })
+      if (j.text === t) rmSync(cachePath(j.input), { force: true })
     }
   }
 
-  const todo = [...jobs.values()].filter(
-    (j) => !existsSync(join(CACHE, `${key(j.input)}.mp3`)),
-  )
+  const todo = [...jobs.values()].filter((j) => !existsSync(cachePath(j.input)))
   const chars = todo.reduce((n, j) => n + j.input.length, 0)
   console.log(
     `${docs.length} canon files, ${bundles.length} bundled clips, ${jobs.size} unique requests; ` +
