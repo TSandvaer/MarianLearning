@@ -189,6 +189,9 @@ export const LITERACY_TREE: readonly WordSongNode[] = [
   'crab-words',
   'tent-words',
   'cake-words',
+  'fox-stories',
+  'hen-stories',
+  'bug-stories',
 ]
 
 /**

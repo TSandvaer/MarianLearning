@@ -21,9 +21,9 @@ const fileFor = (id: PathArtId, size: number) =>
 const ids = new Set<PathArtId>(PATH_ART_IDS)
 
 describe('PATH_ART manifest', () => {
-  it('lists 30 stages + 10 lands + 8 UI pieces, no duplicates', () => {
-    expect(ALL_NODES).toHaveLength(30)
-    expect(PATH_ART_IDS).toHaveLength(30 + 10 + 8)
+  it('lists 33 stages + 11 lands + 8 UI pieces, no duplicates', () => {
+    expect(ALL_NODES).toHaveLength(33)
+    expect(PATH_ART_IDS).toHaveLength(33 + 11 + 8)
     expect(ids.size).toBe(PATH_ART_IDS.length)
   })
 
@@ -38,7 +38,7 @@ describe('PATH_ART manifest', () => {
 
   it('has a file at every size for every land', () => {
     const landIds = LANDS.map(landArtId)
-    expect(new Set(landIds).size).toBe(10)
+    expect(new Set(landIds).size).toBe(11)
     const found = landIds.flatMap((id) =>
       PATH_ART_SIZES.filter(
         (size) => ids.has(id) && existsSync(fileFor(id, size)),
@@ -51,7 +51,7 @@ describe('PATH_ART manifest', () => {
     const expected = PATH_ART_IDS.flatMap((id) =>
       PATH_ART_SIZES.map((size) => `${id}-${size}.webp`),
     ).sort()
-    expect(expected).toHaveLength(48 * PATH_ART_SIZES.length)
+    expect(expected).toHaveLength(52 * PATH_ART_SIZES.length)
     expect(readdirSync(join(PUBLIC, PATH_ART_DIR)).sort()).toEqual(expected)
   })
 })

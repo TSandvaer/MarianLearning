@@ -13,6 +13,7 @@ import {
   HINT_AFTER_WRONG_COUNT,
 } from '../shared/gameplayConstants'
 import { buildBlendHighlightSteps } from './blendHighlight'
+import { storyWordCount } from './littleStories'
 import { buildWordChipOrder } from './wordChips'
 import type { WordEntry } from './wordPack'
 import type { WordSongContentType, WordSongProblem } from './wordSessionPlans'
@@ -25,6 +26,7 @@ import type { WordSongContentType, WordSongProblem } from './wordSessionPlans'
  * - `letter` / `letter-sound`: one large letter glyph.
  * - `sentence`: the gapped sentence panel (+ the gentle-phase scene).
  * - `none`: sight words (the written word IS the chip; no picture).
+ * - `story`: a little story's card (content wave 3 § 4.2; native only).
  */
 export type WordCard =
   | 'picture'
@@ -32,6 +34,7 @@ export type WordCard =
   | 'letter-sound'
   | 'sentence'
   | 'none'
+  | 'story'
 
 /** What a chip shows. Written words: sight words and simple sentences. */
 export type ChipFace = 'picture' | 'letter' | 'letter-sound' | 'written-word'
@@ -46,6 +49,8 @@ export function wordCardFor(contentType?: WordSongContentType): WordCard {
       return 'sentence'
     case 'sight-word':
       return 'none'
+    case 'little-story':
+      return 'story'
     default:
       return 'picture'
   }
@@ -83,7 +88,31 @@ export function chipLabel(face: ChipFace, word: string): string {
 export const SILENT_TEXT_WINDOW_MS = 1500
 
 export function readAloudDelayMs(problem: WordSongProblem): number {
+  if (problem.contentType === 'little-story') return storyReadBeatMs(problem)
   return problem.contentType === 'cvc-word' ? SILENT_TEXT_WINDOW_MS : 0
+}
+
+/**
+ * A little story's reading beat (content wave 3 § 4.4 step 3, D3): the
+ * story shows, and the question comes this long after "Read the story."
+ * ends, 1500 ms a word, never under 12 s or over 21 s (15 s for 10 words,
+ * 21 s for 14: 40 words a minute). A word tap holds the question to at
+ * least `STORY_TAP_HOLD_MS` after the tap, never past
+ * `STORY_BEAT_CEILING_MS` from the beat's start. Foreground time only;
+ * nothing on screen counts down.
+ */
+export const STORY_READ_MS_PER_WORD = 1500
+export const STORY_BEAT_MIN_MS = 12000
+export const STORY_BEAT_MAX_MS = 21000
+export const STORY_TAP_HOLD_MS = 2000
+export const STORY_BEAT_CEILING_MS = 30000
+
+export function storyReadBeatMs(problem: WordSongProblem): number {
+  const words = storyWordCount(problem.story ?? problem.utterances.hint)
+  return Math.min(
+    STORY_BEAT_MAX_MS,
+    Math.max(STORY_BEAT_MIN_MS, STORY_READ_MS_PER_WORD * words),
+  )
 }
 
 // ── How a tap is judged ────────────────────────────────────────────────

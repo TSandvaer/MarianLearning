@@ -61,6 +61,66 @@ export interface SentenceMetrics {
   slot: number
 }
 
+/**
+ * A little story's card (content wave 3 § 4.2, § 4.3): Fredoka 600 at
+ * `font` on `lineHeight` lines (≥ 44 pt, so every word's tap area is), the
+ * sentence panel's 3 pt border, at the top of the stage. The reveal scene
+ * fills `reveal` below it (see `storyRevealScene`).
+ */
+export interface StoryCardMetrics {
+  font: number
+  lineHeight: number
+  padding: { horizontal: number; vertical: number }
+  /** The card's width (stage-wide, at most `maxWidth`). */
+  width: number
+  /** The reveal scene's cap: 200 on phones, 280 on tablets. */
+  sceneMax: number
+  /**
+   * Where the scene may grow after the answer, without the card: from the
+   * card's bottom + 12 to the chips' bottom, stage-wide (P, tablets); the
+   * chip column in phone landscape.
+   */
+  reveal: Rect
+  /** `reveal.y` is measured below the card (P, tablets); not in L. */
+  revealBelowCard: boolean
+}
+
+/** The card's border (the sentence panel's, 3 pt). */
+export const STORY_CARD_BORDER = 3
+/** Gap between the card's bottom and the reveal scene (§ 4.3). */
+export const STORY_REVEAL_GAP = 12
+/** The reveal scene is never smaller than this (§ 4.3). */
+export const STORY_SCENE_MIN = 120
+
+/** The card's height for `lines` lines of text. */
+export function storyCardHeight(m: StoryCardMetrics, lines: number): number {
+  return lines * m.lineHeight + 2 * m.padding.vertical + 2 * STORY_CARD_BORDER
+}
+
+/**
+ * The reveal scene's side (§ 4.3): min(the rect's height, its width, 200
+ * on phones / 280 on tablets), at least 120. In P and on tablets the rect
+ * starts `STORY_REVEAL_GAP` below the card (`cardHeight`); in phone
+ * landscape it is the chip column, and the scene takes the column's width
+ * (99–104 pt, the table's value: no 120 floor there).
+ */
+export function storyRevealScene(
+  m: StoryCardMetrics,
+  cardHeight: number,
+): { x: number; y: number; size: number } {
+  const top = m.revealBelowCard
+    ? m.reveal.y + cardHeight + STORY_REVEAL_GAP
+    : m.reveal.y
+  const height = m.reveal.y + m.reveal.height - top
+  const fit = Math.min(height, m.reveal.width, m.sceneMax)
+  const size = m.revealBelowCard ? Math.max(STORY_SCENE_MIN, fit) : fit
+  return {
+    x: m.reveal.x + (m.reveal.width - size) / 2,
+    y: top + Math.max(0, (height - size) / 2),
+    size,
+  }
+}
+
 export interface WordSongLayout extends ScreenLayout {
   form: MathForm
   safe: Rect
@@ -83,6 +143,7 @@ export interface WordSongLayout extends ScreenLayout {
   scene: number
   chips: { rect: Rect; size: number; gap: number; axis: 'row' | 'column' }
   thCue: { width: number; height: number }
+  story: StoryCardMetrics
 }
 
 const clamp = (min: number, value: number, max: number) =>
@@ -178,6 +239,20 @@ function phonePortrait(v: Viewport): WordSongLayout {
       axis: 'row',
     },
     thCue: TH_CUE_PHONE,
+    story: {
+      font: 24,
+      lineHeight: 46,
+      padding: { horizontal: 16, vertical: 12 },
+      width: stage.width,
+      sceneMax: 200,
+      reveal: {
+        x: stage.x,
+        y: stage.y,
+        width: stage.width,
+        height: chipsTop + chip - stage.y,
+      },
+      revealBelowCard: true,
+    },
   }
 }
 
@@ -242,6 +317,21 @@ function phoneLandscape(v: Viewport): WordSongLayout {
       axis: 'column',
     },
     thCue: TH_CUE_PHONE,
+    story: {
+      font: 22,
+      lineHeight: 44,
+      padding: { horizontal: 16, vertical: 10 },
+      width: stage.width,
+      sceneMax: 200,
+      // The chip column: small, on the form Marian doesn't use (§ 4.3).
+      reveal: {
+        x: chipX,
+        y: s.y + s.height - 16 - chipsH,
+        width: chip,
+        height: chipsH,
+      },
+      revealBelowCard: false,
+    },
   }
 }
 
@@ -284,8 +374,25 @@ function tablet(v: Viewport, landscape: boolean): WordSongLayout {
       axis: 'row',
     },
     thCue: TH_CUE_TABLET,
+    story: {
+      font: 32,
+      lineHeight: 56,
+      padding: { horizontal: 24, vertical: 16 },
+      width: Math.min(stage.width, STORY_TABLET_TEXT_MAX + 2 * 24 + 6),
+      sceneMax: 280,
+      reveal: {
+        x: stage.x,
+        y: stage.y,
+        width: stage.width,
+        height: chipsTop + TABLET_CHIP - stage.y,
+      },
+      revealBelowCard: true,
+    },
   }
 }
+
+/** A tablet story card's text is at most this wide (§ 4.3). */
+export const STORY_TABLET_TEXT_MAX = 586
 
 export function wordSongLayout(v: Viewport): WordSongLayout {
   const landscape = isLandscape(v)

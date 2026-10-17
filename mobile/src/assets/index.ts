@@ -56,6 +56,21 @@ export function sceneAsset(
   return src === undefined ? undefined : assetForWebPath(src)
 }
 
+/**
+ * A little story's scene (content wave 3 § 4.2, § 6), by its
+ * `LITTLE_STORIES` id (`'fox-1'`): `assets/scenes/story-<id>.webp`, written
+ * by the scene generator and registered by `export-assets` under
+ * `/native/scenes/`. `undefined` until it exists (the caller shows the
+ * answer's pack picture instead).
+ */
+export function storySceneAsset(
+  storyId: string | undefined,
+): NativeImage | undefined {
+  return storyId === undefined
+    ? undefined
+    : assetForWebPath(`/native/scenes/story-${storyId}.webp`)
+}
+
 /** Emma's Path clay art at one of its two shipped sizes. */
 export function pathArtAsset(
   id: PathArtId,

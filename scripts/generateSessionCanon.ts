@@ -346,6 +346,11 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
   // `bigWordsCanonCheck.ts` like duck and crab words.
   'tent-words',
   'cake-words',
+  // Content wave 3 (design/native/content-wave-3.md § 4): land 7, the
+  // little stories. Written by scripts/spliceContentWave3Canon.ts.
+  'fox-stories',
+  'hen-stories',
+  'bug-stories',
 ]
 
 /**
@@ -369,6 +374,10 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
  * - tent-words, cake-words (content wave 2 § 6.2): every line is fixed, so
  *   `scripts/spliceContentWave2WordCanon.ts` writes them (no Haiku credit);
  *   their new lines are rendered by `revoiceCanonLily.ts --unrendered`.
+ * - fox-stories, hen-stories, bug-stories (content wave 3 § 5.1): written by
+ *   `scripts/spliceContentWave3Canon.ts` from `LITTLE_STORIES`, NEVER
+ *   Haiku-baked (the planner has no story prompt: a bake would write the
+ *   blending-cv stub); their new lines are rendered the same way.
  *
  * The deliberate render runs `npx tsx scripts/generateSessionCanon.ts
  * --include-pending`; an existing file is still skipped without `--force`.
@@ -382,6 +391,9 @@ export const PENDING_CANON_NODES: ReadonlySet<string> = new Set([
   'crab-words',
   'tent-words',
   'cake-words',
+  'fox-stories',
+  'hen-stories',
+  'bug-stories',
 ])
 
 /** The combos a run bakes: missing (or all, with `--force`), minus pending. */

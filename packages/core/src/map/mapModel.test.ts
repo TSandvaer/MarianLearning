@@ -4,6 +4,7 @@
  * line catalogue so the map cannot drift from either.
  */
 import { describe, expect, it } from 'vitest'
+import { LANDS } from '../progress/lands'
 import {
   LITERACY_TREE,
   MATH_TREE,
@@ -25,9 +26,11 @@ import {
   GATE_TAP,
   LANDSCAPE_BAND,
   LANDSCAPE_TRAY_ROOM,
+  landscapeNeed,
   landscapeScale,
   layoutMap,
   MIN_STOP,
+  PORTRAIT_FIT_LANDS,
 } from './mapLayout'
 import { gateLine, openLine, stopLine } from './mapLines'
 
@@ -55,12 +58,12 @@ function entry(d: number, node: SkillNode, rate: number): SessionHistoryEntry {
 }
 
 describe('buildMapModel', () => {
-  it('13 math stops in 4 lands, 17 word stops in 6 lands, tree order', () => {
+  it('13 math stops in 4 lands, 20 word stops in 7 lands, tree order', () => {
     const math = buildMapModel(seed(MATH_TREE, 0), 'math')
     expect(math.lands.map((l) => l.stops.length)).toEqual([1, 4, 3, 5])
     expect(stopsInOrder(math).map((s) => s.node)).toEqual([...MATH_TREE])
     const word = buildMapModel(seed(LITERACY_TREE, 0), 'word-song')
-    expect(word.lands.map((l) => l.stops.length)).toEqual([2, 1, 5, 3, 2, 4])
+    expect(word.lands.map((l) => l.stops.length)).toEqual([2, 1, 5, 3, 2, 4, 3])
     expect(stopsInOrder(word).map((s) => s.node)).toEqual([...LITERACY_TREE])
   })
 
@@ -137,6 +140,18 @@ describe('layoutMap', () => {
     ['math', MATH_TREE],
     ['word-song', LITERACY_TREE],
   ] as const
+  /**
+   * The region a world is laid out in on portrait: W × H, but past
+   * PORTRAIT_FIT_LANDS lands the native map lays the path out on
+   * landscape's bands and scrolls (content-wave-3.md § 1, T6), as
+   * `mapPathScale` does. Word Song's 7 lands miss the bars at 928.
+   */
+  const heightFor = (world: 'math' | 'word-song') => {
+    const lands = LANDS.filter((l) => l.world === world).length
+    return lands > PORTRAIT_FIT_LANDS
+      ? Math.max(H, landscapeNeed(lands) - LANDSCAPE_TRAY_ROOM)
+      : H
+  }
 
   type Box = { l: number; t: number; r: number; b: number }
   const boxOf = (x: number, y: number, size: number): Box => ({
@@ -166,6 +181,7 @@ describe('layoutMap', () => {
 
   it('every stop and gate: ≥ 88px target, inside the region, no two overlap', () => {
     for (const [world, tree] of worlds) {
+      const H = heightFor(world)
       for (let cur = -1; cur < tree.length; cur++) {
         const l = layoutMap(buildMapModel(seed(tree, cur), world), W, H)
         const boxes = [
@@ -373,9 +389,14 @@ describe('layoutMap', () => {
           const k = landscapeScale(m.lands.length, rh)
           const h = rh / k - LANDSCAPE_TRAY_ROOM
           const l = layoutMap(m, rw / k, h)
-          // Tap targets stay ≥ 44 px on screen.
-          expect(l.stopSize * k).toBeGreaterThanOrEqual(44)
-          expect(GATE_TAP * k).toBeGreaterThanOrEqual(44)
+          // Tap targets stay ≥ 44 px on screen. Not for a world past
+          // PORTRAIT_FIT_LANDS (Word Song's 7 lands, content wave 3): these
+          // are the frozen web's landscape regions; the native map's tablet
+          // landscape keeps them ≥ 44 pt (mapScreenLayout.test.ts).
+          if (m.lands.length <= PORTRAIT_FIT_LANDS) {
+            expect(l.stopSize * k).toBeGreaterThanOrEqual(44)
+            expect(GATE_TAP * k).toBeGreaterThanOrEqual(44)
+          }
           const stop = l.stops.find((s) => s.node === m.current)!
           const e = emmaBadge(stop)
           const emma = {
@@ -387,8 +408,9 @@ describe('layoutMap', () => {
           // Her face stays recognisable on screen: badge >= 48 px (was 56,
           // the web's iPad-landscape rule; 6 Word Song lands measure 49-52
           // px here, native phone landscape ships 41.4 pt; Kyle's call on
-          // PR #575).
-          expect(e.size * k).toBeGreaterThanOrEqual(48)
+          // PR #575). The same 7-land exception as the tap targets above.
+          if (m.lands.length <= PORTRAIT_FIT_LANDS)
+            expect(e.size * k).toBeGreaterThanOrEqual(48)
           // BudTray: top at 1.02 × size inside the stop box, 3 × 42 px
           // holes + padding ≈ 160 × 55 px.
           const trayTop = stop.y - stop.size / 2 + stop.size * 1.02

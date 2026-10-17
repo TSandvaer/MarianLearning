@@ -195,6 +195,10 @@ const STAGE_LABEL: Record<StageId, string> = {
   // Content wave 2 (frozen web: typecheck only).
   'tent-words': 'tent',
   'cake-words': 'cake',
+  // Content wave 3 (frozen web: typecheck only).
+  'fox-stories': 'fox',
+  'hen-stories': 'hen',
+  'bug-stories': 'bug',
 }
 
 function stageAriaLabel(stage: StageId, kind: StageIconKind): string {

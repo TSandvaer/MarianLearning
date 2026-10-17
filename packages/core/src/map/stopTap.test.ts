@@ -57,8 +57,8 @@ describe('stopTapAction (map-tap-to-play § 1)', () => {
   })
 
   it('a complete world: every tap is a replay', () => {
-    const p = progressAtStep('cake-words')
-    p.skillLevels['cake-words'] = 'mastered'
+    const p = progressAtStep('bug-stories')
+    p.skillLevels['bug-stories'] = 'mastered'
     const model = buildMapModel(p, 'word-song')
     expect(model.complete).toBe(true)
     expect(Object.values(actions(model))).toEqual(

@@ -10,6 +10,8 @@
  * - `sentence`: the square scene (when registered; a tap replays the
  *   question), 12 pt, the sentence panel.
  * - `none` (sight words): empty.
+ * - `story` (content wave 3): empty here; the screen draws the story card
+ *   at the stage's top (`./StoryCard.tsx`).
  *
  * The th corner cue sits right of the picture (or of the letter row), top
  * aligned. Press feedback on the picture, glyph and scene: scale 0.96 over

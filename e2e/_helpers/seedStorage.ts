@@ -176,6 +176,9 @@ const DEFAULT_SKILL_LEVELS = {
   'crab-words': 'locked',
   'tent-words': 'locked',
   'cake-words': 'locked',
+  'fox-stories': 'locked',
+  'hen-stories': 'locked',
+  'bug-stories': 'locked',
 } as const
 
 export interface SeedSessionHistoryOptions {

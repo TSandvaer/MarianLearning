@@ -4,7 +4,12 @@
  */
 import type { Viewport } from './layout'
 import { mathLayout } from './mathLayout'
-import { chipInner, wordSongLayout } from './wordSongLayout'
+import {
+  chipInner,
+  storyCardHeight,
+  storyRevealScene,
+  wordSongLayout,
+} from './wordSongLayout'
 
 const vp = (
   width: number,
@@ -201,4 +206,79 @@ it('chip insides scale from the web 112 pt tile', () => {
     sparkle: 16,
   })
   expect(chipInner(103)).toMatchObject({ radius: 29, inset: 11, wordFont: 33 })
+})
+
+describe('the little-story card and its reveal scene (content wave 3 § 4.3, AC 10)', () => {
+  const NO = { top: 0, bottom: 0, left: 0, right: 0 }
+  const forms: [string, Viewport, number, number, number, number][] = [
+    // [name, viewport, font, line, 3-line card, scene below a 3-line card]
+    ['P 375×667', { width: 375, height: 667, insets: NO }, 24, 46, 168, 196],
+    [
+      'L 667×375 b21',
+      { width: 667, height: 375, insets: { ...NO, bottom: 21 } },
+      22,
+      44,
+      158,
+      99,
+    ],
+    [
+      'iPad mini L 1133×744 b20',
+      { width: 1133, height: 744, insets: { ...NO, bottom: 20 } },
+      32,
+      56,
+      206,
+      243,
+    ],
+    [
+      'TP 744×1133 t24 b20',
+      { width: 744, height: 1133, insets: { ...NO, top: 24, bottom: 20 } },
+      32,
+      56,
+      206,
+      280,
+    ],
+  ]
+  it.each(forms)('%s', (_name, v, font, line, card, sceneSize) => {
+    const m = wordSongLayout(v).story
+    expect([m.font, m.lineHeight]).toEqual([font, line])
+    expect(m.lineHeight).toBeGreaterThanOrEqual(44)
+    expect(storyCardHeight(m, 3)).toBe(card)
+    expect(storyRevealScene(m, storyCardHeight(m, 3)).size).toBe(sceneSize)
+  })
+
+  it('P: a 2-line card leaves room for the 200 pt cap; the text is 305 pt wide', () => {
+    const l = wordSongLayout({ width: 375, height: 667, insets: NO })
+    expect(storyCardHeight(l.story, 2)).toBe(122)
+    expect(storyRevealScene(l.story, storyCardHeight(l.story, 2)).size).toBe(
+      200,
+    )
+    expect(l.story.width - 2 * l.story.padding.horizontal - 6).toBe(305)
+  })
+
+  it('tablets: the text is at most 586 pt wide, the card centred in the stage', () => {
+    const l = wordSongLayout({
+      width: 1133,
+      height: 744,
+      insets: { ...NO, bottom: 20 },
+    })
+    expect(l.story.width - 2 * l.story.padding.horizontal - 6).toBe(586)
+    expect(l.story.width).toBeLessThan(l.stage.width)
+  })
+
+  it('the scene stays inside its rect and never under 120 pt below the card', () => {
+    for (const [, v] of forms) {
+      const m = wordSongLayout(v).story
+      for (const lines of [2, 3]) {
+        const s = storyRevealScene(m, storyCardHeight(m, lines))
+        if (m.revealBelowCard) expect(s.size).toBeGreaterThanOrEqual(120)
+        expect(s.x).toBeGreaterThanOrEqual(m.reveal.x)
+        expect(s.x + s.size).toBeLessThanOrEqual(
+          m.reveal.x + m.reveal.width + 0.001,
+        )
+        expect(s.y + s.size).toBeLessThanOrEqual(
+          m.reveal.y + m.reveal.height + 0.001,
+        )
+      }
+    }
+  })
 })
