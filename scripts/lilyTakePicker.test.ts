@@ -16,6 +16,7 @@ import {
   pickDistinct,
   planTakes,
   rmsEnvelope,
+  shortLabel,
   spliceAudio,
   takesPage,
   type CanonDoc,
@@ -264,6 +265,7 @@ describe('takesPage', () => {
     [
       {
         set,
+        label: 'hint',
         audio: new Map([
           [0, 'QUFB'],
           [1, 'QkJC'],
@@ -279,7 +281,7 @@ describe('takesPage', () => {
   )
 
   it('inlines take 0 and the distinct takes only, one Play button each', () => {
-    expect(html.match(/<button /g)).toHaveLength(2)
+    expect(html.match(/<button data-src=/g)).toHaveLength(2)
     expect(html).toContain('data-src="data:audio/mpeg;base64,QUFB"')
     expect(html).toContain('data-src="data:audio/mpeg;base64,Q0ND"')
     expect(html).not.toContain('QkJC')
@@ -296,6 +298,45 @@ describe('takesPage', () => {
     expect(html).toContain('1.25 s')
     expect(html).toContain('take 1 (0.991 vs take 0)')
     expect(html).toContain('1 distinct fresh take(s)')
+  })
+})
+
+describe('takesPage picks', () => {
+  const html = takesPage(
+    [
+      {
+        set: {
+          line: READ,
+          text: 'Read the fig.',
+          input: 'Read the fig.',
+          references: [],
+          takes: [
+            { n: 0, input: 'Read the fig.', hash: 'a', seconds: 1 },
+            { n: 17, input: 'Read the fig,', seed: 1, hash: 'b', seconds: 1 },
+          ],
+        },
+        label: 'read',
+        audio: new Map(),
+        verdicts: [{ n: 17, keep: true, r0: 0.9, r: 0.9, nearest: 'take 0' }],
+      },
+    ],
+    0.95,
+  )
+
+  it('has a Pick button per shown take inside a labelled section, and one Copy button', () => {
+    expect(html).toContain('<section data-label="read">')
+    expect(html).toContain('<button class="pick" data-take="0">Pick</button>')
+    expect(html).toContain('<button class="pick" data-take="17">Pick</button>')
+    expect(html.match(/class="pick"/g)).toHaveLength(2)
+    expect(html.match(/id="copy"/g)).toHaveLength(1)
+    expect(html).toContain('<input id="answer" readonly')
+  })
+
+  it('shortLabel names canon lines by utterance id tail and clips by file stem', () => {
+    expect(shortLabel(READ)).toBe('read')
+    expect(shortLabel({ kind: 'mp3', file: PEEK })).toBe(
+      'guide-session-peek-open-div-share',
+    )
   })
 })
 

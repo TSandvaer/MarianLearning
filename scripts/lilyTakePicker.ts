@@ -20,7 +20,7 @@
  * Render (bills ElevenLabs):
  *   npx tsx scripts/lilyTakePicker.ts --ids <line>,... [--takes 6]
  *     [--input-variant "<key>=<input>"]... [--variant-takes 3]
- *     [--reference "<key>=<file.mp3>"]... [--max-corr 0.95]
+ *     [--reference "<key>=<file.mp3>"]... [--max-corr 0.95] [--label "<key>=<name>"]...
  *     [--out tmp/lily-takes/takes.html] [--max-chars 300] [--dry-run]
  *  - <key> is a line id or its tail (`word.p2.read`, `guide-...-share.mp3`).
  *  - Take 0 is the committed audio, the A/B anchor. Fresh takes use the
@@ -35,6 +35,9 @@
  *    take numbers on an open page stay valid; `--takes 0` rebuilds the page
  *    without billing.
  *  - Aborts before any API call if the run would bill more than --max-chars.
+ *  - The page has a Pick button per take and a "Copy picks" button that copies
+ *    one line such as "read 17, hint 12, sharing 4". A line's name is its
+ *    utterance id's last part or its clip's file stem, or `--label`.
  *
  * Apply (no API call; working tree only, no @ref):
  *   npx tsx scripts/lilyTakePicker.ts --apply <line>=<take>,...
@@ -168,6 +171,13 @@ export const keyMatches = (line: LineRef, key: string) => {
   return id === key || id.endsWith(`:${key}`) || id.endsWith(`/${key}`)
 }
 
+/** The name a line goes by in the page's copied picks ("read 17, hint 12"):
+ *  the utterance id's last part, or the clip's file stem. */
+export const shortLabel = (line: LineRef) =>
+  line.kind === 'canon'
+    ? line.utteranceId.split('.').pop()!
+    : basename(line.file, '.mp3')
+
 /** Fresh takes to render, numbered after the takes already on disk. Each
  *  input in `inputs` gets `count` takes, in order. */
 export function planTakes(
@@ -293,16 +303,18 @@ const escapeHtml = (s: string) =>
   )
 
 /** One self-contained page: take 0 plus every distinct take, inline as data
- *  URIs; the near-duplicates are listed, not playable. */
+ *  URIs; the near-duplicates are listed, not playable. A Pick button per take
+ *  builds the one-line answer ("read 17, hint 12, sharing 4") to copy. */
 export function takesPage(
   sets: ReadonlyArray<{
     set: TakeSet
+    label: string
     audio: ReadonlyMap<number, string>
     verdicts: readonly Verdict[]
   }>,
   maxCorr: number,
 ): string {
-  const sections = sets.map(({ set, audio, verdicts }) => {
+  const sections = sets.map(({ set, label, audio, verdicts }) => {
     const verdict = new Map(verdicts.map((v) => [v.n, v]))
     const shown = [...set.takes]
       .sort((a, b) => a.n - b.n)
@@ -313,6 +325,7 @@ export function takesPage(
         const v = verdict.get(t.n)
         return `      <tr${t.n === 0 ? ' class="anchor"' : ''}>
         <td><button data-src="data:audio/mpeg;base64,${audio.get(t.n) ?? ''}">Play</button></td>
+        <td><button class="pick" data-take="${t.n}">Pick</button></td>
         <td class="n">Take ${t.n}${t.n === 0 ? '<br><small>committed</small>' : ''}</td>
         <td><code>${escapeHtml(t.input)}</code>${t.input === set.input ? '' : ' <small>(variant)</small>'}</td>
         <td>${t.seconds.toFixed(2)} s</td>
@@ -328,8 +341,8 @@ export function takesPage(
           )
           .join(', ')}.</p>\n`
       : ''
-    return `  <section>
-    <h2>${escapeHtml(set.text)}</h2>
+    return `  <section data-label="${escapeHtml(label)}">
+    <h2>${escapeHtml(set.text)} <small>(${escapeHtml(label)})</small></h2>
     <p class="id"><code>${escapeHtml(lineId(set.line))}</code> · ${shown.length - 1} distinct fresh take(s)</p>
     <table>
 ${rows}
@@ -350,14 +363,21 @@ ${note}  </section>`
   td { padding: 0.4rem 0.6rem; border-bottom: 1px solid #ddd; vertical-align: middle; }
   tr.anchor { background: #f3f0e6; }
   tr.playing { background: #dcefdc; }
+  tr.picked td { box-shadow: inset 0 -3px #3a7d44; }
+  .picks { position: sticky; top: 0; background: #fff; padding: 0.5rem 0; border-bottom: 1px solid #ddd; display: flex; gap: 0.5rem; align-items: center; }
+  .picks input { flex: 1; font: inherit; padding: 0.4rem; }
   td.n { white-space: nowrap; font-weight: 600; }
   button { font: inherit; padding: 0.4rem 1rem; }
 </style>
 </head>
 <body>
 <h1>Lily takes</h1>
-<p>Take 0 is the committed clip. Pick with
-<code>npx tsx scripts/lilyTakePicker.ts --apply &lt;line&gt;=&lt;take&gt;</code>.</p>
+<p>Take 0 is the committed clip. Tap Pick on the take you want for each line,
+then Copy picks and paste the line back.</p>
+<div class="picks">
+  <input id="answer" readonly placeholder="No picks yet">
+  <button id="copy">Copy picks</button>
+</div>
 ${sections.join('\n')}
 <script>
   let current = null
@@ -375,6 +395,36 @@ ${sections.join('\n')}
       current = { audio, row }
     })
   }
+
+  const order = [...document.querySelectorAll('section[data-label]')].map(
+    (s) => s.dataset.label,
+  )
+  const picks = {}
+  const answer = document.getElementById('answer')
+  for (const b of document.querySelectorAll('button.pick')) {
+    b.addEventListener('click', () => {
+      const section = b.closest('section')
+      for (const r of section.querySelectorAll('tr.picked'))
+        r.classList.remove('picked')
+      b.closest('tr').classList.add('picked')
+      picks[section.dataset.label] = b.dataset.take
+      answer.value = order
+        .filter((l) => l in picks)
+        .map((l) => l + ' ' + picks[l])
+        .join(', ')
+    })
+  }
+  const copy = document.getElementById('copy')
+  copy.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(answer.value)
+    } catch {
+      answer.select()
+      document.execCommand('copy')
+    }
+    copy.textContent = 'Copied'
+    setTimeout(() => (copy.textContent = 'Copy picks'), 1500)
+  })
 </script>
 </body>
 </html>
@@ -561,8 +611,19 @@ async function renderMode(args: string[]): Promise<void> {
     repeated(args, '--input-variant'),
   )
   const references = parseKeyed('--reference', repeated(args, '--reference'))
-  for (const key of [...variants.keys(), ...references.keys()])
-    lineFor(lines, key, '--input-variant/--reference')
+  const labelOverrides = parseKeyed('--label', repeated(args, '--label'))
+  const labels = lines.map((l) => {
+    const own = [...labelOverrides].find(([key]) => keyMatches(l, key))
+    return own ? own[1][0] : shortLabel(l)
+  })
+  if (new Set(labels).size !== labels.length)
+    throw new Error(`two lines share a page label (${labels}); use --label`)
+  for (const key of [
+    ...variants.keys(),
+    ...references.keys(),
+    ...labelOverrides.keys(),
+  ])
+    lineFor(lines, key, '--input-variant/--reference/--label')
 
   const sets = specs.map((s) => openTakeSet(s.line, s.ref))
   for (const [key, files] of references) {
@@ -621,8 +682,9 @@ async function renderMode(args: string[]): Promise<void> {
   )
   console.log(`Billed ${billed} characters.`)
 
-  const pages = sets.map((set) => ({
+  const pages = sets.map((set, i) => ({
     set,
+    label: labels[i],
     verdicts: verdictsFor(set, maxCorr),
     audio: new Map(
       set.takes.map((t) => [
