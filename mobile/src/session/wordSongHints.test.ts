@@ -226,7 +226,14 @@ describe('th mouth-cue state', () => {
 describe('the step intro lead line (content wave 1 § 6.1)', () => {
   /** Every Word Song step before `node` mastered, `node` at `level`. */
   function seedOn(
-    node: 'duck-words' | 'crab-words' | 'tent-words' | 'cake-words',
+    node:
+      | 'duck-words'
+      | 'crab-words'
+      | 'tent-words'
+      | 'cake-words'
+      | 'fox-stories'
+      | 'hen-stories'
+      | 'bug-stories',
     level: SkillLevel,
   ) {
     const before = WORD_SONG_NODES_IN_ORDER.slice(
@@ -267,6 +274,20 @@ describe('the step intro lead line (content wave 1 § 6.1)', () => {
       focusNode: 'cake-words',
       intro: 'guide.session.intro.cake-words',
     })
+  })
+
+  it('content wave 3: each story step carries its lead until mastered (§ 5.1, D12)', () => {
+    for (const node of ['fox-stories', 'hen-stories', 'bug-stories'] as const) {
+      seedOn(node, 'intro')
+      expect(readWordSongProgressHints()).toMatchObject({
+        focusNode: node,
+        intro: `guide.session.intro.${node}`,
+      })
+      seedOn(node, 'practicing')
+      expect(readWordSongProgressHints().intro).toBe(
+        `guide.session.intro.${node}`,
+      )
+    }
   })
 
   it('a step without an intro gets none', () => {
