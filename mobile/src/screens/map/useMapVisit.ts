@@ -43,6 +43,10 @@
  * Map-started session) plays no open line and shows no caption: Emma has
  * just spoken. An unlock still to celebrate plays its beat regardless.
  *
+ * Debug only (`debugLog`, `EXPO_PUBLIC_DEBUG=1`): every stop tap logs the
+ * stop that took the touch, its state, the path taken and the tap point
+ * (`./mapTapLog.ts`).
+ *
  * Web-only parts not ported: the gesture → audio-unlock calls (native
  * audio needs no unlock, hub-native § 5).
  */
@@ -81,6 +85,12 @@ import {
   type CreateMapSfx,
   type MapLinePlayer,
 } from './mapAudio'
+import {
+  formatMapTap,
+  type MapDebugLog,
+  type MapTapPath,
+  type MapTapPoint,
+} from './mapTapLog'
 
 /** Map tap-to-play § 2.3: the release → this long → App is asked. */
 export const LAUNCH_DELAY_MS = 200
@@ -122,6 +132,8 @@ export interface MapVisitOptions {
    * map-tap-to-play § 4): no open line, an empty caption slot.
    */
   quietReturn?: boolean
+  /** Debug only: one Metro line per stop tap (`./mapTapLog.ts`). */
+  debugLog?: MapDebugLog
 }
 
 export interface MapVisitState {
@@ -140,10 +152,13 @@ export interface MapVisitState {
   launches: (stop: MapStop) => boolean
   /** The launch lock (§ 2.2): Home and Android back are ignored. */
   launchLocked: () => boolean
-  tapStop: (stop: MapStop) => void
+  /** `tap`: where the finger landed, for the debug log only. */
+  tapStop: (stop: MapStop, tap?: MapTapPoint) => void
   tapGate: (land: MapLand) => void
   /** Call before leaving for the Hub. */
   leave: () => void
+  /** Debug only: the Metro line logger (`./mapTapLog.ts`), or none. */
+  debugLog?: MapDebugLog
 }
 
 function safeLoadProgress(): Progress | null {
@@ -166,6 +181,7 @@ export function useMapVisit({
   play,
   replay,
   quietReturn = false,
+  debugLog,
 }: MapVisitOptions): MapVisitState {
   const [visit] = useState(() => planMapVisit(readProgress(), world))
   const [player] = useState<MapLinePlayer>(() => createPlayer())
@@ -337,15 +353,44 @@ export function useMapVisit({
     }, LAUNCH_DELAY_MS)
   }
 
-  const tapStop = (stop: MapStop) => {
-    if (!armedRef.current || launchRef.current !== null) return
-    if (view.tapsWait || peekRef.current !== null) return
-    const launch = launchOf(stop)
+  /** Why a stop tap does nothing now, or null when it counts. */
+  const ignoredBecause = (): MapTapPath | null => {
+    if (!armedRef.current) return 'ignored(arming)'
+    if (launchRef.current !== null) return 'ignored(launch-lock)'
+    if (view.tapsWait) return 'ignored(beat)'
+    if (peekRef.current !== null) return 'ignored(peek-out)'
+    return null
+  }
+
+  const tapStop = (stop: MapStop, tap?: MapTapPoint) => {
+    const ignored = ignoredBecause()
+    const launch = ignored === null ? launchOf(stop) : null
+    const peeks =
+      ignored === null &&
+      launch === null &&
+      peek !== undefined &&
+      stopTapAction(view.model, stop) === 'peek'
+    debugLog?.(
+      formatMapTap(
+        stop.node,
+        stop.state,
+        ignored ??
+          (launch === 'replay'
+            ? 'replay'
+            : launch === 'play'
+              ? 'hub-session'
+              : peeks
+                ? 'peek'
+                : 'name-only'),
+        tap,
+      ),
+    )
+    if (ignored !== null) return
     if (launch !== null) {
       startLaunch(stop, launch)
       return
     }
-    if (peek !== undefined && stopTapAction(view.model, stop) === 'peek') {
+    if (peeks && peek !== undefined) {
       startPeek(stop, peek)
       return
     }
@@ -382,5 +427,6 @@ export function useMapVisit({
     tapStop,
     tapGate,
     leave,
+    debugLog,
   }
 }

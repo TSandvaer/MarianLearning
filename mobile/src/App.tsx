@@ -155,6 +155,7 @@ import {
 } from './screens/greet/Greet'
 import { Hub } from './screens/hub/Hub'
 import { MapScreen, type MapEntry } from './screens/map/MapScreen'
+import type { MapDebugLog } from './screens/map/mapTapLog'
 import { MathScreen } from './screens/math/Math'
 import { ParentSettings } from './screens/parentSettings/ParentSettings'
 import type { MathSessionResult } from './screens/math/mathTypes'
@@ -219,6 +220,9 @@ const WORD_SONG_AUDIO_ROUTES: ReadonlySet<Route> = new Set<Route>([
   'literacy',
   'session-end',
 ])
+
+/** Debug builds only (`EXPO_PUBLIC_DEBUG=1`): the Map's tap log to Metro. */
+const logMapLine: MapDebugLog = (line) => console.log(line)
 
 /** Where a session was started (map-tap-to-play § 4): its Back and end return there. */
 type SessionOrigin = 'hub' | 'map'
@@ -772,6 +776,7 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               onPlay={onMapPlay}
               onReplay={onMapReplay}
               quietReturn={mapEntry.quietReturn === true}
+              debugLog={flags.debug ? logMapLine : undefined}
             />
           ) : parent ? (
             <ParentSettings

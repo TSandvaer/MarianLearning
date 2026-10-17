@@ -87,7 +87,7 @@ function landUnlockDoc(): Progress {
   }
 }
 
-async function mount(doc: Progress) {
+async function mount(doc: Progress, debugLog?: (line: string) => void) {
   const { player, ids } = fakePlayer()
   // App's answer: `true` once the route changed.
   const onPlay = jest.fn<boolean, [SkillNode]>(() => true)
@@ -108,6 +108,7 @@ async function mount(doc: Progress) {
       markUnlockCelebrated={jest.fn()}
       markLeft={jest.fn()}
       wallClock={() => 42}
+      debugLog={debugLog}
     />,
   )
   return { player, ids, onPlay, replay, peek, onHome }
@@ -277,4 +278,57 @@ it('a complete world: every stop replays', async () => {
   await advance(LAUNCH_DELAY_MS)
   expect(h.replay.calls.map((c) => c.node)).toEqual(['div-share'])
   expect(h.onPlay).not.toHaveBeenCalled()
+})
+
+it('debug only: each stop logs its state and hit rect on mount; each tap logs the stop, its state, the path taken and the tap point', async () => {
+  const lines: string[] = []
+  const h = await mount(progressAtStep('add-to-20'), (l) => lines.push(l))
+  const stops = lines.filter((l) => l.startsWith('[map-stop] stop='))
+  expect(stops).toHaveLength(13)
+  expect(stops).toContainEqual(
+    expect.stringMatching(
+      /^\[map-stop\] stop=number-recog state=mastered rect=-?\d+,-?\d+,\d+x\d+$/,
+    ),
+  )
+  expect(stops).toContainEqual(
+    expect.stringMatching(/^\[map-stop\] stop=add-to-20 state=current rect=/),
+  )
+  expect(lines.filter((l) => l.startsWith('[map-stop] pane='))).toHaveLength(1)
+  const at = {
+    nativeEvent: { pageX: 101, pageY: 702, locationX: 3, locationY: 4 },
+  }
+  const taps = () => lines.filter((l) => l.startsWith('[map-tap]'))
+
+  await fireEvent.press(screen.getByTestId('map-stop-number-recog'), at)
+  expect(taps().at(-1)).toMatch(
+    /^\[map-tap\] stop=number-recog state=mastered path=ignored\(arming\) x,y=101,702 local=3,4 rect=/,
+  )
+  await advance(MAP_TAP_ARM_MS)
+  await fireEvent.press(screen.getByTestId('map-stop-number-recog'), at)
+  expect(taps().at(-1)).toMatch(
+    /^\[map-tap\] stop=number-recog state=mastered path=replay x,y=101,702/,
+  )
+  await fireEvent.press(screen.getByTestId('map-stop-add-to-20'), at)
+  expect(taps().at(-1)).toMatch(
+    /^\[map-tap\] stop=add-to-20 state=current path=ignored\(launch-lock\)/,
+  )
+  await advance(LAUNCH_DELAY_MS)
+  await settle(h.replay.calls[0]!, false)
+  await fireEvent.press(screen.getByTestId('map-stop-add-to-20'), at)
+  expect(taps().at(-1)).toMatch(
+    /^\[map-tap\] stop=add-to-20 state=current path=hub-session/,
+  )
+  expect(taps()).toHaveLength(4)
+})
+
+it('debug only: a later stop logs path=peek', async () => {
+  const lines: string[] = []
+  await mount(progressAtStep('add-to-20'), (l) => lines.push(l))
+  await advance(MAP_TAP_ARM_MS)
+  await tap('mult-6-9')
+  expect(lines.filter((l) => l.startsWith('[map-tap]'))).toEqual([
+    expect.stringMatching(
+      /^\[map-tap\] stop=mult-6-9 state=locked path=peek x,y=/,
+    ),
+  ])
 })

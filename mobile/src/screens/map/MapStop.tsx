@@ -15,7 +15,12 @@
 import type { MapStop } from '@marian/core/map/mapModel'
 import { STAGE_SPOKEN_NAMES } from '@marian/core/sessionEnd/friendlyNodeName'
 import { useEffect } from 'react'
-import { Pressable, StyleSheet, View } from 'react-native'
+import {
+  Pressable,
+  StyleSheet,
+  View,
+  type GestureResponderEvent,
+} from 'react-native'
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -28,6 +33,12 @@ import { PathImage } from '../../components/PathImage'
 import { hitSlopFor } from '../../layout/mapScreenLayout'
 import { PRESS_MS } from '../hub/clay'
 import { BudTray, ClayOval, SparkleBurst } from './mapFx'
+import {
+  formatMapStop,
+  type HitRect,
+  type MapDebugLog,
+  type MapTapPoint,
+} from './mapTapLog'
 import { budTrayHeight, lockBox } from './stopGeometry'
 import { FlowerBadge, PadlockPop, Sticker } from './stopParts'
 
@@ -50,7 +61,10 @@ export interface MapStopProps {
   launches?: boolean
   /** The launch is under way: the pop (§ 2.2). */
   launching?: boolean
-  onPress: () => void
+  /** `tap`: where it landed and this stop's hit rect (the debug log). */
+  onPress: (tap: MapTapPoint) => void
+  /** Debug only: logs this stop's hit rect once on mount. */
+  debugLog?: MapDebugLog
 }
 
 /** § 2.1: the press-in scale. */
@@ -73,6 +87,7 @@ export function MapStopView({
   launches = false,
   launching = false,
   onPress,
+  debugLog,
 }: MapStopProps) {
   const locked = stop.state === 'locked'
   const scale = useSharedValue(1)
@@ -99,19 +114,42 @@ export function MapStopView({
   const slop = hitSlopFor(size)
   const trayTop = size * 1.02
   const below = tray ? trayTop + budTrayHeight(stop.buds, s) - size : 0
+  const bottomSlop = Math.max(slop, below)
+  // The touchable area: the box grown by its hitSlop (path-layer pt).
+  const rect: HitRect = {
+    x: x - size / 2 - slop,
+    y: y - size / 2 - slop,
+    width: size + 2 * slop,
+    height: size + slop + bottomSlop,
+  }
+  useEffect(() => {
+    debugLog?.(formatMapStop(stop.node, stop.state, rect))
+    // Once on mount (debug only).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const pressed = (e: GestureResponderEvent) => {
+    const ev = e?.nativeEvent as Partial<GestureResponderEvent['nativeEvent']>
+    onPress({
+      pageX: ev?.pageX ?? Number.NaN,
+      pageY: ev?.pageY ?? Number.NaN,
+      locationX: ev?.locationX ?? Number.NaN,
+      locationY: ev?.locationY ?? Number.NaN,
+      rect,
+    })
+  }
   return (
     <Pressable
       testID={`map-stop-${stop.node}`}
       accessibilityRole="button"
       accessibilityLabel={STAGE_SPOKEN_NAMES[stop.node]}
-      onPress={onPress}
+      onPress={pressed}
       onPressIn={() => press(true)}
       onPressOut={() => press(false)}
       hitSlop={{
         left: slop,
         right: slop,
         top: slop,
-        bottom: Math.max(slop, below),
+        bottom: bottomSlop,
       }}
       style={[
         styles.abs,

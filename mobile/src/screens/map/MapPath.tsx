@@ -15,7 +15,7 @@ import {
   layoutMap,
   type StopLayout,
 } from '@marian/core/map/mapLayout'
-import { useMemo, useRef, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
 import {
   focusBox,
@@ -39,8 +39,17 @@ export function MapPath({
   state: MapVisitState
   reducedMotion: boolean
 }) {
-  const { visit, view, pose, wiggles, launching, launches, tapStop, tapGate } =
-    state
+  const {
+    visit,
+    view,
+    pose,
+    wiggles,
+    launching,
+    launches,
+    tapStop,
+    tapGate,
+    debugLog,
+  } = state
   const { model } = view
   const { pane } = layout
   const k = mapPathScale(pane, model, visit.alsoBadged, layout.landscape)
@@ -53,6 +62,15 @@ export function MapPath({
   const emmaStop = stopAt(view.emmaNode)
   const emmaBox = emmaStop ? emmaBadge(emmaStop) : null
   const currentStop = model.complete ? undefined : stopAt(model.current)
+  // Debug only: where the path layer sits, so a stop's rect (path-layer
+  // pt) maps to the tap's page point.
+  useEffect(() => {
+    debugLog?.(
+      `[map-stop] pane=${Math.round(pane.x)},${Math.round(pane.y)} ${Math.round(pane.width)}x${Math.round(pane.height)} scrolls=${k.scrolls} s=${s.toFixed(3)}`,
+    )
+    // Once on mount (debug only).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const layer = (
     <View
@@ -148,7 +166,8 @@ export function MapPath({
               wiggle={wiggles[stop.node] ?? 0}
               launches={launches(stop)}
               launching={launching === stop.node}
-              onPress={() => tapStop(stop)}
+              onPress={(tap) => tapStop(stop, tap)}
+              debugLog={debugLog}
             />
           )
         }),
