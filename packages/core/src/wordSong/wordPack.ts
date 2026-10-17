@@ -165,6 +165,9 @@ export type WordCategory =
   // `sightWord: true`), but a self-documenting bucket beats overloading
   // 'object'. Per `design/word-song/simple-sentences-content.md` §3.3.
   | 'attribute'
+  // 'nature' added with content wave 2 (`design/native/content-wave-2.md`
+  // § 3.2): pond and pine, which no existing category fits.
+  | 'nature'
 
 /**
  * The 14 target words — all CVC short-a, in Marian's likely vocabulary.
@@ -1134,12 +1137,14 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     phoneme: '/θ/',
     hybridMode: true,
   },
-  // ── Land 6 "Big words": duck words + crab words (content wave 1) ──────
-  // 16 picture targets from `bigWordsSteps.ts` (the one place their words
-  // live), in canon order. `vowel` is set (every word keeps a short vowel),
-  // so the CVC-axis and cross-vowel test scans exclude them by name, as
-  // they do the ch and th words. No `phoneme` tag: ck / ng / start blends
-  // share no grapheme with a pack word that says something else.
+  // ── Land 6 "Big words": duck, crab, tent and cake words ──────────────
+  // 32 picture targets from `bigWordsSteps.ts` (the one place their words
+  // live), in canon order: duck + crab words (content wave 1), tent + cake
+  // words (content wave 2). `vowel` is set (the short vowel; for cake words
+  // the vowel letter, which says its name), so the CVC-axis and
+  // cross-vowel test scans exclude them by name, as they do the ch and th
+  // words. No `phoneme` tag: ck / ng / start and end blends / magic e share
+  // no grapheme with a pack word that says something else.
   ...BIG_WORDS_STEP_IDS.flatMap((step) =>
     BIG_WORDS_STEPS[step].map(
       (row): WordEntry => ({
@@ -1790,6 +1795,13 @@ export const FORBIDDEN_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['plum', 'fig'], // both purple fruits with a stem
   ['flag', 'net'], // both a pole with something at the top
   ['brick', 'box'], // both rectangular blocks
+  // Land 6, tent and cake words (content wave 2,
+  // `design/native/content-wave-2.md` § 5), added before their rows.
+  ['gift', 'box'], // both are boxes
+  ['nest', 'egg'], // the nest holds eggs
+  ['desk', 'bed'], // both are furniture on four legs
+  ['kite', 'flag'], // both are cloth on a stick or string
+  ['rope', 'sack'], // the sack is tied shut with a rope
 ] as const
 
 /** True if `a` and `b` are a forbidden silhouette-similar pair. */
@@ -2151,7 +2163,8 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   // comment.
   moth: { gentle: ['bath', 'cloth'], trap: ['thin', 'math'] }, // th-pool only; path avoided (FORBIDDEN_PAIR); spec's [thin,thick] is itself a FORBIDDEN_PAIR — see deviation note above
   cloth: { gentle: ['bath', 'math'], trap: ['thin', 'moth'] }, // th-pool only
-  // ── Land 6 "Big words" (content wave 1) — rows from `bigWordsSteps.ts`.
+  // ── Land 6 "Big words" (content waves 1 and 2) — rows from
+  // `bigWordsSteps.ts`.
   ...Object.fromEntries(
     BIG_WORDS_STEP_IDS.flatMap((step) =>
       BIG_WORDS_STEPS[step].map(

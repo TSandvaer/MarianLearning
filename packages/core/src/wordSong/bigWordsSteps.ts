@@ -1,7 +1,9 @@
 /**
- * The two Word Song steps of land 6, "Big words" (content wave 1,
- * `design/native/content-wave-1.md` § 3.2 and § 4.2): duck words (ck and ng
- * at the end) and crab words (start blends).
+ * The four Word Song steps of land 6, "Big words": duck words (ck and ng
+ * at the end) and crab words (start blends) from content wave 1
+ * (`design/native/content-wave-1.md` § 3.2 and § 4.2); tent words (end
+ * blends) and cake words (magic e) from content wave 2
+ * (`design/native/content-wave-2.md` § 3.2 and § 4.2).
  *
  * THE one place their words and traps live. `wordPack.ts` builds the
  * picture-pack entries and the distractor rows from it, and the server's
@@ -20,7 +22,11 @@
  * plays the hint line.
  */
 /** The land-6 Word Song steps. */
-export type BigWordsStep = 'duck-words' | 'crab-words'
+export type BigWordsStep =
+  | 'duck-words'
+  | 'crab-words'
+  | 'tent-words'
+  | 'cake-words'
 
 /** The `WordCategory` values these words use (a subset; `wordPack.ts`
  *  assigns them to `WordEntry.category`, so tsc checks the subset). */
@@ -33,11 +39,19 @@ export type BigWordCategory =
   | 'household'
   | 'structure'
   | 'food'
+  // Content wave 2: pond and pine (§ 3.2, § 4.2), bike.
+  | 'nature'
+  | 'vehicle'
 
 export interface BigWordRow {
   word: string
-  /** The word's short vowel (every word keeps it in British English too). */
-  vowel: 'a' | 'o' | 'u' | 'i'
+  /**
+   * The word's vowel letter. Duck, crab and tent words: its short vowel
+   * (every word keeps it in British English too). Cake words: the letter
+   * that says its name (content wave 2 § 4.2); nothing on the land-6 path
+   * reads it as a short sound.
+   */
+  vowel: 'a' | 'e' | 'i' | 'o' | 'u'
   category: BigWordCategory
   /** P1-P3: another category, another first sound, another vowel. */
   gentle: readonly [string, string]
@@ -49,6 +63,8 @@ export interface BigWordRow {
 export const BIG_WORDS_STEP_IDS: readonly BigWordsStep[] = [
   'duck-words',
   'crab-words',
+  'tent-words',
+  'cake-words',
 ]
 
 export const BIG_WORDS_STEPS: Readonly<
@@ -177,6 +193,132 @@ export const BIG_WORDS_STEPS: Readonly<
       category: 'animal',
       gentle: ['cup', 'bed'],
       trap: ['dog', 'flag'], // rhyme without the blend; f with l for r
+    },
+  ],
+  // Content wave 2 § 3.2 (Dave's D7): end blends, 8 of Dave's 10 words
+  // (jump and milk dropped: "Yes! That's a jump." breaks; mask and raft
+  // kept out: a long vowel in British English). Traps: Dave's twin where
+  // it has a picture (nest / net), otherwise the same start with a short
+  // vowel (hand / hat, belt / bed, pond / pot), so she reads to the end.
+  'tent-words': [
+    {
+      word: 'tent',
+      vowel: 'e',
+      category: 'structure',
+      gentle: ['dog', 'cup'],
+      trap: ['nest', 'tap'], // same vowel and last letter; the same t
+    },
+    {
+      word: 'hand',
+      vowel: 'a',
+      category: 'body-part',
+      gentle: ['bus', 'pot'],
+      trap: ['hat', 'pond'], // the same start ha; the same ending nd
+    },
+    {
+      word: 'gift',
+      vowel: 'i',
+      category: 'object',
+      gentle: ['sun', 'pot'],
+      trap: ['gem', 'fig'], // the same g; f, i, g in another order
+    },
+    {
+      word: 'nest',
+      vowel: 'e',
+      category: 'structure',
+      gentle: ['cup', 'fox'],
+      trap: ['net', 'tent'], // nest without the s (Dave's twin); end t
+    },
+    {
+      word: 'desk',
+      vowel: 'e',
+      category: 'household',
+      gentle: ['sun', 'cat'],
+      trap: ['duck', 'nest'], // same first and last sound; s and one more
+    },
+    {
+      word: 'belt',
+      vowel: 'e',
+      category: 'clothing',
+      gentle: ['sun', 'fox'],
+      trap: ['bed', 'tent'], // the same start be; same vowel and end t
+    },
+    {
+      word: 'lamp',
+      vowel: 'a',
+      category: 'household',
+      gentle: ['bus', 'dog'],
+      trap: ['lock', 'hand'], // l and four letters; same vowel, four letters
+    },
+    {
+      word: 'pond',
+      vowel: 'o',
+      category: 'nature',
+      gentle: ['cup', 'hen'],
+      trap: ['pot', 'hand'], // the same start po; the same ending nd
+    },
+  ],
+  // Content wave 2 § 4.2 (Dave's D8): magic e, all CVCe (vowel = cell 2,
+  // e = cell 4). The trap is the short twin she already reads where it has
+  // a picture (cape / cap, pine / pin, tube / tub), otherwise a short word
+  // with the same start; the second trap shares the pattern, so "it has an
+  // e" alone doesn't decide. 8 of Dave's 12 (nose, cube, five, nine out).
+  'cake-words': [
+    {
+      word: 'cake',
+      vowel: 'a',
+      category: 'food',
+      gentle: ['dog', 'pen'],
+      trap: ['cape', 'cat'], // same start and pattern; short ca
+    },
+    {
+      word: 'kite',
+      vowel: 'i',
+      category: 'object',
+      gentle: ['sun', 'hen'],
+      trap: ['king', 'bike'], // the same start ki, short; the same i_e
+    },
+    {
+      word: 'bone',
+      vowel: 'o',
+      category: 'object',
+      gentle: ['jet', 'sun'],
+      trap: ['box', 'rope'], // the same start bo, short; the same o_e
+    },
+    {
+      word: 'cape',
+      vowel: 'a',
+      category: 'clothing',
+      gentle: ['dog', 'bus'],
+      trap: ['cap', 'cake'], // cape without the e (Dave's twin); a_e
+    },
+    {
+      word: 'pine',
+      vowel: 'i',
+      category: 'nature',
+      gentle: ['dog', 'cup'],
+      trap: ['pin', 'kite'], // pine without the e; the same i_e
+    },
+    {
+      word: 'rope',
+      vowel: 'o',
+      category: 'object',
+      gentle: ['hen', 'sun'],
+      trap: ['rock', 'bone'], // the same start ro, short; the same o_e
+    },
+    {
+      word: 'tube',
+      vowel: 'u',
+      category: 'object',
+      gentle: ['hen', 'cat'],
+      trap: ['tub', 'top'], // tube without the e; t with a short vowel
+    },
+    {
+      word: 'bike',
+      vowel: 'i',
+      category: 'vehicle',
+      gentle: ['dog', 'pen'],
+      trap: ['bib', 'kite'], // the same start bi, short; the same i_e
     },
   ],
 }

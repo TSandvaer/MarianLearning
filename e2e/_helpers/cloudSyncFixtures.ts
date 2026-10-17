@@ -253,6 +253,8 @@ export function buildCloudProgressBlob(opts: {
     'simple-sentences': 'locked',
     'duck-words': 'locked',
     'crab-words': 'locked',
+    'tent-words': 'locked',
+    'cake-words': 'locked',
   }
   return {
     schemaVersion: 1,

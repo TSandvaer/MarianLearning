@@ -133,6 +133,8 @@ const WORD_SONG_LABELS: Record<WordSongNode, string> = {
   'simple-sentences': 'simple sentences',
   'duck-words': 'duck words',
   'crab-words': 'crab words',
+  'tent-words': 'tent words',
+  'cake-words': 'cake words',
 }
 
 export function labelForSkillNode(node: SkillNode): string {

@@ -46,6 +46,8 @@ export type WordSongStageId =
   | 'simple-sentences'
   | 'duck-words'
   | 'crab-words'
+  | 'tent-words'
+  | 'cake-words'
 
 export type StageId = NumberGardenStageId | WordSongStageId
 
@@ -85,6 +87,8 @@ export const WORD_SONG_STAGES: WordSongStageId[] = [
   'simple-sentences',
   'duck-words',
   'crab-words',
+  'tent-words',
+  'cake-words',
 ]
 
 /**

@@ -88,6 +88,10 @@ export type WordSongNode =
   // "Big words". ck/ng at the end, then start blends.
   | 'duck-words'
   | 'crab-words'
+  // Content wave 2 (design/native/content-wave-2.md § 3–§ 4): land 6's
+  // 3rd and 4th steps. End blends, then magic e.
+  | 'tent-words'
+  | 'cake-words'
 
 export type SkillNode = NumberGardenNode | WordSongNode
 

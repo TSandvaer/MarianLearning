@@ -337,6 +337,11 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
   // 8-word sessions, held to the spec by `bigWordsCanonCheck.ts` below.
   'duck-words',
   'crab-words',
+  // Content wave 2 (design/native/content-wave-2.md § 3–§ 4): land 6.
+  // Written by scripts/spliceContentWave2WordCanon.ts, held to the spec by
+  // `bigWordsCanonCheck.ts` like duck and crab words.
+  'tent-words',
+  'cake-words',
 ]
 
 /**
@@ -354,6 +359,9 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
  * - duck-words, crab-words: a deliberate bake (Thomas OKs the credit use),
  *   held to the spec by `bigWordsCanonCheck.ts`, then the Lily render and
  *   the ear test. Their committed files are hand-checked.
+ * - tent-words, cake-words (content wave 2 § 6.2): every line is fixed, so
+ *   `scripts/spliceContentWave2WordCanon.ts` writes them (no Haiku credit);
+ *   their new lines are rendered by `revoiceCanonLily.ts --unrendered`.
  *
  * The deliberate render runs `npx tsx scripts/generateSessionCanon.ts
  * --include-pending`; an existing file is still skipped without `--force`.
@@ -364,6 +372,8 @@ export const PENDING_CANON_NODES: ReadonlySet<string> = new Set([
   'mult-mix',
   'duck-words',
   'crab-words',
+  'tent-words',
+  'cake-words',
 ])
 
 /** The combos a run bakes: missing (or all, with `--force`), minus pending. */

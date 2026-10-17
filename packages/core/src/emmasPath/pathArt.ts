@@ -79,6 +79,8 @@ const PATH_ART_SET: Readonly<Record<PathArtId, true>> = {
   'simple-sentences': true,
   'duck-words': true,
   'crab-words': true,
+  'tent-words': true,
+  'cake-words': true,
   // Land emblems
   'land-ng-1': true,
   'land-ng-2': true,
