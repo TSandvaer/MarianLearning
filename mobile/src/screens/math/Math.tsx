@@ -29,7 +29,10 @@
  * `design/native/math-skip-counting-multiplication-native.md`): a number-
  * recognition problem shows `NumberStrip`, a skip-count problem `SkipTrack`,
  * both in place of the equation; a multiplication problem shows
- * `A × B = ?` over `GroupsRow`. Their chips come from
+ * `A × B = ?` over `GroupsRow`; a sharing problem (content wave 2 § 2)
+ * shows `ShareStage`, a pile dealt onto plates with no equation, its P1–P3
+ * dealing on their own 300 ms after the read (Emma `attentive-pointing`
+ * during the deal, then `listening`). Their chips come from
  * `buildExtendedChipOrder`, their hint lines set `hintStep` (arithmetic keeps
  * `hintBeat`), and the subitising scaffolds never run for them.
  * - Background: an advance due while the app is hidden waits for its
@@ -89,6 +92,7 @@ import type {
   ExtendedMathProblem,
   ExtendedMathSessionPlan,
 } from '@marian/core/math/extendedProblems'
+import { GENTLE_RAMP_THROUGH } from '@marian/core/math/distractors'
 import {
   pickStaticSessionPlan,
   type MathProblem,
@@ -156,6 +160,7 @@ import {
   groupsAreDrawn,
   groupsMetrics,
   numberStripMetrics,
+  shareMetrics,
   skipTrackMetrics,
   type ExtendedMathLayout,
   type MathLayout,
@@ -182,6 +187,8 @@ import type {
 } from './mathTypes'
 import { NumberStrip } from './NumberStrip'
 import { ScaffoldFlash } from './ScaffoldFlash'
+import { ShareStage } from './ShareStage'
+import { AUTO_DEAL_DELAY_MS } from './shareDeal'
 import { createSilentMathPlayer, type SilentMathPlayer } from './silentPlayer'
 import { SkipTrack } from './SkipTrack'
 
@@ -545,6 +552,11 @@ export function MathScreen({
   /** A missing number's hidden part: shown from hint 3 (content wave 1
    *  § 1.5); stays until the problem ends. The guided answer shows it too. */
   const [budReveal, setBudReveal] = useState<BudReveal>('hidden')
+  /** Sharing (content wave 2 § 2.4): the read's words revealed so far (its
+   *  ticks pulse the total tag and ripple the plates), and P1–P3's own
+   *  deal, raised 300 ms after the read ends. Both reset per problem. */
+  const [readRevealed, setReadRevealed] = useState(0)
+  const [autoDeal, setAutoDeal] = useState(false)
   const [shakingChip, setShakingChip] = useState<number | null>(null)
   const [captionText, setCaptionText] = useState('')
   const [captionRevealed, setCaptionRevealed] = useState(0)
@@ -582,6 +594,10 @@ export function MathScreen({
   const knewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   /** A peek's gaps around its closer (§ 6.3). */
   const closerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Sharing: the 300 ms before P1–P3's deal, and the deal's end (Emma
+   *  goes from attentive-pointing back to listening). */
+  const autoDealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dealPoseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const minDwellElapsedRef = useRef(false)
   const correctSpeakResolvedRef = useRef(false)
   const advanceFiredRef = useRef(false)
@@ -606,6 +622,8 @@ export function MathScreen({
       leadInTimerRef,
       knewTimerRef,
       closerTimerRef,
+      autoDealTimerRef,
+      dealPoseTimerRef,
     ]) {
       if (ref.current !== null) {
         clearTimeout(ref.current)
@@ -777,7 +795,12 @@ export function MathScreen({
             openChipGate('fallback')
           }, CHIP_GATE_FALLBACK_MS)
         }
-        await speak(problem.utterances.read, true)
+        // Sharing's read drives its stage (the total tag, the plates).
+        await speak(
+          problem.utterances.read,
+          true,
+          problem.kind === 'divide' ? setReadRevealed : undefined,
+        )
         if (!live()) return
         readAloudPlayedRef.current = true
         setReadAloudPlayed(true)
@@ -792,6 +815,62 @@ export function MathScreen({
   useEffect(() => {
     onProblemKindChangeRef.current?.(currentKind)
   }, [currentKind])
+
+  // Sharing (content wave 2 § 2.4): P1–P3 deal on their own 300 ms after
+  // the read ends. The rule is the problem's index ≤ 3, the chip tier's, so
+  // a review block at P2 deals too. Every flower then flies on the UI thread.
+  useEffect(() => {
+    const p = plan.problems[problemIndex]
+    if (
+      !readAloudPlayed ||
+      p === undefined ||
+      p.kind !== 'divide' ||
+      p.index > GENTLE_RAMP_THROUGH
+    ) {
+      return
+    }
+    autoDealTimerRef.current = setTimeout(() => {
+      autoDealTimerRef.current = null
+      if (unmountedRef.current) return
+      setAutoDeal(true)
+    }, AUTO_DEAL_DELAY_MS)
+    return () => {
+      if (autoDealTimerRef.current !== null) {
+        clearTimeout(autoDealTimerRef.current)
+        autoDealTimerRef.current = null
+      }
+    }
+  }, [readAloudPlayed, problemIndex, plan])
+
+  /** Emma is attentive-pointing while P1–P3's own deal runs, then listening
+   *  (§ 2.4). An answer, a hint or the given answer owns her pose instead. */
+  const onShareAutoDeal = useCallback((ms: number) => {
+    if (
+      resolvedRef.current ||
+      hintPlayedRef.current ||
+      guidedPlayedRef.current
+    ) {
+      return
+    }
+    setPose((c) =>
+      c === 'idle' || c === 'listening' ? 'attentive-pointing' : c,
+    )
+    if (dealPoseTimerRef.current !== null) {
+      clearTimeout(dealPoseTimerRef.current)
+    }
+    dealPoseTimerRef.current = setTimeout(() => {
+      dealPoseTimerRef.current = null
+      if (
+        unmountedRef.current ||
+        resolvedRef.current ||
+        hintPlayedRef.current ||
+        guidedPlayedRef.current
+      ) {
+        return
+      }
+      setPose((c) => (c === 'attentive-pointing' ? 'listening' : c))
+    }, ms)
+  }, [])
 
   // Fallback-path latency anchor (completion) + re-arm per problem.
   useLayoutEffect(() => {
@@ -813,6 +892,14 @@ export function MathScreen({
       setHint2Done(false)
       setHint2Lit(0)
       setBudReveal('hidden')
+      setReadRevealed(0)
+      setAutoDeal(false)
+      for (const ref of [autoDealTimerRef, dealPoseTimerRef]) {
+        if (ref.current !== null) {
+          clearTimeout(ref.current)
+          ref.current = null
+        }
+      }
       if (hintTimerRef.current !== null) {
         clearTimeout(hintTimerRef.current)
         hintTimerRef.current = null
@@ -1413,6 +1500,14 @@ export function MathScreen({
       ),
     [layout, plan],
   )
+  const share = useMemo(
+    () =>
+      shareMetrics(
+        layout,
+        plan.problems.flatMap((p) => (p.kind === 'divide' ? [p] : [])),
+      ),
+    [layout, plan],
+  )
   const strip = numberStripMetrics(layout)
   const multiply = currentProblem.kind === 'multiply' ? currentProblem : null
   const groupsDrawn =
@@ -1548,6 +1643,20 @@ export function MathScreen({
                   hintStep={hintStep}
                   guided={guidedActive}
                   answered={problemState.resolved}
+                />
+              )}
+              {currentProblem.kind === 'divide' && (
+                <ShareStage
+                  key={`share-${problemIndex}`}
+                  problem={currentProblem}
+                  metrics={share}
+                  width={area.width}
+                  readRevealed={readRevealed}
+                  autoDeal={autoDeal}
+                  hintStep={hintStep}
+                  guided={guidedActive}
+                  answered={problemState.resolved}
+                  onAutoDeal={onShareAutoDeal}
                 />
               )}
               {equation !== null && (
