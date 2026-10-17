@@ -306,12 +306,12 @@ describe('spend math', () => {
   })
 
   it('estimates a call from the measured tokens and prompt length', () => {
-    // 2 x 3 x 1024 x 8 + ceil(400 / 4) x 5 + 2 x 439 x 30 = 75,992 micro-dollars
+    // 2 x 3 x 1024 x 8 + 2 x ceil(400 / 4) x 5 + 2 x 439 x 30 = 76,492 micro-dollars
     expect(estimateCallCost(2, 400)).toEqual({
       imageInTokens: 6144,
-      textInTokens: 100,
+      textInTokens: 200,
       outputTokens: 878,
-      costUsd: 0.075992,
+      costUsd: 0.076492,
     })
     expect(estimateCallCost(1, 0).costUsd).toBe(0.037746)
   })
@@ -320,13 +320,24 @@ describe('spend math', () => {
     // A scene: 3 anchors + 3 refs, n = 2 → 2 x 6 x 1024 image-in tokens.
     expect(estimateCallCost(2, 400, 6)).toEqual({
       imageInTokens: 12288,
-      textInTokens: 100,
+      textInTokens: 200,
       outputTokens: 878,
-      costUsd: 0.125144,
+      costUsd: 0.125644,
     })
-    // The cake call's token counts (422 text-in = 1,688 chars / 4): the
-    // estimate's image-in and output match that ledger line exactly.
-    expect(estimateCallCost(2, 1688).costUsd).toBe(0.077602)
+  })
+
+  it('bills the text input once per image returned', () => {
+    expect(estimateCallCost(1, 804).textInTokens).toBe(201)
+    // The cake call: an 804-char prompt, n = 2. Its ledger line reports
+    // 6,144 image-in, 422 text-in (about 2 x 211) and 878 out, $0.077602.
+    const cake = estimateCallCost(2, 804)
+    expect(cake).toEqual({
+      imageInTokens: 6144,
+      textInTokens: 402,
+      outputTokens: 878,
+      costUsd: 0.077502,
+    })
+    expect(Math.abs(cake.costUsd - 0.077602)).toBeLessThan(0.0002)
   })
 
   it('sums the ledger without float drift and reports bad lines', () => {

@@ -144,8 +144,8 @@ describe('runGenerate', () => {
     expect(s.results).toEqual([])
     const out = logs.join('\n')
     expect(out).toContain('Images: 4 word(s) x 2 = 8')
-    // 4 x ~$0.0763: 2 x 3 anchors x 1,024 image-in + 2 x 439 out + text.
-    expect(out).toContain('Estimated cost: $0.3053 ')
+    // 4 x ~$0.0772: 2 x 3 anchors x 1,024 image-in + 2 x 439 out + 2 x text.
+    expect(out).toContain('Estimated cost: $0.3087 ')
     expect(out).toContain('Anchors: 3/3 present.')
     expect(existsSync(join(root, PATHS.outRoot))).toBe(false)
   })

@@ -455,7 +455,7 @@ export async function runGenerate(
         : `${ANCHOR_WORDS.length} anchors`
     log(
       `Estimated cost: ${formatUsd(estTotal)} ` +
-        `(per image returned: ${inputs} x ${MEASURED.inputImageTokens} image-in tokens @ $${RATES_PER_1M.imageInput}/1M + ${MEASURED.outputTokensPerImage} out @ $${RATES_PER_1M.imageOutput}/1M; per call ~prompt/4 text-in @ $${RATES_PER_1M.textInput}/1M)`,
+        `(per image returned: ${inputs} x ${MEASURED.inputImageTokens} image-in tokens @ $${RATES_PER_1M.imageInput}/1M + ${MEASURED.outputTokensPerImage} out @ $${RATES_PER_1M.imageOutput}/1M + ~prompt/4 text-in @ $${RATES_PER_1M.textInput}/1M)`,
     )
     log(`Spend ledger so far: ${formatUsd(ledgerTotal)} (${cfg.ledger})`)
     if (cmd.budgetUsd !== undefined) {

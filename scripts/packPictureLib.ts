@@ -476,9 +476,9 @@ export function costFromUsage(usage: ImageUsage): CallCost {
  * 2026-10-16 ledger (90 calls, n = 2) reports 6,144 image-in tokens for the
  * 3 anchors, twice the n = 1 measurement. Each input image is assumed to cost
  * what a 1024 px anchor did; a scene's refs are 500 px chip pictures, and the
- * ledger records what they really cost. Text tokens are approximated as
- * chars / 4, which over-counts English prose (worth well under $0.001 at
- * $5 / 1M).
+ * ledger records what they really cost. Text input is billed once per image
+ * returned too: the cake call's 804-char prompt reports 422 text-in tokens,
+ * about 2 x 211. Text tokens per image are approximated as chars / 4.
  */
 export function estimateCallCost(
   n: number,
@@ -487,7 +487,7 @@ export function estimateCallCost(
 ): CallCost {
   return priced(
     n * inputImages * MEASURED.inputImageTokens,
-    Math.ceil(promptChars / 4),
+    n * Math.ceil(promptChars / 4),
     n * MEASURED.outputTokensPerImage,
   )
 }
