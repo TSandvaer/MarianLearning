@@ -210,6 +210,9 @@ const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {
   // Word Song land 6 (content wave 1 § 3.3, § 4.3).
   'duck-words': 'Two letters, one sound!',
   'crab-words': 'Read all the letters!',
+  // Word Song land 6 (content wave 2 § 3.3, § 4.3, § 6.2; Thomas 2026-10-17).
+  'tent-words': 'Read to the end!',
+  'cake-words': 'The E is quiet. It makes the A say its name.',
 }
 
 const sessionIntroId = (n: SkillNode) => `guide.session.intro.${n}`

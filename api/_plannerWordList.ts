@@ -415,6 +415,20 @@ export const WORD_SONG_TARGET_WORDS_DUCK = bigWordsOf('duck-words').join(', ')
  */
 export const WORD_SONG_TARGET_WORDS_CRAB = bigWordsOf('crab-words').join(', ')
 
+/**
+ * Tent words (`tent-words`, land 6, content wave 2 —
+ * `design/native/content-wave-2.md` § 3): end blends, short vowels only
+ * (every word keeps its short vowel in British English). Exactly 8 words,
+ * IN CANON ORDER. Same source as duck words.
+ */
+export const WORD_SONG_TARGET_WORDS_TENT = bigWordsOf('tent-words').join(', ')
+
+/**
+ * Cake words (`cake-words`, land 6, content wave 2 — § 4): magic e, all
+ * CVCe. Exactly 8 words, IN CANON ORDER. Same source as duck words.
+ */
+export const WORD_SONG_TARGET_WORDS_CAKE = bigWordsOf('cake-words').join(', ')
+
 /** Hint shown to the model so it knows the broader pack — even though it
  *  isn't authoring distractors, knowing the rhyme families helps it order
  *  the gentle-vs-trap window correctly (per Kyle's distractor spec).

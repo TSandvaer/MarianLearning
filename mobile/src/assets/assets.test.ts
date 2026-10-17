@@ -74,15 +74,16 @@ describe('native asset registry', () => {
     expect(pictureAsset('ship')).toBeUndefined()
   })
 
-  // Content wave 1 (design/native/content-wave-1.md § 3.5, § 4.4, AC 8):
-  // the 16 land-6 words draw as pictures, so every chip is a picture. Red
+  // Content wave 1 (design/native/content-wave-1.md § 3.5, § 4.4, AC 8)
+  // and content wave 2 (content-wave-2.md § 7, AC 14): the 32 land-6 words
+  // draw as pictures, so every chip is a picture. Red
   // until Thomas's picture pack is embedded and `npm run export-assets`
   // bakes it (without them the problems fall back to written-word chips).
-  it('has a picture for every duck-words and crab-words word', () => {
+  it('has a picture for every land-6 word (duck, crab, tent and cake words)', () => {
     const keys = Object.values(BIG_WORDS_STEPS).flatMap((rows) =>
       rows.map((r) => r.word),
     )
-    expect(keys).toHaveLength(16)
+    expect(keys).toHaveLength(32)
     expect(keys.filter((key) => pictureAsset(key) === undefined)).toEqual([])
   })
 

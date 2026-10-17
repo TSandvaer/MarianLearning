@@ -1,6 +1,9 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { BAKED_PATH_LINES } from '@marian/core/emmasPath/pathLines'
+import {
+  BAKED_PATH_LINES,
+  PATH_LINES_AWAITING_RENDER,
+} from '@marian/core/emmasPath/pathLines'
 import {
   GUIDANCE_LINES,
   GUIDANCE_LINES_AWAITING_RENDER,
@@ -30,7 +33,9 @@ describe('bundled audio registry (npm run export-audio)', () => {
     const wanted = [
       ...Object.values(GREET_LINE_SOURCES),
       ...Object.values(HUB_LINES).map((l) => l.src),
-      ...BAKED_PATH_LINES.map((l) => l.src),
+      ...BAKED_PATH_LINES.filter(
+        (l) => !PATH_LINES_AWAITING_RENDER.includes(l.id),
+      ).map((l) => l.src),
       ...GUIDANCE_LINES.filter(
         (l) => !GUIDANCE_LINES_AWAITING_RENDER.includes(l.id),
       ).map((l) => l.src),
@@ -38,6 +43,14 @@ describe('bundled audio registry (npm run export-audio)', () => {
     ]
     const missing = wanted.filter((p) => !registryPaths.includes(p))
     expect(missing).toEqual([])
+  })
+
+  it('has no copy of a path line still awaiting its render (the render commit empties that list)', () => {
+    const awaiting = BAKED_PATH_LINES.filter((l) =>
+      PATH_LINES_AWAITING_RENDER.includes(l.id),
+    ).map((l) => l.src)
+    expect(awaiting).toHaveLength(PATH_LINES_AWAITING_RENDER.length)
+    expect(awaiting.filter((p) => registryPaths.includes(p))).toEqual([])
   })
 
   it('has no copy of a line still awaiting its render (the render commit empties that list)', () => {

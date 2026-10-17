@@ -622,7 +622,7 @@
         'other',
       ]
 
-      // Canon files — 11 math + 16 word-song. Iterated in alphabetical
+      // Canon files — 13 math + 18 word-song. Iterated in alphabetical
       // (group, file-stem) order so the dedup canonical-member choice is
       // deterministic across runs. A stem whose file is not baked yet
       // (404) is skipped with a console note, so a new step can be listed
@@ -633,8 +633,10 @@
       // crab-words add 64 (design/native/content-wave-1.md § 10). Computed
       // from the committed files, not by hand. Every PR that adds or
       // re-voices canon updates this number. Content wave 2's div-share
-      // (sharing) adds 16 with its Lily render (#587).
-      const EXPECTED_CANON_UNIQUE = 873
+      // (sharing) adds 16 with its Lily render (#587), tent-words +
+      // cake-words add 64 with theirs (#589). A line awaiting its render
+      // (empty audio) is not counted.
+      const EXPECTED_CANON_UNIQUE = 937
       const CANON_FILES = [
         // math/level-1
         ['math', 'add-to-10'],
@@ -652,6 +654,7 @@
         ['math', 'two-digit-addsub-with-regroup'],
         // word-song/level-1
         ['word-song', 'blending-cv'],
+        ['word-song', 'cake-words'],
         ['word-song', 'crab-words'],
         ['word-song', 'cvc-words'],
         ['word-song', 'cvc-words-short-e'],
@@ -667,6 +670,7 @@
         ['word-song', 'letter-sounds-audit'],
         ['word-song', 'sight-words'],
         ['word-song', 'simple-sentences'],
+        ['word-song', 'tent-words'],
       ]
 
       // Where each asset group's MP3s live, keyed by itemId prefix
@@ -835,6 +839,14 @@
               'path-open-crab-words.mp3',
               'Here is your path! You are on crab words.',
             ],
+            [
+              'path-open-tent-words.mp3',
+              'Here is your path! You are on tent words.',
+            ],
+            [
+              'path-open-cake-words.mp3',
+              'Here is your path! You are on cake words.',
+            ],
           ],
         ],
         [
@@ -868,6 +880,8 @@
             ['path-stop-simple-sentences.mp3', 'Reading sentences.'],
             ['path-stop-duck-words.mp3', 'Duck words.'],
             ['path-stop-crab-words.mp3', 'Crab words.'],
+            ['path-stop-tent-words.mp3', 'Tent words.'],
+            ['path-stop-cake-words.mp3', 'Cake words.'],
           ],
         ],
         [
@@ -992,6 +1006,14 @@
               'path-locked-next-crab-words.mp3',
               'Crab words! First, duck words. Then this!',
             ],
+            [
+              'path-locked-next-tent-words.mp3',
+              'Tent words! First, crab words. Then this!',
+            ],
+            [
+              'path-locked-next-cake-words.mp3',
+              'Cake words! First, tent words. Then this!',
+            ],
           ],
         ],
         [
@@ -1076,6 +1098,8 @@
             ],
             ['end-bud-duck-words.mp3', 'Look! A new flower for duck words!'],
             ['end-bud-crab-words.mp3', 'Look! A new flower for crab words!'],
+            ['end-bud-tent-words.mp3', 'Look! A new flower for tent words!'],
+            ['end-bud-cake-words.mp3', 'Look! A new flower for cake words!'],
           ],
         ],
         [
@@ -1184,6 +1208,14 @@
             [
               'end-unlock-crab-words.mp3',
               'You learned duck words! Now you can do crab words!',
+            ],
+            [
+              'end-unlock-tent-words.mp3',
+              'You learned crab words! Now you can do tent words!',
+            ],
+            [
+              'end-unlock-cake-words.mp3',
+              'You learned tent words! Now you can do cake words!',
             ],
           ],
         ],
@@ -1359,6 +1391,8 @@
         ],
         ['guide-session-peek-open-duck-words.mp3', "Let's look at duck words!"],
         ['guide-session-peek-open-crab-words.mp3', "Let's look at crab words!"],
+        ['guide-session-peek-open-tent-words.mp3', "Let's look at tent words!"],
+        ['guide-session-peek-open-cake-words.mp3', "Let's look at cake words!"],
         [
           'guide-session-peek-close-add-to-10.mp3',
           'Adding to ten is for later. You will learn it!',
@@ -1463,8 +1497,21 @@
           'guide-session-peek-close-crab-words.mp3',
           'Crab words are for later. You will learn it!',
         ],
+        [
+          'guide-session-peek-close-tent-words.mp3',
+          'Tent words are for later. You will learn it!',
+        ],
+        [
+          'guide-session-peek-close-cake-words.mp3',
+          'Cake words are for later. You will learn it!',
+        ],
         ['guide-session-intro-duck-words.mp3', 'Two letters, one sound!'],
         ['guide-session-intro-crab-words.mp3', 'Read all the letters!'],
+        ['guide-session-intro-tent-words.mp3', 'Read to the end!'],
+        [
+          'guide-session-intro-cake-words.mp3',
+          'The E is quiet. It makes the A say its name.',
+        ],
         ['guide-session-intro-mult-mix.mp3', "Let's play all the groups!"],
         ['guide-session-intro-div-share.mp3', "Let's share the flowers!"],
         ['guide-session-hiding.mp3', 'Some flowers are hiding!'],

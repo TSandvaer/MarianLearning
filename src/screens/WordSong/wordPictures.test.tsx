@@ -115,6 +115,23 @@ describe('WordPicture', () => {
     'plum',
     'clock',
     'frog',
+    // Land 6, content wave 2 (tent and cake words): the same.
+    'tent',
+    'hand',
+    'gift',
+    'nest',
+    'desk',
+    'belt',
+    'lamp',
+    'pond',
+    'cake',
+    'kite',
+    'bone',
+    'cape',
+    'pine',
+    'rope',
+    'tube',
+    'bike',
   ])
 
   it('renders a non-empty body for every picture in the curated pack', () => {
@@ -167,9 +184,9 @@ describe('WordPicture', () => {
       unmount()
     }
     // 9 digraphs-sh keys + 9 digraphs-ch keys + 10 digraphs-th keys
-    // (7 th targets + 3 t-contrast distractor-only entries) + 16 land-6
-    // words.
-    expect(fallbackCount).toBe(44)
+    // (7 th targets + 3 t-contrast distractor-only entries) + 32 land-6
+    // words (16 per content wave).
+    expect(fallbackCount).toBe(60)
   })
 
   it('falls back to the unknown-picture text shape for an unknown key', () => {

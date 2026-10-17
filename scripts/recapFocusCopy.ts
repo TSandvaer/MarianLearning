@@ -58,6 +58,8 @@ export const RECAP_FRIENDLY_NODE_NAMES: Record<string, string> = {
   'simple-sentences': 'reading sentences',
   'duck-words': 'reading words',
   'crab-words': 'reading words',
+  'tent-words': 'reading words',
+  'cake-words': 'reading words',
 }
 
 /** Generic fallback — mirrors `FRIENDLY_NODE_NAME_FALLBACK`. Should never fire

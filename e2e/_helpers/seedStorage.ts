@@ -174,6 +174,8 @@ const DEFAULT_SKILL_LEVELS = {
   'simple-sentences': 'locked',
   'duck-words': 'locked',
   'crab-words': 'locked',
+  'tent-words': 'locked',
+  'cake-words': 'locked',
 } as const
 
 export interface SeedSessionHistoryOptions {

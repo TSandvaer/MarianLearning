@@ -158,7 +158,9 @@ describe('nextNode', () => {
     expect(nextNode('math', 'div-share')).toBeNull()
     expect(nextNode('word-song', 'simple-sentences')).toBe('duck-words')
     expect(nextNode('word-song', 'duck-words')).toBe('crab-words')
-    expect(nextNode('word-song', 'crab-words')).toBeNull()
+    expect(nextNode('word-song', 'crab-words')).toBe('tent-words')
+    expect(nextNode('word-song', 'tent-words')).toBe('cake-words')
+    expect(nextNode('word-song', 'cake-words')).toBeNull()
   })
 
   it('returns null when the node does not appear in the track', () => {

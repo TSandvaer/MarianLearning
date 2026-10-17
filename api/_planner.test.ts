@@ -1222,13 +1222,15 @@ describe('generateSessionPlan — word-song P0 regression + step-2 widening (86c
     expect(prompt).not.toMatch(/letter-names:.*Tap the letter <Letter>/i)
     expect(prompt).not.toMatch(/sight-words:.*Tap the word/i)
     // Mode-count drift-guard (batched ticket 86ca7yg0r; Wave 13 → 13;
-    // content wave 1 → 15): the in-prompt first-class-content-modes header
-    // count must match the 15 actual bullets (letter-names, letter-sounds,
-    // blending-cv, cvc-words +4 vowel siblings, 3 digraph tiers,
-    // sight-words, simple-sentences, duck-words, crab-words). The stale
-    // "Ten"/"Twelve"/"Thirteen" were fixed alongside W12-03 / W13-03 /
-    // content wave 1; this pin stops it regressing.
-    expect(prompt).toContain('Fifteen first-class content modes today')
+    // content wave 1 → 15; content wave 2 → 17): the in-prompt
+    // first-class-content-modes header count must match the 17 actual
+    // bullets (letter-names, letter-sounds, blending-cv, cvc-words +4 vowel
+    // siblings, 3 digraph tiers, sight-words, simple-sentences, duck-words,
+    // crab-words, tent-words, cake-words). The stale
+    // "Ten"/"Twelve"/"Thirteen"/"Fifteen" were fixed alongside W12-03 /
+    // W13-03 / content waves 1 and 2; this pin stops it regressing.
+    expect(prompt).toContain('Seventeen first-class content modes today')
+    expect(prompt).not.toContain('Fifteen first-class content modes today')
     expect(prompt).not.toContain('Thirteen first-class content modes today')
     expect(prompt).not.toContain('Twelve first-class content modes today')
     expect(prompt).not.toContain('Ten first-class content modes today')

@@ -207,6 +207,19 @@ export const PATH_LINES: readonly PathLine[] = buildLines()
 export const BAKED_PATH_LINES: readonly (PathLine & { src: string })[] =
   PATH_LINES.filter((l): l is PathLine & { src: string } => l.src !== null)
 
+/**
+ * Baked lines whose MP3 is not rendered yet (as `GUIDANCE_LINES_AWAITING_
+ * RENDER` in `guidanceLines.ts`). They stay in `BAKED_PATH_LINES`, the
+ * render script's input; until the render commit adds their clips
+ * (`scripts/renderPathLinesLily.ts`, then `npm run export-audio` in
+ * `mobile/`) the Map walks their captions silently, and the bundled-MP3
+ * tests expect exactly these to be missing. The render commit sets this
+ * list to `[]`.
+ *
+ * Now: none.
+ */
+export const PATH_LINES_AWAITING_RENDER: readonly string[] = []
+
 const BY_ID = new Map(PATH_LINES.map((l) => [l.id, l]))
 
 /** Line for an id, or undefined for an id the script does not define. */

@@ -1241,7 +1241,8 @@ describe('land 6 — duck words and crab words', () => {
 
   it('adds 16 picture targets with their own picture key, no phoneme tag and no flags', () => {
     const rows = [...DUCK, ...CRAB]
-    const entries = TARGET_WORDS.filter((e) => BIG_WORDS_TIER_WORDS.has(e.word))
+    const waveOne = new Set(rows.map(([w]) => w))
+    const entries = TARGET_WORDS.filter((e) => waveOne.has(e.word))
     expect(entries.map((e) => e.word)).toEqual(rows.map(([w]) => w))
     for (const e of entries) {
       expect(e).toEqual({
@@ -1317,6 +1318,122 @@ describe('land 6 — duck words and crab words', () => {
   })
 })
 
+describe('land 6 — tent words and cake words (content wave 2)', () => {
+  // design/native/content-wave-2.md § 3.2 and § 4.2: [word, gentle, trap].
+  const TENT: readonly (readonly [string, string[], string[]])[] = [
+    ['tent', ['dog', 'cup'], ['nest', 'tap']],
+    ['hand', ['bus', 'pot'], ['hat', 'pond']],
+    ['gift', ['sun', 'pot'], ['gem', 'fig']],
+    ['nest', ['cup', 'fox'], ['net', 'tent']],
+    ['desk', ['sun', 'cat'], ['duck', 'nest']],
+    ['belt', ['sun', 'fox'], ['bed', 'tent']],
+    ['lamp', ['bus', 'dog'], ['lock', 'hand']],
+    ['pond', ['cup', 'hen'], ['pot', 'hand']],
+  ]
+  const CAKE: readonly (readonly [string, string[], string[]])[] = [
+    ['cake', ['dog', 'pen'], ['cape', 'cat']],
+    ['kite', ['sun', 'hen'], ['king', 'bike']],
+    ['bone', ['jet', 'sun'], ['box', 'rope']],
+    ['cape', ['dog', 'bus'], ['cap', 'cake']],
+    ['pine', ['dog', 'cup'], ['pin', 'kite']],
+    ['rope', ['hen', 'sun'], ['rock', 'bone']],
+    ['tube', ['hen', 'cat'], ['tub', 'top']],
+    ['bike', ['dog', 'pen'], ['bib', 'kite']],
+  ]
+
+  it('holds exactly 8 words per step, in canon order (K9)', () => {
+    expect(bigWordsOf('tent-words')).toEqual(TENT.map(([w]) => w))
+    expect(bigWordsOf('cake-words')).toEqual(CAKE.map(([w]) => w))
+  })
+
+  it('pairs every word as the spec matrix does', () => {
+    for (const [word, gentle, trap] of [...TENT, ...CAKE]) {
+      expect(TARGET_PAIRINGS[word], word).toEqual({ gentle, trap })
+      const target = getWordEntry(word)
+      expect(pickDistractors(target, 1).map((d) => d.word)).toEqual(gentle)
+      expect(pickDistractors(target, 4).map((d) => d.word)).toEqual(trap)
+    }
+  })
+
+  it('adds 16 picture targets with their own picture key, no phoneme tag and no flags; the 3 categories of § 3.2 / § 4.2', () => {
+    const rows = [...TENT, ...CAKE]
+    const words = new Set(rows.map(([w]) => w))
+    const entries = TARGET_WORDS.filter((e) => words.has(e.word))
+    expect(entries.map((e) => e.word)).toEqual(rows.map(([w]) => w))
+    for (const e of entries) {
+      expect(e).toEqual({
+        word: e.word,
+        pictureKey: e.word,
+        vowel: e.vowel,
+        category: e.category,
+        isTarget: true,
+      })
+    }
+    expect(
+      Object.fromEntries(entries.map((e) => [e.word, [e.vowel, e.category]])),
+    ).toEqual({
+      tent: ['e', 'structure'],
+      hand: ['a', 'body-part'],
+      gift: ['i', 'object'],
+      nest: ['e', 'structure'],
+      desk: ['e', 'household'],
+      belt: ['e', 'clothing'],
+      lamp: ['a', 'household'],
+      pond: ['o', 'nature'],
+      // Cake words: the vowel letter, which says its name (§ 4.2).
+      cake: ['a', 'food'],
+      kite: ['i', 'object'],
+      bone: ['o', 'object'],
+      cape: ['a', 'clothing'],
+      pine: ['i', 'nature'],
+      rope: ['o', 'object'],
+      tube: ['u', 'object'],
+      bike: ['i', 'vehicle'],
+    })
+    // Every chip partner is an existing picture word (K9).
+    for (const [, gentle, trap] of rows)
+      for (const w of [...gentle, ...trap])
+        expect(() => getWordEntry(w), w).not.toThrow()
+  })
+
+  it('no trio contains a forbidden pair, old or new (§ 5)', () => {
+    const hits: string[] = []
+    for (const [word, gentle, trap] of [...TENT, ...CAKE]) {
+      for (const [a, b] of [gentle, trap]) {
+        for (const [x, y] of [
+          [word, a],
+          [word, b],
+          [a, b],
+        ] as const)
+          if (isForbiddenPair(x!, y!)) hits.push(`${word}: ${x}/${y}`)
+      }
+    }
+    expect(hits).toEqual([])
+  })
+
+  it('every gentle chip has another first letter, another vowel and another category than its target (§ 3.2)', () => {
+    const misses: string[] = []
+    for (const [word, gentle] of [...TENT, ...CAKE]) {
+      const t = getWordEntry(word)
+      for (const d of gentle.map(getWordEntry))
+        if (
+          d.word[0] === t.word[0] ||
+          d.vowel === t.vowel ||
+          d.category === t.category
+        )
+          misses.push(`${word}: ${d.word}`)
+    }
+    expect(misses).toEqual([])
+  })
+
+  it('cake words: the short twin she already reads is a trap where it has a picture (cape/cap, pine/pin, tube/tub)', () => {
+    const twins = CAKE.flatMap(([word, , trap]) =>
+      trap.filter((t) => t === word.slice(0, 3)).map((t) => `${word}/${t}`),
+    )
+    expect(twins).toEqual(['cape/cap', 'pine/pin', 'tube/tub'])
+  })
+})
+
 describe('FORBIDDEN_PAIRS', () => {
   it("contains the silhouette-similarity pairs from Kyle's pack-doc + the v2 short-o + v3 short-u + v4 short-i + v5 short-e + digraphs-sh + digraphs-ch + digraphs-th additions (tickets 86c9m3ae3 / 86c9q9ben / 86c9qdba4 / 86c9teua2 / digraphs-sh / digraphs-ch / digraphs-th)", () => {
     // Per design/word-song-picture-pack.md §"Distractor pairing matrix"
@@ -1371,6 +1488,12 @@ describe('FORBIDDEN_PAIRS', () => {
       ['plum', 'fig'],
       ['flag', 'net'],
       ['brick', 'box'],
+      // Land 6, tent and cake words (content wave 2 § 5).
+      ['gift', 'box'],
+      ['nest', 'egg'],
+      ['desk', 'bed'],
+      ['kite', 'flag'],
+      ['rope', 'sack'],
     ].map((p) => [...p].sort().join(','))
 
     for (const expected of expectedPairs) {

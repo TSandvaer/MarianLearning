@@ -64,7 +64,7 @@ describe('LANDS', () => {
       world: 'word-song',
       number: 6,
       name: 'Big words',
-      nodes: ['duck-words', 'crab-words'],
+      nodes: ['duck-words', 'crab-words', 'tent-words', 'cake-words'],
     })
   })
 })

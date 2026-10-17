@@ -69,6 +69,8 @@ import {
   WORD_SONG_TARGET_WORDS_SIGHT,
   WORD_SONG_TARGET_WORDS_DUCK,
   WORD_SONG_TARGET_WORDS_CRAB,
+  WORD_SONG_TARGET_WORDS_TENT,
+  WORD_SONG_TARGET_WORDS_CAKE,
   WORD_SONG_DISTRACTOR_HINTS,
   WORD_SONG_NOVEL_PROBE_WORDS_FOR_PROMPT,
   WORD_SONG_SIMPLE_SENTENCES_GENTLE_FOR_PROMPT,
@@ -188,6 +190,9 @@ export const VALID_WORD_SONG_FOCUS_NODES: readonly string[] = [
   // Content wave 1 (design/native/content-wave-1.md § 3–§ 4): land 6.
   'duck-words',
   'crab-words',
+  // Content wave 2 (design/native/content-wave-2.md § 3–§ 4): land 6.
+  'tent-words',
+  'cake-words',
 ]
 
 // ── continuant-onset CVC reorder (Q1, design/research/cvc-blend-audio-phonics.md)
@@ -1077,6 +1082,10 @@ const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
   // `WORD_SONG_TRACK_GUIDE`); served from canon every session.
   'duck-words',
   'crab-words',
+  // Content wave 2 — land 6's tent words (end blends) and cake words
+  // (magic e), the same fixed 8-word shape and the same block.
+  'tent-words',
+  'cake-words',
 ]
 
 /**
@@ -1593,7 +1602,7 @@ Rules:
 - Exactly 8 problems per plan.
 - Each problem's utterance slots depend on the track (the track-specific guide below is authoritative):
   · MATH track — exactly 7 utterances with these slot names: read, correct, reprompt, hint1, hint2, hint3, giveAnswer. The single hint is split into three escalating sub-step utterances (hint1 -> hint2 -> hint3); see the MATH track guide's per-slot templates for the per-tier hint1/hint2/hint3 wording.
-  · WORD-SONG track — exactly 5 REQUIRED utterances with these slot names: read, correct, reprompt, hint, giveAnswer. ONE tier — and only one — carries a 6th OPTIONAL slot: for cvc-word problems (read line "Read the <word>." drawn from a cvc-words / cvc-words-short-* pool) ALSO emit a "blend" utterance, making 6 utterances for each cvc-word problem. Every OTHER word-song tier (letter-names, letter-sounds, blending-cv, digraphs-*, sight-words, simple-sentences, duck-words, crab-words) stays at exactly 5 — NEVER emit a "blend" slot on those. See the BLEND slot directive in the WORD-SONG track guide for the exact blend-line shape.
+  · WORD-SONG track — exactly 5 REQUIRED utterances with these slot names: read, correct, reprompt, hint, giveAnswer. ONE tier — and only one — carries a 6th OPTIONAL slot: for cvc-word problems (read line "Read the <word>." drawn from a cvc-words / cvc-words-short-* pool) ALSO emit a "blend" utterance, making 6 utterances for each cvc-word problem. Every OTHER word-song tier (letter-names, letter-sounds, blending-cv, digraphs-*, sight-words, simple-sentences, duck-words, crab-words, tent-words, cake-words) stays at exactly 5 — NEVER emit a "blend" slot on those. See the BLEND slot directive in the WORD-SONG track guide for the exact blend-line shape.
 - Utterance ids follow the pattern "<track>.p<N>.<slot>" — e.g. "math.p1.read", "math.p1.hint1", "math.p1.hint2", "math.p1.hint3", "word.p1.read", "word.p1.hint", "word.p1.blend" (cvc-word only), etc. The N is the 1-based problem index.
 - Lines are spoken aloud by Emma's TTS voice. Keep them short (1 short sentence is ideal; 2 if needed for the hint). No abbreviations Emma can't read aloud naturally. No emoji. No exclamation marks beyond one per line.
 - The "reprompt" line for every problem should be "Hmm... try again?" verbatim — that's the spec wording, intentionally repeated for cache locality.
@@ -1603,7 +1612,7 @@ Session-End utterances (REQUIRED — append to the same flat utterances array):
 After the per-problem utterances (8 × 7 = 56 for MATH, 8 × 5 = 40 for WORD-SONG — or 8 × 6 = 48 on the cvc-word tier, which adds the optional "blend" slot per problem), append the following Session-End utterances. The Session-End screen looks them up by exact id at runtime and degrades gracefully on a miss, but every id below MUST be emitted so the celebration never falls back to silent captions.
 
   - "session.end.opener" — text: "You did it!"
-  - "session.end.recap.focus" — text: "You worked on <spoken-focus-name> today!" where <spoken-focus-name> is a short, warm, CHILD-FACING phrase for the focus skill node named in the user message. Spell any numbers out as words and drop curriculum jargon — Emma is speaking to an 8-year-old, not a parent. Use exactly these phrases per focus node: add-to-10 -> "adding to ten"; add-to-20 -> "adding to twenty"; sub-to-10 -> "taking away to ten"; sub-to-20 -> "taking away to twenty"; number-recog -> "your numbers"; two-digit-addsub-no-regroup / two-digit-addsub-with-regroup -> "bigger numbers"; skip-counting -> "skip counting"; mult-2-5-10 / mult-3-4 / mult-6-9 / mult-mix -> "counting in groups"; div-share -> "sharing"; letter-names -> "your letters"; letter-sounds -> "letter sounds"; blending-cv -> "blending sounds"; any cvc-words* tier, any digraphs* tier, sight-words, duck-words and crab-words -> "reading words"; simple-sentences -> "reading sentences". Exactly one line; never use digits; one exclamation mark.
+  - "session.end.recap.focus" — text: "You worked on <spoken-focus-name> today!" where <spoken-focus-name> is a short, warm, CHILD-FACING phrase for the focus skill node named in the user message. Spell any numbers out as words and drop curriculum jargon — Emma is speaking to an 8-year-old, not a parent. Use exactly these phrases per focus node: add-to-10 -> "adding to ten"; add-to-20 -> "adding to twenty"; sub-to-10 -> "taking away to ten"; sub-to-20 -> "taking away to twenty"; number-recog -> "your numbers"; two-digit-addsub-no-regroup / two-digit-addsub-with-regroup -> "bigger numbers"; skip-counting -> "skip counting"; mult-2-5-10 / mult-3-4 / mult-6-9 / mult-mix -> "counting in groups"; div-share -> "sharing"; letter-names -> "your letters"; letter-sounds -> "letter sounds"; blending-cv -> "blending sounds"; any cvc-words* tier, any digraphs* tier, sight-words, duck-words, crab-words, tent-words and cake-words -> "reading words"; simple-sentences -> "reading sentences". Exactly one line; never use digits; one exclamation mark.
   - "session.end.recap.1" through "session.end.recap.11" — one entry per N in 1..11. The N=1 line is "You earned one star!"; for N >= 2 the line is "You earned <number-word> stars!" with the number spelled out (one, two, three, four, five, six, seven, eight, nine, ten, eleven). Never use digits; never use "stars" with N=1.
   - "session.end.streak.3" through "session.end.streak.8" — one entry per N in 3..8. Each line is "<number-word> in a row! Wow!" with the number spelled out (three, four, five, six, seven, eight). Capitalise the leading word.
   - "session.end.goodbye" — text: "See you soon."
@@ -2207,6 +2216,8 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 //   - sight-words          → "Find the word: <word>." (whole-word recognition, Wave 11)
 //   - duck-words           → "Read the <word>." (ck / ng endings, fixed 8, content wave 1)
 //   - crab-words           → "Read the <word>." (start blends, fixed 8, content wave 1)
+//   - tent-words           → "Read the <word>." (end blends, fixed 8, content wave 2)
+//   - cake-words           → "Read the <word>." (magic e, fixed 8, content wave 2)
 //
 // All gated by the browser parser (PR #132 widened it to dispatch on
 // the read-line template; the sight-words "Find the word:" template was
@@ -2314,7 +2325,7 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 const WORD_SONG_TRACK_GUIDE = `Track: Word Song.
 
 The user message names a focus skill node. The planner emits content
-matching that node. Fifteen first-class content modes today:
+matching that node. Seventeen first-class content modes today:
 
   - letter-names: "Tap the letter <NAME>." problems. Marian sees a
     trio of LETTER GLYPHS (the alphabet, uppercase + lowercase — no
@@ -2432,12 +2443,23 @@ matching that node. Fifteen first-class content modes today:
     of a short-vowel word. Same wire shape and templates as cvc-words,
     picture chips, but NO blend slot. Marian arrives here after she's
     mastered simple-sentences. The session is FIXED — see the
-    DUCK-WORDS AND CRAB-WORDS block below.
+    BIG-WORDS STEPS block below.
   - crab-words: "Read the <word>." problems with words that START with
     two consonants blended together (flag, drum, crab, ...), short vowels
     only. Same wire shape and templates as cvc-words, picture chips, NO
     blend slot. Marian arrives here after she's mastered duck-words. The
-    session is FIXED — see the DUCK-WORDS AND CRAB-WORDS block below.
+    session is FIXED — see the BIG-WORDS STEPS block below.
+  - tent-words: "Read the <word>." problems with words that END with two
+    consonants (tent, hand, gift, ...), short vowels only. Same wire shape
+    and templates as cvc-words, picture chips, NO blend slot. Marian
+    arrives here after she's mastered crab-words. The session is FIXED —
+    see the BIG-WORDS STEPS block below.
+  - cake-words: "Read the <word>." problems with magic-e words
+    (consonant, vowel, consonant, e: cake, kite, bone, ...), where the
+    vowel says its name. Same wire shape and templates as cvc-words,
+    picture chips, NO blend slot. Marian arrives here after she's mastered
+    tent-words. The session is FIXED — see the BIG-WORDS STEPS block
+    below.
 
 Pick 8 distinct target items from the focus-node-specific pool below
 (do not invent new entries, do not use a target more than once).
@@ -2476,9 +2498,10 @@ practice lands on a fully-decodable word. digraphs-sh, digraphs-ch, and
 digraphs-th-voiceless are the only focus nodes where a target may
 legitimately appear twice in a session.
 
-EXCEPTION for duck-words AND crab-words: do NOT pick. Use the 8 pool
-words below in EXACTLY the listed order, one word per problem, each word
-once (problem 1 = the first word, problem 8 = the last).
+EXCEPTION for duck-words, crab-words, tent-words AND cake-words: do NOT
+pick. Use the 8 pool words below in EXACTLY the listed order, one word
+per problem, each word once (problem 1 = the first word, problem 8 = the
+last).
 
 Pool for letter-names (52 glyphs — 26 uppercase + 26 lowercase). Each
 letter carries its inline confusion-band tag; see the LETTER-NAMES
@@ -2545,9 +2568,15 @@ ${WORD_SONG_TARGET_WORDS_DUCK}
 Pool for crab-words (8 words, FIXED ORDER — problem 1 to problem 8):
 ${WORD_SONG_TARGET_WORDS_CRAB}
 
-DUCK-WORDS AND CRAB-WORDS (duck-words and crab-words tiers ONLY;
-OVERRIDES the pick-and-order rules above). These two steps are the same
-8 words every session, so emit them EXACTLY like this:
+Pool for tent-words (8 words, FIXED ORDER — problem 1 to problem 8):
+${WORD_SONG_TARGET_WORDS_TENT}
+
+Pool for cake-words (8 words, FIXED ORDER — problem 1 to problem 8):
+${WORD_SONG_TARGET_WORDS_CAKE}
+
+BIG-WORDS STEPS (duck-words, crab-words, tent-words and cake-words tiers
+ONLY; OVERRIDES the pick-and-order rules above). These four steps are the
+same 8 words every session, so emit them EXACTLY like this:
 (1) Problems 1 to 8 use the pool words in the listed order, each once.
 (2) Per problem emit exactly these 5 utterances, word lowercase except
     where capitalised at the start of a sentence:
@@ -2561,8 +2590,8 @@ OVERRIDES the pick-and-order rules above). These two steps are the same
 (3) NO "blend" slot (these words have 4 or 5 letters for 3 or 4 sounds;
     the letters pulse silently on screen instead).
 (4) NO extra teaching words inside these lines: no letter names, no
-    "two letters", no sounding-out, no IPA. The step's intro line is
-    played by the app, not the plan.
+    "two letters", no "the e is quiet", no sounding-out, no IPA. The
+    step's intro line is played by the app, not the plan.
 Self-check before emitting: 8 problems, the pool order exactly, every
 correct line is "Yes! That's a <word>.", and no word.p<N>.blend id.
 
@@ -3356,6 +3385,8 @@ all other slots are content-mode-agnostic:
     - digraphs-th-voiceless: "Read the <word>." e.g. "Read the thin."
     - duck-words: "Read the <word>." e.g. "Read the duck."
     - crab-words: "Read the <word>." e.g. "Read the flag."
+    - tent-words: "Read the <word>." e.g. "Read the tent."
+    - cake-words: "Read the <word>." e.g. "Read the cake."
     - sight-words: "Find the word: <word>." e.g. "Find the word: the."
       (whole-word recognition — see SIGHT-WORDS RECOGNITION block above;
       NOT a decoding "Read"/"Tap" template).
@@ -3372,8 +3403,9 @@ all other slots are content-mode-agnostic:
   letter says" for letter-sounds, "Read" for cvc-words /
   cvc-words-short-o / cvc-words-short-u / cvc-words-short-i /
   cvc-words-short-e / digraphs-sh / digraphs-ch /
-  digraphs-th-voiceless / duck-words / crab-words, "Find the word:" for
-  sight-words, "Finish the sentence:" for simple-sentences.
+  digraphs-th-voiceless / duck-words / crab-words / tent-words /
+  cake-words, "Find the word:" for sight-words, "Finish the sentence:"
+  for simple-sentences.
   Do not mix templates within a single plan.
 - correct (letter-names tier): "Yes! That's the letter <NAME>." e.g.
   "Yes! That's the letter M." — uses the SAME case-preserved
@@ -3461,8 +3493,8 @@ with slot id "word.p<N>.blend". This is the phoneme-blend prompt Emma
 sounds out on the 2nd wrong tap so Marian re-decodes the word herself.
 DO NOT emit a blend slot on ANY other tier (blending-cv, letter-names,
 letter-sounds, digraphs-sh, digraphs-ch, digraphs-th-voiceless,
-sight-words, simple-sentences, duck-words, crab-words) — those carry
-exactly the 5 slots above.
+sight-words, simple-sentences, duck-words, crab-words, tent-words,
+cake-words) — those carry exactly the 5 slots above.
   Text shape — the target word segmented grapheme-by-grapheme, then the
   whole word, using ASCII-7 punctuation ONLY (space-hyphen-space between
   graphemes, space-three-dots-space before the whole word). NEVER use an

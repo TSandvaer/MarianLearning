@@ -59,9 +59,11 @@ const WORD = [
   'digraphs-th-voiceless',
   'sight-words',
   'simple-sentences',
-  // Content wave 1: land 6, "Big words".
+  // Content waves 1 and 2: land 6, "Big words".
   'duck-words',
   'crab-words',
+  'tent-words',
+  'cake-words',
 ] as const
 
 /** Mastered before `current`, practicing at it, locked after (-1 = all mastered). */
@@ -616,7 +618,7 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     await arm(page, seedProgress({ word: 4 }))
     await openMapFromHub(page, 'word-song')
 
-    await expect(page.getByTestId('map-stop')).toHaveCount(15)
+    await expect(page.getByTestId('map-stop')).toHaveCount(17)
     await expect(page.getByTestId('map-band')).toHaveCount(6)
     await expect(page.getByTestId('map-gate')).toHaveCount(5)
     await expect(page.getByTestId('map-emma')).toHaveAttribute(

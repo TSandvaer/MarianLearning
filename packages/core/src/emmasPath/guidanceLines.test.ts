@@ -37,15 +37,15 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'session-review': 1,
       'session-warmup': 1,
       'session-knew': 1,
-      'session-peek-open': 26,
-      'session-peek-close': 26,
-      'session-intro': 4,
+      'session-peek-open': 28,
+      'session-peek-close': 28,
+      'session-intro': 6,
       'session-hiding': 1,
     })
-    expect(GUIDANCE_LINES).toHaveLength(80)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(80)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(80)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(80)
+    expect(GUIDANCE_LINES).toHaveLength(86)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(86)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(86)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(86)
   })
 
   it('bakes each world and count variant', () => {
@@ -163,7 +163,20 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     expect(peekLines('div-share')?.close.text).toBe(
       'Sharing is for later. You will learn it!',
     )
-    // Rendered in Lily, like wave 1's (content wave 2 § 6.2).
+    // Content wave 2 (design/native/content-wave-2.md § 6.2, T2).
+    expect(sessionIntroLine('tent-words')).toMatchObject({
+      id: 'guide.session.intro.tent-words',
+      world: 'word-song',
+      text: 'Read to the end!',
+      src: '/assets/audio/path/guide-session-intro-tent-words.mp3',
+    })
+    expect(sessionIntroLine('cake-words')).toMatchObject({
+      id: 'guide.session.intro.cake-words',
+      world: 'word-song',
+      text: 'The E is quiet. It makes the A say its name.',
+      src: '/assets/audio/path/guide-session-intro-cake-words.mp3',
+    })
+    // Rendered in Lily, like wave 1's and sharing's (content wave 2 § 6.2).
     expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
   })
 
@@ -202,6 +215,15 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       open: { text: "Let's look at crab words!", world: 'word-song' },
       close: { text: 'Crab words are for later. You will learn it!' },
     })
+    // Content wave 2 (design/native/content-wave-2.md § 6.2).
+    expect(peekLines('tent-words')).toMatchObject({
+      open: { text: "Let's look at tent words!", world: 'word-song' },
+      close: { text: 'Tent words are for later. You will learn it!' },
+    })
+    expect(peekLines('cake-words')).toMatchObject({
+      open: { text: "Let's look at cake words!", world: 'word-song' },
+      close: { text: 'Cake words are for later. You will learn it!' },
+    })
     // Plural noun phrases take "are"; activity (gerund) names take "is".
     const ARE = new Set([
       'two-digit-addsub-no-regroup',
@@ -221,6 +243,8 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'sight-words',
       'duck-words',
       'crab-words',
+      'tent-words',
+      'cake-words',
     ])
     // Every step but a world's first (a peek never reaches it) has both.
     for (const tree of [MATH_TREE, LITERACY_TREE]) {
@@ -253,7 +277,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(80)
+    ).toHaveLength(86)
   })
 
   it('repeats no Emma’s Path line', () => {

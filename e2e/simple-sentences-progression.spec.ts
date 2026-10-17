@@ -163,6 +163,8 @@ const WORD_SONG_NODES: ReadonlyArray<string> = [
   'simple-sentences',
   'duck-words',
   'crab-words',
+  'tent-words',
+  'cake-words',
 ]
 
 /**

@@ -37,8 +37,10 @@ import { generateSessionPlan, type PlannerAnthropicClient } from './_planner.js'
 import {
   WORD_SONG_NOVEL_PROBE_WORDS,
   WORD_SONG_SIMPLE_SENTENCES,
+  WORD_SONG_TARGET_WORDS_CAKE,
   WORD_SONG_TARGET_WORDS_CRAB,
   WORD_SONG_TARGET_WORDS_DUCK,
+  WORD_SONG_TARGET_WORDS_TENT,
 } from './_plannerWordList.js'
 import { bigWordsOf } from '@marian/core/wordSong/bigWordsSteps'
 import { wordSongSessionPlanFromServer } from '@marian/core/wordSong/planFromServer'
@@ -1436,8 +1438,19 @@ describe('simple-sentences tier — canonical pool ↔ browser-mirror alignment 
 // names the words in canon order from `bigWordsSteps.ts`, the planner keeps
 // that order (no continuant-onset reorder), and the parser reads every
 // problem as a picture-chip `cvc-word` with a real distractor trio.
-describe('planner → parser round-trip — duck-words + crab-words (content wave 1)', () => {
-  const STEPS = ['duck-words', 'crab-words'] as const
+describe('planner → parser round-trip — land 6: duck, crab (content wave 1), tent and cake words (content wave 2)', () => {
+  const STEPS = [
+    'duck-words',
+    'crab-words',
+    'tent-words',
+    'cake-words',
+  ] as const
+  const SERVER_LIST = {
+    'duck-words': WORD_SONG_TARGET_WORDS_DUCK,
+    'crab-words': WORD_SONG_TARGET_WORDS_CRAB,
+    'tent-words': WORD_SONG_TARGET_WORDS_TENT,
+    'cake-words': WORD_SONG_TARGET_WORDS_CAKE,
+  } as const
 
   function wirePlan(words: readonly string[]): string {
     return JSON.stringify({
@@ -1462,11 +1475,7 @@ describe('planner → parser round-trip — duck-words + crab-words (content wav
     async (step) => {
       const words = bigWordsOf(step)
       expect(words).toHaveLength(8)
-      expect(
-        step === 'duck-words'
-          ? WORD_SONG_TARGET_WORDS_DUCK
-          : WORD_SONG_TARGET_WORDS_CRAB,
-      ).toBe(words.join(', '))
+      expect(SERVER_LIST[step]).toBe(words.join(', '))
 
       const client = makeMockClient(wirePlan(words))
       const plan = await generateSessionPlan({
