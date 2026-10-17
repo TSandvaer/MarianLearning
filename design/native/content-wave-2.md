@@ -563,15 +563,15 @@ Wave 1's mechanism (`content-wave-1.md` § 6.1): `createManifestLinePlayer('sess
 
 ## 11. Thomas decides
 
-One team recommendation each.
+Thomas approved T1–T4 on 2026-10-17. T5 is pending: sharing builds now, and the Word Song half waits for the T5 check.
 
-- **T1. The names:** "sharing", "tent words" (not "jump words", K7) and "cake words". Recommendation: approve.
-- **T2. The new lines (§ 6.2),** chiefly the three leads: "Let's share the flowers!", "Read to the end!" and "The E is quiet. It makes the A say its name.". Recommendation: approve. The ear test settles "the A"; the fallback text is in § 4.3.
-- **T3. The 3 clay pieces (§ 1):** two plates of sweets, a tent, a cake. Recommendation: approve the subjects. The look is judged when they are made.
-- **T4. The picture spend:** 16 pictures, about $1.25, or about $1.56 with retakes on the four riskiest. Recommendation: approve, and top up the OpenAI balance first, because it is low.
-- **T5. Dave's check** (roadmap § 4): after a reading-sentences session, ask Marian "Who sat on the mat?" about a sentence she has just read.
+- **T1. The names:** "sharing", "tent words" (not "jump words", K7) and "cake words". **Approved (Thomas, 2026-10-17).**
+- **T2. The new lines (§ 6.2),** chiefly the three leads: "Let's share the flowers!", "Read to the end!" and "The E is quiet. It makes the A say its name.". **Approved (Thomas, 2026-10-17): the three leads go to the Lily render.** The ear test settles "the A"; the fallback text is in § 4.3.
+- **T3. The 3 clay pieces (§ 1):** two plates of sweets, a tent, a cake. **Approved (Thomas, 2026-10-17): the subjects.** The look is judged when they are made.
+- **T4. The picture spend:** 16 pictures, about $1.25, or about $1.56 with retakes on the four riskiest. **Approved (Thomas, 2026-10-17): the pictures are generated only after Thomas tops up the OpenAI balance.**
+- **T5. Dave's check** (roadmap § 4): after a reading-sentences session, ask Marian "Who sat on the mat?" about a sentence she has just read. **Pending.**
   - If she reads it but can't say who, little stories move up. They replace this wave's Word Song half (in their own spec), and tent and cake words wait.
-  - Recommendation: do the check before the Word Song build starts. Sharing doesn't depend on it.
+  - The Word Song half (tent and cake words) waits for this check. Sharing builds now; it doesn't depend on the check.
 
 ## 12. Pedagogy assumptions for Dave (D1…)
 
