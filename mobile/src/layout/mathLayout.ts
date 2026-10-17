@@ -575,6 +575,7 @@ export type MathLayoutKind =
   | 'skip-count'
   | 'multiply'
   | 'missing-addend'
+  | 'divide'
 
 export interface ExtendedMathLayout extends MathLayout {
   /** The chips' row (Math's) or the right-edge column (Word Song's L). */
@@ -593,13 +594,14 @@ const COLUMN_CHIP_GAP = 16
  *
  * - arithmetic, missing numbers, number recognition, and every tablet
  *   form: `mathLayout`.
- * - Phone portrait, skip / multiply: Math's P frame; the ribbon is capped at
- *   4 lines (they end at 253 pt on the 375×667 floor, above the problem's
- *   top at 259).
- * - Phone landscape, skip / multiply: Word Song's L frame
+ * - Phone portrait, skip / multiply / divide: Math's P frame; the ribbon is
+ *   capped at 4 lines (they end at 253 pt on the 375×667 floor, above the
+ *   problem's top at 259).
+ * - Phone landscape, skip / multiply / divide: Word Song's L frame
  *   (`wordSongLayout.ts`, mirrored here: importing it would be a require
  *   cycle): Math's Emma column and back arrow, the HUD row, the ribbon at
- *   safe y + 60 in a 2-line (skip) or 1-line (multiply) slot, the chip column
+ *   safe y + 60 in a 2-line (skip, divide) or 1-line (multiply) slot, the
+ *   chip column
  *   clamp(88, ⌊(safe h − 56) / 3⌋, 104) on the right, and the stage between
  *   as the problem rect.
  */
@@ -633,7 +635,8 @@ export function extendedMathLayout(
   const paneX = s.x + column
   const paneW = chipX - 16 - paneX
   const hudRow = { x: paneX, y: s.y + 8, width: paneW, height: 44 }
-  const ribbonLines = kind === 'skip-count' ? 2 : 1
+  // Sharing takes skip's 2-line slot (content wave 2 § 2.3).
+  const ribbonLines = kind === 'skip-count' || kind === 'divide' ? 2 : 1
   const ribbonH = ribbonSlot(
     PHONE_CAPTION_PT,
     PHONE_RIBBON_PADDING,
@@ -983,5 +986,204 @@ export function numberStripMetrics(
     divider: 1,
     dot: 6,
     ring: 4,
+  }
+}
+
+// ── Sharing: the cloth, the pile and the plates (content wave 2 § 2.3) ──
+//
+// `design/native/content-wave-2.md` § 2.2, § 2.3; `shareLayout.test.ts`
+// pins its table. The plates are `GroupsRow`'s (`groupsMetrics`,
+// `plateSize`, `groupsRow`), not a fork; every plate of a plan has the size
+// of the plan's largest share, so a plate's size never gives the answer
+// away.
+
+/** The pile's flowers are at most this big (pt); tablet {@link SHARE_TABLET_FLOWER_MAX}. */
+export const SHARE_PHONE_FLOWER_MAX = 20
+export const SHARE_TABLET_FLOWER_MAX = 24
+/** The total tag's outer half, reserved left of the cloth when fitting `s`. */
+export const SHARE_TAG_OUTER = 22
+export const SHARE_TABLET_TAG_OUTER = 26
+/** Pile rows hold this many flowers (P and tablet); L draws one row. */
+export const SHARE_PILE_ROW = 10
+
+export interface ShareMetrics {
+  /** The pile's flower size `s`. */
+  pileFlower: number
+  /** Between pile flowers, and after every 5th. */
+  pileGap: number
+  pileFifthGap: number
+  /** Between the pile's rows. */
+  pileRowGap: number
+  /** Flowers per pile row (10; L: the plan's largest pile, one row). */
+  pileRow: number
+  clothPad: number
+  clothRadius: number
+  cloth: { width: number; height: number }
+  /** The total tag's outer half (fitting only). */
+  tagOuter: number
+  /** The plates: `GroupsRow`'s metrics for the plan's largest share. */
+  groups: GroupsMetrics
+  /** Every plate's size (the plan's largest share). */
+  plate: { width: number; height: number }
+  /** The largest share and plate count of the plan. */
+  maxShare: number
+  /** Cloth → plate slot. */
+  gap: number
+  /** Cloth + gap + half a tag + plate. */
+  block: number
+  /** The deal's arc height h. */
+  arc: number
+}
+
+/** Width of `n` pile flowers in rows of `row` at size `s`. */
+function pileRowWidth(
+  n: number,
+  row: number,
+  s: number,
+  gap: number,
+  fifth: number,
+): number {
+  const cols = Math.min(n, row)
+  if (cols <= 0) return 0
+  return (
+    cols * s + (cols - 1) * gap + Math.floor((cols - 1) / 5) * (fifth - gap)
+  )
+}
+
+/** The sharing visuals' sizes for a plan of divide problems (§ 2.3). */
+export function shareMetrics(
+  layout: Pick<MathLayout, 'tablet' | 'form' | 'problem' | 'problemGap'>,
+  problems: readonly { total: number; plates: number; correct: number }[],
+): ShareMetrics {
+  const tablet = layout.tablet
+  const oneRow = layout.form === 'phone-landscape'
+  const maxPile = problems.reduce((m, p) => Math.max(m, p.total), 0)
+  const maxShare = problems.reduce((m, p) => Math.max(m, p.correct), 0)
+  const maxPlates = problems.reduce((m, p) => Math.max(m, p.plates), 0)
+  const pileGap = oneRow ? 2 : tablet ? 6 : 4
+  const pileFifthGap = oneRow ? 6 : tablet ? 16 : 12
+  const pileRowGap = tablet ? 6 : 4
+  const clothPad = tablet ? 8 : 6
+  const tagOuter = tablet ? SHARE_TABLET_TAG_OUTER : SHARE_TAG_OUTER
+  const pileRow = oneRow ? Math.max(1, maxPile) : SHARE_PILE_ROW
+  const rows = Math.max(1, Math.ceil(maxPile / pileRow))
+  const fits = (s: number) =>
+    pileRowWidth(maxPile, pileRow, s, pileGap, pileFifthGap) +
+      2 * clothPad +
+      tagOuter <=
+    layout.problem.width
+  let s = tablet ? SHARE_TABLET_FLOWER_MAX : SHARE_PHONE_FLOWER_MAX
+  while (s > 8 && !fits(s)) s -= 1
+  const groups = groupsMetrics(layout, [
+    { factorA: Math.max(1, maxShare), factorB: Math.max(1, maxPlates) },
+  ])
+  const plate = plateSize(groups, Math.max(1, maxShare))
+  const cloth = {
+    width:
+      pileRowWidth(maxPile, pileRow, s, pileGap, pileFifthGap) + 2 * clothPad,
+    height: rows * s + (rows - 1) * pileRowGap + 2 * clothPad,
+  }
+  return {
+    pileFlower: s,
+    pileGap,
+    pileFifthGap,
+    pileRowGap,
+    pileRow,
+    clothPad,
+    clothRadius: tablet ? 20 : 16,
+    cloth,
+    tagOuter,
+    groups,
+    plate,
+    maxShare,
+    gap: layout.problemGap,
+    block:
+      cloth.height + layout.problemGap + groups.tagHeight / 2 + plate.height,
+    arc: tablet ? 40 : 32,
+  }
+}
+
+export interface SharePoint {
+  x: number
+  y: number
+}
+
+export interface ShareGeometry {
+  /** The cloth, in the block (origin: the block's top-left). */
+  cloth: { x: number; y: number; width: number; height: number }
+  /** The total tag's centre (on the cloth's left edge). */
+  totalTag: SharePoint
+  /** Pile cell centres, reading order (cell 0 top-left). */
+  pile: readonly SharePoint[]
+  /** The plates, left to right. */
+  plates: readonly { x: number; y: number; width: number; height: number }[]
+  /** Each plate's "?" tag centre (on its top edge). */
+  plateTags: readonly SharePoint[]
+  /** Each plate's cell centres for `share` flowers: columns of 5, top to
+   *  bottom, left column first. */
+  plateCells: readonly (readonly SharePoint[])[]
+  /** The plate row's gap. */
+  plateGap: number
+}
+
+/** Where everything of one problem sits in a block `width` wide. */
+export function shareGeometry(
+  m: ShareMetrics,
+  total: number,
+  plates: number,
+  width: number,
+): ShareGeometry {
+  const share = plates > 0 ? Math.floor(total / plates) : 0
+  // The cloth and the tag's outer half, centred together.
+  const groupWidth = m.cloth.width + m.tagOuter
+  const clothX = (width - groupWidth) / 2 + m.tagOuter
+  const cloth = { x: clothX, y: 0, ...m.cloth }
+  const s = m.pileFlower
+  const pile: SharePoint[] = []
+  for (let i = 0; i < total; i++) {
+    const r = Math.floor(i / m.pileRow)
+    const c = i % m.pileRow
+    pile.push({
+      x:
+        clothX +
+        m.clothPad +
+        c * (s + m.pileGap) +
+        Math.floor(c / 5) * (m.pileFifthGap - m.pileGap) +
+        s / 2,
+      y: m.clothPad + r * (s + m.pileRowGap) + s / 2,
+    })
+  }
+  const row = groupsRow(m.groups, Math.max(1, m.maxShare), plates, width)
+  const rowX = (width - row.width) / 2
+  const plateY = m.cloth.height + m.gap + m.groups.tagHeight / 2
+  const g = m.groups
+  const platesOut = Array.from({ length: plates }, (_, k) => ({
+    x: rowX + k * (m.plate.width + row.gap),
+    y: plateY,
+    width: m.plate.width,
+    height: m.plate.height,
+  }))
+  const plateCells = platesOut.map((p) =>
+    Array.from({ length: share }, (_, j) => ({
+      x:
+        p.x +
+        g.pad +
+        Math.floor(j / GROUP_COLUMN) * (g.flower + g.flowerGap) +
+        g.flower / 2,
+      y:
+        p.y +
+        g.pad +
+        (j % GROUP_COLUMN) * (g.flower + g.flowerGap) +
+        g.flower / 2,
+    })),
+  )
+  return {
+    cloth,
+    totalTag: { x: clothX, y: m.cloth.height / 2 },
+    pile,
+    plates: platesOut,
+    plateTags: platesOut.map((p) => ({ x: p.x + p.width / 2, y: p.y })),
+    plateCells,
+    plateGap: row.gap,
   }
 }
