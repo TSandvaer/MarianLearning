@@ -62,7 +62,7 @@ describe('nodeProgress — basic fields', () => {
   it('last step of each tree unlocks nothing', () => {
     const p = build(levels())
     expect(nodeProgress(p, 'mult-mix').unlocksNext).toBeNull()
-    expect(nodeProgress(p, 'crab-words').unlocksNext).toBeNull()
+    expect(nodeProgress(p, 'cake-words').unlocksNext).toBeNull()
   })
 
   it('lastSuccessRate is the most recent session on THIS step only', () => {

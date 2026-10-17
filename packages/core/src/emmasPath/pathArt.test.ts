@@ -21,9 +21,9 @@ const fileFor = (id: PathArtId, size: number) =>
 const ids = new Set<PathArtId>(PATH_ART_IDS)
 
 describe('PATH_ART manifest', () => {
-  it('lists 27 stages + 10 lands + 8 UI pieces, no duplicates', () => {
-    expect(ALL_NODES).toHaveLength(27)
-    expect(PATH_ART_IDS).toHaveLength(27 + 10 + 8)
+  it('lists 29 stages + 10 lands + 8 UI pieces, no duplicates', () => {
+    expect(ALL_NODES).toHaveLength(29)
+    expect(PATH_ART_IDS).toHaveLength(29 + 10 + 8)
     expect(ids.size).toBe(PATH_ART_IDS.length)
   })
 
@@ -51,7 +51,7 @@ describe('PATH_ART manifest', () => {
     const expected = PATH_ART_IDS.flatMap((id) =>
       PATH_ART_SIZES.map((size) => `${id}-${size}.webp`),
     ).sort()
-    expect(expected).toHaveLength(45 * PATH_ART_SIZES.length)
+    expect(expected).toHaveLength(47 * PATH_ART_SIZES.length)
     expect(readdirSync(join(PUBLIC, PATH_ART_DIR)).sort()).toEqual(expected)
   })
 })

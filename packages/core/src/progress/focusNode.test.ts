@@ -93,6 +93,8 @@ describe('MATH_NODES_IN_ORDER / WORD_SONG_NODES_IN_ORDER', () => {
       // Content wave 1: land 6, "Big words".
       'duck-words',
       'crab-words',
+      'tent-words',
+      'cake-words',
     ])
   })
 })
@@ -329,7 +331,7 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
     // graduation review (cvc-words-short-u) instead, which is a different
     // scenario covered by the CVC-review describe block below.
     const progress = buildProgress({}, { cvcGraduationSessionFired: true })
-    expect(pickFocusNode(progress, 'word-song').node).toBe('crab-words')
+    expect(pickFocusNode(progress, 'word-song').node).toBe('cake-words')
   })
 
   it('returns the lowest non-mastered across a sweep of progress shapes', () => {

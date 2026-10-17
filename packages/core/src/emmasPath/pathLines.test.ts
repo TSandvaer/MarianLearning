@@ -8,27 +8,29 @@ import {
   BAKED_PATH_LINES,
   DEFERRED_PATH_LINE_KINDS,
   PATH_LINES,
+  PATH_LINES_AWAITING_RENDER,
   pathLine,
   pathStepsOf,
 } from './pathLines'
 
 /** Spec §4.5 word list (carrier + name + land-name words), lower-case;
- *  plus "the" of "all the groups" (content wave 1 K7, Thomas 2026-10-16). */
+ *  plus "the" of "all the groups" (content wave 1 K7, Thomas 2026-10-16);
+ *  tent and cake, content wave 2's step names (K7, Thomas 2026-10-17). */
 const SPEC_VOCAB = new Set(
   `here is your path you are on did all of it look at flowers flower a new for
   learned now can do land first then this not yet numbers adding taking away to
   ten twenty big making tens skip counting groups two three four five and letter
   letters names sounds blending words reading sentences cat dog sun pig bed ship
-  chick thumb star sound pairs the duck crab`.split(/\s+/),
+  chick thumb star sound pairs the duck crab tent cake`.split(/\s+/),
 )
 const NUMERALS = new Set(['1', '2', '3', '4', '5', '6'])
 
 describe('STAGE_SPOKEN_NAMES (spec §4.3)', () => {
-  it('gives all 27 stages a name and no two the same', () => {
+  it('gives all 29 stages a name and no two the same', () => {
     const nodes = [...MATH_TREE, ...LITERACY_TREE]
-    expect(nodes).toHaveLength(27)
+    expect(nodes).toHaveLength(29)
     const names = nodes.map((n) => STAGE_SPOKEN_NAMES[n])
-    expect(new Set(names).size).toBe(27)
+    expect(new Set(names).size).toBe(29)
   })
 })
 
@@ -54,15 +56,15 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
     const counts: Record<string, number> = {}
     for (const l of PATH_LINES) counts[l.kind] = (counts[l.kind] ?? 0) + 1
     expect(counts).toEqual({
-      open: 27,
+      open: 29,
       'open-done': 2,
-      stop: 27,
+      stop: 29,
       land: 10,
-      'locked-next': 25,
-      'locked-later': 146,
+      'locked-next': 27,
+      'locked-later': 175,
       'gate-locked': 51,
-      'end-bud': 27,
-      'end-unlock': 25,
+      'end-bud': 29,
+      'end-unlock': 27,
       'end-land': 8,
       'end-land-no-number': 8,
     })
@@ -124,22 +126,55 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
       'A new land! Land 6: Big words!',
       'A new land: Big words!',
     ])
+    // Content wave 2 (design/native/content-wave-2.md § 6.2, path rows).
+    expect(
+      [
+        'path.open.tent-words',
+        'path.stop.tent-words',
+        'path.locked.next.tent-words',
+        'end.bud.tent-words',
+        'end.unlock.tent-words',
+        'path.open.cake-words',
+        'path.stop.cake-words',
+        'path.locked.next.cake-words',
+        'end.bud.cake-words',
+        'end.unlock.cake-words',
+      ].map((id) => pathLine(id)?.text),
+    ).toEqual([
+      'Here is your path! You are on tent words.',
+      'Tent words.',
+      'Tent words! First, crab words. Then this!',
+      'Look! A new flower for tent words!',
+      'You learned crab words! Now you can do tent words!',
+      'Here is your path! You are on cake words.',
+      'Cake words.',
+      'Cake words! First, tent words. Then this!',
+      'Look! A new flower for cake words!',
+      'You learned tent words! Now you can do cake words!',
+    ])
   })
 
   it('bakes every non-deferred line and none of the deferred ones', () => {
     for (const l of PATH_LINES)
       expect(l.src === null).toBe(DEFERRED_PATH_LINE_KINDS.has(l.kind))
     // Content wave 1: + 5 (all the groups) + 13 (duck words, crab words,
-    // land 6) = 159, the spec's § 6.2 count.
-    expect(BAKED_PATH_LINES).toHaveLength(159)
-    expect(new Set(BAKED_PATH_LINES.map((l) => l.text)).size).toBe(158)
+    // land 6) = 159, the spec's § 6.2 count. Content wave 2: + 10 (tent
+    // words, cake words) = 169.
+    expect(BAKED_PATH_LINES).toHaveLength(169)
+    expect(new Set(BAKED_PATH_LINES.map((l) => l.text)).size).toBe(168)
   })
 
-  it('has a bundled MP3 for every baked line', () => {
+  it('has a bundled MP3 for every baked line but the ones awaiting their render', () => {
     const missing = BAKED_PATH_LINES.filter(
       (l) => !existsSync(join(process.cwd(), 'public', l.src)),
-    ).map((l) => l.src)
-    expect(missing).toEqual([])
+    ).map((l) => l.id)
+    // Exactly the awaiting list: the render commit adds the clips AND
+    // empties `PATH_LINES_AWAITING_RENDER`.
+    expect(missing.sort()).toEqual([...PATH_LINES_AWAITING_RENDER].sort())
+    // Today: content wave 2's tent and cake lines (§ 6.2), 5 each.
+    expect(PATH_LINES_AWAITING_RENDER).toHaveLength(10)
+    for (const id of PATH_LINES_AWAITING_RENDER)
+      expect(pathLine(id)?.src, id).not.toBeNull()
   })
 
   it('stays inside the spec §4.5 vocabulary', () => {

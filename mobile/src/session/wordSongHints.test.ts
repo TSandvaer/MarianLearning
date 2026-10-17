@@ -225,7 +225,10 @@ describe('th mouth-cue state', () => {
 
 describe('the step intro lead line (content wave 1 § 6.1)', () => {
   /** Every Word Song step before `node` mastered, `node` at `level`. */
-  function seedOn(node: 'duck-words' | 'crab-words', level: SkillLevel) {
+  function seedOn(
+    node: 'duck-words' | 'crab-words' | 'tent-words' | 'cake-words',
+    level: SkillLevel,
+  ) {
     const before = WORD_SONG_NODES_IN_ORDER.slice(
       0,
       WORD_SONG_NODES_IN_ORDER.indexOf(node),
@@ -250,6 +253,19 @@ describe('the step intro lead line (content wave 1 § 6.1)', () => {
     expect(readWordSongProgressHints()).toMatchObject({
       focusNode: 'crab-words',
       intro: 'guide.session.intro.crab-words',
+    })
+  })
+
+  it('content wave 2: tent words and cake words carry their intros until mastered (§ 6.1, D9)', () => {
+    seedOn('tent-words', 'intro')
+    expect(readWordSongProgressHints()).toMatchObject({
+      focusNode: 'tent-words',
+      intro: 'guide.session.intro.tent-words',
+    })
+    seedOn('cake-words', 'practicing')
+    expect(readWordSongProgressHints()).toMatchObject({
+      focusNode: 'cake-words',
+      intro: 'guide.session.intro.cake-words',
     })
   })
 
