@@ -2,12 +2,19 @@
  * `design/native/word-song-native.md` § 2: the sizes table, row for row,
  * and the tablet worst case (iPad mini landscape: a 325 pt stage).
  */
+import {
+  LITTLE_STORIES,
+  storySentences,
+} from '@marian/core/wordSong/littleStories'
+import { FREDOKA_600, fontMeasure } from '../../test/fontAdvances'
 import type { Viewport } from './layout'
 import { mathLayout } from './mathLayout'
 import {
   chipInner,
   storyCardHeight,
+  storyLineCount,
   storyRevealScene,
+  storyTextWidth,
   wordSongLayout,
 } from './wordSongLayout'
 
@@ -279,6 +286,60 @@ describe('the little-story card and its reveal scene (content wave 3 § 4.3, AC 
           m.reveal.y + m.reveal.height + 0.001,
         )
       }
+    }
+  })
+})
+
+describe('every little story fits its card (content wave 3 § 4.3, AC 15: ≤ 3 lines)', () => {
+  const NO = { top: 0, bottom: 0, left: 0, right: 0 }
+  const measure = fontMeasure(FREDOKA_600)
+  const lines = (v: Viewport, story: string) => {
+    const m = wordSongLayout(v).story
+    return storyLineCount(
+      m,
+      storySentences(story).map((words) =>
+        words.map((w) => measure(w, m.font)),
+      ),
+    )
+  }
+
+  it('measures as the spec did (Fredoka 600 advances, no kerning)', () => {
+    // § 4.3's widest sentence, "383 pt" (382.5).
+    expect(measure('The fox and the crab sat in the sun.', 24)).toBeCloseTo(
+      382.5,
+      1,
+    )
+  })
+
+  it("P 375×667: each story's line count, the 3-liners are § 4.3's", () => {
+    const P = { width: 375, height: 667, insets: NO }
+    expect(storyTextWidth(wordSongLayout(P).story)).toBe(305)
+    const threeLines = new Set(['fox-8', 'hen-7', 'hen-8', 'bug-6'])
+    expect(LITTLE_STORIES).toHaveLength(24)
+    for (const s of LITTLE_STORIES)
+      expect([s.id, lines(P, s.story)]).toEqual([
+        s.id,
+        threeLines.has(s.id) ? 3 : 2,
+      ])
+  })
+
+  it.each([
+    [
+      'L 667×375 b21',
+      { width: 667, height: 375, insets: { ...NO, bottom: 21 } },
+    ],
+    [
+      'iPad mini L 1133×744 b20',
+      { width: 1133, height: 744, insets: { ...NO, bottom: 20 } },
+    ],
+    [
+      'TP 744×1133 t24 b20',
+      { width: 744, height: 1133, insets: { ...NO, top: 24, bottom: 20 } },
+    ],
+  ])('%s: every story takes 2–3 lines', (_name, v) => {
+    for (const s of LITTLE_STORIES) {
+      const n = lines(v, s.story)
+      expect([s.id, n >= 2 && n <= 3]).toEqual([s.id, true])
     }
   })
 })

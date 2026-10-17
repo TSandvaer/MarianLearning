@@ -97,6 +97,46 @@ export function storyCardHeight(m: StoryCardMetrics, lines: number): number {
   return lines * m.lineHeight + 2 * m.padding.vertical + 2 * STORY_CARD_BORDER
 }
 
+/** Words are 0.35 em apart; each word's box takes half on each side (§ 4.3). */
+export const STORY_WORD_GAP_EM = 0.35
+/**
+ * The spotlight is the word's width + 4 (§ 4.2): it overhangs the word by 2
+ * on each side, drawn over the half-gap, so it takes no layout width.
+ */
+export const STORY_SPOT_OVERHANG = 2
+
+/** The card's text width: inside its padding and border. */
+export function storyTextWidth(m: StoryCardMetrics): number {
+  return m.width - 2 * m.padding.horizontal - 2 * STORY_CARD_BORDER
+}
+
+/**
+ * The card's line count, given each sentence's word widths: each sentence
+ * starts a line and wraps word boxes (text + the gap) as the card's
+ * flex-wrap rows do.
+ */
+export function storyLineCount(
+  m: StoryCardMetrics,
+  sentences: readonly (readonly number[])[],
+): number {
+  const width = storyTextWidth(m)
+  const gap = STORY_WORD_GAP_EM * m.font
+  let lines = 0
+  for (const words of sentences) {
+    let x = 0
+    lines += 1
+    for (const w of words) {
+      const box = w + gap
+      if (x > 0 && x + box > width) {
+        lines += 1
+        x = 0
+      }
+      x += box
+    }
+  }
+  return lines
+}
+
 /**
  * The reveal scene's side (§ 4.3): min(the rect's height, its width, 200
  * on phones / 280 on tablets), at least 120. In P and on tablets the rect

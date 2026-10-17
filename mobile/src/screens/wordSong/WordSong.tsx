@@ -670,9 +670,13 @@ export function WordSong({
     [speak, unmounted],
   )
 
-  /** The question again, `STORY_ASK_AGAIN_MS` later (wrong 1, wrong 2). */
+  /**
+   * The question again, `STORY_ASK_AGAIN_MS` later (wrong 1, wrong 2), for
+   * the `wrongs`-th wrong tap: a newer wrong tap owns what comes next, so
+   * no stray question lands in its sequence (§ 4.4 steps 5–6).
+   */
   const askAgainSoon = useCallback(
-    (problem: WordSongProblem) => {
+    (problem: WordSongProblem, wrongs: number) => {
       const my = problemIndexRef.current
       if (askAgainTimerRef.current !== null)
         clearTimeout(askAgainTimerRef.current)
@@ -680,6 +684,7 @@ export function WordSong({
         askAgainTimerRef.current = null
         if (unmounted.current || problemIndexRef.current !== my) return
         if (resolvedRef.current || guidedPlayedRef.current) return
+        if (wrongCountRef.current !== wrongs) return
         setPose('listening')
         void speak(problem.utterances.read).then(() => {
           setPose((c) => (c === 'listening' ? 'idle' : c))
@@ -1093,9 +1098,10 @@ export function WordSong({
       // A little story: Emma reads it with the read-along, then asks again
       // (content wave 3 § 4.4 step 6).
       if (problem.contentType === 'little-story') {
+        const wrongs = wrongCountRef.current
         void readStory(problem).then(() => {
           setPose((c) => (c === 'attentive-pointing' ? 'idle' : c))
-          askAgainSoon(problem)
+          askAgainSoon(problem, wrongs)
         })
         return
       }
@@ -1138,6 +1144,11 @@ export function WordSong({
 
   const handleWrongTap = useCallback(
     (word: string, problem: WordSongProblem) => {
+      // A little story's last wrong may still be about to ask again.
+      if (askAgainTimerRef.current !== null) {
+        clearTimeout(askAgainTimerRef.current)
+        askAgainTimerRef.current = null
+      }
       sfx.poof.play()
       setShakingChip(word)
       if (shakeTimerRef.current !== null) clearTimeout(shakeTimerRef.current)
@@ -1190,7 +1201,8 @@ export function WordSong({
         if (!outcome.scheduleHint && !outcome.scheduleGuided) {
           backToIdleSoon()
           // A little story's 1st wrong asks the question again (§ 4.4).
-          if (problem.contentType === 'little-story') askAgainSoon(problem)
+          if (problem.contentType === 'little-story')
+            askAgainSoon(problem, outcome.wrongCount)
         }
         if (outcome.scheduleGuided) {
           setGuidedActive(true)

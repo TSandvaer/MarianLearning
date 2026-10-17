@@ -339,6 +339,73 @@ describe('the wrong taps: never a red X (AC 12)', () => {
     // The scene never shows before the answer.
     expect(scene()).toBeNull()
   })
+
+  /** Her voice lines from the first wrong tap on. */
+  const afterQuestion = (h: StoryHarness) => h.voice.texts().slice(1)
+
+  it("a 2nd wrong within 400 ms of the 1st re-prompt's end: no stray question, the story 600 ms after its re-prompt", async () => {
+    const h = await renderStory()
+    await toQuestion(h)
+    await say(lastVoice(h))
+    await fireEvent.press(screen.getByTestId('word-song-chip-rug'))
+    await flush()
+    await say(lastVoice(h))
+    await advance(200)
+    await fireEvent.press(screen.getByTestId('word-song-chip-cup'))
+    await flush()
+    await advance(250)
+    await say(lastVoice(h))
+    await advance(600)
+    expect(afterQuestion(h)).toEqual([
+      'Hmm... try again?',
+      'Hmm... try again?',
+      FOX_1.story,
+    ])
+    // The story ends: 400 ms, the question, once.
+    await say(lastVoice(h))
+    await advance(STORY_ASK_AGAIN_MS)
+    expect(afterQuestion(h)).toEqual([
+      'Hmm... try again?',
+      'Hmm... try again?',
+      FOX_1.story,
+      FOX_1.question,
+    ])
+  })
+
+  it("a 2nd wrong that cuts the 1st re-prompt: the 1st's ending asks nothing", async () => {
+    const h = await renderStory()
+    await toQuestion(h)
+    await say(lastVoice(h))
+    await fireEvent.press(screen.getByTestId('word-song-chip-rug'))
+    await flush()
+    const first = lastVoice(h)
+    await fireEvent.press(screen.getByTestId('word-song-chip-cup'))
+    await flush()
+    const second = lastVoice(h)
+    // The replaced line just ends (useLineSpeaker).
+    await say(first)
+    await advance(300)
+    await say(second)
+    await advance(600)
+    expect(afterQuestion(h)).toEqual([
+      'Hmm... try again?',
+      'Hmm... try again?',
+      FOX_1.story,
+    ])
+  })
+
+  it('unmounted within 400 ms of the 1st re-prompt: the question never plays', async () => {
+    const h = await renderStory()
+    await toQuestion(h)
+    await say(lastVoice(h))
+    await fireEvent.press(screen.getByTestId('word-song-chip-rug'))
+    await flush()
+    await say(lastVoice(h))
+    await advance(200)
+    await h.unmount()
+    await advance(STORY_ASK_AGAIN_MS)
+    expect(afterQuestion(h)).toEqual(['Hmm... try again?'])
+  })
 })
 
 describe('the reveal (AC 11, AC 14)', () => {

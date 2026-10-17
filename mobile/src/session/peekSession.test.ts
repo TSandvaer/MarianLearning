@@ -107,6 +107,7 @@ it('accepts only a peek- plan of exactly 3 readable problems', () => {
 it('a story step peeks and replays from its canon (content wave 3 § 7: a story runs in full)', () => {
   for (const node of ['fox-stories', 'hen-stories', 'bug-stories']) {
     const peek = peekPlanFromServer('word-song', peekOf('word-song', node))
+    if (peek.world !== 'word-song') throw new Error('expected a word-song peek')
     expect(peek.plan.problems.map((p) => p.contentType)).toEqual(
       Array(3).fill('little-story'),
     )
@@ -114,6 +115,8 @@ it('a story step peeks and replays from its canon (content wave 3 § 7: a story 
       ...canonPlan('word-song', node, 8),
       id: 'replay-word-song',
     })
+    if (replay.world !== 'word-song')
+      throw new Error('expected a word-song replay')
     expect(replay.plan.problems).toHaveLength(8)
     expect(replay.plan.problems.every((p) => p.storyId !== undefined)).toBe(
       true,

@@ -8,7 +8,9 @@
  *   word is a button ("Word fox") whose box takes half the 0.35 em gap on
  *   each side, a line tall (≥ 44 pt), so the boxes touch.
  * - **Spotlight**: the letter row's pink (`#FFB7C5`) behind one word, its
- *   width + 4, F + 8 tall, radius 0.3 F; the word stays dark. A tapped word
+ *   width + 4 (an overhang over the half-gaps, not layout width, so the
+ *   line counts stay § 4.3's), F + 8 tall, radius 0.3 F; the word stays
+ *   dark. A tapped word
  *   also pulses 1 → 1.08 → 1 (300 ms ease-out). [Reduce Motion: the
  *   spotlight only.] It comes in over 120 ms and goes out over 200 ms.
  * - **Scene** (`testID="word-story-scene"`, after the answer only): the
@@ -36,6 +38,8 @@ import Animated, {
 import { storySceneAsset } from '../../assets'
 import {
   STORY_CARD_BORDER,
+  STORY_SPOT_OVERHANG,
+  STORY_WORD_GAP_EM,
   type StoryCardMetrics,
 } from '../../layout/wordSongLayout'
 import { colors, fonts } from '../../theme'
@@ -96,24 +100,25 @@ function StoryWord({
       onPress={() => onPress(cell)}
       style={[
         styles.word,
-        { height: m.lineHeight, paddingHorizontal: 0.175 * F },
+        {
+          height: m.lineHeight,
+          paddingHorizontal: (STORY_WORD_GAP_EM / 2) * F,
+        },
       ]}
     >
-      <Animated.View
-        style={[
-          styles.wordInner,
-          { height: F + 8, paddingHorizontal: 2, borderRadius: 0.3 * F },
-          style,
-        ]}
-      >
+      <Animated.View style={[styles.wordInner, { height: F + 8 }, style]}>
         {lit && (
           <Animated.View
             testID={`word-story-lit-${cell.index}`}
             entering={FadeIn.duration(STORY_SPOT_IN_MS)}
             exiting={FadeOut.duration(STORY_SPOT_OUT_MS)}
             style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: STORY_SPOT, borderRadius: 0.3 * F },
+              styles.spot,
+              {
+                left: -STORY_SPOT_OVERHANG,
+                right: -STORY_SPOT_OVERHANG,
+                borderRadius: 0.3 * F,
+              },
             ]}
           />
         )}
@@ -299,6 +304,12 @@ const styles = StyleSheet.create({
   },
   word: { justifyContent: 'center' },
   wordInner: { justifyContent: 'center', alignItems: 'center' },
+  spot: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    backgroundColor: STORY_SPOT,
+  },
   text: { fontFamily: fonts.semibold, color: colors.ink },
   scene: { position: 'absolute', borderRadius: 16, overflow: 'hidden' },
 })
