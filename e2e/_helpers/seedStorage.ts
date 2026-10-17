@@ -157,6 +157,7 @@ const DEFAULT_SKILL_LEVELS = {
   'mult-3-4': 'locked',
   'mult-6-9': 'locked',
   'mult-mix': 'locked',
+  'div-share': 'locked',
   'letter-names': 'mastered',
   'letter-sounds': 'practicing',
   'blending-cv': 'practicing',

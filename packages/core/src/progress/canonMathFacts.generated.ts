@@ -115,4 +115,5 @@ export const CANON_MATH_FACTS: Readonly<
     { a: 8, b: 4, op: '*' },
     { a: 9, b: 4, op: '*' },
   ],
+  'div-share': [null, null, null, null, null, null, null, null],
 }

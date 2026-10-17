@@ -143,6 +143,7 @@ export const MATH_TREE: readonly NumberGardenNode[] = [
   'mult-3-4',
   'mult-6-9',
   'mult-mix',
+  'div-share',
 ]
 
 /**

@@ -37,15 +37,15 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'session-review': 1,
       'session-warmup': 1,
       'session-knew': 1,
-      'session-peek-open': 25,
-      'session-peek-close': 25,
-      'session-intro': 3,
+      'session-peek-open': 26,
+      'session-peek-close': 26,
+      'session-intro': 4,
       'session-hiding': 1,
     })
-    expect(GUIDANCE_LINES).toHaveLength(77)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(77)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(77)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(77)
+    expect(GUIDANCE_LINES).toHaveLength(80)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(80)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(80)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(80)
   })
 
   it('bakes each world and count variant', () => {
@@ -151,7 +151,19 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       text: 'Read all the letters!',
       src: '/assets/audio/path/guide-session-intro-crab-words.mp3',
     })
-    // All rendered in Lily (§ 6.2 rows 1-10).
+    // Sharing (content wave 2 § 6.2; Thomas approved the texts 2026-10-17).
+    expect(sessionIntroLine('div-share')).toMatchObject({
+      id: 'guide.session.intro.div-share',
+      kind: 'session-intro',
+      world: 'math',
+      text: "Let's share the flowers!",
+      src: '/assets/audio/path/guide-session-intro-div-share.mp3',
+    })
+    expect(peekLines('div-share')?.open.text).toBe("Let's look at sharing!")
+    expect(peekLines('div-share')?.close.text).toBe(
+      'Sharing is for later. You will learn it!',
+    )
+    // Rendered in Lily, like wave 1's (content wave 2 § 6.2).
     expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
   })
 
@@ -241,7 +253,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(77)
+    ).toHaveLength(80)
   })
 
   it('repeats no Emma’s Path line', () => {
