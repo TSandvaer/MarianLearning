@@ -16,8 +16,8 @@
  * jest is offline: a session start fails and Math / Word Song play their
  * silent fallback plan. The replay request is stubbed (`requestReplay`):
  * its plan is the committed canon's add-to-10 problems 1–8, its audio a
- * fake that starts and ends each line at once. The replay lines await
- * their render, so Emma's opener and closer walk their captions.
+ * fake that starts and ends each line at once. Emma's opener and closer
+ * play their bundled clips; the test starts and ends each one.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -47,7 +47,7 @@ import {
   screen,
   within,
 } from '@testing-library/react-native'
-import { flush, resetFakePlayers } from '../test/fakeAudio'
+import { fakePlayers, flush, resetFakePlayers } from '../test/fakeAudio'
 import { REPO_ROOT } from '../test/webSource'
 import App from './App'
 import {
@@ -163,6 +163,24 @@ function payloadsFor(track: string): Record<string, unknown>[] {
 
 /** The line on Emma's voice channel now (`<player>:<line id>`), or null. */
 const voiceLine = () => audioEngine.voice.activeLabel
+
+/**
+ * The guide line in flight plays its bundled clip: start it and end it.
+ * The newest playing player: an earlier one also sits in `play` here.
+ */
+async function finishGuideLine(): Promise<void> {
+  const p = [...fakePlayers]
+    .reverse()
+    .find(
+      (f) => f.calls.at(-1) === 'play' && !f.released && f.listenerCount > 0,
+    )
+  if (!p) return
+  await act(async () => {
+    p.start(1.5)
+    p.finish()
+    await flush()
+  })
+}
 
 /** Emma's line on Math's ribbon. */
 const ribbon = () =>
@@ -317,6 +335,7 @@ it('AC 2: a mastered stop replays — opener, 8 problems with no stardust pill, 
   // The opener over the empty stage.
   expect(screen.queryByTestId('math-chips')).toBeNull()
   await settle(300)
+  await finishGuideLine()
   expect(ribbon()).toBe("Let's play adding to ten again!")
   await settle(3000)
 
@@ -326,6 +345,7 @@ it('AC 2: a mastered stop replays — opener, 8 problems with no stardust pill, 
   }
   expect(screen.queryByTestId('math-stardust')).toBeNull()
   await settle(700)
+  await finishGuideLine()
   expect(ribbon()).toBe('You know adding to ten!')
   await settle(5000)
   expect(screen.queryByTestId('session-end')).toBeNull()

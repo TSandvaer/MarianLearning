@@ -262,14 +262,9 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: the 60 Map replay lines (map-tap-to-play § 6), every
- * `guide.session.replay-open.<step>` and `guide.session.replay-close.<step>`.
+ * Now: none.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] =
-  GUIDANCE_LINES.filter(
-    (l) =>
-      l.kind === 'session-replay-open' || l.kind === 'session-replay-close',
-  ).map((l) => l.id)
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 

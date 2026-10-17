@@ -94,10 +94,8 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       "Let's play groups of two, five and ten again!",
     )
     expect(Math.max(...[...open, ...close].map((l) => l.text.length))).toBe(45)
-    // Not voiced yet: exactly these 60 await their render.
-    expect([...GUIDANCE_LINES_AWAITING_RENDER].sort()).toEqual(
-      [...open, ...close].map((l) => l.id).sort(),
-    )
+    // Rendered in Lily: none of the 60 awaits its render.
+    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
   })
 
   it('bakes each world and count variant', () => {
@@ -228,13 +226,8 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       text: 'The E is quiet. It makes the A say its name.',
       src: '/assets/audio/path/guide-session-intro-cake-words.mp3',
     })
-    // Rendered in Lily, like wave 1's and sharing's (content wave 2 § 6.2):
-    // only the map replay lines still await their render.
-    expect(
-      GUIDANCE_LINES_AWAITING_RENDER.filter(
-        (id) => !id.startsWith('guide.session.replay-'),
-      ),
-    ).toEqual([])
+    // Rendered in Lily, like wave 1's and sharing's (content wave 2 § 6.2).
+    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
   })
 
   it('names the step in the peek opener and closer (Thomas 2026-10-15), with the path lines’ spoken names and their verb', () => {
