@@ -10,8 +10,8 @@
  *   speaks; records nothing;
  * - wrong 1 asks again, wrong 2 reads the story with the read-along and
  *   asks again, wrong 3 gives the answer — never a red X;
- * - a right tap: "Yes! The fox!", the chips go, the scene (the answer's
- *   picture until the scenes exist) enters, Emma reads the story with the
+ * - a right tap: "Yes! The fox!", the chips go, the story's scene enters
+ *   (the answer's picture if it had none), Emma reads the story with the
  *   read-along (the ribbon keeps its line), 800 ms, the next card;
  * - the word-tap cue (Kyle's call on PR #599): on the mount's first card,
  *   forward on an unmastered step or a peek, the hand taps "The" once at
@@ -414,7 +414,7 @@ describe('the wrong taps: never a red X (AC 12)', () => {
 })
 
 describe('the reveal (AC 11, AC 14)', () => {
-  it('a right tap: "Yes! The fox!", the chips go, the answer\'s picture enters, the read-along, 800 ms, the next card', async () => {
+  it('a right tap: "Yes! The fox!", the chips go, the scene enters, the read-along, 800 ms, the next card', async () => {
     const h = await renderStory()
     await toQuestion(h)
     await say(lastVoice(h))
@@ -427,10 +427,11 @@ describe('the reveal (AC 11, AC 14)', () => {
     expect(scene()).toBeNull()
     await advance(STORY_REVEAL_DELAY_MS)
     expect(chips()).toBeNull()
-    // No scene file yet (§ 6, a later job): the answer's pack picture.
+    // Fox 1's own scene (§ 6), not the answer's pack picture.
     expect(scene()).not.toBeNull()
-    expect(screen.getByTestId('word-story-scene-picture')).toBeOnTheScreen()
-    expect(screen.getByTestId('word-picture-fox')).toBeOnTheScreen()
+    const art = screen.getByTestId('word-story-scene-art')
+    expect(art.props.accessibilityLabel).toBe('fox')
+    expect(screen.queryByTestId('word-story-scene-picture')).toBeNull()
     await advance(STORY_SCENE_LAND_MS + STORY_REVEAL_READ_GAP_MS - 1)
     expect(lastVoice(h).text).toBe('Yes! The fox!')
     await advance(1)

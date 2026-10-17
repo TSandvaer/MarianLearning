@@ -123,9 +123,9 @@
     "scene": "hen-8",
     "tier": "hen-stories",
     "batch": 2,
-    "subject": "The hen holding an open jug full of red jam, a pink mug beside her.",
-    "avoid": ["jam in the mug"],
-    "refs": ["hen", "jam", "cup", "jug"]
+    "subject": "The hen holding the cream jug (a pitcher with a handle and a spout) by its handle, its open top tilted forward so the thick red jam filling it is clearly seen; a pink mug on the ground beside her.",
+    "avoid": ["a jam jar", "a lid on the jug", "jam in the mug"],
+    "refs": ["hen", "cup", "jug"]
   },
   {
     "scene": "bug-1",
@@ -163,24 +163,24 @@
     "scene": "bug-5",
     "tier": "bug-stories",
     "batch": 3,
-    "subject": "A peach van, side door open; inside, a pink tote bag with the bug peeking out.",
-    "avoid": ["the bag outside the van"],
+    "subject": "A peach van seen close up, its side door wide open; just inside the doorway a pink tote bag, and the big pink bug climbing out of the top of the bag, the bug about half as wide as the bag so it is easy to see.",
+    "avoid": ["a tiny bug", "the bag outside the van"],
     "refs": ["bug", "van", "bag"]
   },
   {
     "scene": "bug-6",
     "tier": "bug-stories",
     "batch": 3,
-    "subject": "The dog running to a small pond; nearby the pink bug hides in a cream bathtub.",
-    "avoid": ["the dog in the tub"],
+    "subject": "The dog on the left running right, about to jump into a small pond right in front of its nose in the middle of the picture; in the back corner, behind the pond and away from the dog, the pink bug hides in a cream bathtub.",
+    "avoid": ["the dog facing or running toward the tub", "the dog in the tub"],
     "refs": ["dog", "pond", "tub", "bug"]
   },
   {
     "scene": "bug-7",
     "tier": "bug-stories",
     "batch": 3,
-    "subject": "The pink bug in a bird's nest; the hen sitting on a log beside it.",
-    "avoid": ["eggs", "the hen in the nest"],
+    "subject": "The pink bug in a bird's nest; beside it, the hen sitting down on top of a log, her body resting low on the log and her legs tucked under her so her feet do not show.",
+    "avoid": ["the hen standing", "eggs", "the hen in the nest"],
     "refs": ["bug", "nest", "hen", "log"]
   },
   {

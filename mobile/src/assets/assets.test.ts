@@ -6,6 +6,7 @@
 import { TILT_BY_POSE, type EmmaPose } from '@marian/core/character/emmaPose'
 import { PATH_ART_IDS, PATH_ART_SIZES } from '@marian/core/emmasPath/pathArt'
 import { SCENE_PICTURES } from '@marian/core/wordSong/sceneRegistry'
+import { LITTLE_STORIES } from '@marian/core/wordSong/littleStories'
 import { NOVEL_PROBE_WORDS } from '@marian/core/wordSong/novelProbeWords'
 import { BIG_WORDS_STEPS } from '@marian/core/wordSong/bigWordsSteps'
 import { existsSync, readdirSync } from 'fs'
@@ -19,12 +20,14 @@ import {
   pathArtMutedAsset,
   pictureAsset,
   sceneAsset,
+  storySceneAsset,
 } from './index'
 import { LANDS } from '@marian/core/progress/lands'
 import { LITERACY_TREE, MATH_TREE } from '@marian/core/progress/mastery'
 import { WEB_ASSET_MODULES } from './registry'
 
 const WEB_ASSETS = join(__dirname, '..', '..', '..', 'public', 'assets')
+const SCENES = join(__dirname, '..', '..', 'assets', 'scenes')
 
 describe('native asset registry', () => {
   it('has every Emma pose, the logo and the th mouth', () => {
@@ -54,6 +57,24 @@ describe('native asset registry', () => {
       expect([id, sceneAsset(id) !== undefined]).toEqual([id, true])
     expect(sceneAsset(undefined)).toBeUndefined()
     expect(sceneAsset('no-such-scene')).toBeUndefined()
+  })
+
+  it("has each little story's own scene, so none falls back to the answer's picture", () => {
+    expect(LITTLE_STORIES).toHaveLength(24)
+    for (const { id } of LITTLE_STORIES) {
+      const key = `/native/scenes/story-${id}.webp`
+      expect([id, existsSync(join(SCENES, `story-${id}.webp`))]).toEqual([
+        id,
+        true,
+      ])
+      expect([id, key in WEB_ASSET_MODULES]).toEqual([id, true])
+      expect(storySceneAsset(id)).toBe(WEB_ASSET_MODULES[key])
+    }
+    // Each its own file: 24 different modules.
+    const modules = LITTLE_STORIES.map(({ id }) => storySceneAsset(id))
+    expect(new Set(modules.map((m) => JSON.stringify(m))).size).toBe(24)
+    expect(storySceneAsset(undefined)).toBeUndefined()
+    expect(storySceneAsset('no-such-story')).toBeUndefined()
   })
 
   it('has every picture the web ships', () => {
@@ -137,6 +158,9 @@ describe('native asset registry', () => {
     }
     for (const key of Object.keys(WEB_ASSET_MODULES)) {
       if (key.startsWith('/native/pictures/')) continue
+      // The little stories' scenes have no web source (native only; the
+      // test above checks each file).
+      if (key.startsWith('/native/scenes/story-')) continue
       const webPath = key.startsWith('/native/') ? source(key) : key
       expect(webPath.startsWith('/assets/')).toBe(true)
       expect([webPath, existsSync(join(WEB_ASSETS, '..', webPath))]).toEqual([
