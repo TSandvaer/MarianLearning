@@ -4,8 +4,9 @@
  * § 3.3, § 4.3). While Emma says the intro, the word card's cells light on
  * `LetterRow`'s rose spotlight (120 ms fade in, the pulse unless Reduce
  * Motion), and all go back to normal `INTRO_SPOT_OFF_MS` after the line
- * ends (the 1500 ms silent beat runs from the line's end, so they settle
- * inside it).
+ * ends, or later when tent words' end pulse needs it (`introSpotOffDelay`).
+ * The 1500 ms silent beat runs from the line's end, so they settle inside
+ * it.
  *
  * - Duck words, "Two letters, one sound!": the word's last two cells (c k /
  *   n g) light together.
@@ -54,6 +55,13 @@ export const INTRO_SPOT_OFF_MS = 200
  * never fight over its scale.
  */
 export const LIT_PULSE_MS = 400
+/** Tent words' end pulse (1 → 1.08 → 1, `LetterRow`) lasts this long. */
+export const END_PULSE_MS = 300
+/**
+ * Kyle's guard on #589: the cells stay lit at least this long after the end
+ * pulse has finished, so a short lead render can't cut the pulse.
+ */
+export const END_PULSE_SETTLE_MS = 100
 
 /**
  * Per letter of `word`: the delay (ms after the intro starts) before its
@@ -91,6 +99,23 @@ export function introEndPulse(
   const n = word.length
   const at = (n - 1) * INTRO_STAGGER_MS + LIT_PULSE_MS
   return Array.from({ length: n }, (_, i) => (i >= n - 2 ? at : null))
+}
+
+/**
+ * How long after the intro line ends its cells go dark (Kyle's guard on
+ * #589): at `max(lineEnd + INTRO_SPOT_OFF_MS, endPulseStart + END_PULSE_MS +
+ * END_PULSE_SETTLE_MS)`, both measured from the intro's start, so a short
+ * Lily render can't cut tent words' end pulse. Without an end pulse it is
+ * `INTRO_SPOT_OFF_MS`. The silent beat still starts at the line's end.
+ */
+export function introSpotOffDelay(
+  endPulse: readonly (number | null)[] | null,
+  lineEndMs: number,
+): number {
+  const starts = (endPulse ?? []).filter((d): d is number => d !== null)
+  if (starts.length === 0) return INTRO_SPOT_OFF_MS
+  const pulseDone = Math.max(...starts) + END_PULSE_MS + END_PULSE_SETTLE_MS
+  return Math.max(INTRO_SPOT_OFF_MS, pulseDone - lineEndMs)
 }
 
 /** A cake-words card's quiet-E cells: the vowel (cell 2) and the e (cell 4). */

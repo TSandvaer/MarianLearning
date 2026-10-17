@@ -28,10 +28,13 @@ import {
   say,
 } from '../../../test/wordSongHarness'
 import {
+  END_PULSE_MS,
+  END_PULSE_SETTLE_MS,
   INTRO_SPOT_OFF_MS,
   INTRO_STAGGER_MS,
   LIT_PULSE_MS,
   introEndPulse,
+  introSpotOffDelay,
   introSpotlight,
   introTickCue,
   quietECue,
@@ -213,8 +216,28 @@ describe('introSpotlight and friends (§ 3.3, § 4.3)', () => {
   })
 })
 
+describe("the cells' dark time (Kyle's guard on #589)", () => {
+  const PULSE_DONE =
+    3 * INTRO_STAGGER_MS + LIT_PULSE_MS + END_PULSE_MS + END_PULSE_SETTLE_MS
+
+  it('is 200 ms after the line, or later so the end pulse finishes first', () => {
+    const pulse = introEndPulse(TENT_INTRO, 'tent', false)
+    expect(PULSE_DONE).toBe(1250)
+    // A short render: dark at 1250 ms from the intro's start.
+    expect(introSpotOffDelay(pulse, 800)).toBe(PULSE_DONE - 800)
+    expect(introSpotOffDelay(pulse, 0)).toBe(PULSE_DONE)
+    // A long render: the usual 200 ms after the line.
+    expect(introSpotOffDelay(pulse, 1300)).toBe(INTRO_SPOT_OFF_MS)
+    // No end pulse (Reduce Motion, duck/crab/cake): always 200 ms.
+    expect(introSpotOffDelay(null, 0)).toBe(INTRO_SPOT_OFF_MS)
+    expect(introSpotOffDelay(introEndPulse(TENT_INTRO, 'tent', true), 0)).toBe(
+      INTRO_SPOT_OFF_MS,
+    )
+  })
+})
+
 describe('tent words: the intro before the scored problem 1 (AC 12)', () => {
-  it('"Read to the end!" lights every cell and pulses n and t; dark 200 ms after; the silent beat runs from its end', async () => {
+  it('"Read to the end!" (an 800 ms render) lights every cell and pulses n and t; the pulse ends (1150 ms) before any cell goes dark (1250 ms); the silent beat runs from the line\'s end', async () => {
     const guide = fakeGuide()
     const h = await renderWordSong({
       plan: TENT,
@@ -228,16 +251,36 @@ describe('tent words: the intro before the scored problem 1 (AC 12)', () => {
     expect(endPulseCells()).toEqual([2, 3])
     expect(quietCells('tent')).toEqual([])
 
+    await advance(800)
+    await endGuide(guide.lines[0]!)
+    // 1249 ms from the start: still lit, past the pulse's end at 1150 ms.
+    await advance(1249 - 800)
+    expect(litCells('tent')).toEqual([0, 1, 2, 3])
+    await advance(1)
+    expect(litCells('tent')).toEqual([])
+    expect(endPulseCells()).toEqual([])
+    // The 1500 ms beat counts from the line's end (800 ms), not from dark.
+    await advance(800 + SILENT_TEXT_WINDOW_MS - 1250 - 1)
+    expect(h.voice.lines).toHaveLength(0)
+    await advance(1)
+    expect(h.voice.texts()).toEqual(['Read the tent.'])
+  })
+
+  it('a 1300 ms render: dark 200 ms after the line, as before', async () => {
+    const guide = fakeGuide()
+    const h = await renderWordSong({
+      plan: TENT,
+      sessionIntro: TENT_INTRO,
+      sessionGuide: guide.player,
+    })
+    await startGuide(guide.lines[0]!)
+    await advance(1300)
     await endGuide(guide.lines[0]!)
     await advance(INTRO_SPOT_OFF_MS - 1)
     expect(litCells('tent')).toEqual([0, 1, 2, 3])
     await advance(1)
     expect(litCells('tent')).toEqual([])
-    expect(endPulseCells()).toEqual([])
-    // The 1500 ms beat counts from the line's end (no 400 ms gap first).
-    await advance(SILENT_TEXT_WINDOW_MS - INTRO_SPOT_OFF_MS - 1)
-    expect(h.voice.lines).toHaveLength(0)
-    await advance(1)
+    await advance(SILENT_TEXT_WINDOW_MS - INTRO_SPOT_OFF_MS)
     expect(h.voice.texts()).toEqual(['Read the tent.'])
   })
 

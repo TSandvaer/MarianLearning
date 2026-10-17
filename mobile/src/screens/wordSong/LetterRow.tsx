@@ -36,14 +36,13 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import { colors, fonts } from '../../theme'
+import { END_PULSE_MS } from './introSpotlight'
 
 const SPOTLIGHT = '#FFB7C5'
 const INK = '#3B3B3B'
 const EASE_OUT = Easing.bezier(0, 0, 0.58, 1)
-/** Tent words' end pulse: 1 → this → 1 (content wave 2 § 3.3). */
+/** Tent words' end pulse: 1 → this → 1 over `END_PULSE_MS` (§ 3.3). */
 export const END_PULSE_SCALE = 1.08
-/** …over this long in all. */
-export const END_PULSE_MS = 300
 /** A quiet cell's glyph opacity, and its fade each way (§ 4.3). */
 export const QUIET_OPACITY = 0.35
 export const QUIET_FADE_MS = 200

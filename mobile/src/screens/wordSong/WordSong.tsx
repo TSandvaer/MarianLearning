@@ -141,9 +141,9 @@ import {
   type SilentMathPlayer,
 } from '../math/silentPlayer'
 import {
-  INTRO_SPOT_OFF_MS,
   introEndPulse,
   introSpotlight,
+  introSpotOffDelay,
   introTickCue,
   quietECue,
 } from './introSpotlight'
@@ -589,9 +589,15 @@ export function WordSong({
         setPose('listening')
         const text = sessionGuideLine(lead).text
         const word = problem.target.word
+        const pulse =
+          isIntro && sessionIntro !== null
+            ? introEndPulse(sessionIntro, word, reducedMotion)
+            : null
+        /** The intro's start, for the guard on its end pulse (#589). */
+        const startedAt = Date.now()
         if (isIntro && sessionIntro !== null) {
           setSpotlight(introSpotlight(sessionIntro, word, reducedMotion))
-          setEndPulse(introEndPulse(sessionIntro, word, reducedMotion))
+          setEndPulse(pulse)
         }
         void speak(text, {
           play: (_text, opts) => guide.playLine(lead, opts),
@@ -614,12 +620,17 @@ export function WordSong({
           if (lead === opener) setOpenerDone(true)
           setPose((c) => (c === 'listening' ? 'idle' : c))
           if (isIntro) {
-            spotOffTimerRef.current = setTimeout(() => {
-              spotOffTimerRef.current = null
-              setSpotlight(null)
-              setEndPulse(null)
-              setQuiet(null)
-            }, INTRO_SPOT_OFF_MS)
+            // Dark 200 ms after the line, or later so tent words' end pulse
+            // finishes first (Kyle's guard on #589). The beat starts now.
+            spotOffTimerRef.current = setTimeout(
+              () => {
+                spotOffTimerRef.current = null
+                setSpotlight(null)
+                setEndPulse(null)
+                setQuiet(null)
+              },
+              introSpotOffDelay(pulse, Date.now() - startedAt),
+            )
             if (round.readAloudDelayMs > 0) {
               read()
               return
