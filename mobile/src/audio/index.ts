@@ -83,6 +83,7 @@ export {
   leadLinesForRound,
   PEEK_CLOSE_GAP_MS,
   peekGuideLines,
+  replayGuideLines,
   sessionGuideLine,
   sessionGuidePlayer,
   SESSION_GUIDE_GAP_MS,
@@ -91,6 +92,7 @@ export {
 export type {
   IntroGuideLineId,
   PeekGuideLineId,
+  ReplayGuideLineId,
   RoundLeadContext,
   SessionGuideLineId,
   SessionGuidePlayer,

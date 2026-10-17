@@ -28,6 +28,7 @@ import type { Sfx } from '../../audio'
 import { mapScreenLayout, MAP_MIN_HIT } from '../../layout/mapScreenLayout'
 import type { MapLinePlayer } from './mapAudio'
 import { MapScreen } from './MapScreen'
+import { MAP_TAP_ARM_MS } from './useMapVisit'
 
 const P = mapScreenLayout({
   width: 375,
@@ -160,6 +161,7 @@ it('opens on the open line at mount, whole, with no tap and no write', async () 
 
 it('taps speak: a stop its name, a gate its land; a deferred line is caption-only', async () => {
   const h = await mount(defaultProgress())
+  await advance(MAP_TAP_ARM_MS)
   await fireEvent.press(screen.getByTestId('map-stop-add-to-10'))
   await fireEvent.press(screen.getByTestId('map-gate-2'))
   // mult-6-9 is two steps away: its "later" line is deferred (no MP3).
@@ -176,6 +178,7 @@ it('taps speak: a stop its name, a gate its land; a deferred line is caption-onl
 
 it('a locked stop poofs (0.45), wiggles, tilts Emma for 1.5 s and says what opens it', async () => {
   const h = await mount(defaultProgress())
+  await advance(MAP_TAP_ARM_MS)
   await fireEvent.press(screen.getByTestId('map-stop-add-to-20'))
   expect(h.sfx.made.map(({ src, volume }) => [src, volume])).toEqual([
     ['/assets/sfx-poof.mp3', 0.45],

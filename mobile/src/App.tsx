@@ -70,8 +70,17 @@
  * audio loaded beside the Hub's prefetch). Once the server answered, the
  * route goes to `peek`, where Math or Word Song plays the step's 3 problems
  * in peek mode; the closer (or the back button) returns to the map, which
- * remounts quiet (`returnFromPeek`). A peek writes nothing: no Session End,
+ * remounts quiet (`quietReturn`). A peek writes nothing: no Session End,
  * no session controller, no stardust, no history, no cloud push.
+ *
+ * Map tap-to-play (native spec `design/native/map-tap-to-play.md`): the
+ * current stop starts exactly the Hub card's session for that world (the
+ * same controller kick, so the same `sessionPlanKind`, and the world
+ * recorded as played today); a mastered stop's replay is a peek of its 8
+ * canon problems (`requestReplay`, the `peek` route, the replay's lines),
+ * writing nothing. A session the Map started remembers it (`originRef`):
+ * Back, and Session End's "All done", return to that world's map, quiet (a
+ * pending unlock still plays its beat). Hub starts are unchanged.
  *
  * `@marian/core` is wired to the device before this module loads
  * (`./platform/boot.ts`, imported first by `index.ts`).
@@ -146,6 +155,7 @@ import {
 } from './screens/greet/Greet'
 import { Hub } from './screens/hub/Hub'
 import { MapScreen, type MapEntry } from './screens/map/MapScreen'
+import type { MapDebugLog } from './screens/map/mapTapLog'
 import { MathScreen } from './screens/math/Math'
 import { ParentSettings } from './screens/parentSettings/ParentSettings'
 import type { MathSessionResult } from './screens/math/mathTypes'
@@ -164,7 +174,11 @@ import {
   wordSongSessionEndPayload,
   type SessionEndPayload,
 } from './session/sessionEndPayload'
-import { requestPeek, type PreparedPeek } from './session/peekSession'
+import {
+  requestPeek,
+  requestReplay,
+  type PreparedPeek,
+} from './session/peekSession'
 import { createWordSongSessionController } from './session/wordSongSession'
 import { colors } from './theme'
 
@@ -206,6 +220,18 @@ const WORD_SONG_AUDIO_ROUTES: ReadonlySet<Route> = new Set<Route>([
   'literacy',
   'session-end',
 ])
+
+/** Debug builds only (`EXPO_PUBLIC_DEBUG=1`): the Map's tap log to Metro. */
+const logMapLine: MapDebugLog = (line) => console.log(line)
+
+/** Where a session was started (map-tap-to-play § 4): its Back and end return there. */
+type SessionOrigin = 'hub' | 'map'
+
+/** The Hub card's tree of a map's world. */
+const TREE_OF: Readonly<Record<MasteryTrack, SkillTreeId>> = {
+  math: 'number-garden',
+  'word-song': 'word-song',
+}
 
 /** Once per App mount, as on the web: the fallback plan + scaffold decisions. */
 function mathSessionDefaults() {
@@ -298,6 +324,9 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
   const [peek, setPeek] = useState<PreparedPeek | null>(null)
   const peekRef = useRef<PreparedPeek | null>(null)
   const [peekPose, setPeekPose] = useState<EmmaPose>('idle')
+  // Where the session on screen was started (map-tap-to-play § 4); set by
+  // each way into a session, kept through Session End's "Again".
+  const originRef = useRef<SessionOrigin>('hub')
 
   // The web's tear-downs (`handleBackToHub`, `handleSessionEndAllDone` /
   // `…Again`, the leave-effect) run BEFORE the route flips: leaving
@@ -357,12 +386,25 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
     },
     [navigate],
   )
+  // Back to a world's map from a session the Map started, or a peek or a
+  // replay (map-tap-to-play § 4, fast-track § 6.4): quiet, Emma has spoken.
+  const returnToMap = useCallback(
+    (world: MasteryTrack) => {
+      if (nextRoute(routeRef.current, 'map') !== 'map') return
+      setMapEntry({ world, quietReturn: true })
+      navigate('map')
+    },
+    [navigate],
+  )
   const onSplashDone = useCallback(
     () => navigate(nextAfterSplash()),
     [navigate],
   )
   // Web `handleGreetAdvance`: the first-launch flow goes straight to Math.
-  const onGreetDone = useCallback(() => navigate('math'), [navigate])
+  const onGreetDone = useCallback(() => {
+    originRef.current = 'hub'
+    navigate('math')
+  }, [navigate])
 
   // Web kick-effect: kick on Greet / Math (latched until a tear-down).
   useEffect(() => {
@@ -429,22 +471,35 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
   )
   // Web `handleSessionEndAllDone`: an unlock this world has not celebrated
   // yet opens the map (which plays it); otherwise the Hub. (The route
-  // flip tears the Math session down, as the web's handler does.)
+  // flip tears the Math session down, as the web's handler does.) A
+  // session the Map started returns to its map, quiet; a pending unlock
+  // plays its beat there all the same (map-tap-to-play § 4).
   const onSessionEndAllDone = useCallback(() => {
     const world: MasteryTrack =
       sessionEnd?.surface === 'word-song' ? 'word-song' : 'math'
+    if (originRef.current === 'map') {
+      returnToMap(world)
+      return
+    }
     const saved = loadProgress()
     if (saved !== null && pendingUnlock(saved, world) !== null) openMap(world)
     else navigate('hub')
-  }, [sessionEnd, navigate, openMap])
+  }, [sessionEnd, navigate, openMap, returnToMap])
   // Web `handleSessionEndAgain` (not-yet day): another session, same world.
   const onSessionEndAgain = useCallback(
     () => navigate(sessionEnd?.surface === 'word-song' ? 'literacy' : 'math'),
     [sessionEnd, navigate],
   )
-  // Web `handleBackToHub` (`navigate` tears the session down).
-  const onMathExit = useCallback(() => navigate('hub'), [navigate])
-  const onWordSongExit = onMathExit
+  // Web `handleBackToHub` (`navigate` tears the session down); a session
+  // the Map started goes back to its map, quiet (map-tap-to-play § 4).
+  const onMathExit = useCallback(() => {
+    if (originRef.current === 'map') returnToMap('math')
+    else navigate('hub')
+  }, [navigate, returnToMap])
+  const onWordSongExit = useCallback(() => {
+    if (originRef.current === 'map') returnToMap('word-song')
+    else navigate('hub')
+  }, [navigate, returnToMap])
 
   // Hub entry: prefetch the glowing world's session (web
   // `useHubSessionPrefetch`; no glow → Word Song).
@@ -463,9 +518,11 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
   }, [route, mathSession, wordSongSession])
   // Web `handleHubPickTree`. The kick takes the prefetch in the tap; then,
   // as on the web, the world is recorded as played today (after the Hub's
-  // own suggestion write, before the route flips).
-  const onHubPick = useCallback(
-    (tree: SkillTreeId) => {
+  // own suggestion write, before the route flips). The Map's current stop
+  // starts the same session (map-tap-to-play § 1, D1).
+  const startTree = useCallback(
+    (tree: SkillTreeId, origin: SessionOrigin) => {
+      originRef.current = origin
       if (tree === 'number-garden') mathSession.kick()
       else wordSongSession.kick()
       recordTreeTouched(tree, progressNow())
@@ -473,19 +530,29 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
     },
     [mathSession, wordSongSession, navigate],
   )
+  const onHubPick = useCallback(
+    (tree: SkillTreeId) => startTree(tree, 'hub'),
+    [startTree],
+  )
   // Web `handleHubOpenMap`; the map's Home is web `handleMapBack` (the
   // map stamps the Hub's rapid-remount clock, so the Hub stays quiet).
   const onHubMap = openMap
   const onMapHome = useCallback(() => navigate('hub'), [navigate])
-  // Fast-track spec § 6.1: a later stop's tap. The map waits (taps held)
-  // until this settles; `true` = the peek opened. Home aborts `signal`.
+  // Fast-track spec § 6.1: a later stop's tap (a peek), and map-tap-to-play
+  // § 3: a mastered stop's (a replay, the same route under the same rules).
+  // The map waits (taps held) until this settles; `true` = it opened. Home
+  // (a peek) or the map's unmount aborts `signal`.
   const mapWorld = mapEntry?.world
-  const onMapPeek = useCallback(
-    async (node: SkillNode, signal: AbortSignal): Promise<boolean> => {
+  const openMapSession = useCallback(
+    async (
+      request: typeof requestPeek,
+      node: SkillNode,
+      signal: AbortSignal,
+    ): Promise<boolean> => {
       if (mapWorld === undefined) return false
       let prepared: PreparedPeek
       try {
-        prepared = await requestPeek({ world: mapWorld, node, signal })
+        prepared = await request({ world: mapWorld, node, signal })
       } catch {
         return false
       }
@@ -501,14 +568,30 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
     },
     [mapWorld, navigate],
   )
+  const onMapPeek = useCallback(
+    (node: SkillNode, signal: AbortSignal) =>
+      openMapSession(requestPeek, node, signal),
+    [openMapSession],
+  )
+  const onMapReplay = useCallback(
+    (node: SkillNode, signal: AbortSignal) =>
+      openMapSession(requestReplay, node, signal),
+    [openMapSession],
+  )
+  // Map tap-to-play § 1: the current stop starts the Hub card's session for
+  // the map's world; `true` = the route changed.
+  const onMapPlay = useCallback((): boolean => {
+    if (mapWorld === undefined || routeRef.current !== 'map') return false
+    startTree(TREE_OF[mapWorld], 'map')
+    return routeRef.current !== 'map'
+  }, [mapWorld, startTree])
   // § 6.3: the closer's end, or the back button: back to the same map,
   // which opens quiet (§ 6.4).
   const onPeekEnd = useCallback(() => {
     const current = peekRef.current
     if (current === null || routeRef.current !== 'peek') return
-    setMapEntry({ world: current.world, returnFromPeek: true })
-    navigate('map')
-  }, [navigate])
+    returnToMap(current.world)
+  }, [returnToMap])
   const onPeekProblemKind = useCallback(
     (kind: ExtendedMathProblem['kind']) =>
       setReportedKind({ plan: peekRef.current?.plan ?? null, kind }),
@@ -634,6 +717,7 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               planFocusNode={mathPeek.node}
               problemNodes={mathPeek.plan.problems.map(() => mathPeek.node)}
               peek={mathPeek.node}
+              replay={mathPeek.mode === 'replay'}
               onPeekEnd={onPeekEnd}
               onRequestExit={onPeekEnd}
               onProblemKindChange={onPeekProblemKind}
@@ -651,6 +735,7 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               clipFor={(text) => wordPeek.audio.fileFor(text)}
               audioReady
               peek={wordPeek.node}
+              replay={wordPeek.mode === 'replay'}
               onPeekEnd={onPeekEnd}
               onRequestExit={onPeekEnd}
               onPoseChange={setPeekPose}
@@ -688,7 +773,10 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               world={mapEntry.world}
               onHome={onMapHome}
               onPeek={onMapPeek}
-              returnFromPeek={mapEntry.returnFromPeek === true}
+              onPlay={onMapPlay}
+              onReplay={onMapReplay}
+              quietReturn={mapEntry.quietReturn === true}
+              debugLog={flags.debug ? logMapLine : undefined}
             />
           ) : parent ? (
             <ParentSettings

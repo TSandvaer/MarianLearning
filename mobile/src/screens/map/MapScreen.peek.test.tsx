@@ -19,6 +19,7 @@ import type { Sfx } from '../../audio'
 import { mapScreenLayout } from '../../layout/mapScreenLayout'
 import type { MapLinePlayer } from './mapAudio'
 import { MapScreen } from './MapScreen'
+import { MAP_TAP_ARM_MS } from './useMapVisit'
 
 const P = mapScreenLayout({
   width: 375,
@@ -87,7 +88,7 @@ function landUnlockDoc(): Progress {
   }
 }
 
-async function mount(doc: Progress, opts: { returnFromPeek?: boolean } = {}) {
+async function mount(doc: Progress, opts: { quietReturn?: boolean } = {}) {
   const { player, ids } = fakePlayer()
   const sfx = fakeSfx()
   const fake = fakePeek()
@@ -98,7 +99,7 @@ async function mount(doc: Progress, opts: { returnFromPeek?: boolean } = {}) {
       world="math"
       onHome={onHome}
       onPeek={fake.peek}
-      returnFromPeek={opts.returnFromPeek}
+      quietReturn={opts.quietReturn}
       readProgress={() => doc}
       createPlayer={() => player}
       createSfx={sfx.create}
@@ -107,6 +108,10 @@ async function mount(doc: Progress, opts: { returnFromPeek?: boolean } = {}) {
       wallClock={() => 42}
     />,
   )
+  // Stop taps count once the map has been up 400 ms (map-tap-to-play § 5).
+  await act(async () => {
+    jest.advanceTimersByTime(MAP_TAP_ARM_MS)
+  })
   return { player, ids, sfx, ...fake, onHome }
 }
 
@@ -195,8 +200,8 @@ it('Home aborts the request in flight; its failure then says nothing', async () 
   expect(h.ids()).toEqual(['path.open.add-to-10'])
 })
 
-it('§ 6.4: back from a peek, no open line and an empty caption; every stop tappable at once', async () => {
-  const h = await mount(defaultProgress(), { returnFromPeek: true })
+it('§ 6.4: back from a peek, no open line and an empty caption; every stop tappable once the 400 ms tap guard is past', async () => {
+  const h = await mount(defaultProgress(), { quietReturn: true })
   expect(h.ids()).toEqual([])
   expect(screen.queryByTestId('map-ribbon')).toBeNull()
   await fireEvent.press(screen.getByTestId('map-stop-add-to-10'))

@@ -18,8 +18,11 @@
  *
  * Native-only, the Map peek (fast-track spec
  * `design/native/fast-track-native.md` § 6): a later stop's tap asks App
- * for a peek (`onPeek`); a map remounted after one (`returnFromPeek`)
- * opens quiet. See `useMapVisit`.
+ * for a peek (`onPeek`). Map tap-to-play (`design/native/map-tap-to-play.md`):
+ * the current stop starts the Hub card's session (`onPlay`), a mastered
+ * stop a replay (`onReplay`); during a launch Home and Android back are
+ * ignored. A map remounted after a peek, a replay or a Map-started session
+ * (`quietReturn`) opens quiet. See `useMapVisit`.
  */
 import type { MasteryTrack } from '@marian/core/progress'
 import { useEffect, useRef } from 'react'
@@ -42,13 +45,16 @@ export const MAP_EXIT_MS = 200
 /** The handoff that opens the map (App clears it when the map is left). */
 export interface MapEntry {
   world: MasteryTrack
-  /** Back from a peek (fast-track spec § 6.4). */
-  returnFromPeek?: true
+  /**
+   * Back from a peek, a replay or a Map-started session (fast-track spec
+   * § 6.4, map-tap-to-play § 4): no open line.
+   */
+  quietReturn?: true
 }
 
 export interface MapScreenProps extends Omit<
   MapVisitOptions,
-  'world' | 'peek'
+  'world' | 'peek' | 'play' | 'replay'
 > {
   layout: MapScreenLayout
   world: MasteryTrack
@@ -56,6 +62,10 @@ export interface MapScreenProps extends Omit<
   onHome: () => void
   /** A later stop was tapped: start its peek (`useMapVisit`'s `peek`). */
   onPeek?: MapVisitOptions['peek']
+  /** The current stop was tapped: the Hub card's session (`play`). */
+  onPlay?: MapVisitOptions['play']
+  /** A mastered stop was tapped: its replay (`replay`). */
+  onReplay?: MapVisitOptions['replay']
 }
 
 export function MapScreen({
@@ -63,14 +73,23 @@ export function MapScreen({
   world,
   onHome,
   onPeek,
+  onPlay,
+  onReplay,
   ...seams
 }: MapScreenProps) {
   const reducedMotion = useReducedMotion()
-  const state = useMapVisit({ world, peek: onPeek, ...seams })
+  const state = useMapVisit({
+    world,
+    peek: onPeek,
+    play: onPlay,
+    replay: onReplay,
+    ...seams,
+  })
   const leavingRef = useRef(false)
-  const { leave } = state
+  const { leave, launchLocked } = state
   const home = () => {
-    if (leavingRef.current) return
+    // The launch lock (map-tap-to-play § 2.2): ignored until the route changes.
+    if (leavingRef.current || launchLocked()) return
     leavingRef.current = true
     leave()
     onHome()

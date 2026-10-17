@@ -21,11 +21,16 @@ export { FIRST_ROUTE, type Route }
  * - hub → parent-settings         `handleHubParentGate` / long-press
  * - math | literacy → session-end `handleMathComplete` / `handleWordSongComplete`
  * - math | literacy → hub         `handleBackToHub`
+ * - math | literacy → map         native only: Back from a session the Map
+ *                                 started (map-tap-to-play § 4)
  * - session-end → hub | map       `handleSessionEndAllDone` (map: pending unlock)
  * - session-end → math | literacy `handleSessionEndAgain`
  * - map → hub                     `handleMapBack`
  * - map → peek                    native only: a later stop's peek
- *                                 (fast-track spec § 6.1)
+ *                                 (fast-track spec § 6.1), or a mastered
+ *                                 stop's replay (map-tap-to-play § 3)
+ * - map → math | literacy         native only: the current stop starts the
+ *                                 Hub card's session (map-tap-to-play § 1)
  * - peek → map                    the closer's end, or the back button
  * - parent-settings → hub         `handleParentSettingsExit`
  * - reward → hub                  the web renders no screen for `reward`
@@ -36,12 +41,12 @@ export const ROUTE_EXITS: Readonly<Record<Route, readonly Route[]>> = {
   splash: ['greet', 'hub'],
   greet: ['math'],
   hub: ['math', 'literacy', 'map', 'parent-settings'],
-  math: ['session-end', 'hub'],
-  literacy: ['session-end', 'hub'],
+  math: ['session-end', 'hub', 'map'],
+  literacy: ['session-end', 'hub', 'map'],
   'session-end': ['hub', 'map', 'math', 'literacy'],
   reward: ['hub'],
   'parent-settings': ['hub'],
-  map: ['hub', 'peek'],
+  map: ['hub', 'peek', 'math', 'literacy'],
   peek: ['map'],
 }
 

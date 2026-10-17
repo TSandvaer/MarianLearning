@@ -47,6 +47,9 @@
  * it!" → 400 ms → `onPeekEnd`; the back
  * arrow (and Android back) cuts the line and calls `onPeekEnd` at once. A
  * peek writes nothing and hands no result over.
+ * A Map replay (`replay` with `peek`, `design/native/map-tap-to-play.md`
+ * § 3) runs a mastered step's 8 problems under the same rules, opened by
+ * "Let's play <name> again!" and closed by "You know <name>!".
  *
  * Native-only, content wave 1 (`design/native/content-wave-1.md` § 6.1,
  * § 3.3, § 4.3): the lead before each problem's read comes from
@@ -113,6 +116,7 @@ import {
   litAt,
   PEEK_CLOSE_GAP_MS,
   peekGuideLines,
+  replayGuideLines,
   SESSION_GUIDE_GAP_MS,
   sessionGuideLine,
   sessionGuidePlayer,
@@ -242,6 +246,13 @@ export interface WordSongProps {
   /** The peek is over (after the closer, or the back arrow at once). */
   onPeekEnd?: () => void
   /**
+   * With `peek`: a Map replay of this mastered step (map-tap-to-play § 3),
+   * under the peek's rules for its 8 canon problems, with the replay's
+   * opener "Let's play <name> again!" and closer "You know <name>!".
+   * Fixed for the mount.
+   */
+  replay?: boolean
+  /**
    * The focus step's intro lead line (content wave 1 § 6.1), before the
    * scored problem 1's read; `null` / unset = none. The session start
    * decides (a forward session on a step that is not mastered).
@@ -300,6 +311,7 @@ export function WordSong({
   sessionGuide,
   peek,
   onPeekEnd,
+  replay = false,
   sessionIntro = null,
 }: WordSongProps) {
   const appHidden = useIsAppHidden(visibility)
@@ -337,7 +349,11 @@ export function WordSong({
   const isPeek = peekNode !== undefined
   /** The step's opener and closer (§ 8); none for a step without lines. */
   const [peekLines] = useState(() =>
-    peekNode === undefined ? null : peekGuideLines(peekNode),
+    peekNode === undefined
+      ? null
+      : replay
+        ? replayGuideLines(peekNode)
+        : peekGuideLines(peekNode),
   )
   /** `onPeekEnd` fires once. */
   const peekEndedRef = useRef(false)

@@ -41,6 +41,13 @@ describe('route shell', () => {
     )
   })
 
+  it('Map tap-to-play: the map starts a session or a replay, and a Map start returns to it', () => {
+    expect(ROUTE_EXITS.map).toEqual(['hub', 'peek', 'math', 'literacy'])
+    expect(ROUTE_EXITS.math).toContain('map')
+    expect(ROUTE_EXITS.literacy).toContain('map')
+    expect(ROUTE_EXITS.peek).toEqual(['map'])
+  })
+
   it('ignores a jump that is not an exit', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
     expect(nextRoute('greet', 'hub')).toBe('greet')

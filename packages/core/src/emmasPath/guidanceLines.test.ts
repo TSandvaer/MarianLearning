@@ -2,11 +2,14 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { LITERACY_TREE, MATH_TREE } from '../progress/mastery'
+import type { SkillNode } from '../progress/types'
+import { STAGE_SPOKEN_NAMES } from '../sessionEnd/friendlyNodeName'
 import {
   GUIDANCE_LINES,
   GUIDANCE_LINES_AWAITING_RENDER,
   guidanceLine,
   peekLines,
+  replayLines,
   sessionIntroLine,
 } from './guidanceLines'
 import { PATH_LINES } from './pathLines'
@@ -41,11 +44,58 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'session-peek-close': 28,
       'session-intro': 6,
       'session-hiding': 1,
+      'session-replay-open': 30,
+      'session-replay-close': 30,
     })
-    expect(GUIDANCE_LINES).toHaveLength(86)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(86)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(86)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(86)
+    expect(GUIDANCE_LINES).toHaveLength(146)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(146)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(146)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(146)
+  })
+
+  it('AC8: both replay sets, one line per STAGE_SPOKEN_NAMES step, with the exact texts (map-tap-to-play § 6, T1 approved 2026-10-17)', () => {
+    const steps = Object.keys(STAGE_SPOKEN_NAMES) as SkillNode[]
+    expect(steps).toHaveLength(30)
+    expect([...MATH_TREE, ...LITERACY_TREE].sort()).toEqual([...steps].sort())
+    for (const node of steps) {
+      const name = STAGE_SPOKEN_NAMES[node]
+      const world = (MATH_TREE as readonly SkillNode[]).includes(node)
+        ? 'math'
+        : 'word-song'
+      expect(replayLines(node)).toEqual({
+        open: {
+          id: `guide.session.replay-open.${node}`,
+          kind: 'session-replay-open',
+          world,
+          text: `Let's play ${name} again!`,
+          src: `/assets/audio/path/guide-session-replay-open-${node}.mp3`,
+        },
+        close: {
+          id: `guide.session.replay-close.${node}`,
+          kind: 'session-replay-close',
+          world,
+          text: `You know ${name}!`,
+          src: `/assets/audio/path/guide-session-replay-close-${node}.mp3`,
+        },
+      })
+    }
+    // The spec's range and Lily character count (§ 6).
+    const open = GUIDANCE_LINES.filter((l) => l.kind === 'session-replay-open')
+    const close = GUIDANCE_LINES.filter(
+      (l) => l.kind === 'session-replay-close',
+    )
+    const chars = (ls: typeof open) => ls.reduce((n, l) => n + l.text.length, 0)
+    expect(chars(open)).toBe(916)
+    expect(chars(close)).toBe(676)
+    expect(guidanceLine('guide.session.replay-close.number-recog')?.text).toBe(
+      'You know numbers!',
+    )
+    expect(guidanceLine('guide.session.replay-open.mult-2-5-10')?.text).toBe(
+      "Let's play groups of two, five and ten again!",
+    )
+    expect(Math.max(...[...open, ...close].map((l) => l.text.length))).toBe(45)
+    // Rendered in Lily: none of the 60 awaits its render.
+    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
   })
 
   it('bakes each world and count variant', () => {
@@ -277,7 +327,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(86)
+    ).toHaveLength(146)
   })
 
   it('repeats no Emma’s Path line', () => {

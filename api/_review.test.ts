@@ -562,3 +562,105 @@ describe('times mix (payload.mix, content wave 1 § 2.4)', () => {
     expect(planLines(body)).toEqual(planLines(canon('mult-mix')))
   })
 })
+
+describe('Map replay (payload.replay, map-tap-to-play § 3)', () => {
+  it('AC7: a node → replay-math, math.p1–p8 = the canon’s P1–P8 in order; no Anthropic, no TTS, no limiter', async () => {
+    const anthropicClient = anthropicSpy()
+    const rateLimiter = limiterSpy()
+    const res = await handler(
+      request({
+        ...base,
+        // Every other hint is ignored.
+        progress: {
+          focusNode: 'add-to-20',
+          leitner: [{ a: 1, b: 2, op: '+', box: 1 }],
+        },
+        replay: { node: 'add-to-10' },
+      }),
+      {
+        anthropicClient,
+        rateLimiter,
+        sessionCache: createSessionCache({ ttlMs: 60_000 }),
+      },
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as SessionStartResponse
+    expect((body.plan as { id: string }).id).toBe('replay-math')
+    expect((body.plan as { label: string }).label).toBe('Replay')
+    for (let problem = 1; problem <= 8; problem++) {
+      const want = block('add-to-10', problem)
+      expect(want.plan.length).toBeGreaterThanOrEqual(5)
+      expect(blockOf(body, `p${problem}`)).toEqual(want)
+    }
+    // Only the 8 blocks: no session-end lines, no warm-up.
+    expect(body.utterances.every((u) => /^math\.p[1-8]\./.test(u.id))).toBe(
+      true,
+    )
+    expect(planLines(body).every((u) => /^math\.p[1-8]\./.test(u.id))).toBe(
+      true,
+    )
+    // The app's parser reads exactly the 8 canon problems.
+    const plan = mathSessionPlanFromServer(body.plan, {
+      extendedKinds: true,
+      problemCount: 8,
+    })
+    expect(plan.problems).toHaveLength(8)
+    expect(anthropicClient.messages.create).not.toHaveBeenCalled()
+    expect(mockedRender).not.toHaveBeenCalled()
+    expect(rateLimiter.check).not.toHaveBeenCalled()
+  })
+
+  it('AC7: a bad node → 400 invalid-request (unknown, the other track’s, not a string, none)', async () => {
+    for (const replay of [
+      { node: 'add-to-11' },
+      { node: 'cvc-words' },
+      { node: 3 },
+      {},
+      'add-to-10',
+    ]) {
+      const res = await handler(request({ ...base, replay }), {
+        anthropicClient: anthropicSpy(),
+      })
+      expect(res.status).toBe(400)
+      expect(await res.json()).toMatchObject({ error: 'invalid-request' })
+    }
+  })
+
+  it('every step of both worlds can be replayed, and the app reads 8 problems from it', async () => {
+    const worlds = [
+      ['math', VALID_MATH_FOCUS_NODES],
+      ['word-song', VALID_WORD_SONG_FOCUS_NODES],
+    ] as const
+    const failed: string[] = []
+    for (const [track, steps] of worlds) {
+      for (const node of steps) {
+        const res = await handler(
+          request({ track, level: 1, childName: 'Marian', replay: { node } }),
+          { anthropicClient: anthropicSpy() },
+        )
+        if (res.status !== 200) {
+          failed.push(`${track}/${node} ${res.status}`)
+          continue
+        }
+        const { plan } = (await res.json()) as SessionStartResponse
+        if ((plan as { id: string }).id !== `replay-${track}`) {
+          failed.push(`${track}/${node} id`)
+        }
+        try {
+          const problems =
+            track === 'math'
+              ? mathSessionPlanFromServer(plan, {
+                  extendedKinds: true,
+                  problemCount: 8,
+                }).problems
+              : wordSongSessionPlanFromServer(plan, { problemCount: 8 })
+                  .problems
+          if (problems.length !== 8) failed.push(`${track}/${node} parse`)
+        } catch (err) {
+          failed.push(`${track}/${node} ${String(err)}`)
+        }
+      }
+    }
+    expect(failed).toEqual([])
+  })
+})
