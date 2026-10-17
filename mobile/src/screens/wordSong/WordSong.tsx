@@ -322,6 +322,11 @@ export interface WordSongProps {
   storyGuide?: StoryGuidePlayer
   /** Test seam: the word taps' one-word clips. */
   storyWords?: StoryGuidePlayer
+  /**
+   * Debug builds only (`EXPO_PUBLIC_DEBUG=1`): the word-tap cue's
+   * `[story-cue] ...` lines to Metro (device check, 2026-10-17).
+   */
+  debugLog?: (line: string) => void
 }
 
 interface PerProblemState {
@@ -379,6 +384,7 @@ export function WordSong({
   sessionIntro = null,
   storyGuide: storyGuideProp,
   storyWords: storyWordsProp,
+  debugLog,
 }: WordSongProps) {
   const appHidden = useIsAppHidden(visibility)
   const reducedMotion = useReducedMotion()
@@ -404,6 +410,7 @@ export function WordSong({
   const onPoseChangeRef = useRef(onPoseChange)
   const onRequestExitRef = useRef(onRequestExit)
   const onPeekEndRef = useRef(onPeekEnd)
+  const debugLogRef = useRef(debugLog)
   useLayoutEffect(() => {
     playRef.current = playUtterance ?? silent.play
     clipForRef.current = clipFor
@@ -411,6 +418,7 @@ export function WordSong({
     onPoseChangeRef.current = onPoseChange
     onRequestExitRef.current = onRequestExit
     onPeekEndRef.current = onPeekEnd
+    debugLogRef.current = debugLog
   })
   /** A peek is fixed for the mount (App mounts a fresh screen per peek). */
   const [peekNode] = useState(peek)
@@ -533,11 +541,12 @@ export function WordSong({
   /**
    * The word-tap cue (Kyle's call on PR #599): the hand taps word 0 once on
    * the mount's first story card, forward on a step not yet mastered or in
-   * a peek; never in a review or a Map replay. Fixed at mount.
+   * a peek; never in a review or a Map replay. Read from the session's
+   * props, not fixed at mount: App mounts the screen while the session
+   * start is in flight (no intro yet) and the intro comes with the plan
+   * (Thomas's device check, 2026-10-17: no hand after a QA jump).
    */
-  const [storyCueOn] = useState(
-    () => !review && (isPeek ? !replay : sessionIntro !== null),
-  )
+  const storyCueOn = !review && (isPeek ? !replay : sessionIntro !== null)
   /** What the card draws: the hand up, or leaving after her tap. */
   const [storyCue, setStoryCue] = useState<'run' | 'leave' | null>(null)
   /** pending = scheduled, no hand yet; shown; leaving = her tap's fade. */
@@ -548,6 +557,8 @@ export function WordSong({
   const storyCueSpentRef = useRef(false)
   /** The card's word 0 is measured (the hand can be placed). */
   const storyWord0MeasuredRef = useRef(false)
+  /** The cue's eligibility line went to Metro (debug, once per mount). */
+  const storyCueLoggedRef = useRef(false)
 
   const advanceTimerRef = useRef<Timer>(null)
   const ceilingTimerRef = useRef<Timer>(null)
@@ -569,6 +580,10 @@ export function WordSong({
   const advanceFiredRef = useRef(false)
   const pendingAdvanceRef = useRef(false)
   const problemIndexRef = useRef(problemIndex)
+  /** `[story-cue] card=<i> <what>` to Metro, in debug builds. */
+  const logCue = useCallback((what: string) => {
+    debugLogRef.current?.(`[story-cue] card=${problemIndexRef.current} ${what}`)
+  }, [])
 
   const round = useMemo(
     () => nativeRound(plan.problems[problemIndex]!, crossVowelMixing),
@@ -607,13 +622,14 @@ export function WordSong({
    */
   const stopStoryCue = useCallback(() => {
     if (storyCuePhaseRef.current === 'idle') return
+    logCue(`stopped (${storyCuePhaseRef.current})`)
     storyCuePhaseRef.current = 'idle'
     if (storyCueTimerRef.current !== null) {
       clearTimeout(storyCueTimerRef.current)
       storyCueTimerRef.current = null
     }
     setStoryCue(null)
-  }, [])
+  }, [logCue])
 
   /**
    * Her tap wins: before the hand shows, the cue never runs; once it shows,
@@ -624,6 +640,7 @@ export function WordSong({
     storyCueSpentRef.current = true
     const phase = storyCuePhaseRef.current
     if (phase === 'idle' || phase === 'leaving') return
+    logCue(`cancelled-by-tap (${phase})`)
     if (storyCueTimerRef.current !== null) {
       clearTimeout(storyCueTimerRef.current)
       storyCueTimerRef.current = null
@@ -639,7 +656,7 @@ export function WordSong({
       storyCuePhaseRef.current = 'idle'
       setStoryCue(null)
     }, STORY_TAP_CUE_CANCEL_OUT_MS)
-  }, [])
+  }, [logCue])
 
   useEffect(() => {
     // Read at unmount on purpose: the latest line count.
@@ -850,28 +867,43 @@ export function WordSong({
      * is not measured by + 600.
      */
     const startStoryCue = () => {
-      if (storyCueSpentRef.current) return
+      const skip = (why: string) => logCue(`skipped:${why}`)
+      if (storyCueSpentRef.current) {
+        skip('spent')
+        return
+      }
       storyCueSpentRef.current = true
-      if (!storyCueOn || visibility.getIsHidden()) return
+      if (!storyCueOn || visibility.getIsHidden()) {
+        skip(storyCueOn ? 'hidden' : 'off')
+        return
+      }
       const word0 = storyCells(problem.story ?? problem.utterances.hint)[0]
-      if (word0 === undefined) return
+      if (word0 === undefined) {
+        skip('no-word0')
+        return
+      }
+      logCue('started')
       storyCuePhaseRef.current = 'pending'
       storyCueTimerRef.current = setTimeout(() => {
         storyCueTimerRef.current = null
         if (stale() || storyCuePhaseRef.current !== 'pending') return
         if (!storyWord0MeasuredRef.current) {
+          logCue(`skipped:unmeasured@${STORY_TAP_CUE_DELAY_MS}`)
           storyCuePhaseRef.current = 'idle'
           return
         }
+        logCue('shown')
         storyCuePhaseRef.current = 'shown'
         setStoryCue('run')
         storyCueTimerRef.current = setTimeout(() => {
           storyCueTimerRef.current = null
           if (stale() || storyCuePhaseRef.current !== 'shown') return
+          logCue('fired')
           playStoryWord(word0, { cue: true })
           storyCueTimerRef.current = setTimeout(() => {
             storyCueTimerRef.current = null
             if (storyCuePhaseRef.current !== 'shown') return
+            logCue('done')
             storyCuePhaseRef.current = 'idle'
             setStoryCue(null)
           }, STORY_TAP_CUE_TOTAL_MS - STORY_TAP_CUE_FIRE_MS)
@@ -992,6 +1024,26 @@ export function WordSong({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- web parity: re-run on problem / readiness only
   }, [problemIndex, audioReady])
+
+  // Debug: the word-tap cue's eligibility, once per mount, when a story
+  // session is ready (App's first snapshot has no intro yet).
+  useEffect(() => {
+    if (audioReady === false || storyCueLoggedRef.current) return
+    if (!plan.problems.some((p) => p.contentType === 'little-story')) return
+    storyCueLoggedRef.current = true
+    debugLogRef.current?.(
+      `[story-cue] eligible=${storyCueOn} review=${review} peek=${isPeek} replay=${replay} intro=${sessionIntro} warmups=${warmups}`,
+    )
+  }, [
+    audioReady,
+    plan,
+    storyCueOn,
+    review,
+    isPeek,
+    replay,
+    sessionIntro,
+    warmups,
+  ])
 
   // Background: the beat pauses; a tap sound stops for good (its own end
   // callback, or its light's timer, puts the light out).
@@ -1699,6 +1751,7 @@ export function WordSong({
                 tapCueLeaving={storyCue === 'leave'}
                 tapCueSize={storyTapCueSize(layout.tablet)}
                 onTapCueReady={() => {
+                  if (!storyWord0MeasuredRef.current) logCue('word0-measured')
                   storyWord0MeasuredRef.current = true
                 }}
               />

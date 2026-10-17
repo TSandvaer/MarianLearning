@@ -224,6 +224,9 @@ const WORD_SONG_AUDIO_ROUTES: ReadonlySet<Route> = new Set<Route>([
 /** Debug builds only (`EXPO_PUBLIC_DEBUG=1`): the Map's tap log to Metro. */
 const logMapLine: MapDebugLog = (line) => console.log(line)
 
+/** Debug builds only: Word Song's `[story-cue]` lines to Metro. */
+const logStoryCueLine = (line: string) => console.log(line)
+
 /** Where a session was started (map-tap-to-play § 4): its Back and end return there. */
 type SessionOrigin = 'hub' | 'map'
 
@@ -740,6 +743,7 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               onRequestExit={onPeekEnd}
               onPoseChange={setPeekPose}
               qaAutoAnswerAfterMs={qaAutoTapMs}
+              debugLog={flags.debug ? logStoryCueLine : undefined}
             />
           ) : wordSong ? (
             <WordSong
@@ -758,6 +762,7 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               onRequestExit={onWordSongExit}
               onPoseChange={setWordSongPose}
               qaAutoAnswerAfterMs={qaAutoTapMs}
+              debugLog={flags.debug ? logStoryCueLine : undefined}
             />
           ) : hub ? (
             <Hub

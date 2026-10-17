@@ -26,19 +26,29 @@ import {
   type LittleStory,
   type StoryNode,
 } from '@marian/core/wordSong/littleStories'
+import { progressAtStep } from '@marian/core/debug/stepProgress'
+import type { SessionPlanKind } from '@marian/core/progress/reviewPlan'
+import { ADVANCE_AFTER_CORRECT_MS } from '@marian/core/shared/gameplayConstants'
 import { wordSongSessionPlanFromServer } from '@marian/core/wordSong/planFromServer'
-import type { WordSongSessionPlan } from '@marian/core/wordSong/wordSessionPlans'
+import {
+  wordSongSessionPlanToUtteranceSources,
+  type WordSongSessionPlan,
+} from '@marian/core/wordSong/wordSessionPlans'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import * as Reanimated from 'react-native-reanimated'
-import type {
-  SessionGuideLineId,
-  SessionGuidePlayer,
-  StoryGuideLineId,
-  StoryGuidePlayer,
+import {
+  SESSION_GUIDE_GAP_MS,
+  type SessionGuideLineId,
+  type SessionGuidePlayer,
+  type StoryGuideLineId,
+  type StoryGuidePlayer,
 } from '../../audio'
 import type { LineCallbacks } from '../../audio/linePlayback'
+import { sessionIntroFor } from '../../session/reviewSession'
+import { wordSongRoundFromServer } from '../../session/wordSongSession'
 import {
   advance,
+  BLENDING,
   flush,
   renderWordSong,
   say,
@@ -648,6 +658,104 @@ describe("the word-tap cue (Thomas's device check, PR #599)", () => {
     await endLine(h.prompt.lines[0]!)
     await measureWord0()
     await expectNoCue(h)
+  })
+
+  it("Thomas's device check: App mounts before the session start; 2 warm-ups, the step lead, then the cue on the first story card", async () => {
+    // A forward session after QA: jump to a step -> fox stories, as the
+    // session start answers it: hearts w1 and w2 (two earlier cards), then
+    // the step's 8 stories (Metro: "ready (fox-stories-level-1, 2 warm-up)").
+    const hearts = wordSongSessionPlanToUtteranceSources({
+      ...BLENDING,
+      problems: [2, 3].map((k, i) => ({
+        ...BLENDING.problems[k]!,
+        index: i + 1,
+      })),
+    }).map((u) => ({ ...u, id: u.id.replace('word.p', 'word.w') }))
+    const planKind: SessionPlanKind = {
+      kind: 'forward',
+      warmup: [
+        { node: 'blending-cv', problem: 3 },
+        { node: 'blending-cv', problem: 4 },
+      ],
+    }
+    const ready = wordSongRoundFromServer(
+      {
+        id: 'fox-stories-level-1',
+        label: 'fox-stories',
+        utterances: [
+          ...hearts,
+          ...storiesOf('fox-stories').flatMap((s, i) => block(i + 1, s)),
+        ],
+      },
+      {
+        planKind,
+        intro: sessionIntroFor(
+          progressAtStep('fox-stories'),
+          'fox-stories',
+          planKind,
+        ),
+      },
+    )
+    expect(ready).toMatchObject({ review: false, warmupCount: 2, intro: INTRO })
+
+    // App's first snapshot (the session start in flight): no plan, no
+    // intro, not ready; then the ready one, on the same mount.
+    const log = jest.fn()
+    const h = await renderStory({
+      plan: BLENDING,
+      audioReady: false,
+      debugLog: log,
+    })
+    await h.update({
+      plan: ready.plan,
+      audioReady: true,
+      review: ready.review,
+      warmupCount: ready.warmupCount,
+      sessionIntro: ready.intro,
+    })
+
+    for (let i = 0; i < 2; i++) {
+      const heart = h.guide.lines[i]!
+      expect(heart.id).toBe('guide.session.warmup')
+      await endLine(heart)
+      await advance(SESSION_GUIDE_GAP_MS)
+      const read = lastVoice(h)
+      expect(read.text).toBe(ready.plan.problems[i]!.utterances.read)
+      await say(read)
+      await fireEvent.press(
+        screen.getByTestId(
+          `word-song-chip-${ready.plan.problems[i]!.target.word}`,
+        ),
+      )
+      await flush()
+      await say(lastVoice(h))
+      await advance(ADVANCE_AFTER_CORRECT_MS)
+    }
+
+    // The step's lead (no "Read the story." after it), then the beat.
+    expect(h.guide.lines.map((l) => l.id)).toEqual([
+      'guide.session.warmup',
+      'guide.session.warmup',
+      INTRO,
+    ])
+    await endLine(h.guide.lines[2]!)
+    expect(h.prompt.lines).toHaveLength(0)
+    await measureWord0()
+    await advance(600)
+    expect(cue()).not.toBeNull()
+    await advance(400)
+    expect(h.words.lines.map((l) => l.id)).toEqual(['guide.story.word.the'])
+    await advance(1_400)
+    expect(cue()).toBeNull()
+    // The debug instrument's Metro lines (card 2: after the 2 hearts).
+    expect(log.mock.calls.map(([line]) => line)).toEqual([
+      `[story-cue] eligible=true review=false peek=false replay=false intro=${INTRO} warmups=2`,
+      '[story-cue] card=2 started',
+      '[story-cue] card=2 word0-measured',
+      '[story-cue] card=2 shown',
+      '[story-cue] card=2 fired',
+      '[story-cue] card=2 done',
+    ])
   })
 
   it('a peek: one cue on its first card, none on its 2nd', async () => {
