@@ -622,7 +622,7 @@
         'other',
       ]
 
-      // Canon files — 11 math + 18 word-song. Iterated in alphabetical
+      // Canon files — 13 math + 18 word-song. Iterated in alphabetical
       // (group, file-stem) order so the dedup canonical-member choice is
       // deterministic across runs. A stem whose file is not baked yet
       // (404) is skipped with a console note, so a new step can be listed
@@ -632,14 +632,17 @@
       // (#576: missing numbers, mult-mix) adds 33 and duck-words +
       // crab-words add 64 (design/native/content-wave-1.md § 10). Computed
       // from the committed files, not by hand. Every PR that adds or
-      // re-voices canon updates this number. A line awaiting its render
-      // (empty audio) is not counted: tent-words + cake-words (content wave
-      // 2) add their 64 new texts with their Lily render, not before.
-      const EXPECTED_CANON_UNIQUE = 857
+      // re-voices canon updates this number. Content wave 2's div-share
+      // (sharing) adds 16 with its Lily render (#587). A line awaiting its
+      // render (empty audio) is not counted: tent-words + cake-words
+      // (content wave 2) add their 64 new texts with their render, not
+      // before.
+      const EXPECTED_CANON_UNIQUE = 873
       const CANON_FILES = [
         // math/level-1
         ['math', 'add-to-10'],
         ['math', 'add-to-20'],
+        ['math', 'div-share'],
         ['math', 'mult-2-5-10'],
         ['math', 'mult-3-4'],
         ['math', 'mult-6-9'],
@@ -772,6 +775,10 @@
               'path-open-mult-mix.mp3',
               'Here is your path! You are on all the groups.',
             ],
+            [
+              'path-open-div-share.mp3',
+              'Here is your path! You are on sharing.',
+            ],
             ['path-open-done.mp3', 'You did all of it! Look at your flowers!'],
             [
               'path-open-letter-names.mp3',
@@ -858,6 +865,7 @@
             ['path-stop-mult-3-4.mp3', 'Groups of three and four.'],
             ['path-stop-mult-6-9.mp3', 'Big groups.'],
             ['path-stop-mult-mix.mp3', 'All the groups.'],
+            ['path-stop-div-share.mp3', 'Sharing.'],
             ['path-stop-letter-names.mp3', 'Letter names.'],
             ['path-stop-letter-sounds.mp3', 'Letter sounds.'],
             ['path-stop-blending-cv.mp3', 'Blending sounds.'],
@@ -938,6 +946,10 @@
             [
               'path-locked-next-mult-mix.mp3',
               'All the groups! First, big groups. Then this!',
+            ],
+            [
+              'path-locked-next-div-share.mp3',
+              'Sharing! First, all the groups. Then this!',
             ],
             [
               'path-locked-next-letter-sounds.mp3',
@@ -1044,6 +1056,7 @@
             ],
             ['end-bud-mult-6-9.mp3', 'Look! A new flower for big groups!'],
             ['end-bud-mult-mix.mp3', 'Look! A new flower for all the groups!'],
+            ['end-bud-div-share.mp3', 'Look! A new flower for sharing!'],
             [
               'end-bud-letter-names.mp3',
               'Look! A new flower for letter names!',
@@ -1136,6 +1149,10 @@
             [
               'end-unlock-mult-mix.mp3',
               'You learned big groups! Now you can do all the groups!',
+            ],
+            [
+              'end-unlock-div-share.mp3',
+              'You learned all the groups! Now you can do sharing!',
             ],
             [
               'end-unlock-letter-sounds.mp3',
@@ -1327,6 +1344,7 @@
           'guide-session-peek-open-mult-mix.mp3',
           "Let's look at all the groups!",
         ],
+        ['guide-session-peek-open-div-share.mp3', "Let's look at sharing!"],
         [
           'guide-session-peek-open-letter-sounds.mp3',
           "Let's look at letter sounds!",
@@ -1421,6 +1439,10 @@
           'All the groups are for later. You will learn it!',
         ],
         [
+          'guide-session-peek-close-div-share.mp3',
+          'Sharing is for later. You will learn it!',
+        ],
+        [
           'guide-session-peek-close-letter-sounds.mp3',
           'Letter sounds are for later. You will learn it!',
         ],
@@ -1492,6 +1514,7 @@
           'The E is quiet. It makes the A say its name.',
         ],
         ['guide-session-intro-mult-mix.mp3', "Let's play all the groups!"],
+        ['guide-session-intro-div-share.mp3', "Let's share the flowers!"],
         ['guide-session-hiding.mp3', 'Some flowers are hiding!'],
       ]
 

@@ -31,6 +31,10 @@
  *    missing part (content wave 1 § 1.6). Lives inside add-to-10 and
  *    add-to-20 (P4, P6, P8), so the web's silent fallback now covers those
  *    two steps too (§ 1.9).
+ *  - divide: `"Twelve flowers, three plates. How many on each plate?"` —
+ *    the answer is the share, total / plates (content wave 2 § 2.6). Only
+ *    in the sharing step (`div-share`); there is no division sign on
+ *    screen and no Leitner fact.
  *
  * Answer chips
  * ------------
@@ -61,6 +65,7 @@ export type ExtendedMathProblemKind =
   | 'skip-count'
   | 'multiply'
   | 'missing-addend'
+  | 'divide'
 
 /** An addition or subtraction problem in an extended plan: a
  *  {@link MathProblem}, tagged so the union can discriminate. Assignable to
@@ -139,6 +144,37 @@ export interface MissingAddendProblem {
   utterances: MathProblemUtterances
 }
 
+/** Sharing's ranges (content wave 2 § 2.6, K4, D2): 2–5 plates (one plate
+ *  row), a share of 2–6 (the round plate has a die face for each; Kyle's
+ *  plate call on #587), at most 20 flowers (two pile rows of 10). */
+export const DIVIDE_PLATES_MIN = 2
+export const DIVIDE_PLATES_MAX = 5
+export const DIVIDE_SHARE_MIN = 2
+export const DIVIDE_SHARE_MAX = 6
+export const DIVIDE_TOTAL_MAX = 20
+
+/**
+ * A sharing problem (content wave 2 § 2, NG-C): a pile of `total` flowers
+ * is dealt one for each plate in turn onto `plates` plates; the child taps
+ * how many land on each. e.g. "Twelve flowers, three plates. How many on
+ * each plate?" → total 12, plates 3, correct 4. It records no Leitner
+ * fact (K6): its time includes the deal, so it would mark × facts slow.
+ */
+export interface DivideProblem {
+  kind: 'divide'
+  /** 1-based position in the session (1..8). */
+  index: number
+  /** Flowers in the pile ({@link DIVIDE_PLATES_MIN} × {@link DIVIDE_SHARE_MIN}
+   *  .. {@link DIVIDE_TOTAL_MAX}). */
+  total: number
+  /** How many plates ({@link DIVIDE_PLATES_MIN}..{@link DIVIDE_PLATES_MAX}). */
+  plates: number
+  /** The share, `total / plates` (a whole number). */
+  correct: number
+  /** Pre-canned utterance lines, same slots as arithmetic problems. */
+  utterances: MathProblemUtterances
+}
+
 /** One problem in an extended plan. Switch on `kind`. */
 export type ExtendedMathProblem =
   | ArithmeticProblem
@@ -146,6 +182,7 @@ export type ExtendedMathProblem =
   | SkipCountProblem
   | MultiplyProblem
   | MissingAddendProblem
+  | DivideProblem
 
 /** A Math session plan with the extended problem kinds: exactly 8 problems. */
 export interface ExtendedMathSessionPlan {
@@ -188,13 +225,20 @@ export function isMultiplyProblem(
   return problem.kind === 'multiply'
 }
 
+export function isDivideProblem(
+  problem: ExtendedMathProblem,
+): problem is DivideProblem {
+  return problem.kind === 'divide'
+}
+
 /**
  * The Leitner fact a problem practises, or `null` for one that is not an
- * a/b fact (number recognition, skip counting). Arithmetic is `a ± b`;
+ * a/b fact (number recognition, skip counting, sharing). Arithmetic is `a ± b`;
  * multiplication `A * B` in read order (`2*3` is not `3*2`); a missing
  * number is the bond it completes, `{ a: addendA, b: correct, op: '+' }`,
- * the key plain addition uses (content wave 1 K4). One reading for the
- * session end, the canon fact table and the review picker.
+ * the key plain addition uses (content wave 1 K4). Sharing records none
+ * (content wave 2 K6). One reading for the session end, the canon fact
+ * table and the review picker.
  */
 export function problemFact(
   problem: MathProblem | ExtendedMathProblem,
@@ -209,6 +253,7 @@ export function problemFact(
       return { a: problem.addendA, b: problem.correct, op: '+' }
     case 'recognize':
     case 'skip-count':
+    case 'divide':
       return null
   }
 }

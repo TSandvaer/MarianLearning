@@ -43,6 +43,7 @@ const MATH = [
   'mult-3-4',
   'mult-6-9',
   'mult-mix',
+  'div-share',
 ] as const
 const WORD = [
   'letter-names',
@@ -307,8 +308,8 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
       'data-node',
       'add-to-10',
     )
-    await expect(page.getByTestId('map-stop')).toHaveCount(12)
-    await expect(page.getByTestId('map-plinth')).toHaveCount(12)
+    await expect(page.getByTestId('map-stop')).toHaveCount(13)
+    await expect(page.getByTestId('map-plinth')).toHaveCount(13)
     await expect(page.getByTestId('map-band')).toHaveCount(4)
     await expect(page.getByTestId('map-gate')).toHaveCount(3)
     await expect(page.getByTestId('map-land-pill')).toHaveCount(4)
@@ -481,7 +482,7 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
       stop(page, current).locator('[data-testid="map-bud"][data-open="true"]'),
     ).toHaveCount(2)
     // Mastered stops carry the bloom badge; locked ones are pale + padlock
-    // (every stop after the current one: 6 since times mix, content wave 1).
+    // (every stop after the current one: 7 since sharing, content wave 2).
     const lockedStops = MATH.length - 6
     await expect(page.getByTestId('map-flower-badge')).toHaveCount(5)
     await expect(page.getByTestId('map-stop-frost')).toHaveCount(lockedStops)
@@ -663,7 +664,7 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     )
     await expect(page.getByTestId('map-emma')).toHaveAttribute(
       'data-node',
-      'mult-mix',
+      'div-share',
     )
     await expect(page.getByTestId('map-emma')).toHaveAttribute(
       'data-pose',
@@ -714,7 +715,7 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     await openMapFromHub(page, 'math')
     await expect(page.getByTestId('map-land-pill')).toHaveCount(4)
     await expect(page.getByTestId('map-land-number')).toHaveCount(0)
-    await expect(page.getByTestId('map-stop')).toHaveCount(12)
+    await expect(page.getByTestId('map-stop')).toHaveCount(13)
     await expect(page.getByTestId('map-gate')).toHaveCount(3)
   })
 })

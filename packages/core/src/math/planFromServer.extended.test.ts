@@ -476,7 +476,7 @@ describe('extended kinds — mixed and failing plans', () => {
     expect(plan.problems.map((p) => p.index)).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
   })
 
-  it('an unknown read line names all seven templates', () => {
+  it('an unknown read line names all eight templates', () => {
     const reads = Array.from({ length: 8 }, () => 'Two times two. How many?')
     reads[2] = 'Tap the cat.'
     expect(() =>
@@ -487,7 +487,8 @@ describe('extended kinds — mixed and failing plans', () => {
         'How many are left?"; subtraction first-session "<W> take away <W>. ' +
         'How many are left?"; number recognition "Tap the <W>."; skip-count ' +
         '"<W>, <W>, <W>. What is next?"; multiplication "<W> times <W>. How ' +
-        'many?"; missing number "<W> and what make <W>?")',
+        'many?"; missing number "<W> and what make <W>?"; sharing "<W> ' +
+        'flowers, <W> plates. How many on each plate?")',
     )
   })
 

@@ -17,8 +17,9 @@
  *
  * Audio: a text that a Word Song canon file already carries reuses those
  * bytes when its ElevenLabs request is the same (`renderElevenLabsText`
- * with that file's tier, as `scripts/revoiceCanonLily.ts` renders it):
- * "Hmm... try again?" and the shared session-end lines. A new text gets an
+ * with that file's tier from `lilyCanonLib.ts`'s `tierFor`, as
+ * `scripts/revoiceCanonLily.ts` renders it): "Hmm... try again?" and the
+ * shared session-end lines. A new text gets an
  * empty `audio.base64`: awaiting its Lily render, which
  * `npx tsx scripts/revoiceCanonLily.ts --unrendered` fills without touching
  * any other clip. Until then the native app walks that line's caption
@@ -37,6 +38,7 @@ import {
   bigWordsCanonViolations,
   expectedBigWordsLines,
 } from './bigWordsCanonCheck.ts'
+import { tierFor } from './lilyCanonLib.ts'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 export const WORD_CANON_DIR = join(
@@ -71,9 +73,9 @@ export interface CanonDoc {
 const readDoc = (stem: string): CanonDoc =>
   JSON.parse(readFileSync(join(WORD_CANON_DIR, `${stem}.json`), 'utf8'))
 
-/** A canon file's production tier (mirrors `revoiceCanonLily.ts`). */
-const tierOf = (stem: string): string =>
-  stem.startsWith('letter-sounds') ? 'letter-sounds' : stem
+/** A Word Song canon file's production tier (the render's own mapping). */
+const tierOf = (stem: string): string | undefined =>
+  tierFor(`word-song/level-1/${stem}.json`)
 
 /**
  * ElevenLabs request → bytes over every Word Song canon file (the first
@@ -112,7 +114,7 @@ export function spliceWordStep(step: Wave2WordStep): CanonDoc {
   const audio = audioIndex(new Set(WAVE_2_WORD_STEPS))
   const keep = ownAudio(step)
   const line = (id: string, text: string): AudioLine => {
-    const request = renderElevenLabsText(text, step)
+    const request = renderElevenLabsText(text, tierOf(step))
     return {
       id,
       text,

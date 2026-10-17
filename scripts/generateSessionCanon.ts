@@ -133,6 +133,7 @@ import {
   bigWordsCanonViolations,
   isBigWordsStep,
 } from './bigWordsCanonCheck.ts'
+import { shareCanonViolations } from './shareCanonCheck.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = join(__dirname, '..')
@@ -248,6 +249,9 @@ const MATH_FOCUS_NODES: readonly string[] = [
   // Content wave 1: written by scripts/spliceContentWave1Canon.ts, not
   // baked (the file exists, so the incremental bake skips it).
   'mult-mix',
+  // Content wave 2 § 2.7: written by scripts/spliceContentWave2Canon.ts,
+  // held to the spec by `shareCanonCheck.ts` below.
+  'div-share',
 ]
 
 // Word-song first-class content modes — must match the
@@ -356,6 +360,9 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
  *   main, the § 1.8 / § 2.2 lines), never Haiku-baked; their new lines are
  *   rendered by `scripts/revoiceCanonLily.ts --unrendered`. A Haiku bake
  *   would re-draw the kept problems.
+ * - div-share (content wave 2 § 2.7): written by
+ *   `scripts/spliceContentWave2Canon.ts` from the binding table, never
+ *   Haiku-baked; its new lines are rendered the same way.
  * - duck-words, crab-words: a deliberate bake (Thomas OKs the credit use),
  *   held to the spec by `bigWordsCanonCheck.ts`, then the Lily render and
  *   the ear test. Their committed files are hand-checked.
@@ -370,6 +377,7 @@ export const PENDING_CANON_NODES: ReadonlySet<string> = new Set([
   'add-to-10',
   'add-to-20',
   'mult-mix',
+  'div-share',
   'duck-words',
   'crab-words',
   'tent-words',
@@ -717,6 +725,20 @@ export async function bakeOne(
       const message =
         `[big-words] ${combo.focusNode}: ${drift.length} line(s) off the ` +
         `spec:\n` +
+        drift.map((d) => `  - ${d}`).join('\n')
+      if (lintWarn)
+        console.warn(`\n${message}\n(writing anyway: --lint-warn)\n`)
+      else throw new Error(message)
+    }
+  }
+
+  // Sharing (content wave 2 § 2.7, binding): a bake (`--include-pending
+  // --force`) must land the spec's 8 problems and lines exactly.
+  if (combo.track === 'math' && combo.focusNode === 'div-share') {
+    const drift = shareCanonViolations(response.utterances)
+    if (drift.length > 0) {
+      const message =
+        `[sharing] div-share: ${drift.length} line(s) off the spec:\n` +
         drift.map((d) => `  - ${d}`).join('\n')
       if (lintWarn)
         console.warn(`\n${message}\n(writing anyway: --lint-warn)\n`)

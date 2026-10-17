@@ -37,15 +37,15 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'session-review': 1,
       'session-warmup': 1,
       'session-knew': 1,
-      'session-peek-open': 27,
-      'session-peek-close': 27,
-      'session-intro': 5,
+      'session-peek-open': 28,
+      'session-peek-close': 28,
+      'session-intro': 6,
       'session-hiding': 1,
     })
-    expect(GUIDANCE_LINES).toHaveLength(83)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(83)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(83)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(83)
+    expect(GUIDANCE_LINES).toHaveLength(86)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(86)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(86)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(86)
   })
 
   it('bakes each world and count variant', () => {
@@ -151,6 +151,18 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       text: 'Read all the letters!',
       src: '/assets/audio/path/guide-session-intro-crab-words.mp3',
     })
+    // Sharing (content wave 2 § 6.2; Thomas approved the texts 2026-10-17).
+    expect(sessionIntroLine('div-share')).toMatchObject({
+      id: 'guide.session.intro.div-share',
+      kind: 'session-intro',
+      world: 'math',
+      text: "Let's share the flowers!",
+      src: '/assets/audio/path/guide-session-intro-div-share.mp3',
+    })
+    expect(peekLines('div-share')?.open.text).toBe("Let's look at sharing!")
+    expect(peekLines('div-share')?.close.text).toBe(
+      'Sharing is for later. You will learn it!',
+    )
     // Content wave 2 (design/native/content-wave-2.md § 6.2, T2).
     expect(sessionIntroLine('tent-words')).toMatchObject({
       id: 'guide.session.intro.tent-words',
@@ -164,8 +176,8 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       text: 'The E is quiet. It makes the A say its name.',
       src: '/assets/audio/path/guide-session-intro-cake-words.mp3',
     })
-    // Wave 1 rendered in Lily (§ 6.2 rows 1-10); wave 2's tent and cake
-    // lines await their render (a separate agent voices them).
+    // Wave 1 and sharing are rendered in Lily (§ 6.2); wave 2's tent and
+    // cake lines await their render (a separate agent voices them).
     expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([
       'guide.session.peek-open.tent-words',
       'guide.session.peek-open.cake-words',
@@ -273,7 +285,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(83)
+    ).toHaveLength(86)
   })
 
   it('repeats no Emma’s Path line', () => {

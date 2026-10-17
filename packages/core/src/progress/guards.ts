@@ -39,6 +39,7 @@ const SKILL_NODES: ReadonlySet<SkillNode> = new Set<SkillNode>([
   'mult-3-4',
   'mult-6-9',
   'mult-mix',
+  'div-share',
   // Word Song
   'letter-names',
   'letter-sounds',

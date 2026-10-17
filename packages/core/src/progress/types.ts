@@ -44,6 +44,9 @@ export type NumberGardenNode =
   // Content wave 1 § 2 (times mix): mixed × facts across the three
   // multiplication steps, composed from canon blocks by core.
   | 'mult-mix'
+  // Content wave 2 § 2 (sharing): a pile of flowers dealt onto 2–5
+  // plates; "How many on each plate?". Served from canon; no Leitner fact.
+  | 'div-share'
 
 // cvc-words = short-a CVC. Subsequent vowels get sibling nodes
 // (cvc-words-short-o, cvc-words-short-u, cvc-words-short-i,
