@@ -163,13 +163,8 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     expect(peekLines('div-share')?.close.text).toBe(
       'Sharing is for later. You will learn it!',
     )
-    // Wave 1's are rendered in Lily (§ 6.2 rows 1-10); sharing's three wait
-    // for their render (the render commit empties the list).
-    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([
-      'guide.session.peek-open.div-share',
-      'guide.session.peek-close.div-share',
-      'guide.session.intro.div-share',
-    ])
+    // Rendered in Lily, like wave 1's (content wave 2 § 6.2).
+    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
   })
 
   it('names the step in the peek opener and closer (Thomas 2026-10-15), with the path lines’ spoken names and their verb', () => {

@@ -233,14 +233,9 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: sharing's peek pair and lead (content wave 2 § 6.2), rendered in
- * ElevenLabs Lily by a later commit.
+ * Now: none.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
-  'guide.session.peek-open.div-share',
-  'guide.session.peek-close.div-share',
-  'guide.session.intro.div-share',
-]
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 
