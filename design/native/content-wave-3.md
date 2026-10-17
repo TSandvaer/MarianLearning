@@ -468,10 +468,220 @@ Every problem also has the reprompt "Hmm... try again?" (reused) and the giveAns
   - a word she has read in the sight-words or simple-sentences canon (a, the, is, it, in, on, to, she, has, sat, ran…), or
   - one of 3 decodable extras built only from patterns she has mastered: _and_ (end blend nd, tent words), _got_ and _hid_ (CVC).
   - No plurals and no -s or -ed endings. _shed_ is the one noun without a picture, and it is never a chip.
-- **Shape:** 2–3 sentences and 10–14 words. Bug 6 and hen 8 have 3 sentences. Each pronoun has one clear referent (_It_ = the subject of the sentence before; _She_ = the hen).
+- **Shape:** 2–3 sentences and 10–14 words. Bug 6 and hen 8 have 3 sentences. Each pronoun has one clear referent: _She_ is always the hen, and _It_ is the animal of the sentence before, except hen 8's "in it" (the jug).
 - **Chips:** every chip word has a pack picture and appears in the story, and no trio holds a `FORBIDDEN_PAIRS` pair (cat–dog, duck–hen, bus–van and the rest).
   - **P1–P3 (gentle):** both wrong chips are a different kind than the question asks: things for "who"; the character and a place for "what"; the character and a thing for "where".
   - **P4–P8 (trap):** one wrong chip is the same kind and is in the story (another character, object or place), so she has to read who did what. Fox 4 and 7 are answered by the friend, not the fox.
 - **Why the order:** the step's gentle stories come first, and the 14-word and 3-sentence stories sit at P6–P8.
 
-<!-- wave3:next -->
+## 5. Copy / TTS script
+
+### 5.1 Every new spoken line (for the Lily render)
+
+Character counts are in brackets. Canon lines are in § 3.7 and § 4.7.
+
+**Guidance** (`createManifestLinePlayer('session-guide', …)`, wave 1 § 6.1). The leads play before scored P1 of every forward session until mastery, never in a peek, review, replay or warm-up heart:
+
+| Line id                           | `hundreds`                                        | `fox-stories`                                        | `hen-stories`                                        | `bug-stories`                                        |
+| --------------------------------- | ------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------- |
+| `guide.session.peek-open.<node>`  | "Let's look at hundreds!" (23)                    | "Let's look at fox stories!" (26)                    | "Let's look at hen stories!" (26)                    | "Let's look at bug stories!" (26)                    |
+| `guide.session.peek-close.<node>` | "Hundreds are for later. You will learn it!" (42) | "Fox stories are for later. You will learn it!" (45) | "Hen stories are for later. You will learn it!" (45) | "Bug stories are for later. You will learn it!" (45) |
+| `guide.session.intro.<node>`      | "Hundreds, tens and ones!" (24)                   | "Read the story. Who did it?" (27)                   | "Read the story. What is it?" (27)                   | "Read the story. Where is it?" (28)                  |
+
+- **Shared prompt:** `guide.story.read` "Read the story." (15), new kind `'story-read'`.
+- **Word clips:** `guide.story.word.<word>`, kind `'story-word'`, text "<Word>." (e.g. "Fox."). One per distinct story word, **54 clips, 224 characters**: a, and, bag, bed, bone, box, bug, cake, cat, crab, cup, desk, dog, drum, fig, fox, frog, gem, got, has, hat, hen, hid, in, is, it, jam, jug, kite, lamp, lid, log, nest, nut, on, pen, pig, plum, pond, pot, ran, ring, rock, rug, sat, she, shed, sun, tent, the, to, tub, van, wig.
+- **Replay lines, only if #592 has merged** (`map-tap-to-play.md` § 6): "Let's play <name> again!" (26, 29, 29, 29) and "You know <name>!" (18, 21, 21, 21), in the table's order.
+
+**Path** (`PATH_LINES`, generated from the names; `pathLines.test.ts`'s baked count grows by 26):
+
+| Line id                   | `hundreds`                                           | `fox-stories`                                              | `hen-stories`                                               | `bug-stories`                                               |
+| ------------------------- | ---------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
+| `path.open.<node>`        | "Here is your path! You are on hundreds." (39)       | "Here is your path! You are on fox stories." (42)          | "… on hen stories." (42)                                    | "… on bug stories." (42)                                    |
+| `path.stop.<node>`        | "Hundreds." (9)                                      | "Fox stories." (12)                                        | "Hen stories." (12)                                         | "Bug stories." (12)                                         |
+| `path.locked.next.<node>` | "Hundreds! First, sharing. Then this!" (36)          | "Fox stories! First, cake words. Then this!" (42)          | "Hen stories! First, fox stories. Then this!" (43)          | "Bug stories! First, hen stories. Then this!" (43)          |
+| `end.bud.<node>`          | "Look! A new flower for hundreds!" (32)              | "Look! A new flower for fox stories!" (35)                 | "… for hen stories!" (35)                                   | "… for bug stories!" (35)                                   |
+| `end.unlock.<node>`       | "You learned sharing! Now you can do hundreds!" (45) | "You learned cake words! Now you can do fox stories!" (51) | "You learned fox stories! Now you can do hen stories!" (52) | "You learned hen stories! Now you can do bug stories!" (52) |
+
+- **Lands:** "Land 5: Hundreds." (17), "A new land! Land 5: Hundreds!" (29), "A new land: Hundreds!" (21); "Land 7: Stories." (16), "A new land! Land 7: Stories!" (28), "A new land: Stories!" (20).
+- The deferred kinds (`locked-later`, `gate-locked`) generate as today and aren't rendered.
+
+**Total: 218 distinct new texts, 4,980 characters for ElevenLabs Lily** (210 and 4,786 without the 8 replay lines).
+
+| Surface                | Texts | Characters |
+| ---------------------- | ----- | ---------- |
+| guidance (with prompt) | 13    | 399        |
+| replay (#592)          | 8     | 194        |
+| path                   | 26    | 842        |
+| word clips             | 54    | 224        |
+| canon `hundreds`       | 32    | 1,190      |
+| canon `fox-stories`    | 25    | 661        |
+| canon `hen-stories`    | 31    | 746        |
+| canon `bug-stories`    | 29    | 724        |
+
+- **How it was counted:** a scratch script (2026-10-17, not committed) generated the texts from this spec's lists and compared them with every `text` in `public/canon/*/level-1/*.json` and every literal in `guidanceLines.ts`. Only "Hmm... try again?" is reused (32 slots). Repeats inside the wave count once ("Yes! The fox!" serves 5 stories).
+- **The bill holds only if the bake reuses audio** (wave 2 § 6.2): `revoiceCanonLily.ts` de-duplicates on exact text. Its `--dry-run` prints the real number before any spend.
+- **Canon is spliced, not Haiku-baked:** `scripts/spliceContentWave3Canon.ts` writes the four files from § 3.7 and `LITTLE_STORIES`. The four nodes join `PENDING_CANON_NODES`.
+- **Render with** `renderGuidanceLinesLily.ts` (guidance, prompt, word clips, replay), `renderPathLinesLily.ts` and `revoiceCanonLily.ts --unrendered`.
+
+**Prediction for the ear test (Predict-Before-Soak; bar 2):**
+
+- Every story clip pauses ≥ 250 ms at each full stop (the marks need it), and "Where did the bug go?" rises at the end.
+- "Two hundred and forty-three" comes out British, with a clear "and"; "Two hundreds, three tens and four ones" keeps the plural s's.
+- The isolated "A." is said "ay" and "The." "thee"; both are acceptable citation forms.
+- **Not predicted:** whether "What has the hen got?" stresses _got_. The ear test settles it.
+
+### 5.2 Vocabulary check (the ~200-word cap)
+
+- **New core words: 5.** _hundred_ (and _hundreds_), _story_ (and _stories_), _who_; and the story verbs _got_ and _hid_, which Emma now says. _ones_, _tens_, _more_, _number_, _did_, _what_ and _where_ are already in her lines. That takes wave 2's count of about 169 to about 174.
+- **Target words:** _fox_, _hen_ and _bug_ name the steps. Every other story word is already a target or sight word.
+- **Zero-cost choices, made on purpose:** "Hundreds, tens and ones!" not "place value"; "What is ten more?" not "add ten"; "What has the hen got?" (British) not "What does the hen have?".
+- Every text is ASCII-7, with no IPA.
+
+## 6. Pictures (OpenAI, a scene mode for the generator)
+
+**24 new pictures: one scene per story.** The hundreds blocks are drawn in code (K5), and every chip word already has a pack picture (89 WebPs).
+
+- **Generator mode** `npx tsx scripts/generatePackPictures.ts --scenes`:
+  - It reads a new `design/word-song/scene-manifest.json`, so the pack manifest and its checks don't change.
+  - Its prompt is `Subject` + `STYLE_INSTRUCTION` + a new `SCENE_RULES`: "Show exactly the characters and objects named, each drawn like its reference picture, in one simple scene on a soft cream background that fills the square. Nothing else: no other animals, people or objects, no text or letters, no faces on objects." Then `avoid`.
+  - **Image inputs:** the 3 style anchors, plus the approved pack PNG of each `refs` word (the chips plus the hero, at most 4). The fox in the scene is then the fox on the chip.
+  - **Output:** an opaque 1024 px PNG, exported to `mobile/assets/scenes/story-<id>.webp` at 600 px. There is one contact sheet per batch, and Thomas approves each batch.
+- **Cost:** ~$0.078 per picture (the brief's rate), plus about $0.008 per reference image (1,024 tokens at $8 / 1M, from `packPictureLib.ts`'s `MEASURED` and `RATES_PER_1M`). That is about $0.11 a scene and **about $2.60 for 24**. A second round on the six riskiest (fox-3, fox-8, hen-6, hen-7, bug-7, bug-8) adds about $0.66. The `--dry-run` prints the real estimate first.
+- **If a scene fails its second round, stop and tell Matt.** The reveal can ship without it (§ 4.2's fallback).
+- **Don't create the file before Thomas approves (T4):** the generator reads the whole file, so an early file could start the spend.
+
+**`design/word-song/scene-manifest.json`** (batches 1–3 = fox, hen, bug):
+
+```
+  { "scene": "fox-1", "tier": "fox-stories", "batch": 1, "subject": "The fox sitting on a striped woven rug, with a pink mug standing on the rug beside it.", "avoid": ["a table or a chair"], "refs": ["fox", "rug", "cup"] },
+  { "scene": "fox-2", "tier": "fox-stories", "batch": 1, "subject": "The fox sitting beside an open cardboard box; a hat sits inside the box, its top showing.", "avoid": ["the fox wearing the hat"], "refs": ["fox", "hat", "box"] },
+  { "scene": "fox-3", "tier": "fox-stories", "batch": 1, "subject": "A small orange tent standing on top of a big grey rock, with the fox looking out of its open door.", "avoid": ["the tent on grass beside the rock"], "refs": ["fox", "tent", "rock"] },
+  { "scene": "fox-4", "tier": "fox-stories", "batch": 1, "subject": "On the left the fox sits on a bed; on the right the hen runs towards a peach van.", "avoid": ["the fox running", "the hen on the bed"], "refs": ["fox", "hen", "van"] },
+  { "scene": "fox-5", "tier": "fox-stories", "batch": 1, "subject": "The dog holding a bone in its mouth, and the fox beside it holding a fig in its paws.", "avoid": ["the fox with the bone"], "refs": ["fox", "dog", "bone"] },
+  { "scene": "fox-6", "tier": "fox-stories", "batch": 1, "subject": "A frog sitting on a log in front; behind it a small wooden garden shed with the fox peeking out of its door.", "avoid": ["the fox on the log"], "refs": ["fox", "frog", "log"] },
+  { "scene": "fox-7", "tier": "fox-stories", "batch": 1, "subject": "The pig holding a kite string with the kite flying above, and the fox running towards the pig.", "avoid": ["the fox holding the kite"], "refs": ["pig", "fox", "kite"] },
+  { "scene": "fox-8", "tier": "fox-stories", "batch": 1, "subject": "The fox and the crab sitting side by side under a warm sun; the crab holds a purple plum in one claw.", "avoid": ["the fox holding the plum"], "refs": ["crab", "fox", "sun", "plum"] },
+  { "scene": "hen-1", "tier": "hen-stories", "batch": 2, "subject": "The hen sitting inside a peach van, seen through its open side door, with a pink-iced cake beside her.", "avoid": ["candles or numbers"], "refs": ["hen", "cake", "van"] },
+  { "scene": "hen-2", "tier": "hen-stories", "batch": 2, "subject": "The hen standing beside a small orange tent; through its open door a pink pen lies on the tent floor.", "avoid": ["the hen holding the pen"], "refs": ["hen", "pen", "tent"] },
+  { "scene": "hen-3", "tier": "hen-stories", "batch": 2, "subject": "The hen holding a pink tote bag with a purple plum peeking out of the top.", "avoid": ["more than one plum"], "refs": ["hen", "plum", "bag"] },
+  { "scene": "hen-4", "tier": "hen-stories", "batch": 2, "subject": "A grey cooking pot standing on a small wooden desk; the hen beside the desk holding a pink mug.", "avoid": ["the mug on the desk"], "refs": ["hen", "pot", "cup", "desk"] },
+  { "scene": "hen-5", "tier": "hen-stories", "batch": 2, "subject": "The hen beating a small drum, and the pig next to her holding a kite.", "avoid": ["the hen holding the kite"], "refs": ["hen", "drum", "kite", "pig"] },
+  { "scene": "hen-6", "tier": "hen-stories", "batch": 2, "subject": "The hen wearing a hat at the edge of a small pond; a curly brown wig floats on the water.", "avoid": ["a person", "the hat on the water"], "refs": ["hen", "wig", "hat", "pond"] },
+  { "scene": "hen-7", "tier": "hen-stories", "batch": 2, "subject": "The hen beside a table lamp and an open cardboard box; a gold ring sits inside the box.", "avoid": ["the ring on the lamp"], "refs": ["hen", "ring", "lamp", "box"] },
+  { "scene": "hen-8", "tier": "hen-stories", "batch": 2, "subject": "The hen holding an open jug full of red jam, with a pink mug beside her.", "avoid": ["jam in the mug"], "refs": ["hen", "jam", "cup", "jug"] },
+  { "scene": "bug-1", "tier": "bug-stories", "batch": 3, "subject": "The pink bug sitting inside a pink mug, peeking over the rim and holding a fig.", "avoid": ["coffee or tea in the mug"], "refs": ["bug", "cup", "fig"] },
+  { "scene": "bug-2", "tier": "bug-stories", "batch": 3, "subject": "The pink bug sitting on a bed's pillow, with a walnut beside it.", "avoid": ["a person in the bed"], "refs": ["bug", "bed", "nut"] },
+  { "scene": "bug-3", "tier": "bug-stories", "batch": 3, "subject": "The pink bug walking in at the open door of a small orange tent, carrying a small gem.", "avoid": ["the bug far from the tent"], "refs": ["bug", "tent", "gem"] },
+  { "scene": "bug-4", "tier": "bug-stories", "batch": 3, "subject": "The pink bug on a striped rug in front; behind it the cat lies on a bed.", "avoid": ["the bug on the bed"], "refs": ["bug", "rug", "bed", "cat"] },
+  { "scene": "bug-5", "tier": "bug-stories", "batch": 3, "subject": "A peach van with its side door open; inside it a pink tote bag, with the pink bug peeking out of the bag.", "avoid": ["the bag outside the van"], "refs": ["bug", "van", "bag"] },
+  { "scene": "bug-6", "tier": "bug-stories", "batch": 3, "subject": "The dog running to a small pond; nearby the pink bug hides in a cream bathtub.", "avoid": ["the dog in the tub"], "refs": ["dog", "pond", "tub", "bug"] },
+  { "scene": "bug-7", "tier": "bug-stories", "batch": 3, "subject": "The pink bug sitting in a bird's nest, and the hen sitting on a log beside it.", "avoid": ["eggs in the nest", "the hen in the nest"], "refs": ["bug", "nest", "hen", "log"] },
+  { "scene": "bug-8", "tier": "bug-stories", "batch": 3, "subject": "A grey cooking pot with its lid on, and the pink bug sitting on top of the lid.", "avoid": ["steam or fire", "the bug in the pot"], "refs": ["bug", "lid", "pot"] }
+```
+
+**The 6 clay pieces (§ 1) are not in this pipeline.** They are made as the clay set was, with Thomas's tool.
+
+## 7. States and edge cases
+
+- **Error path:** a wrong tap gets the poof, the shake, `puzzled-tilt` and "Hmm... try again?", the hints at 2 wrongs and the given answer at 3. Never a red X.
+- **First visit:** the Map's land beat, then the lead before P1 of each forward session until mastery.
+- **Peek:** P1–P3 with the step's opener and closer, no lead, nothing written. Hundreds builds as usual, and a story runs its full flow, reveal included.
+- **Replay (#592) and review:** the canon blocks, in full. A story block is never a warm-up heart (§ 4.6), and hundreds has no fact to make one.
+- **Return user who finished a world:** wave 1's load rule (K13).
+- **Background:** the reading beat counts foreground time only. Lines park and resume (#528), and the read-along freezes with the voice.
+- **Rotation:** layouts recompute and nothing replays. A lit word stays lit, and a build in flight lands at once.
+- **Missing assets:** a missing scene shows the answer's pack picture. A missing word clip leaves the word lighting silently.
+- **Reduce Motion:** § 3.5 and § 4.5.
+- **Ship order:** G on both devices first (§ 2). The deployed server doesn't know the four nodes until `yarn release`, so release before the device check (wave 2 § 8).
+- **Web:** a hundreds or story read throws, and the web's static fallback plays.
+
+## 8. Wiring checklist (Kevin, Devon)
+
+**Each new SkillNode** goes through `.claude/docs/sibling-tier-checklist.md`:
+
+- **All four:** rows 1–10 and 12.
+- **The three story steps:** row 11, and rows 13–15 (`VALID_WORD_SONG_FOCUS_NODES`, `WORD_SONG_FIRST_CLASS_FOCUS_NODES`, `WORD_SONG_FOCUS_NODES`).
+- **`hundreds`:** `VALID_MATH_FOCUS_NODES` (`api/_planner.ts`) and `MATH_FOCUS_NODES` (`scripts/generateSessionCanon.ts`).
+- **Skipped:** row 16, the web debug seeds.
+
+**From the list's "does not cover" section:** the math read-line template (8/8); `CANON_FILES` in `public/voice-qa.html` (4 stems); the committed canon JSON; the sibling-spec audit of e2e seeds ending at `cake-words` or `div-share`.
+
+**Plus:**
+
+- **G first** (§ 2), its own PR and build.
+- **Names:** `STAGE_SPOKEN_NAMES`, `STAGE_SPOKEN_NAME_VERBS`, `FRIENDLY_NODE_NAMES`, the recap list in `api/_planner.ts` and `scripts/recapFocusCopy.ts`.
+- **Map and lines:** `LANDS` (+2 lands), `PATH_LINES` (+26 baked), `PATH_ART_SET` (+4), `LandArtId` (+2), `GUIDANCE_LINES` (4 peek pairs, 4 intros, the prompt, 54 word clips, and 4 replay pairs if #592 has merged).
+- **Math:** `EXTENDED_ANSWER_MAX` 999 and `TWO_DIGIT_CHIP_MAX` (§ 2, G4); `PlaceValueProblem`, `MoreProblem`, their templates and `wordToNumber`; `hundredsDistractors`; `extendedMathLayout(…, 'place-value')`; `PlaceValueStage` and the three glyphs; `CANON_MATH_FACTS` (8 nulls).
+- **Word Song:** `littleStories.ts`; the `'little-story'` parser route; `StoryCard`; `wordSongLayout`'s card metrics; `storyMarks.generated.ts`; the scene registry; `pickWarmupBlocks`'s exclusion.
+- **Canon and pictures:** `spliceContentWave3Canon.ts`, `PENDING_CANON_NODES` + 4, and the generator's `--scenes` mode.
+
+**Unchanged on purpose:** `isLeitnerDirectiveActive`, `MULTIPLICATION_FOCUS_NODES`, `MIX_SOURCE_STEPS`, `WORD_SONG_GRADUATION_GATED_NODES`, `CVC_CROSS_VOWEL_NODES`, `FIRST_ENCOUNTER_GATED_NODES`, the celebration exception list, `TARGET_PAIRINGS`, `FORBIDDEN_PAIRS`, `pickDistractors`, and the guard's `mathFacts` bounds.
+
+## 9. Acceptance criteria
+
+**Core (vitest):**
+
+1. **G:** the four G2 cases pass, on the local load and on the cloud install.
+2. **Hundreds parser:**
+   - P1 parses to `{ kind: 'place-value', hundreds: 2, tens: 3, ones: 4, correct: 234 }`, and P5 to `spokenOrder: ['ones', 'tens', 'hundreds']`, `correct: 326`.
+   - P6 parses to `{ kind: 'more', start: 243, step: 10, correct: 253 }`.
+   - "One hundreds, …" (digit 1), "Two hundred and four. What is ten more?" (a zero) and "Two hundred and ninety-three. What is ten more?" (regrouping) are rejected. Without `extendedKinds` it throws.
+3. `hundreds.json` equals § 3.7 (8/8 reads parse), and `hundredsDistractors` returns § 3.7's chips. Skip and times chips are unchanged (`TWO_DIGIT_CHIP_MAX`).
+4. A hundreds session-end write has no `mathFacts` entry, its `perProblemAnswerValue` holds the tapped 3-digit numbers, and the doc loads back.
+5. **Stories:**
+   - `LITTLE_STORIES` equals § 4.7, and the lint holds every § 4.7 rule.
+   - The three canon files parse 24/24 to `'little-story'` with the § 4.7 chips.
+   - A hint text not in the table throws.
+6. `pickWarmupBlocks` never returns a block of a story step.
+7. **Lines and lands:** Number Garden has 5 lands and Word Song 7. `GUIDANCE_LINES` and `PATH_LINES` hold § 5.1's texts exactly, the baked path count is +26, and the `STAGE_SPOKEN_NAMES` values stay unique.
+8. **Loading:** a doc with `cake-words` mastered and no story keys loads `fox-stories: 'intro'` and the other two `'locked'`. A doc with `div-share` mastered and no `hundreds` key loads `hundreds: 'intro'`.
+
+**Native (jest):**
+
+9. **Hundreds:**
+   - P1: the flats, rods and cubes appear on the word ticks of "hundreds", "tens" and "ones". The tags read "?" until a right tap, then 2, 3, 4. The chips are 234, 434 and 634.
+   - P5: the cubes land first, in the right-hand tray.
+   - P6 hint 2: a rod drops in with a "+10" pill, and the tens tag ticks 4 → 5. A right tap shows 253 in the number tag.
+10. `extendedMathLayout(…, 'place-value')` gives § 3.3's u on the four forms, and every chip numeral fits its chip.
+11. **Story P1 (fake timers):**
+    - "Read the story." plays, and the question starts 9,000 ms after it ends (10 words). A word tap at 8,000 ms moves the question to 10,000 ms.
+    - No chip or picture is mounted before the question. The chips open when it ends.
+    - A right tap: the chips fade, the scene enters, the read-along plays, then the advance.
+12. **Story wrongs:** the 1st replays the question; the 2nd plays the story read-along, then the question; the 3rd plays the guided answer.
+13. **Word taps:** a tap plays `guide.story.word.<word>` and lights the word. Taps are inert during Emma's lines and record nothing.
+14. A missing scene shows the answer's pack picture. Reduce Motion gives § 3.5's and § 4.5's bracketed forms.
+
+**Device** (Expo Go, `EXPO_PUBLIC_QA_STEP`):
+
+15. **Each new step from the QA picker:**
+    - Emma speaks every line.
+    - At 375×667 and 667×375 nothing leaves its rect, and every story card is ≤ 3 lines.
+    - No picture shows before the first answer. On an iPad the read-along lights each word as Lily says it; if not, ship `STORY_READ_ALONG = 'sentence'`.
+16. **Map, 375×667, 744×1133 and 820×1180 portrait:** Number Garden shows 5 lands and Word Song 7, and no stops overlap. If the T6 fallback is on, the current stop is in view when the Map opens.
+17. **Before any hundreds build is installed:** both devices run build G or later (Thomas checks the TestFlight build number).
+
+## 10. Thomas decides
+
+- **T1. The names:** "hundreds", "fox stories", "hen stories" and "bug stories", and the lands "Land 5: Hundreds" and "Land 7: Stories".
+- **T2. The lines (§ 5.1):** 218 texts, 4,980 Lily characters. Chiefly the four leads, and the 54 one-word clips, which add 54 short items to the ear test.
+- **T3. The 6 clay pieces (§ 1):** a hundred-flat, a fox, a hen, a bug, an apple tree and a puppet theatre.
+- **T4. The picture spend:** 24 scenes, about $2.60 (about $3.30 with retakes), after an OpenAI top-up. Recommendation: approve. The scenes are the reward for reading, and the steps can ship without them.
+- **T5. The rollout (§ 2, G3):** build G goes on the iPad and the iPhone before any hundreds build, and no device is downgraded below it.
+- **T6. The Map fallback (§ 1):** if 7 Word Song lands don't fit the portrait bars, the Word Song path scrolls on portrait as it does in phone landscape. Recommendation: approve now, so a failed bar doesn't stall the build.
+
+## 11. Pedagogy assumptions for Dave (D1…)
+
+The spec had to fill these in. All are **pending** Dave's check after the PR opens.
+
+- **D1. Three steps, one question word each** (who → what → where), 8 stories each, each led by one character. Alternative: mix the question words in every step and grow the stories in length instead.
+- **D2. The taught-word rule (§ 4.7):** target and sight words only, plus _and_, _got_ and _hid_ as decodable extras; no plurals or endings; 10–14 words; 2–3 sentences (only 2 of the 24 have three).
+- **D3. Story, then question.** The story stays on screen during the question (look-back is allowed). The beat is 900 ms per word (6–12 s), held by word taps (≥ 2 s after the last, at most 20 s).
+- **D4. Reading support:** a word tap plays that word. Emma reads the whole story only on the 2nd wrong and in the reveal, never on request before an answer.
+- **D5. No picture before the first answer:** the chips mount with the question, and the scene comes in the reveal (Q6).
+- **D6. The chips:** P1–P3 wrong chips are another kind; P4–P8 add a same-kind noun from the story. The question's own noun may be a chip (fox 1's rug, hen 7's box).
+- **D7. Story blocks are never warm-up hearts**, but they join reviews.
+- **D8. Hundreds is built by Emma and tapped by Marian.** The place-value digits are 2–9, with no 0 or 1. Zeros (305) and "one hundred" are left for a later deepening.
+- **D9. The hundreds chips:** P1–P3 differ in the hundreds digit only; P4 has the tens/ones swap (M6) and tens ± 1; P5 says the parts in Danish order with a spoken-order chip (623 for 326).
+- **D10. +10 and +100 inside the step** (P6–P8, no regrouping). Alternative: a step of their own.
+- **D11. No Leitner fact and no equation for hundreds,** only the "+10" and "+100" pills.
+- **D12. Leads every forward session until mastery** (wave 1's D5): "Hundreds, tens and ones!", "Read the story. Who did it?", "… What is it?", "… Where is it?".
