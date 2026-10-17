@@ -3,7 +3,7 @@
  *
  * generatePackPictures end to end against a temp repo root and a mocked
  * images.edit: files, ledger, budget stop, failure handling, skip-existing,
- * contact sheet, --pick. No network, no key.
+ * contact sheet, --pick, and the same for --scenes. No network, no key.
  */
 import {
   existsSync,
@@ -30,8 +30,15 @@ import {
 
 import { runGenerate, runPick } from './generatePackPictures.ts'
 import type { Deps, EditImages } from './generatePackPictures.ts'
-import { parseCli, PATHS } from './packPictureLib.ts'
-import type { CliCommand } from './packPictureLib.ts'
+import {
+  buildScenePrompt,
+  estimateCallCost,
+  formatUsd,
+  parseCli,
+  PATHS,
+  roundUsd,
+} from './packPictureLib.ts'
+import type { CliCommand, SceneManifestEntry } from './packPictureLib.ts'
 
 const FIXTURE = 'scripts/fixtures/pack-picture-manifest.fixture.json'
 const FIXTURE_JSON = readFileSync(
@@ -117,8 +124,8 @@ function gen(argv: string[]): Extract<CliCommand, { mode: 'generate' }> {
   return cmd
 }
 
-function ledgerLines(): Record<string, unknown>[] {
-  const p = join(root, PATHS.ledger)
+function ledgerLines(rel: string = PATHS.ledger): Record<string, unknown>[] {
+  const p = join(root, rel)
   if (!existsSync(p)) return []
   return readFileSync(p, 'utf8')
     .trim()
@@ -137,18 +144,19 @@ describe('runGenerate', () => {
     expect(s.results).toEqual([])
     const out = logs.join('\n')
     expect(out).toContain('Images: 4 word(s) x 2 = 8')
-    expect(out).toMatch(/Estimated cost: \$0\.2\d{3}/)
+    // 4 x ~$0.0772: 2 x 3 anchors x 1,024 image-in + 2 x 439 out + 2 x text.
+    expect(out).toContain('Estimated cost: $0.3087 ')
     expect(out).toContain('Anchors: 3/3 present.')
     expect(existsSync(join(root, PATHS.outRoot))).toBe(false)
   })
 
   it('dry run: says how many words a --budget covers', async () => {
     await runGenerate(
-      gen(['--batch', '1', '--dry-run', '--budget', '0.15']),
+      gen(['--batch', '1', '--dry-run', '--budget', '0.2']),
       deps(vi.fn()),
     )
     expect(logs.join('\n')).toMatch(
-      /Budget \$0\.1500: .* would stop after 2 of 4 word\(s\)/,
+      /Budget \$0\.2000: .* would stop after 2 of 4 word\(s\)/,
     )
   })
 
@@ -231,9 +239,9 @@ describe('runGenerate', () => {
       `${JSON.stringify({ costUsd: 1 })}\n`,
     )
     const edit = vi.fn<EditImages>(async (params) => okResponse(params.n ?? 1))
-    // Each call estimates ~$0.052: $1 spent + 2 calls fit under $1.12, a 3rd does not.
+    // Each call estimates ~$0.076: $1 spent + 2 calls fit under $1.16, a 3rd does not.
     const s = await runGenerate(
-      gen(['--batch', '1', '--budget', '1.12']),
+      gen(['--batch', '1', '--budget', '1.16']),
       deps(edit),
     )
     expect(edit).toHaveBeenCalledTimes(2)
@@ -508,5 +516,304 @@ describe('runPick', () => {
     expect(existsSync(join(root, PATHS.packRoot, 'transparent-short-a'))).toBe(
       false,
     )
+  })
+})
+
+describe('--scenes', () => {
+  // Three rows of design/word-song/scene-manifest.json, at its default path.
+  const SCENES: SceneManifestEntry[] = [
+    {
+      scene: 'fox-1',
+      tier: 'fox-stories',
+      batch: 1,
+      subject:
+        'The fox sitting on a striped rug, a pink mug on the rug beside it.',
+      avoid: ['a table'],
+      refs: ['fox', 'rug', 'cup'],
+    },
+    {
+      scene: 'fox-2',
+      tier: 'fox-stories',
+      batch: 1,
+      subject:
+        'The fox beside an open cardboard box with a hat inside, its top showing.',
+      avoid: ['the fox wearing the hat'],
+      refs: ['fox', 'hat', 'box'],
+    },
+    {
+      scene: 'hen-1',
+      tier: 'hen-stories',
+      batch: 2,
+      subject:
+        'The hen inside a peach van, seen through its open side door, a pink-iced cake beside her.',
+      avoid: ['candles, numbers'],
+      refs: ['hen', 'cake', 'van'],
+    },
+  ]
+  const CHIPS = ['fox', 'rug', 'cup', 'hat', 'box', 'hen', 'cake', 'van']
+
+  beforeEach(async () => {
+    mkdirSync(join(root, 'design/word-song'), { recursive: true })
+    writeFileSync(join(root, PATHS.sceneManifest), JSON.stringify(SCENES))
+    for (const w of CHIPS) {
+      await sharp({
+        create: {
+          width: 8,
+          height: 8,
+          channels: 4,
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+        },
+      })
+        .webp()
+        .toFile(join(root, PATHS.currentPictures, `${w}.webp`))
+    }
+  })
+
+  function scenes(argv: string[]): Extract<CliCommand, { mode: 'generate' }> {
+    const cmd = parseCli(['--scenes', ...argv])
+    if (cmd.mode !== 'generate') throw new Error('expected generate')
+    return cmd
+  }
+
+  const sceneVariant = (batch: number, file: string) =>
+    join(root, PATHS.sceneOutRoot, `batch-${batch}`, file)
+
+  async function solidPng(
+    size: number,
+    background: { r: number; g: number; b: number; alpha: number },
+  ): Promise<Buffer> {
+    return sharp({
+      create: { width: size, height: size, channels: 4, background },
+    })
+      .png()
+      .toBuffer()
+  }
+
+  it('dry run: every scene, its refs, the estimate and the scene ledger; no call, no files', async () => {
+    const d = deps(vi.fn())
+    const s = await runGenerate(scenes(['--dry-run']), d)
+    expect(d.createEditor).not.toHaveBeenCalled()
+    expect(s.results).toEqual([])
+    const out = logs.join('\n')
+    expect(out).toContain('2 variant(s) per scene.')
+    expect(out).toContain(`Manifest: ${PATHS.sceneManifest}`)
+    expect(out).toContain('Scenes (3):')
+    expect(out).toMatch(
+      /fox-1 +tier fox-stories +batch 1 +\+3 refs est \$0\.1\d{3} \(writes v1-v2\)/,
+    )
+    expect(out).toContain('Images: 3 scene(s) x 2 = 6')
+    // 3 anchors + 3 refs per call, billed for each of the 2 images.
+    const est = roundUsd(
+      SCENES.reduce(
+        (t, e) =>
+          t + estimateCallCost(2, buildScenePrompt(e).length, 6).costUsd,
+        0,
+      ),
+    )
+    expect(out).toContain(`Estimated cost: ${formatUsd(est)} `)
+    expect(out).toContain(`Spend ledger so far: $0.0000 (${PATHS.sceneLedger})`)
+    expect(out).toContain('Anchors: 3/3 present.')
+    expect(out).toContain('Refs: 8/8 chip pictures present.')
+    expect(existsSync(join(root, PATHS.outRoot))).toBe(false)
+  })
+
+  it('sends the anchors then the chip refs, opaque, and writes scene variants, ledger and sheets', async () => {
+    const edit = vi.fn<EditImages>(async (params) => okResponse(params.n ?? 1))
+    const s = await runGenerate(scenes([]), deps(edit))
+
+    expect(edit).toHaveBeenCalledTimes(3)
+    const call = edit.mock.calls.find((c) =>
+      c[0].prompt.includes('striped rug'),
+    )
+    const p = call?.[0]
+    expect(p).toMatchObject({
+      model: 'gpt-image-2.5-flare',
+      size: '1024x1024',
+      quality: 'medium',
+      background: 'opaque',
+      output_format: 'png',
+      n: 2,
+      prompt: buildScenePrompt(SCENES[0]),
+    })
+    expect((p?.image as File[]).map((f) => [f.name, f.type])).toEqual([
+      ['anchor-hen.png', 'image/png'],
+      ['anchor-sack.png', 'image/png'],
+      ['anchor-wing.png', 'image/png'],
+      ['fox.webp', 'image/webp'],
+      ['rug.webp', 'image/webp'],
+      ['cup.webp', 'image/webp'],
+    ])
+
+    expect(s.results.map((r) => [r.word, r.status, r.images])).toEqual([
+      ['fox-1', 'ok', 2],
+      ['fox-2', 'ok', 2],
+      ['hen-1', 'ok', 2],
+    ])
+    expect(existsSync(sceneVariant(1, 'fox-1__v2.png'))).toBe(true)
+    expect(existsSync(sceneVariant(2, 'hen-1__v1.png'))).toBe(true)
+
+    const ledger = ledgerLines(PATHS.sceneLedger)
+    expect(ledger.map((l) => l.scene).sort()).toEqual([
+      'fox-1',
+      'fox-2',
+      'hen-1',
+    ])
+    expect(ledger[0]).not.toHaveProperty('word')
+    expect(ledger[0]).toMatchObject({ n: 2, costUsd: 0.051306 })
+    expect(existsSync(join(root, PATHS.ledger))).toBe(false)
+
+    expect(s.sheets).toEqual([
+      `${PATHS.sceneOutRoot}/batch-1/contact-sheet.png`,
+      `${PATHS.sceneOutRoot}/batch-2/contact-sheet.png`,
+    ])
+    const meta = await sharp(join(root, s.sheets[0])).metadata()
+    // label column + current + 2 variants; header + 2 rows
+    expect([meta.width, meta.height]).toEqual([1072, 692])
+    expect(logs.join('\n')).toContain(`Batch total: $0.1539 for 3/3 scene(s).`)
+  })
+
+  it('--budget caps the scene ledger alone (the pack ledger is not counted)', async () => {
+    mkdirSync(join(root, PATHS.sceneOutRoot), { recursive: true })
+    writeFileSync(
+      join(root, PATHS.sceneLedger),
+      `${JSON.stringify({ costUsd: 1 })}\n`,
+    )
+    writeFileSync(
+      join(root, PATHS.ledger),
+      `${JSON.stringify({ costUsd: 100 })}\n`,
+    )
+    const edit = vi.fn<EditImages>(async (params) => okResponse(params.n ?? 1))
+    // Each scene estimates ~$0.126: $1 spent + 1 call fits under $1.20, a 2nd does not.
+    const s = await runGenerate(scenes(['--budget', '1.2']), deps(edit))
+    expect(edit).toHaveBeenCalledTimes(1)
+    expect(s.stoppedBy).toBe('budget')
+    expect(s.results.map((r) => r.status)).toEqual(['ok', 'skipped', 'skipped'])
+    expect(s.ledgerTotalUsd).toBe(1.051306)
+    const out = logs.join('\n')
+    expect(out).toMatch(/STOP budget/)
+    expect(out).toContain(
+      '  npx tsx scripts/generatePackPictures.ts --scenes --words fox-2,hen-1 --budget <usd>',
+    )
+  })
+
+  it('stops the run on exhausted credit: no retry, nothing recorded', async () => {
+    const sleep = vi.fn(async () => {})
+    const edit = vi.fn<EditImages>(async () => {
+      throw APIError.generate(
+        429,
+        {
+          error: {
+            type: 'insufficient_quota',
+            code: 'credit_balance_exhausted',
+            message: 'Your organization has no prepaid credits remaining.',
+          },
+        },
+        undefined,
+        new Headers(),
+      )
+    })
+    const s = await runGenerate(scenes([]), { ...deps(edit), sleep })
+    expect(edit).toHaveBeenCalledTimes(3) // the 3 already in flight, once each
+    expect(sleep).not.toHaveBeenCalled()
+    expect(s.stoppedBy).toBe('fatal')
+    expect(s.results.map((r) => r.status)).toEqual([
+      'failed',
+      'failed',
+      'failed',
+    ])
+    expect(ledgerLines(PATHS.sceneLedger)).toHaveLength(0)
+    expect(logs.join('\n')).toContain(
+      '429 Your organization has no prepaid credits remaining. (stopping the run)',
+    )
+  })
+
+  it('re-runs skip scenes on disk; --force adds v3, v4 and keeps v1, v2', async () => {
+    const edit = vi.fn<EditImages>(async (params) => okResponse(params.n ?? 1))
+    await runGenerate(scenes(['--words', 'fox-1']), deps(edit))
+    const v1 = readFileSync(sceneVariant(1, 'fox-1__v1.png'))
+
+    const again = vi.fn<EditImages>(async (params) => okResponse(params.n ?? 1))
+    const s = await runGenerate(scenes(['--batch', '1']), deps(again))
+    expect(again).toHaveBeenCalledTimes(1)
+    expect(s.results.map((r) => [r.word, r.status])).toEqual([
+      ['fox-1', 'exists'],
+      ['fox-2', 'ok'],
+    ])
+
+    const green = await solidPng(8, { r: 0, g: 200, b: 0, alpha: 1 })
+    const retake = vi.fn<EditImages>(async (params) =>
+      okResponse(params.n ?? 1, green.toString('base64')),
+    )
+    await runGenerate(scenes(['--words', 'fox-1', '--force']), deps(retake))
+    expect(retake).toHaveBeenCalledTimes(1)
+    expect(readFileSync(sceneVariant(1, 'fox-1__v1.png'))).toEqual(v1)
+    expect(readFileSync(sceneVariant(1, 'fox-1__v3.png'))).toEqual(green)
+    expect(existsSync(sceneVariant(1, 'fox-1__v4.png'))).toBe(true)
+    expect(ledgerLines(PATHS.sceneLedger)).toHaveLength(3)
+  })
+
+  it('a missing chip picture warns in a dry run and stops a real run before any call', async () => {
+    rmSync(join(root, PATHS.currentPictures, 'rug.webp'))
+    await runGenerate(scenes(['--dry-run']), deps(vi.fn()))
+    expect(logs.join('\n')).toContain(
+      'WARN refs missing (a real run would stop): mobile/assets/pictures/rug.webp',
+    )
+    const d = deps(vi.fn())
+    await expect(runGenerate(scenes([]), d)).rejects.toThrow(
+      /Reference pictures missing .*:\n {2}mobile\/assets\/pictures\/rug\.webp/,
+    )
+    expect(d.createEditor).not.toHaveBeenCalled()
+  })
+
+  describe('--pick', () => {
+    function pickScenes(arg: string, dryRun = false) {
+      const cmd = parseCli([
+        '--scenes',
+        '--pick',
+        arg,
+        ...(dryRun ? ['--dry-run'] : []),
+      ])
+      if (cmd.mode !== 'pick') throw new Error('expected pick')
+      return cmd
+    }
+    const story = (id: string) => join(root, PATHS.scenes, `story-${id}.webp`)
+
+    beforeEach(async () => {
+      mkdirSync(join(root, PATHS.sceneOutRoot, 'batch-1'), { recursive: true })
+      writeFileSync(
+        sceneVariant(1, 'fox-1__v2.png'),
+        await solidPng(1024, { r: 255, g: 246, b: 238, alpha: 1 }),
+      )
+    })
+
+    it('writes an opaque 600x600 WebP to mobile/assets/scenes/story-<id>.webp', async () => {
+      const r = await runPick(pickScenes('fox-1=v2'), {
+        root,
+        log: (l) => logs.push(l),
+      })
+      expect(r.copied).toBe(1)
+      const meta = await sharp(story('fox-1')).metadata()
+      expect([meta.width, meta.height, meta.format, meta.hasAlpha]).toEqual([
+        600,
+        600,
+        'webp',
+        false,
+      ])
+      expect(logs[0]).toBe(
+        `write ${PATHS.sceneOutRoot}/batch-1/fox-1__v2.png → mobile/assets/scenes/story-fox-1.webp (600x600)`,
+      )
+    })
+
+    it('writes nothing in a dry run or when a picked variant is missing', async () => {
+      const dry = await runPick(pickScenes('fox-1=v2', true), {
+        root,
+        log: () => {},
+      })
+      expect(dry.copied).toBe(0)
+      await expect(
+        runPick(pickScenes('fox-1=v2,fox-2=v1'), { root, log: () => {} }),
+      ).rejects.toThrow(/not on disk \(nothing copied\):\n {2}.*fox-2__v1\.png/)
+      expect(existsSync(story('fox-1'))).toBe(false)
+    })
   })
 })

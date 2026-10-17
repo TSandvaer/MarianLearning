@@ -219,12 +219,15 @@ for (const name of sorted(join(webAssets, 'pictures'), /^picture-.+\.svg$/)) {
 }
 
 // Simple-sentences scenes. The little stories' scenes (`story-<id>.webp`,
-// content wave 3 § 4.2, § 6) are written here by the scene generator, not
-// exported from the web, so they survive the clean-out and are registered
-// as they are (native only: keyed under /native/scenes/).
+// content wave 3 § 4.2, § 6) are written here directly by
+// `generatePackPictures.ts --scenes --pick`, not exported from the web, so
+// the clear-out keeps them and they are registered as they are (native
+// only: keyed under /native/scenes/).
 mkdirSync(join(out, 'scenes'), { recursive: true })
 for (const name of readdirSync(join(out, 'scenes'))) {
-  if (!/^story-.+\.webp$/.test(name)) rmSync(join(out, 'scenes', name))
+  if (!/^story-.+\.webp$/.test(name)) {
+    rmSync(join(out, 'scenes', name), { recursive: true, force: true })
+  }
 }
 for (const name of sorted(join(out, 'scenes'), /^story-.+\.webp$/)) {
   registry.push([`/native/scenes/${name}`, join(out, 'scenes', name)])

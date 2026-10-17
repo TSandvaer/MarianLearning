@@ -4,7 +4,7 @@
  * Pure helpers behind scripts/generatePackPictures.ts: manifest validation,
  * prompt building, spend math, the --pick mapping, CLI args, retry + pool.
  */
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { APIConnectionError, APIConnectionTimeoutError, APIError } from 'openai'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -13,6 +13,7 @@ import {
   backoffMs,
   budgetAllows,
   buildPrompt,
+  buildScenePrompt,
   classifyApiError,
   costFromUsage,
   estimateCallCost,
@@ -21,14 +22,22 @@ import {
   parseCli,
   parseManifest,
   parsePickArg,
+  parseSceneManifest,
   planPicks,
+  planScenePicks,
   runPool,
+  SCENE_RULES,
   selectEntries,
+  selectRows,
   sumLedger,
   variantsOnDisk,
   withRetry,
 } from './packPictureLib.ts'
-import type { LedgerEntry, PictureManifestEntry } from './packPictureLib.ts'
+import type {
+  LedgerEntry,
+  PictureManifestEntry,
+  SceneManifestEntry,
+} from './packPictureLib.ts'
 
 const FIXTURE = JSON.parse(
   readFileSync(
@@ -276,13 +285,14 @@ describe('spend math', () => {
     })
   })
 
-  it('prices two images in one call (input billed once)', () => {
+  it('prices a real n = 2 pack call (the input images billed per image)', () => {
+    // The ledger's cake line (2026-10-16): 2 x 3,072 image-in, 422 text-in.
     const c = costFromUsage({
-      input_tokens: 3150,
-      input_tokens_details: { image_tokens: 3072, text_tokens: 78 },
+      input_tokens: 6566,
+      input_tokens_details: { image_tokens: 6144, text_tokens: 422 },
       output_tokens: 878,
     })
-    expect(c.costUsd).toBe(0.051306)
+    expect(c.costUsd).toBe(0.077602)
   })
 
   it('prices all input at the image rate when the split is missing', () => {
@@ -296,14 +306,38 @@ describe('spend math', () => {
   })
 
   it('estimates a call from the measured tokens and prompt length', () => {
-    // 3072 x 8 + ceil(400 / 4) x 5 + 2 x 439 x 30 = 51,416 micro-dollars
+    // 2 x 3 x 1024 x 8 + 2 x ceil(400 / 4) x 5 + 2 x 439 x 30 = 76,492 micro-dollars
     expect(estimateCallCost(2, 400)).toEqual({
-      imageInTokens: 3072,
-      textInTokens: 100,
+      imageInTokens: 6144,
+      textInTokens: 200,
       outputTokens: 878,
-      costUsd: 0.051416,
+      costUsd: 0.076492,
     })
     expect(estimateCallCost(1, 0).costUsd).toBe(0.037746)
+  })
+
+  it('bills the input images once per image returned, refs included', () => {
+    // A scene: 3 anchors + 3 refs, n = 2 → 2 x 6 x 1024 image-in tokens.
+    expect(estimateCallCost(2, 400, 6)).toEqual({
+      imageInTokens: 12288,
+      textInTokens: 200,
+      outputTokens: 878,
+      costUsd: 0.125644,
+    })
+  })
+
+  it('bills the text input once per image returned', () => {
+    expect(estimateCallCost(1, 804).textInTokens).toBe(201)
+    // The cake call: an 804-char prompt, n = 2. Its ledger line reports
+    // 6,144 image-in, 422 text-in (about 2 x 211) and 878 out, $0.077602.
+    const cake = estimateCallCost(2, 804)
+    expect(cake).toEqual({
+      imageInTokens: 6144,
+      textInTokens: 402,
+      outputTokens: 878,
+      costUsd: 0.077502,
+    })
+    expect(Math.abs(cake.costUsd - 0.077602)).toBeLessThan(0.0002)
   })
 
   it('sums the ledger without float drift and reports bad lines', () => {
@@ -418,6 +452,7 @@ describe('parseCli', () => {
   it('defaults to 2 variants, no budget, no force, the real manifest', () => {
     expect(parseCli(['--batch', '3'])).toEqual({
       mode: 'generate',
+      set: 'pack',
       selection: { kind: 'batch', batch: 3 },
       variants: 2,
       dryRun: false,
@@ -443,6 +478,7 @@ describe('parseCli', () => {
       ]),
     ).toEqual({
       mode: 'generate',
+      set: 'pack',
       selection: { kind: 'words', words: ['hen', 'sack'] },
       variants: 3,
       dryRun: true,
@@ -455,6 +491,7 @@ describe('parseCli', () => {
   it('parses --pick', () => {
     expect(parseCli(['--pick', 'hen=v2'])).toEqual({
       mode: 'pick',
+      set: 'pack',
       picks: [{ word: 'hen', variant: 2 }],
       dryRun: false,
       manifestPath: 'design/word-song/picture-manifest.json',
@@ -606,5 +643,232 @@ describe('runPool', () => {
     const worker = vi.fn(async () => {})
     await runPool([], 4, worker)
     expect(worker).not.toHaveBeenCalled()
+  })
+})
+
+// ── --scenes (content-wave-3.md § 6) ────────────────────────────────────────
+
+const repoFile = (rel: string) => new URL(`../${rel}`, import.meta.url)
+const readRepoJson = (rel: string) =>
+  JSON.parse(readFileSync(repoFile(rel), 'utf8')) as unknown
+
+const scene = (over: Partial<SceneManifestEntry> = {}): SceneManifestEntry => ({
+  scene: 'fox-1',
+  tier: 'fox-stories',
+  batch: 1,
+  subject: 'The fox sitting on a striped rug.',
+  avoid: [],
+  refs: ['fox', 'rug'],
+  ...over,
+})
+
+describe('the scene manifest', () => {
+  const scenes = parseSceneManifest(
+    readRepoJson('design/word-song/scene-manifest.json'),
+  )
+  const pack = parseManifest(
+    readRepoJson('design/word-song/picture-manifest.json'),
+  )
+
+  it('holds the 24 stories: fox, hen, bug 1-8 in batches 1, 2, 3', () => {
+    const ids = ['fox', 'hen', 'bug'].flatMap((a) =>
+      Array.from({ length: 8 }, (_, i) => `${a}-${i + 1}`),
+    )
+    expect(scenes.map((e) => e.scene)).toEqual(ids)
+    for (const e of scenes) {
+      const animal = e.scene.split('-')[0]
+      expect(e.tier).toBe(`${animal}-stories`)
+      expect(e.batch).toBe({ fox: 1, hen: 2, bug: 3 }[animal])
+      expect(e.avoid.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('every ref is a pack word whose chip picture ships', () => {
+    const words = new Set(pack.map((e) => e.word))
+    for (const e of scenes) {
+      for (const w of e.refs) {
+        expect(words.has(w), `${e.scene}: ${w}`).toBe(true)
+        expect(
+          existsSync(repoFile(`mobile/assets/pictures/${w}.webp`)),
+          `${e.scene}: ${w}.webp`,
+        ).toBe(true)
+      }
+    }
+  })
+})
+
+describe('parseSceneManifest', () => {
+  it('trims the subject and avoid list like the pack', () => {
+    const [e] = parseSceneManifest([
+      { ...scene({ subject: '  A fox.  ', avoid: ['a table', ' '] }) },
+    ])
+    expect(e).toEqual(scene({ subject: 'A fox.', avoid: ['a table'] }))
+  })
+
+  it('collects every problem, refs included', () => {
+    let msg = ''
+    try {
+      parseSceneManifest([
+        scene({ refs: ['fox', 'rug', 'cup', 'hat', 'box'] }),
+        scene({ scene: 'fox-2', refs: [] }),
+        scene({ scene: 'fox-3', refs: ['fox', 'fox'] }),
+        { ...scene({ scene: 'fox-4' }), refs: 'fox' },
+        scene({ scene: 'fox-1' }),
+        { ...scene({ scene: 'Fox 6' }), subject: '' },
+      ])
+    } catch (err) {
+      msg = (err as Error).message
+    }
+    expect(msg).toContain('Manifest has 7 problem(s)')
+    expect(msg).toContain('entry 0 ("fox-1"): "refs" must be 1-4 pack words')
+    expect(msg).toContain('entry 1 ("fox-2"): "refs" must be 1-4 pack words')
+    expect(msg).toContain('entry 2 ("fox-3"): "refs" names a word twice')
+    expect(msg).toContain('entry 3 ("fox-4"): "refs" must be 1-4 pack words')
+    expect(msg).toContain('entry 4 ("fox-1"): duplicate scene')
+    expect(msg).toContain(
+      'entry 5 ("Fox 6"): "scene" must be a lower-case slug',
+    )
+    expect(msg).toContain(
+      'entry 5 ("Fox 6"): "subject" must be a non-empty string',
+    )
+  })
+})
+
+describe('buildScenePrompt', () => {
+  it('is subject + scene style + scene rules + a "Do not show" clause', () => {
+    expect(
+      buildScenePrompt(
+        scene({
+          subject:
+            'The fox beside an open cardboard box with a hat inside, its top showing.',
+          avoid: ['the fox wearing the hat'],
+        }),
+      ),
+    ).toBe(
+      'Subject: The fox beside an open cardboard box with a hat inside, its top showing. ' +
+        "Draw this subject as a single children's picture-book illustration in exactly the same " +
+        'art style as the reference pictures: the same soft line weight, the same flat soft ' +
+        'colours and gentle cel-shading, the same simplicity and finish. The first 3 reference ' +
+        'pictures show the style only; do not copy their subjects. The other reference pictures ' +
+        'show the characters and objects of this scene. Show exactly the characters and objects ' +
+        'named, each drawn like its reference picture, in one simple scene on a soft cream ' +
+        'background that fills the square. Nothing else: no other animals, people or objects, no ' +
+        'text or letters, no faces on objects. Do not show: the fox wearing the hat.',
+    )
+  })
+
+  it("carries the spec's SCENE_RULES and none of the pack's single-subject rules", () => {
+    for (const e of parseSceneManifest(
+      readRepoJson('design/word-song/scene-manifest.json'),
+    )) {
+      const p = buildScenePrompt(e)
+      expect(p).toContain(SCENE_RULES)
+      expect(p).not.toContain('No scene')
+      expect(p).not.toContain('transparent')
+      expect(p).not.toContain('Must not look like')
+      expect(p).not.toContain('The references show the style only')
+    }
+  })
+
+  it('omits the avoid clause when the list is empty', () => {
+    expect(buildScenePrompt(scene({ avoid: [] }))).not.toContain('Do not show')
+  })
+})
+
+describe('scene selection and picks', () => {
+  const m = [
+    scene(),
+    scene({ scene: 'fox-2' }),
+    scene({ scene: 'hen-1', tier: 'hen-stories', batch: 2 }),
+  ]
+
+  it('selects all, a batch, or ids in the requested order', () => {
+    const key = (e: SceneManifestEntry) => e.scene
+    expect(selectRows(m, { kind: 'all' }, key).map(key)).toEqual([
+      'fox-1',
+      'fox-2',
+      'hen-1',
+    ])
+    expect(selectRows(m, { kind: 'batch', batch: 2 }, key).map(key)).toEqual([
+      'hen-1',
+    ])
+    expect(
+      selectRows(m, { kind: 'words', words: ['hen-1', 'fox-1'] }, key).map(key),
+    ).toEqual(['hen-1', 'fox-1'])
+    expect(() =>
+      selectRows(m, { kind: 'words', words: ['fox-9'] }, key),
+    ).toThrow('Not in the manifest: fox-9')
+  })
+
+  it("maps a pick to its scenes batch variant and the app's story file", () => {
+    expect(planScenePicks(parsePickArg('fox-2=v1,hen-1=v3'), m)).toEqual([
+      {
+        word: 'fox-2',
+        src: 'design/references/picture-pack/openai/scenes/batch-1/fox-2__v1.png',
+        dest: 'mobile/assets/scenes/story-fox-2.webp',
+      },
+      {
+        word: 'hen-1',
+        src: 'design/references/picture-pack/openai/scenes/batch-2/hen-1__v3.png',
+        dest: 'mobile/assets/scenes/story-hen-1.webp',
+      },
+    ])
+    expect(() => planScenePicks(parsePickArg('bug-1=v1'), m)).toThrow(
+      '--pick: not in the manifest: bug-1',
+    )
+  })
+})
+
+describe('parseCli --scenes', () => {
+  it('alone selects every scene from the scene manifest', () => {
+    expect(parseCli(['--scenes', '--dry-run'])).toEqual({
+      mode: 'generate',
+      set: 'scenes',
+      selection: { kind: 'all' },
+      variants: 2,
+      dryRun: true,
+      budgetUsd: undefined,
+      force: false,
+      manifestPath: 'design/word-song/scene-manifest.json',
+    })
+  })
+
+  it('takes --batch, scene ids in --words, --budget and --force', () => {
+    expect(parseCli(['--scenes', '--batch', '2'])).toMatchObject({
+      set: 'scenes',
+      selection: { kind: 'batch', batch: 2 },
+    })
+    expect(
+      parseCli([
+        '--scenes',
+        '--words',
+        'fox-3,fox-8',
+        '--budget',
+        '3.3',
+        '--force',
+      ]),
+    ).toMatchObject({
+      set: 'scenes',
+      selection: { kind: 'words', words: ['fox-3', 'fox-8'] },
+      budgetUsd: 3.3,
+      force: true,
+    })
+  })
+
+  it('picks scenes', () => {
+    expect(parseCli(['--scenes', '--pick', 'fox-1=v2'])).toEqual({
+      mode: 'pick',
+      set: 'scenes',
+      picks: [{ word: 'fox-1', variant: 2 }],
+      dryRun: false,
+      manifestPath: 'design/word-song/scene-manifest.json',
+    })
+  })
+
+  it('rejects two selections; the pack still needs one', () => {
+    expect(() =>
+      parseCli(['--scenes', '--batch', '1', '--words', 'fox-1']),
+    ).toThrow('at most one of')
+    expect(() => parseCli(['--dry-run'])).toThrow('exactly one of')
   })
 })
