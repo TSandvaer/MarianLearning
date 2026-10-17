@@ -1833,6 +1833,49 @@ describe('M4 Leitner-hint payload (ticket 86c9pwgc8)', () => {
     )
   })
 
+  it.each([
+    ['a: 100', { a: 100, b: 2, op: '+', box: 1 }],
+    ['b: 100', { a: 3, b: 100, op: '-', box: 1 }],
+  ])(
+    'still drops a leitner fact outside 0..99 (%s; content wave 3 widens answers, not facts)',
+    async (_what, badFact) => {
+      const capture: { lastArgs?: unknown } = {}
+      const canonStub = vi.fn(() => null)
+      const anthropicClient = makeStubAnthropicClient(
+        STUB_MATH_PLAN_BODY,
+        capture,
+      )
+
+      const res = await handler(
+        makeRequest({
+          kind: 'session-start',
+          payload: {
+            track: 'math',
+            level: 1,
+            childName: 'Marian',
+            progress: {
+              focusNode: 'add-to-10',
+              leitner: [{ a: 3, b: 2, op: '+', box: 1 }, badFact],
+            },
+          },
+        }),
+        {
+          anthropicClient,
+          sessionCache,
+          rateLimiter,
+          now: nowFn,
+          getCanonEntry: canonStub,
+        },
+      )
+
+      expect(res.status).toBe(200)
+      const args = capture.lastArgs as { messages: Array<{ content: string }> }
+      expect(args.messages[0]!.content).not.toContain(
+        'LEITNER PRIORITY DIRECTIVE',
+      )
+    },
+  )
+
   it('does NOT cache a Leitner-active response under the standard key', async () => {
     // A cached Leitner-weighted plan would leak into a regular session
     // under the same (track, level, childName, focusNode) key. Same

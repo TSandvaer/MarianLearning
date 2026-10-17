@@ -17,9 +17,15 @@
  *    confirm a step it does not know, and the newer build re-queues it;
  *  - real corruption (a non-string where a step name belongs) still
  *    rejects.
+ *
+ * Content wave 3 (`design/native/content-wave-3.md` § 2, G) adds the
+ * same for recorded answers: hundreds records answers such as 234, so a
+ * `perProblemAnswerValue` entry is any whole number from 0 up, while the
+ * `mathFacts` bounds stay 0..99.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { recordProgressOnSessionEnd } from '../sessionEnd/progressHistory'
 import { reconcileWithCloud, type ReconcileOutcome } from './cloudSync'
 import { defaultProgress } from './defaults'
 import { pickFocusNode } from './focusNode'
@@ -288,5 +294,237 @@ describe('reconcileWithCloud — cloud doc from a build that knows more steps', 
     expect(doc.skillLevels).toEqual(loaded.skillLevels)
     expect(doc.lifetimeFirstEncounters).toEqual(loaded.lifetimeFirstEncounters)
     expect(doc.pendingPromotion).toEqual(loaded.pendingPromotion)
+  })
+})
+
+describe('recorded answers above 99 (content wave 3, G)', () => {
+  /** A hundreds session as a newer build records it: 3-digit answers, a
+   *  `null` where no chip was tapped, and 1000 for step 15. */
+  const WIDE_ANSWERS = [234, null, 999, 1000, 362, 0, 99, 100]
+  const OLD_ANSWERS = [3, 5, null, 7, 9, 10, 8, 6]
+
+  /** A doc a hundreds build wrote: an older entry in 0..99 plus a
+   *  hundreds entry (a step this build does not know). */
+  function wideDoc(): Doc {
+    const seed = defaultProgress('Marian')
+    return {
+      ...seed,
+      profile: { ...seed.profile, lastPlayedISO: '2026-10-15T09:00:00.000Z' },
+      history: [
+        {
+          dateISO: '2026-10-14T09:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.875,
+          mathFacts: [{ a: 4, b: 3, op: '+' }],
+          perProblemAnswerValue: OLD_ANSWERS,
+        },
+        {
+          dateISO: '2026-10-15T09:00:00.000Z',
+          skillFocus: ['hundreds'],
+          successRate: 1,
+          perProblemAnswerValue: WIDE_ANSWERS,
+        },
+      ],
+    }
+  }
+
+  function answersOn(
+    history: readonly { dateISO: string; perProblemAnswerValue?: unknown }[],
+    dateISO: string,
+  ): unknown {
+    return history.find((h) => h.dateISO === dateISO)?.perProblemAnswerValue
+  }
+
+  function withAnswers(values: unknown[]): Doc {
+    return {
+      ...defaultProgress('Marian'),
+      history: [
+        {
+          dateISO: '2026-10-15T09:00:00.000Z',
+          skillFocus: ['hundreds'],
+          successRate: 1,
+          perProblemAnswerValue: values,
+        },
+      ],
+    }
+  }
+
+  function withFact(fact: unknown): Doc {
+    return {
+      ...defaultProgress('Marian'),
+      history: [
+        {
+          dateISO: '2026-10-15T09:00:00.000Z',
+          skillFocus: ['add-to-20'],
+          successRate: 1,
+          mathFacts: [fact],
+        },
+      ],
+    }
+  }
+
+  describe('local load and save', () => {
+    it('loads a doc whose answers go above 99', () => {
+      store(wideDoc())
+      const loaded = loadProgress()
+      expect(loaded).not.toBeNull()
+      expect(isProgressV1(loaded)).toBe(true)
+      expect(loaded!.profile.lastPlayedISO).toBe('2026-10-15T09:00:00.000Z')
+      expect(answersOn(loaded!.history, '2026-10-15T09:00:00.000Z')).toEqual(
+        WIDE_ANSWERS,
+      )
+    })
+
+    it('a 362 survives load + save unchanged', () => {
+      store(wideDoc())
+      const loaded = loadProgress()
+      expect(loaded).not.toBeNull()
+      saveProgress(loaded!)
+
+      const saved = storedRaw()
+      expect(saved.history).toEqual(wideDoc().history)
+      const answers = answersOn(
+        saved.history as { dateISO: string }[],
+        '2026-10-15T09:00:00.000Z',
+      ) as number[]
+      expect(answers.filter((n) => n === 362)).toEqual([362])
+    })
+
+    it('a session end on this build keeps the 3-digit answers (no fresh start, no rollback)', () => {
+      store(wideDoc())
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 8,
+        dateISO: '2026-10-16T09:00:00.000Z',
+        focusNode: 'add-to-10',
+        perProblemAnswerValue: [3, 4, 5, 6, 7, 8, 9, 10],
+      })
+      const after = loadProgress()
+      expect(after).not.toBeNull()
+      expect(after!.history.map((h) => h.dateISO)).toEqual([
+        '2026-10-14T09:00:00.000Z',
+        '2026-10-15T09:00:00.000Z',
+        '2026-10-16T09:00:00.000Z',
+      ])
+      expect(answersOn(after!.history, '2026-10-15T09:00:00.000Z')).toEqual(
+        WIDE_ANSWERS,
+      )
+    })
+
+    it('an old doc (answers in 0..99, or none) loads and saves back unchanged', () => {
+      const old: Doc = {
+        ...wideDoc(),
+        history: [
+          (wideDoc().history as Doc[])[0]!,
+          {
+            dateISO: '2026-10-15T09:00:00.000Z',
+            skillFocus: ['cvc-words'],
+            successRate: 0.75,
+          },
+        ],
+      }
+      store(old)
+      const loaded = loadProgress()
+      expect(loaded).not.toBeNull()
+      saveProgress(loaded!)
+      expect(storedRaw()).toEqual(old)
+    })
+  })
+
+  describe('the guard', () => {
+    it.each([
+      ['-1', -1],
+      ['2.5', 2.5],
+      ["'7'", '7'],
+      ['NaN', NaN],
+      ['Infinity', Infinity],
+      ['2^53 (not a safe integer)', 2 ** 53],
+    ])('still rejects an answer of %s', (_what, bad) => {
+      expect(isProgressV1(withAnswers([234, bad]))).toBe(false)
+    })
+
+    it.each([
+      ['a: 100', { a: 100, b: 2, op: '+' }],
+      ['b: 100', { a: 3, b: 100, op: '-' }],
+      ['a: -1', { a: -1, b: 2, op: '+' }],
+      ['a: 2.5', { a: 2.5, b: 2, op: '*' }],
+    ])('mathFacts keep 0..99: still rejects %s', (_what, fact) => {
+      expect(isProgressV1(withFact(fact))).toBe(false)
+    })
+
+    it('mathFacts at 99 still pass', () => {
+      expect(isProgressV1(withFact({ a: 99, b: 99, op: '-' }))).toBe(true)
+    })
+  })
+
+  describe('cloud sync', () => {
+    function fetchReturning(blob: unknown, lastModifiedISO: string) {
+      return vi.fn(
+        async () =>
+          new Response(JSON.stringify({ ok: true, blob, lastModifiedISO }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      ) as unknown as typeof fetch
+    }
+
+    it('installs a newer cloud doc with 3-digit answers and merges local ones', async () => {
+      const local: Progress = {
+        ...defaultProgress('Marian'),
+        profile: {
+          ...defaultProgress('Marian').profile,
+          lastPlayedISO: '2026-10-13T09:00:00.000Z',
+        },
+        history: [
+          {
+            dateISO: '2026-10-13T09:00:00.000Z',
+            skillFocus: [
+              'hundreds',
+            ] as unknown as Progress['history'][number]['skillFocus'],
+            successRate: 1,
+            perProblemAnswerValue: [512, 362],
+          },
+        ],
+      }
+      const installed: Progress[] = []
+      const outcome = await reconcileWithCloud(VALID_UUID, local, {
+        fetchImpl: fetchReturning(wideDoc(), '2026-10-15T09:00:00.000Z'),
+        authSecret: SECRET,
+        installLocally: (p) => installed.push(p),
+        pushImpl: vi.fn(async () => 'sent' as const),
+      })
+      expect(outcome.kind).toBe('installed-from-cloud')
+      expect(installed).toHaveLength(1)
+      const doc = installed[0]!
+      expect(isProgressV1(doc)).toBe(true)
+      expect(answersOn(doc.history, '2026-10-13T09:00:00.000Z')).toEqual([
+        512, 362,
+      ])
+      expect(answersOn(doc.history, '2026-10-15T09:00:00.000Z')).toEqual(
+        WIDE_ANSWERS,
+      )
+    })
+
+    it('a loaded doc with 3-digit answers is pushed as is when it is newer', async () => {
+      store(wideDoc())
+      const local = loadProgress()
+      expect(local).not.toBeNull()
+      const pushImpl = vi.fn(async () => 'sent' as const)
+      const outcome = await reconcileWithCloud(VALID_UUID, local, {
+        fetchImpl: fetchReturning(
+          defaultProgress('Marian'),
+          '2026-10-14T09:00:00.000Z',
+        ),
+        authSecret: SECRET,
+        installLocally: vi.fn(),
+        pushImpl,
+      })
+      expect(outcome.kind).toBe('pushed-to-cloud')
+      expect(pushImpl).toHaveBeenCalledTimes(1)
+      const pushed = (pushImpl.mock.calls[0] as unknown[])[1] as Progress
+      expect(answersOn(pushed.history, '2026-10-15T09:00:00.000Z')).toEqual(
+        WIDE_ANSWERS,
+      )
+    })
   })
 })
