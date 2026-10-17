@@ -212,8 +212,15 @@ for (const name of sorted(join(webAssets, 'pictures'), /^picture-.+\.svg$/)) {
   }
 }
 
-// Simple-sentences scenes.
-freshDir(join(out, 'scenes'))
+// Simple-sentences scenes. The little-story scenes (`story-<id>.webp`) are
+// written here directly by `generatePackPictures.ts --scenes --pick` and have
+// no web source, so the clear-out keeps them.
+mkdirSync(join(out, 'scenes'), { recursive: true })
+for (const name of readdirSync(join(out, 'scenes'))) {
+  if (!/^story-.+\.webp$/.test(name)) {
+    rmSync(join(out, 'scenes', name), { recursive: true, force: true })
+  }
+}
 for (const name of sorted(join(webAssets, 'scenes'), /^scene-.+\.svg$/)) {
   const id = name.slice('scene-'.length, -'.svg'.length)
   await svgToWebp(

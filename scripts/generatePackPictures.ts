@@ -16,14 +16,27 @@
  *   then: yarn embed-pictures design/references/picture-pack/transparent-<tier> public/assets/pictures
  *         (cd mobile && npm run export-assets)
  *
- * Inputs: design/word-song/picture-manifest.json (override: --manifest) and
- * the local, gitignored anchors in design/references/picture-pack/anchors-openai/.
+ * Little-story scenes (content-wave-3.md § 6), the same flow with --scenes:
+ *   npx tsx scripts/generatePackPictures.ts --scenes --dry-run    (all 24)
+ *   npx tsx scripts/generatePackPictures.ts --scenes --batch 1 --budget 3.3
+ *   npx tsx scripts/generatePackPictures.ts --scenes --words fox-3 --force
+ *     → design/references/picture-pack/openai/scenes/batch-N/<scene>__v<k>.png
+ *   Each call sends the 3 anchors plus the chip picture of each `refs` word
+ *   (mobile/assets/pictures/<word>.webp), so the scene's fox is the chip's
+ *   fox; the background is opaque. --pick writes the app's file:
+ *   npx tsx scripts/generatePackPictures.ts --scenes --pick fox-1=v2
+ *     → mobile/assets/scenes/story-<scene>.webp (600x600, opaque)
+ *
+ * Inputs: design/word-song/picture-manifest.json (scenes:
+ * design/word-song/scene-manifest.json; override: --manifest) and the local,
+ * gitignored anchors in design/references/picture-pack/anchors-openai/.
  * OPENAI_API_KEY comes from .env.local (never logged).
  *
  * Spend: every response's `usage` is priced (packPictureLib.RATES_PER_1M) and
- * appended to design/references/picture-pack/openai/spend-ledger.jsonl, so
- * the running total survives across runs. `--budget <usd>` stops before any
- * call that would take ledger + in-flight + this call's estimate over it.
+ * appended to design/references/picture-pack/openai/spend-ledger.jsonl
+ * (scenes: openai/scenes/spend-ledger.jsonl), so the running total survives
+ * across runs. `--budget <usd>` stops before any call that would take that
+ * ledger + in-flight + this call's estimate over it.
  */
 
 import {
@@ -34,7 +47,7 @@ import {
   readdirSync,
   writeFileSync,
 } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import OpenAI, { toFile } from 'openai'
@@ -45,6 +58,7 @@ import type {
 } from 'openai/resources/images'
 
 import {
+  ANCHOR_WORDS,
   DEFAULT_VARIANTS,
   IMAGE_SIZE,
   MAX_CONCURRENCY,
@@ -55,11 +69,13 @@ import {
   PACK_PICTURE_PX,
   QUALITY,
   RATES_PER_1M,
+  SCENE_PICTURE_PX,
   USAGE,
   anchorRelPaths,
   batchDirRel,
   budgetAllows,
   buildPrompt,
+  buildScenePrompt,
   classifyApiError,
   contactSheetRelPath,
   costFromUsage,
@@ -69,10 +85,13 @@ import {
   ledgerLine,
   parseCli,
   parseManifest,
+  parseSceneManifest,
   planPicks,
+  planScenePicks,
   roundUsd,
   runPool,
-  selectEntries,
+  sceneDestRelPath,
+  selectRows,
   sumLedger,
   variantRelPath,
   variantsOnDisk,
@@ -82,6 +101,8 @@ import type {
   CliCommand,
   LedgerEntry,
   PictureManifestEntry,
+  PictureSet,
+  SceneManifestEntry,
 } from './packPictureLib.ts'
 import { buildContactSheet } from './packPictureSheet.ts'
 
@@ -102,6 +123,7 @@ export interface Deps {
 }
 
 export interface WordResult {
+  /** The word, or the scene id with --scenes. */
   word: string
   /** `exists`: variants already on disk and no `--force`, so no call (and no
    *  spend). `skipped`: not attempted because the run stopped. */
@@ -153,7 +175,7 @@ function realEditor(root: string): EditImages {
   return (params) => client.images.edit(params)
 }
 
-function readManifest(root: string, rel: string): PictureManifestEntry[] {
+function readManifestJson(root: string, rel: string): unknown {
   // resolve, not join: --manifest may be an absolute path.
   const path = resolve(root, rel)
   if (!existsSync(path)) {
@@ -161,19 +183,107 @@ function readManifest(root: string, rel: string): PictureManifestEntry[] {
       `Manifest not found: ${rel}. Pass --manifest <path> to use another file.`,
     )
   }
-  let raw: unknown
   try {
-    raw = JSON.parse(readFileSync(path, 'utf8'))
+    return JSON.parse(readFileSync(path, 'utf8'))
   } catch (err) {
     throw new Error(
       `Manifest is not valid JSON (${rel}): ${(err as Error).message}`,
     )
   }
-  return parseManifest(raw)
 }
 
-function readLedgerTotal(root: string, log: (s: string) => void): number {
-  const path = join(root, PATHS.ledger)
+function readManifest(root: string, rel: string): PictureManifestEntry[] {
+  return parseManifest(readManifestJson(root, rel))
+}
+
+function readSceneManifest(root: string, rel: string): SceneManifestEntry[] {
+  return parseSceneManifest(readManifestJson(root, rel))
+}
+
+/** Where each picture set lives and how its calls differ. */
+interface SetConfig {
+  noun: 'word' | 'scene'
+  manifest: string
+  outRoot: string
+  ledger: string
+  background: 'transparent' | 'opaque'
+  /** The CLI flag that selects the set ('' for the pack). */
+  flag: string
+  sheetTitle: string
+  pickExample: string
+}
+
+const SETS: Record<PictureSet, SetConfig> = {
+  pack: {
+    noun: 'word',
+    manifest: PATHS.manifest,
+    outRoot: PATHS.outRoot,
+    ledger: PATHS.ledger,
+    background: 'transparent',
+    flag: '',
+    sheetTitle: 'Batch',
+    pickExample: '--pick word=v1,word=v2',
+  },
+  scenes: {
+    noun: 'scene',
+    manifest: PATHS.sceneManifest,
+    outRoot: PATHS.sceneOutRoot,
+    ledger: PATHS.sceneLedger,
+    background: 'opaque',
+    flag: '--scenes',
+    sheetTitle: 'Scenes batch',
+    pickExample: '--scenes --pick fox-1=v1,fox-2=v2',
+  },
+}
+
+/** A manifest row of either set, as the run uses it. */
+interface Row {
+  /** The word, or the scene id. */
+  key: string
+  tier: string
+  batch: number
+  prompt: string
+  /** Repo-relative chip pictures sent after the anchors (scenes only). */
+  refs: string[]
+  /** What the app shows today, the contact sheet's first cell. */
+  currentRel: string
+  notes: string[]
+}
+
+function readRows(root: string, set: PictureSet, rel: string): Row[] {
+  if (set === 'pack') {
+    return readManifest(root, rel).map((e) => ({
+      key: e.word,
+      tier: e.tier,
+      batch: e.batch,
+      prompt: buildPrompt(e),
+      refs: [],
+      currentRel: currentPictureRelPath(e.word),
+      notes: [
+        `tier: ${e.tier}`,
+        ...(e.distinctFrom.length > 0
+          ? [`not like: ${e.distinctFrom.join(', ')}`]
+          : []),
+      ],
+    }))
+  }
+  return readSceneManifest(root, rel).map((e) => ({
+    key: e.scene,
+    tier: e.tier,
+    batch: e.batch,
+    prompt: buildScenePrompt(e),
+    refs: e.refs.map(currentPictureRelPath),
+    currentRel: sceneDestRelPath(e.scene),
+    notes: [`tier: ${e.tier}`, `refs: ${e.refs.join(', ')}`],
+  }))
+}
+
+function readLedgerTotal(
+  root: string,
+  ledgerRel: string,
+  log: (s: string) => void,
+): number {
+  const path = join(root, ledgerRel)
   if (!existsSync(path)) return 0
   const { totalUsd, badLines } = sumLedger(readFileSync(path, 'utf8'))
   if (badLines.length > 0) {
@@ -193,8 +303,8 @@ function errorText(err: unknown): string {
   return `${status}${msg}`.replace(/\s+/g, ' ').slice(0, 300)
 }
 
-function listBatchDir(root: string, batch: number): string[] {
-  const dir = join(root, batchDirRel(batch))
+function listBatchDir(root: string, batch: number, outRoot: string): string[] {
+  const dir = join(root, batchDirRel(batch, outRoot))
   return existsSync(dir) ? readdirSync(dir) : []
 }
 
@@ -218,33 +328,36 @@ function highestVariantOnDisk(dir: string, words: Set<string>): number {
 
 async function writeContactSheet(
   root: string,
+  cfg: SetConfig,
   batch: number,
-  manifest: PictureManifestEntry[],
+  all: Row[],
   minVariants: number,
 ): Promise<string> {
-  const rows = manifest.filter((e) => e.batch === batch)
-  const dir = join(root, batchDirRel(batch))
+  const rows = all.filter((e) => e.batch === batch)
+  const dir = join(root, batchDirRel(batch, cfg.outRoot))
   const k = Math.max(
     minVariants,
-    highestVariantOnDisk(dir, new Set(rows.map((r) => r.word))),
+    highestVariantOnDisk(dir, new Set(rows.map((r) => r.key))),
   )
   const png = await buildContactSheet(
-    batch,
+    {
+      title: `${cfg.sheetTitle} ${batch} · ${rows.length} ${cfg.noun}(s)`,
+      hint: `Pick with: npx tsx scripts/generatePackPictures.ts ${cfg.pickExample}`,
+    },
     rows.map((e) => {
-      const current = join(root, currentPictureRelPath(e.word))
+      const current = join(root, e.currentRel)
       return {
-        word: e.word,
-        tier: e.tier,
-        distinctFrom: e.distinctFrom,
+        key: e.key,
+        notes: e.notes,
         currentPath: existsSync(current) ? current : null,
         variantPaths: Array.from({ length: k }, (_, i) => {
-          const p = join(root, variantRelPath(batch, e.word, i + 1))
+          const p = join(root, variantRelPath(batch, e.key, i + 1, cfg.outRoot))
           return existsSync(p) ? p : null
         }),
       }
     }),
   )
-  const rel = contactSheetRelPath(batch)
+  const rel = contactSheetRelPath(batch, cfg.outRoot)
   mkdirSync(join(root, dirname(rel)), { recursive: true })
   writeFileSync(join(root, rel), png)
   return rel
@@ -256,14 +369,16 @@ export function rerunCommand(
   words: string[],
   cmd: Extract<CliCommand, { mode: 'generate' }>,
 ): string {
+  const cfg = SETS[cmd.set]
   const parts = [
     'npx tsx scripts/generatePackPictures.ts',
+    ...(cfg.flag ? [cfg.flag] : []),
     `--words ${words.join(',')}`,
   ]
   if (cmd.variants !== DEFAULT_VARIANTS)
     parts.push(`--variants ${cmd.variants}`)
   if (cmd.budgetUsd !== undefined) parts.push('--budget <usd>')
-  if (cmd.manifestPath !== PATHS.manifest) {
+  if (cmd.manifestPath !== cfg.manifest) {
     parts.push(`--manifest ${cmd.manifestPath}`)
   }
   return parts.join(' ')
@@ -274,16 +389,24 @@ export async function runGenerate(
   deps: Deps,
 ): Promise<GenerateSummary> {
   const { root, log } = deps
-  const manifest = readManifest(root, cmd.manifestPath)
-  const entries = selectEntries(manifest, cmd.selection)
+  const cfg = SETS[cmd.set]
+  const { noun } = cfg
+  const all = readRows(root, cmd.set, cmd.manifestPath)
+  const entries = selectRows(all, cmd.selection, (r) => r.key)
   const n = cmd.variants
   const plans = entries.map((e) => {
-    const prompt = buildPrompt(e)
-    const existing = variantsOnDisk(listBatchDir(root, e.batch), e.word)
+    const existing = variantsOnDisk(
+      listBatchDir(root, e.batch, cfg.outRoot),
+      e.key,
+    )
     return {
       entry: e,
-      prompt,
-      estimate: estimateCallCost(n, prompt.length),
+      prompt: e.prompt,
+      estimate: estimateCallCost(
+        n,
+        e.prompt.length,
+        ANCHOR_WORDS.length + e.refs.length,
+      ),
       existing,
       // Never overwrite a paid variant: new ones are numbered after them.
       firstVariant: (existing[existing.length - 1] ?? 0) + 1,
@@ -296,16 +419,21 @@ export async function runGenerate(
   const missingAnchors = anchorRelPaths().filter(
     (p) => !existsSync(join(root, p)),
   )
-  const ledgerTotal = readLedgerTotal(root, log)
+  const refRels = [...new Set(jobs.flatMap((j) => j.entry.refs))]
+  const missingRefs = refRels.filter((p) => !existsSync(join(root, p)))
+  const ledgerTotal = readLedgerTotal(root, cfg.ledger, log)
 
   if (cmd.dryRun) {
     log(
-      `DRY RUN — no API call. Model ${MODEL}, ${IMAGE_SIZE}, quality ${QUALITY}, ${n} variant(s) per word.`,
+      `DRY RUN — no API call. Model ${MODEL}, ${IMAGE_SIZE}, quality ${QUALITY}, ${n} variant(s) per ${noun}.`,
     )
     log(`Manifest: ${cmd.manifestPath}`)
-    log(`Words (${plans.length}):`)
+    log(`${noun === 'word' ? 'Words' : 'Scenes'} (${plans.length}):`)
     for (const p of plans) {
-      const head = `  ${p.entry.word.padEnd(12)} tier ${p.entry.tier.padEnd(14)} batch ${String(p.entry.batch).padEnd(3)}`
+      const refs = p.entry.refs.length
+      const head =
+        `  ${p.entry.key.padEnd(12)} tier ${p.entry.tier.padEnd(14)} batch ${String(p.entry.batch).padEnd(3)}` +
+        (refs > 0 ? ` +${refs} refs` : '')
       if (!cmd.force && p.existing.length > 0) {
         log(`${head} skip: ${variantRange(p.existing)} on disk`)
       } else {
@@ -316,16 +444,20 @@ export async function runGenerate(
       }
     }
     log(
-      `Images: ${jobs.length} word(s) x ${n} = ${jobs.length * n}` +
+      `Images: ${jobs.length} ${noun}(s) x ${n} = ${jobs.length * n}` +
         (onDisk.length > 0
           ? ` (${onDisk.length} already on disk, skipped; --force adds more)`
           : ''),
     )
+    const inputs =
+      noun === 'scene'
+        ? `(${ANCHOR_WORDS.length} anchors + refs)`
+        : `${ANCHOR_WORDS.length} anchors`
     log(
       `Estimated cost: ${formatUsd(estTotal)} ` +
-        `(per call: ${MEASURED.anchorImageInputTokens} image-in tokens @ $${RATES_PER_1M.imageInput}/1M + ~prompt/4 text-in @ $${RATES_PER_1M.textInput}/1M + ${n} x ${MEASURED.outputTokensPerImage} out @ $${RATES_PER_1M.imageOutput}/1M)`,
+        `(per image returned: ${inputs} x ${MEASURED.inputImageTokens} image-in tokens @ $${RATES_PER_1M.imageInput}/1M + ${MEASURED.outputTokensPerImage} out @ $${RATES_PER_1M.imageOutput}/1M; per call ~prompt/4 text-in @ $${RATES_PER_1M.textInput}/1M)`,
     )
-    log(`Spend ledger so far: ${formatUsd(ledgerTotal)} (${PATHS.ledger})`)
+    log(`Spend ledger so far: ${formatUsd(ledgerTotal)} (${cfg.ledger})`)
     if (cmd.budgetUsd !== undefined) {
       let fitting = 0
       let committed = 0
@@ -344,7 +476,7 @@ export async function runGenerate(
         `Budget ${formatUsd(cmd.budgetUsd)}: ledger + estimate = ${formatUsd(roundUsd(ledgerTotal + estTotal))} → ` +
           (fitting === jobs.length
             ? 'fits'
-            : `would stop after ${fitting} of ${jobs.length} word(s)`),
+            : `would stop after ${fitting} of ${jobs.length} ${noun}(s)`),
       )
     }
     log(
@@ -352,6 +484,13 @@ export async function runGenerate(
         ? 'Anchors: 3/3 present.'
         : `WARN anchors missing (a real run would stop): ${missingAnchors.join(', ')}`,
     )
+    if (refRels.length > 0) {
+      log(
+        missingRefs.length === 0
+          ? `Refs: ${refRels.length}/${refRels.length} chip pictures present.`
+          : `WARN refs missing (a real run would stop): ${missingRefs.join(', ')}`,
+      )
+    }
     return {
       results: [],
       runCostUsd: 0,
@@ -368,21 +507,36 @@ export async function runGenerate(
         `Copy anchor-hen.png, anchor-sack.png and anchor-wing.png into ${PATHS.anchorsDir}/.`,
     )
   }
+  if (missingRefs.length > 0 && jobs.length > 0) {
+    throw new Error(
+      `Reference pictures missing (the chip picture of a refs word):\n  ${missingRefs.join('\n  ')}`,
+    )
+  }
   // Nothing to call (every word already on disk): no key or anchors needed.
   const edit: EditImages =
     jobs.length > 0
       ? deps.createEditor()
       : () => Promise.reject(new Error('no calls in this run'))
-  const anchors =
+  // Anchors and refs, read once; each call sends the anchors, then its refs.
+  const inputBytes = new Map<string, Buffer>(
     jobs.length > 0
-      ? anchorRelPaths().map((rel) => ({
-          name: rel.slice(rel.lastIndexOf('/') + 1),
-          bytes: readFileSync(join(root, rel)),
-        }))
-      : []
+      ? [...anchorRelPaths(), ...refRels].map((rel) => [
+          rel,
+          readFileSync(join(root, rel)),
+        ])
+      : [],
+  )
+  const inputFiles = (refs: string[]) =>
+    Promise.all(
+      [...anchorRelPaths(), ...refs].map((rel) =>
+        toFile(inputBytes.get(rel) as Buffer, basename(rel), {
+          type: rel.endsWith('.webp') ? 'image/webp' : 'image/png',
+        }),
+      ),
+    )
 
   const runId = randomUUID()
-  const ledgerPath = join(root, PATHS.ledger)
+  const ledgerPath = join(root, cfg.ledger)
   mkdirSync(dirname(ledgerPath), { recursive: true })
 
   let runSpent = 0
@@ -390,8 +544,8 @@ export async function runGenerate(
   let stoppedBy: GenerateSummary['stoppedBy'] = null
   const results = new Map<string, WordResult>()
   for (const p of onDisk) {
-    results.set(p.entry.word, {
-      word: p.entry.word,
+    results.set(p.entry.key, {
+      word: p.entry.key,
       status: 'exists',
       images: 0,
       costUsd: 0,
@@ -400,9 +554,9 @@ export async function runGenerate(
   }
 
   log(
-    `Generating ${jobs.length} word(s) x ${n} with ${MODEL} (max ${MAX_CONCURRENCY} concurrent). ` +
+    `Generating ${jobs.length} ${noun}(s) x ${n} with ${MODEL} (max ${MAX_CONCURRENCY} concurrent). ` +
       (onDisk.length > 0
-        ? `${onDisk.length} word(s) already on disk, skipped. `
+        ? `${onDisk.length} ${noun}(s) already on disk, skipped. `
         : '') +
       `Estimate ${formatUsd(estTotal)}; ledger so far ${formatUsd(ledgerTotal)}` +
       (cmd.budgetUsd !== undefined
@@ -412,7 +566,7 @@ export async function runGenerate(
 
   await runPool(jobs, MAX_CONCURRENCY, async (job) => {
     const { entry, prompt, estimate, firstVariant } = job
-    const { word, batch } = entry
+    const { key: word, batch } = entry
     if (stoppedBy !== null) {
       results.set(word, {
         word,
@@ -452,15 +606,11 @@ export async function runGenerate(
         async () =>
           edit({
             model: MODEL,
-            image: await Promise.all(
-              anchors.map((a) =>
-                toFile(a.bytes, a.name, { type: 'image/png' }),
-              ),
-            ),
+            image: await inputFiles(entry.refs),
             prompt,
             size: IMAGE_SIZE,
             quality: QUALITY,
-            background: 'transparent',
+            background: cfg.background,
             output_format: 'png',
             n,
           }),
@@ -498,7 +648,7 @@ export async function runGenerate(
     const entryLine: LedgerEntry & { usageMissing?: boolean } = {
       ts: deps.now().toISOString(),
       runId,
-      word,
+      ...(cmd.set === 'scenes' ? { scene: word } : { word }),
       batch,
       model: MODEL,
       size: IMAGE_SIZE,
@@ -515,7 +665,7 @@ export async function runGenerate(
       (d) => typeof d.b64_json === 'string',
     )
     images.forEach((d, i) => {
-      const rel = variantRelPath(batch, word, firstVariant + i)
+      const rel = variantRelPath(batch, word, firstVariant + i, cfg.outRoot)
       mkdirSync(join(root, dirname(rel)), { recursive: true })
       writeFileSync(
         join(root, rel),
@@ -538,8 +688,8 @@ export async function runGenerate(
 
   const ordered = plans.map(
     ({ entry }) =>
-      results.get(entry.word) ?? {
-        word: entry.word,
+      results.get(entry.key) ?? {
+        word: entry.key,
         status: 'skipped' as const,
         images: 0,
         costUsd: 0,
@@ -548,12 +698,12 @@ export async function runGenerate(
 
   const sheets: string[] = []
   for (const batch of [...new Set(entries.map((e) => e.batch))]) {
-    sheets.push(await writeContactSheet(root, batch, manifest, n))
+    sheets.push(await writeContactSheet(root, cfg, batch, all, n))
   }
 
   const ledgerAfter = roundUsd(ledgerTotal + runSpent)
   log('')
-  log('Per word:')
+  log(`Per ${noun}:`)
   for (const r of ordered) {
     log(
       `  ${r.status.padEnd(7)} ${r.word.padEnd(12)} ${String(r.images).padStart(2)} img  ${formatUsd(r.costUsd)}${r.detail ? `  ${r.detail}` : ''}`,
@@ -565,17 +715,17 @@ export async function runGenerate(
   const skipped = count('skipped')
   const existed = count('exists')
   log(
-    `Batch total: ${formatUsd(runSpent)} for ${count('ok')}/${ordered.length} word(s)` +
+    `Batch total: ${formatUsd(runSpent)} for ${count('ok')}/${ordered.length} ${noun}(s)` +
       `${failed ? `, ${failed} failed` : ''}${skipped ? `, ${skipped} skipped` : ''}` +
       `${existed ? `, ${existed} already on disk` : ''}.`,
   )
-  log(`Spend ledger total: ${formatUsd(ledgerAfter)} (${PATHS.ledger})`)
+  log(`Spend ledger total: ${formatUsd(ledgerAfter)} (${cfg.ledger})`)
   for (const s of sheets) log(`Contact sheet: ${s}`)
   const rest = ordered
     .filter((r) => r.status === 'failed' || r.status === 'skipped')
     .map((r) => r.word)
   if (rest.length > 0) {
-    log('To generate the rest (only these words are called and paid for):')
+    log(`To generate the rest (only these ${noun}s are called and paid for):`)
     log(`  ${rerunCommand(rest, cmd)}`)
   }
 
@@ -588,9 +738,13 @@ export async function runGenerate(
   }
 }
 
+/** export-assets.mjs encodes the app's WebPs at q 85. */
+const SCENE_WEBP = { quality: 85 }
+
 /**
  * Writes the chosen variants into the embed pipeline at the pack's size:
- * 1024x1024 → 500x500 transparent PNG (PACK_PICTURE_PX). Every pick is
+ * 1024x1024 → 500x500 transparent PNG (PACK_PICTURE_PX). Scenes go straight
+ * to the app as opaque 600x600 WebPs (SCENE_PICTURE_PX). Every pick is
  * decoded and resized in memory first, so one bad file means nothing is
  * written.
  */
@@ -599,18 +753,27 @@ export async function runPick(
   deps: Pick<Deps, 'root' | 'log'>,
 ): Promise<{ copied: number }> {
   const { root, log } = deps
-  const manifest = readManifest(root, cmd.manifestPath)
-  const plan = planPicks(cmd.picks, manifest)
+  const scenes = cmd.set === 'scenes'
+  const plan = scenes
+    ? planScenePicks(cmd.picks, readSceneManifest(root, cmd.manifestPath))
+    : planPicks(cmd.picks, readManifest(root, cmd.manifestPath))
   const missing = plan.filter((c) => !existsSync(join(root, c.src)))
   if (missing.length > 0) {
     throw new Error(
       `Picked variant(s) not on disk (nothing copied):\n  ${missing.map((c) => c.src).join('\n  ')}`,
     )
   }
-  const px = PACK_PICTURE_PX
+  const px = scenes ? SCENE_PICTURE_PX : PACK_PICTURE_PX
   const resized = await Promise.all(
     plan.map(async (c) => {
       try {
+        if (scenes) {
+          return await sharp(join(root, c.src))
+            .resize(px, px, { fit: 'cover' })
+            .removeAlpha()
+            .webp(SCENE_WEBP)
+            .toBuffer()
+        }
         return await sharp(join(root, c.src))
           .resize(px, px, {
             fit: 'contain',
@@ -635,8 +798,12 @@ export async function runPick(
       writeFileSync(join(root, c.dest), resized[i])
     }
   })
-  const tiers = [...new Set(plan.map((c) => dirname(c.dest)))]
   log('')
+  if (scenes) {
+    log(`Next: commit ${PATHS.scenes}/story-*.webp (export-assets keeps them).`)
+    return { copied: cmd.dryRun ? 0 : plan.length }
+  }
+  const tiers = [...new Set(plan.map((c) => dirname(c.dest)))]
   log('Next, per tier:')
   for (const t of tiers)
     log(`  yarn embed-pictures ${t} public/assets/pictures`)
