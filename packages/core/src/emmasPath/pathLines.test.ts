@@ -13,22 +13,23 @@ import {
 } from './pathLines'
 
 /** Spec §4.5 word list (carrier + name + land-name words), lower-case;
- *  plus "the" of "all the groups" (content wave 1 K7, Thomas 2026-10-16). */
+ *  plus "the" of "all the groups" (content wave 1 K7, Thomas 2026-10-16)
+ *  and "sharing" (content wave 2 K7, Thomas 2026-10-17). */
 const SPEC_VOCAB = new Set(
   `here is your path you are on did all of it look at flowers flower a new for
   learned now can do land first then this not yet numbers adding taking away to
   ten twenty big making tens skip counting groups two three four five and letter
   letters names sounds blending words reading sentences cat dog sun pig bed ship
-  chick thumb star sound pairs the duck crab`.split(/\s+/),
+  chick thumb star sound pairs the duck crab sharing`.split(/\s+/),
 )
 const NUMERALS = new Set(['1', '2', '3', '4', '5', '6'])
 
 describe('STAGE_SPOKEN_NAMES (spec §4.3)', () => {
-  it('gives all 27 stages a name and no two the same', () => {
+  it('gives all 28 stages a name and no two the same', () => {
     const nodes = [...MATH_TREE, ...LITERACY_TREE]
-    expect(nodes).toHaveLength(27)
+    expect(nodes).toHaveLength(28)
     const names = nodes.map((n) => STAGE_SPOKEN_NAMES[n])
-    expect(new Set(names).size).toBe(27)
+    expect(new Set(names).size).toBe(28)
   })
 })
 
@@ -54,15 +55,15 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
     const counts: Record<string, number> = {}
     for (const l of PATH_LINES) counts[l.kind] = (counts[l.kind] ?? 0) + 1
     expect(counts).toEqual({
-      open: 27,
+      open: 28,
       'open-done': 2,
-      stop: 27,
+      stop: 28,
       land: 10,
-      'locked-next': 25,
-      'locked-later': 146,
+      'locked-next': 26,
+      'locked-later': 157,
       'gate-locked': 51,
-      'end-bud': 27,
-      'end-unlock': 25,
+      'end-bud': 28,
+      'end-unlock': 26,
       'end-land': 8,
       'end-land-no-number': 8,
     })
@@ -124,15 +125,31 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
       'A new land! Land 6: Big words!',
       'A new land: Big words!',
     ])
+    // Content wave 2 § 6.2, sharing's 5 path lines (Thomas 2026-10-17).
+    expect(
+      [
+        'path.open.div-share',
+        'path.stop.div-share',
+        'path.locked.next.div-share',
+        'end.bud.div-share',
+        'end.unlock.div-share',
+      ].map((id) => pathLine(id)?.text),
+    ).toEqual([
+      'Here is your path! You are on sharing.',
+      'Sharing.',
+      'Sharing! First, all the groups. Then this!',
+      'Look! A new flower for sharing!',
+      'You learned all the groups! Now you can do sharing!',
+    ])
   })
 
   it('bakes every non-deferred line and none of the deferred ones', () => {
     for (const l of PATH_LINES)
       expect(l.src === null).toBe(DEFERRED_PATH_LINE_KINDS.has(l.kind))
     // Content wave 1: + 5 (all the groups) + 13 (duck words, crab words,
-    // land 6) = 159, the spec's § 6.2 count.
-    expect(BAKED_PATH_LINES).toHaveLength(159)
-    expect(new Set(BAKED_PATH_LINES.map((l) => l.text)).size).toBe(158)
+    // land 6) = 159, the spec's § 6.2 count. Content wave 2: + 5 (sharing).
+    expect(BAKED_PATH_LINES).toHaveLength(164)
+    expect(new Set(BAKED_PATH_LINES.map((l) => l.text)).size).toBe(163)
   })
 
   it('has a bundled MP3 for every baked line', () => {

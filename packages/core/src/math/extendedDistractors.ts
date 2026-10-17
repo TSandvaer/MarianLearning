@@ -14,11 +14,16 @@
  * | recognize  | `pickDistractors(c, i, 10)`     | `pickDistractors(c, i, 10)` (off by one)   | `'off-by-one'`   |
  * | skip-count | first term; `c + step`          | last term + 1; `c + step`                  | `'count-by-one'` |
  * | multiply   | `pickDistractors(c, i, M)`      | `A + B`; `c ± 1` (sign by position)        | `'wrong-op'`     |
+ * | divide     | `pickDistractors(c, i, 10)`     | `pickDistractors(c, i, 10)` (off by one)   | `'off-by-one'`   |
+ *
+ * Sharing (content wave 2 § 2.6, K5, D4): `pickDistractors` unchanged with
+ * M = 10, so no far "99" chip and no plate-count trap.
  */
 
 import { GENTLE_RAMP_THROUGH, pickDistractors } from './distractors'
 import {
   EXTENDED_ANSWER_MAX,
+  type DivideProblem,
   type MultiplyProblem,
   type NumberRecogProblem,
   type SkipCountProblem,
@@ -26,6 +31,8 @@ import {
 
 /** Number recognition: the chips are numbers 1..10 (spec § 10). */
 export const RECOGNIZE_CHIP_MAX = 10
+/** Sharing: the chips are shares 1..10 (content wave 2 § 2.6, K5). */
+export const SHARE_CHIP_MAX = 10
 /** Skip counting: every chip stays in 1..99. The spec's § 4 "Skip repair"
  *  says 1..100; 99 is the progress guard's ceiling for a recorded answer
  *  ({@link EXTENDED_ANSWER_MAX}), so a tapped 100 can't reset the doc. */
@@ -42,6 +49,7 @@ export type ExtendedChipProblem =
   | NumberRecogProblem
   | SkipCountProblem
   | MultiplyProblem
+  | DivideProblem
 
 const sortPair = (a: number, b: number): [number, number] =>
   a <= b ? [a, b] : [b, a]
@@ -86,6 +94,12 @@ export function recognizeDistractors(
   problem: NumberRecogProblem,
 ): [number, number] {
   return pickDistractors(problem.correct, problem.index, RECOGNIZE_CHIP_MAX)
+}
+
+/** Sharing: `pickDistractors(correct, index, 10)`, unchanged (content wave
+ *  2 § 2.6): far values on P1–P3, the neighbours on P4–P8. */
+export function divideDistractors(problem: DivideProblem): [number, number] {
+  return pickDistractors(problem.correct, problem.index, SHARE_CHIP_MAX)
 }
 
 /**
@@ -155,14 +169,15 @@ export function multiplyDistractors(
 }
 
 /** The class a problem's chips offer: `null` on P1–P3; on P4–P8
- *  `'off-by-one'` (recognize), `'count-by-one'` (skip) or `'wrong-op'`
- *  (multiply). */
+ *  `'off-by-one'` (recognize, divide), `'count-by-one'` (skip) or
+ *  `'wrong-op'` (multiply). */
 export function extendedOfferedClass(
   problem: ExtendedChipProblem,
 ): ExtendedOfferedClass | null {
   if (problem.index <= GENTLE_RAMP_THROUGH) return null
   switch (problem.kind) {
     case 'recognize':
+    case 'divide':
       return 'off-by-one'
     case 'skip-count':
       return 'count-by-one'
@@ -184,5 +199,7 @@ export function extendedDistractors(
       return skipCountDistractors(problem)
     case 'multiply':
       return multiplyDistractors(problem, multiplyCeiling)
+    case 'divide':
+      return divideDistractors(problem)
   }
 }

@@ -113,8 +113,8 @@ describe('reviewBaseline / reviewPool (D2)', () => {
     expect(
       reviewPool(progressAtStep('cvc-words-short-o'), 'word-song'),
     ).toEqual(['letter-sounds', 'blending-cv', 'cvc-words'])
-    const done = progressAtStep('mult-mix')
-    done.skillLevels['mult-mix'] = 'mastered'
+    const done = progressAtStep('div-share')
+    done.skillLevels['div-share'] = 'mastered'
     expect(reviewPool(done, 'math')).toEqual([])
   })
 })
@@ -391,8 +391,8 @@ describe('sessionPlanKind (§ 2)', () => {
   })
 
   it('a complete world is a forward session (no sleeping flower)', () => {
-    const done = progressAtStep('mult-mix')
-    done.skillLevels['mult-mix'] = 'mastered'
+    const done = progressAtStep('div-share')
+    done.skillLevels['div-share'] = 'mastered'
     const p = withHistory(done, entry('mult-6-9', at(TUE, 7), 8))
     expect(sessionPlanKind(p, 'math', NOW_MS, TODAY, 0).kind).toBe('forward')
   })

@@ -151,6 +151,18 @@ const CANON_CHIPS: Record<string, [number, [number, number]][]> = {
     [32, [12, 31]],
     [36, [13, 37]],
   ],
+  // Content wave 2 § 2.7 (AC 3): sharing, `pickDistractors(c, i, 10)`
+  // unchanged. P1–P3 gentle (far values), P4–P8 off by one; no "99" chip.
+  'div-share': [
+    [3, [1, 10]],
+    [4, [1, 10]],
+    [5, [1, 10]],
+    [4, [3, 5]],
+    [2, [1, 3]],
+    [3, [2, 4]],
+    [5, [4, 6]],
+    [6, [5, 7]],
+  ],
 }
 
 describe.each(Object.keys(CANON_CHIPS))('canon chips — %s', (node) => {
@@ -204,6 +216,7 @@ describe('extendedOfferedClass', () => {
     ['mult-2-5-10', 'wrong-op'],
     ['mult-3-4', 'wrong-op'],
     ['mult-6-9', 'wrong-op'],
+    ['div-share', 'off-by-one'],
   ] as const)('%s: null on P1–P3, %s on P4–P8', (node, offered) => {
     const classes = canonProblems(node).map((p) => {
       if (p.kind === 'arithmetic' || p.kind === 'missing-addend')

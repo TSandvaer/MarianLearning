@@ -161,6 +161,9 @@ export const VALID_MATH_FOCUS_NODES: readonly string[] = [
   // from canon blocks (`payload.mix`, api/_review.ts); a request without
   // `mix` is served the step's own canon.
   'mult-mix',
+  // Content wave 2 § 2: sharing. Served from its committed canon every
+  // session (written by scripts/spliceContentWave2Canon.ts, never baked).
+  'div-share',
 ]
 
 export const VALID_WORD_SONG_FOCUS_NODES: readonly string[] = [
@@ -1600,7 +1603,7 @@ Session-End utterances (REQUIRED — append to the same flat utterances array):
 After the per-problem utterances (8 × 7 = 56 for MATH, 8 × 5 = 40 for WORD-SONG — or 8 × 6 = 48 on the cvc-word tier, which adds the optional "blend" slot per problem), append the following Session-End utterances. The Session-End screen looks them up by exact id at runtime and degrades gracefully on a miss, but every id below MUST be emitted so the celebration never falls back to silent captions.
 
   - "session.end.opener" — text: "You did it!"
-  - "session.end.recap.focus" — text: "You worked on <spoken-focus-name> today!" where <spoken-focus-name> is a short, warm, CHILD-FACING phrase for the focus skill node named in the user message. Spell any numbers out as words and drop curriculum jargon — Emma is speaking to an 8-year-old, not a parent. Use exactly these phrases per focus node: add-to-10 -> "adding to ten"; add-to-20 -> "adding to twenty"; sub-to-10 -> "taking away to ten"; sub-to-20 -> "taking away to twenty"; number-recog -> "your numbers"; two-digit-addsub-no-regroup / two-digit-addsub-with-regroup -> "bigger numbers"; skip-counting -> "skip counting"; mult-2-5-10 / mult-3-4 / mult-6-9 / mult-mix -> "counting in groups"; letter-names -> "your letters"; letter-sounds -> "letter sounds"; blending-cv -> "blending sounds"; any cvc-words* tier, any digraphs* tier, sight-words, duck-words and crab-words -> "reading words"; simple-sentences -> "reading sentences". Exactly one line; never use digits; one exclamation mark.
+  - "session.end.recap.focus" — text: "You worked on <spoken-focus-name> today!" where <spoken-focus-name> is a short, warm, CHILD-FACING phrase for the focus skill node named in the user message. Spell any numbers out as words and drop curriculum jargon — Emma is speaking to an 8-year-old, not a parent. Use exactly these phrases per focus node: add-to-10 -> "adding to ten"; add-to-20 -> "adding to twenty"; sub-to-10 -> "taking away to ten"; sub-to-20 -> "taking away to twenty"; number-recog -> "your numbers"; two-digit-addsub-no-regroup / two-digit-addsub-with-regroup -> "bigger numbers"; skip-counting -> "skip counting"; mult-2-5-10 / mult-3-4 / mult-6-9 / mult-mix -> "counting in groups"; div-share -> "sharing"; letter-names -> "your letters"; letter-sounds -> "letter sounds"; blending-cv -> "blending sounds"; any cvc-words* tier, any digraphs* tier, sight-words, duck-words and crab-words -> "reading words"; simple-sentences -> "reading sentences". Exactly one line; never use digits; one exclamation mark.
   - "session.end.recap.1" through "session.end.recap.11" — one entry per N in 1..11. The N=1 line is "You earned one star!"; for N >= 2 the line is "You earned <number-word> stars!" with the number spelled out (one, two, three, four, five, six, seven, eight, nine, ten, eleven). Never use digits; never use "stars" with N=1.
   - "session.end.streak.3" through "session.end.streak.8" — one entry per N in 3..8. Each line is "<number-word> in a row! Wow!" with the number spelled out (three, four, five, six, seven, eight). Capitalise the leading word.
   - "session.end.goodbye" — text: "See you soon."
@@ -2149,6 +2152,7 @@ The user message names a focus skill node. Generate problems specifically for th
 - mult-3-4: multiplication by 3 or 4. read: same template.
 - mult-6-9: multiplication by 6, 7, 8, or 9. read: same template.
 - mult-mix: mixed multiplication, any group size 2-9 with 2-5 groups (answers up to 36). read: same template.
+- div-share: sharing — a pile of flowers dealt equally onto plates; the answer is how many land on each plate. <rule band="hard">OVERRIDES the per-problem template and the generic hint templates below</rule>: use EXACTLY these 8 problems in this order (pile on plates): 6 on 2, 8 on 2, 10 on 2, 12 on 3, 8 on 4, 15 on 5, 20 on 4, 18 on 3. read: "<pile-word> flowers, <plates-word> plates. How many on each plate?" e.g. "Twelve flowers, three plates. How many on each plate?"; correct: "Yes! <share-word> on each plate!" e.g. "Yes! Four on each plate!"; reprompt: "Hmm... try again?"; hint1: "Look at the flowers."; hint2: "One for each plate."; hint3: "How many on each plate?"; giveAnswer: "This one is <share-word>." Never say "divide", "equal" or "fair", and never write a division sign.
 
 Per-problem utterance template (any focus node):
 - read: see the focus-node-specific shape above.

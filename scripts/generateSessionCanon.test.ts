@@ -41,7 +41,7 @@ import {
  */
 
 describe('activeCombos — coverage matches the curriculum', () => {
-  it('produces 27 combos: 12 math nodes × level 1 + 15 word-song nodes × level 1 (mult-mix spliced; duck-words + crab-words, content wave 1)', () => {
+  it('produces 28 combos: 13 math nodes × level 1 + 15 word-song nodes × level 1 (mult-mix spliced; duck-words + crab-words, content wave 1; div-share spliced, content wave 2)', () => {
     // Step 2 of the planner-parser contract added cvc-words alongside
     // blending-cv as a first-class word-song content mode. Ticket
     // 86c9m3ae3 added `cvc-words-short-o` as the next-vowel sibling
@@ -80,11 +80,13 @@ describe('activeCombos — coverage matches the curriculum', () => {
     // word-song node is first-class — no remaining untuned tiers.
     // Content wave 1 added `duck-words` and `crab-words` (land 6, "Big
     // words"; design/native/content-wave-1.md § 3–§ 4), fixed 8-word sessions.
+    // Content wave 2 added `div-share` (sharing, land 4;
+    // design/native/content-wave-2.md § 2.7), written by a splice.
     const combos = activeCombos()
-    expect(combos).toHaveLength(27)
+    expect(combos).toHaveLength(28)
     const mathCount = combos.filter((c) => c.track === 'math').length
     const wordSongCount = combos.filter((c) => c.track === 'word-song').length
-    expect(mathCount).toBe(12)
+    expect(mathCount).toBe(13)
     expect(wordSongCount).toBe(15)
   })
 

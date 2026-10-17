@@ -54,8 +54,9 @@
  * ------------------------------------
  * `{ extendedKinds: true }` also reads the number-recognition ("Tap the
  * seven."), skip-count ("Two, four, six, eight. What is next?"),
- * multiplication ("Two times three. How many?") and missing-number ("Seven
- * and what make ten?") read lines and returns an
+ * multiplication ("Two times three. How many?"), missing-number ("Seven
+ * and what make ten?") and sharing ("Twelve flowers, three plates. How
+ * many on each plate?") read lines and returns an
  * `ExtendedMathSessionPlan` (see `extendedProblems.ts`). Without the option (the frozen web app's call) the
  * output is exactly what it was before: arithmetic only, and those read
  * lines throw.
@@ -66,6 +67,11 @@
  */
 
 import {
+  DIVIDE_PLATES_MAX,
+  DIVIDE_PLATES_MIN,
+  DIVIDE_SHARE_MAX,
+  DIVIDE_SHARE_MIN,
+  DIVIDE_TOTAL_MAX,
   EXTENDED_ANSWER_MAX,
   MISSING_ADDEND_TOTAL_MAX,
   type ExtendedMathProblem,
@@ -408,8 +414,8 @@ function arithmeticProblem(
 
 /** One problem of an extended plan, dispatched on the read line's template.
  *  The templates are disjoint ("Tap the", comma list + "What is next?",
- *  "times", "plus" / "minus" / "take away"), so the order only decides which
- *  error a near-miss gets. */
+ *  "and what make", "plates", "times", "plus" / "minus" / "take away"), so
+ *  the order only decides which error a near-miss gets. */
 function extendedProblemFromRead(
   index: number,
   utterances: MathProblemUtterances,
@@ -433,6 +439,10 @@ function extendedProblemFromRead(
   const missing = matchMissingAddendRead(read)
   if (missing) {
     return { kind: 'missing-addend', index, ...missing, utterances }
+  }
+  const divide = matchDivideRead(read)
+  if (divide) {
+    return { kind: 'divide', index, ...divide, utterances }
   }
   const multiply = matchMultiplyRead(read)
   if (multiply) {
@@ -459,7 +469,8 @@ function extendedProblemFromRead(
       `How many are left?"; subtraction first-session "<W> take away <W>. ` +
       `How many are left?"; number recognition "Tap the <W>."; skip-count ` +
       `"<W>, <W>, <W>. What is next?"; multiplication "<W> times <W>. How ` +
-      `many?"; missing number "<W> and what make <W>?")`,
+      `many?"; missing number "<W> and what make <W>?"; sharing "<W> ` +
+      `flowers, <W> plates. How many on each plate?")`,
   )
 }
 
@@ -633,6 +644,67 @@ export function parseMissingAddendRead(read: string): {
     `math read line "${read}" did not match the missing-number read ` +
       `template "<W> and what make <W>?"`,
   )
+}
+
+/** Extract the pile, the plates and the share from a sharing `read` line
+ *  (content wave 2 § 2.6).
+ *
+ *  Template (canon): `"<T> flowers, <B> plates. How many on each plate?"`,
+ *  e.g. `"Twelve flowers, three plates. How many on each plate?"` → total
+ *  12, plates 3, correct 4. Valid when 2 ≤ B ≤ 5, B divides T, the share is
+ *  2..10 and T ≤ 20 (what the plates and the pile can show).
+ *  Case-insensitive; throws on any drift, an unknown number word or an
+ *  out-of-range pair. Disjoint from every other template (none contains
+ *  "plates").
+ *
+ *  Opt-in kind: only `mathSessionPlanFromServer(plan, { extendedKinds: true
+ *  })` reads this template. */
+export function parseDivideRead(read: string): {
+  total: number
+  plates: number
+  correct: number
+} {
+  const divide = matchDivideRead(read)
+  if (divide) return divide
+  throw new PlanFromServerError(
+    `math read line "${read}" did not match the sharing read template ` +
+      `"<W> flowers, <W> plates. How many on each plate?"`,
+  )
+}
+
+/** {@link parseDivideRead}'s template: `null` on a miss; throws on an
+ *  unknown number word or a pile and plates the screen can't share. */
+function matchDivideRead(
+  read: string,
+): { total: number; plates: number; correct: number } | null {
+  const match = read.match(
+    /^\s*([a-z-]+)\s+flowers,\s+([a-z-]+)\s+plates\.\s+how\s+many\s+on\s+each\s+plate\?\s*$/i,
+  )
+  if (!match) return null
+  const total = wordToNumber(match[1]!.toLowerCase())
+  const plates = wordToNumber(match[2]!.toLowerCase())
+  if (total === undefined || plates === undefined) {
+    throw new PlanFromServerError(
+      `math read line "${read}" had unrecognised number word(s)`,
+    )
+  }
+  const share = total / plates
+  if (
+    plates < DIVIDE_PLATES_MIN ||
+    plates > DIVIDE_PLATES_MAX ||
+    total > DIVIDE_TOTAL_MAX ||
+    !Number.isInteger(share) ||
+    share < DIVIDE_SHARE_MIN ||
+    share > DIVIDE_SHARE_MAX
+  ) {
+    throw new PlanFromServerError(
+      `math read line "${read}" shares ${total} onto ${plates} plates; ` +
+        `sharing needs ${DIVIDE_PLATES_MIN}-${DIVIDE_PLATES_MAX} plates, ` +
+        `an even share of ${DIVIDE_SHARE_MIN}-${DIVIDE_SHARE_MAX} and at ` +
+        `most ${DIVIDE_TOTAL_MAX} flowers`,
+    )
+  }
+  return { total, plates, correct: share }
 }
 
 /** {@link parseMissingAddendRead}'s template: `null` on a miss; throws on an
