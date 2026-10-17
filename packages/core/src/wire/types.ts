@@ -141,6 +141,26 @@ export const PEEK_BLOCK_COUNT = 3
  */
 export const PEEK_PLAN_ID_PREFIX = 'peek-'
 
+// --- Map replay ---------------------------------------------------------------
+//
+// Native spec `design/native/map-tap-to-play.md` § 3. A tap on a mastered
+// stop replays that step under the peek's rules: the session-start track
+// payload carries `replay: { node }`, a step of `track`. The server answers
+// it like a peek (step 0, before the canon lookup, the session cache and the
+// rate limiter): the step's canon problems 1..`REPLAY_BLOCK_COUNT` copied
+// with their baked audio, in canon order, with a plan id starting
+// `REPLAY_PLAN_ID_PREFIX`. A replay counts toward nothing.
+
+/** A replay plays this many problems: the step's canon P1–P8. */
+export const REPLAY_BLOCK_COUNT = 8
+
+/**
+ * A replay response's `plan.id` starts with this. An older server ignores
+ * `payload.replay` and answers with a forward plan, which the client must
+ * take as the replay's failure path.
+ */
+export const REPLAY_PLAN_ID_PREFIX = 'replay-'
+
 // --- Times mix ----------------------------------------------------------------
 //
 // Content wave 1 `design/native/content-wave-1.md` § 2.4. A session on the
@@ -194,9 +214,10 @@ export interface ClaudeErrorResponse {
      *  exactly 8 refs, a step of another track, a problem outside 1..8, or a
      *  missing canon entry (native spec review-mode-and-warmup-native.md
      *  § 7.4). Likewise a `payload.peek` that is not exactly 3 refs of one
-     *  step of the track (fast-track-native.md § 6.2), and a `payload.mix`
+     *  step of the track (fast-track-native.md § 6.2), a `payload.mix`
      *  that is not exactly 8 refs of `MIX_SOURCE_STEPS` (content wave 1
-     *  § 2.4). */
+     *  § 2.4), and a `payload.replay` whose node is not a step of the
+     *  track (map-tap-to-play.md § 3). */
     | 'invalid-request'
   message?: string
 }

@@ -52,6 +52,8 @@ export type GuidanceLineKind =
   | 'session-peek-close'
   | 'session-intro'
   | 'session-hiding'
+  | 'session-replay-open'
+  | 'session-replay-close'
 
 export interface GuidanceLine {
   /** Dotted id, e.g. `guide.hub.suggest.math`. */
@@ -195,6 +197,28 @@ function buildLines(): GuidanceLine[] {
       if (text !== undefined) add(sessionIntroId(n), 'session-intro', text, w)
     }
   add(SESSION_HIDING_ID, 'session-hiding', 'Some flowers are hiding!', 'math')
+  // The Map replay's opener and closer (native spec
+  // design/native/map-tap-to-play.md § 6, T1 approved by Thomas
+  // 2026-10-17): "Let's play <name> again!" / "You know <name>!". One pair
+  // per step of both worlds: every step can become mastered, so every step
+  // can be replayed. The closer praises what she knows (D4); no line
+  // anywhere suggests a replay.
+  for (const w of WORLDS)
+    for (const n of pathStepsOf(w))
+      add(
+        replayOpenId(n),
+        'session-replay-open',
+        `Let's play ${STAGE_SPOKEN_NAMES[n]} again!`,
+        w,
+      )
+  for (const w of WORLDS)
+    for (const n of pathStepsOf(w))
+      add(
+        replayCloseId(n),
+        'session-replay-close',
+        `You know ${STAGE_SPOKEN_NAMES[n]}!`,
+        w,
+      )
   return lines
 }
 
@@ -225,6 +249,8 @@ function peekableSteps(world: World): SkillNode[] {
 
 const peekOpenId = (n: SkillNode) => `guide.session.peek-open.${n}`
 const peekCloseId = (n: SkillNode) => `guide.session.peek-close.${n}`
+const replayOpenId = (n: SkillNode) => `guide.session.replay-open.${n}`
+const replayCloseId = (n: SkillNode) => `guide.session.replay-close.${n}`
 
 /** Every guidance line: Hub, then session end, then in session. */
 export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
@@ -236,9 +262,14 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: none.
+ * Now: the 60 Map replay lines (map-tap-to-play § 6), every
+ * `guide.session.replay-open.<step>` and `guide.session.replay-close.<step>`.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] =
+  GUIDANCE_LINES.filter(
+    (l) =>
+      l.kind === 'session-replay-open' || l.kind === 'session-replay-close',
+  ).map((l) => l.id)
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 
@@ -268,4 +299,20 @@ export function peekLines(
   const open = BY_ID.get(peekOpenId(node))
   const close = BY_ID.get(peekCloseId(node))
   return open !== undefined && close !== undefined ? { open, close } : null
+}
+
+/**
+ * The Map replay's opener and closer for `node` (map-tap-to-play § 6):
+ * "Let's play <name> again!" / "You know <name>!". Every step has both.
+ */
+export function replayLines(node: SkillNode): {
+  open: GuidanceLine
+  close: GuidanceLine
+} {
+  const open = BY_ID.get(replayOpenId(node))
+  const close = BY_ID.get(replayCloseId(node))
+  if (open === undefined || close === undefined) {
+    throw new Error(`no replay lines for ${node}`)
+  }
+  return { open, close }
 }
