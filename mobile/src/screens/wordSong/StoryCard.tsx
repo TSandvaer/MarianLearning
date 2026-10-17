@@ -19,11 +19,21 @@
  *   over 250 ms. [Reduce Motion: a 200 ms fade.]
  * - The card enters with opacity 0 → 1 and a 12 pt rise on a 260 / 20
  *   spring. [Reduce Motion: a 150 ms fade.]
+ * - **Word-tap cue** (`./StoryTapCue.tsx`, PR #599): the hand, the card's
+ *   last child (above every word, outside word 0's pulse), its fingertip
+ *   2 pt above the bottom-centre of word 0's text box, placed from word
+ *   0's measured frame.
  */
 import type { WordEntry } from '@marian/core/wordSong/wordPack'
 import { Image } from 'expo-image'
-import { useEffect, useMemo } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type LayoutRectangle,
+} from 'react-native'
 import Animated, {
   Easing,
   FadeIn,
@@ -44,6 +54,7 @@ import {
 } from '../../layout/wordSongLayout'
 import { colors, fonts } from '../../theme'
 import { storyCells, type StoryWordCell } from './storyCells'
+import { StoryTapCue } from './StoryTapCue'
 import { WordPicture } from './WordPicture'
 
 /** The spotlight (the letter row's). */
@@ -63,6 +74,7 @@ function StoryWord({
   enabled,
   reducedMotion,
   onPress,
+  onLayout,
 }: {
   cell: StoryWordCell
   metrics: StoryCardMetrics
@@ -72,6 +84,8 @@ function StoryWord({
   enabled: boolean
   reducedMotion: boolean
   onPress: (cell: StoryWordCell) => void
+  /** Word 0's frame in its sentence row (the cue's hand is placed from it). */
+  onLayout?: (frame: LayoutRectangle) => void
 }) {
   const scale = useSharedValue(1)
   useEffect(() => {
@@ -98,6 +112,7 @@ function StoryWord({
       accessibilityState={{ disabled: !enabled }}
       disabled={!enabled}
       onPress={() => onPress(cell)}
+      onLayout={onLayout && ((e) => onLayout(e.nativeEvent.layout))}
       style={[
         styles.word,
         {
@@ -148,6 +163,14 @@ export interface StoryCardProps {
   onWordPress: (cell: StoryWordCell) => void
   /** The card's measured height (the reveal scene sits below it). */
   onHeight?: (height: number) => void
+  /** The word-tap cue's hand is up at word 0 (PR #599). */
+  tapCue?: boolean
+  /** Her tap: the hand fades out. */
+  tapCueLeaving?: boolean
+  /** The hand's size S (`storyTapCueSize`). */
+  tapCueSize?: number
+  /** Word 0 has been measured: the hand can be placed. */
+  onTapCueReady?: () => void
 }
 
 export function StoryCard({
@@ -160,8 +183,14 @@ export function StoryCard({
   wordsEnabled,
   onWordPress,
   onHeight,
+  tapCue = false,
+  tapCueLeaving = false,
+  tapCueSize = 48,
+  onTapCueReady,
 }: StoryCardProps) {
   const reducedMotion = useReducedMotion()
+  /** Word 0's frame in sentence row 0 (null until measured). */
+  const [word0, setWord0] = useState<LayoutRectangle | null>(null)
   const cells = useMemo(() => storyCells(story), [story])
   const sentences = useMemo(
     () =>
@@ -186,6 +215,7 @@ export function StoryCard({
     transform: [{ translateY: rise.get() }],
   }))
   const litSet = new Set(lit)
+  const F = m.font
   return (
     <Animated.View
       testID="word-story"
@@ -217,10 +247,28 @@ export function StoryCard({
               enabled={wordsEnabled}
               reducedMotion={reducedMotion}
               onPress={onWordPress}
+              onLayout={
+                cell.index === 0
+                  ? (frame) => {
+                      setWord0(frame)
+                      onTapCueReady?.()
+                    }
+                  : undefined
+              }
             />
           ))}
         </View>
       ))}
+      {tapCue && word0 !== null && (
+        // Absolute insets count from inside the border, where row 0's
+        // padding starts; the text box (F + 8) is centred in the word's box.
+        <StoryTapCue
+          x={m.padding.horizontal + word0.x + word0.width / 2}
+          y={m.padding.vertical + word0.y + (word0.height + F + 8) / 2 - 2}
+          size={tapCueSize}
+          leaving={tapCueLeaving}
+        />
+      )}
     </Animated.View>
   )
 }

@@ -186,7 +186,14 @@ import {
 import { nativeRound } from './nativeRound'
 import { startSilentBeat, type SilentBeat } from './silentBeat'
 import { StoryCard, StoryScene } from './StoryCard'
-import type { StoryWordCell } from './storyCells'
+import { storyCells, type StoryWordCell } from './storyCells'
+import {
+  STORY_TAP_CUE_CANCEL_OUT_MS,
+  STORY_TAP_CUE_DELAY_MS,
+  STORY_TAP_CUE_FIRE_MS,
+  STORY_TAP_CUE_TOTAL_MS,
+  storyTapCueSize,
+} from './storyTapCueMotion'
 import { ThIntroPanel } from './ThCue'
 import { useLineSpeaker, type SpeakHooks } from './useLineSpeaker'
 import { WordChip } from './WordChip'
@@ -523,6 +530,24 @@ export function WordSong({
   const storyTapTokenRef = useRef(0)
   /** "Read the story." started for this problem (one per problem). */
   const storyPromptForRef = useRef(-1)
+  /**
+   * The word-tap cue (Kyle's call on PR #599): the hand taps word 0 once on
+   * the mount's first story card, forward on a step not yet mastered or in
+   * a peek; never in a review or a Map replay. Fixed at mount.
+   */
+  const [storyCueOn] = useState(
+    () => !review && (isPeek ? !replay : sessionIntro !== null),
+  )
+  /** What the card draws: the hand up, or leaving after her tap. */
+  const [storyCue, setStoryCue] = useState<'run' | 'leave' | null>(null)
+  /** pending = scheduled, no hand yet; shown; leaving = her tap's fade. */
+  const storyCuePhaseRef = useRef<'idle' | 'pending' | 'shown' | 'leaving'>(
+    'idle',
+  )
+  /** At most once per mount: spent by its run, her tap, or a skip. */
+  const storyCueSpentRef = useRef(false)
+  /** The card's word 0 is measured (the hand can be placed). */
+  const storyWord0MeasuredRef = useRef(false)
 
   const advanceTimerRef = useRef<Timer>(null)
   const ceilingTimerRef = useRef<Timer>(null)
@@ -533,6 +558,7 @@ export function WordSong({
   const litTimerRef = useRef<Timer>(null)
   const spotOffTimerRef = useRef<Timer>(null)
   const storyLitTimerRef = useRef<Timer>(null)
+  const storyCueTimerRef = useRef<Timer>(null)
   const askAgainTimerRef = useRef<Timer>(null)
   const readOffTimerRef = useRef<Timer>(null)
   const beatRef = useRef<SilentBeat | null>(null)
@@ -562,6 +588,7 @@ export function WordSong({
       leadInTimerRef,
       closerTimerRef,
       storyLitTimerRef,
+      storyCueTimerRef,
       askAgainTimerRef,
       readOffTimerRef,
     ]) {
@@ -572,6 +599,46 @@ export function WordSong({
     }
     beatRef.current?.cancel()
     beatRef.current = null
+  }, [])
+
+  /**
+   * The word-tap cue ends at once (a line starts, the background, a new
+   * card, unmount): the hand goes, no fire. It is already spent.
+   */
+  const stopStoryCue = useCallback(() => {
+    if (storyCuePhaseRef.current === 'idle') return
+    storyCuePhaseRef.current = 'idle'
+    if (storyCueTimerRef.current !== null) {
+      clearTimeout(storyCueTimerRef.current)
+      storyCueTimerRef.current = null
+    }
+    setStoryCue(null)
+  }, [])
+
+  /**
+   * Her tap wins: before the hand shows, the cue never runs; once it shows,
+   * the hand fades out over 200 ms (a 2nd tap keeps the 1st's deadline).
+   * It never comes back in this mount.
+   */
+  const fadeStoryCue = useCallback(() => {
+    storyCueSpentRef.current = true
+    const phase = storyCuePhaseRef.current
+    if (phase === 'idle' || phase === 'leaving') return
+    if (storyCueTimerRef.current !== null) {
+      clearTimeout(storyCueTimerRef.current)
+      storyCueTimerRef.current = null
+    }
+    if (phase === 'pending') {
+      storyCuePhaseRef.current = 'idle'
+      return
+    }
+    storyCuePhaseRef.current = 'leaving'
+    setStoryCue('leave')
+    storyCueTimerRef.current = setTimeout(() => {
+      storyCueTimerRef.current = null
+      storyCuePhaseRef.current = 'idle'
+      setStoryCue(null)
+    }, STORY_TAP_CUE_CANCEL_OUT_MS)
   }, [])
 
   useEffect(() => {
@@ -630,9 +697,11 @@ export function WordSong({
         }
       }
       setStoryLit([])
+      // A line starting ends the word-tap cue at once (PR #599).
+      stopStoryCue()
       return speakLine(text, hooks)
     },
-    [tap, speakLine, storyWords],
+    [tap, speakLine, storyWords, stopStoryCue],
   )
 
   /**
@@ -694,6 +763,41 @@ export function WordSong({
     [speak, unmounted],
   )
 
+  /**
+   * A story word plays (content wave 3 § 4.4): that word alone, lit for
+   * max(400 ms, the clip); live from the card's first frame until the
+   * reveal, inert while Emma speaks; a new one cuts the last. Not a move:
+   * nothing recorded, no Emma reaction. Her tap holds the reading beat and
+   * ends the word-tap cue; the cue's own tap (`cue`) does neither (D3).
+   */
+  const playStoryWord = (cell: StoryWordCell, { cue }: { cue: boolean }) => {
+    if (revealingRef.current || linesInFlight.current > 0) return
+    if (!cue) {
+      beatRef.current?.letterTapped()
+      fadeStoryCue()
+    }
+    const token = ++storyTapTokenRef.current
+    const started = Date.now()
+    if (storyLitTimerRef.current !== null) {
+      clearTimeout(storyLitTimerRef.current)
+      storyLitTimerRef.current = null
+    }
+    setStoryLit([cell.index])
+    setStoryPulses((p) => ({ ...p, [cell.index]: (p[cell.index] ?? 0) + 1 }))
+    const id = storyWordLineId(cell.key)
+    const done = id === null ? Promise.resolve() : storyWords.playLine(id)
+    void done.then(() => {
+      if (unmounted.current || storyTapTokenRef.current !== token) return
+      storyLitTimerRef.current = setTimeout(
+        () => {
+          storyLitTimerRef.current = null
+          if (storyTapTokenRef.current === token) setStoryLit([])
+        },
+        Math.max(0, TAP_LIGHT_MIN_MS - (Date.now() - started)),
+      )
+    })
+  }
+
   // ── The read-aloud (+ the silent beat) ───────────────────────────────
 
   useEffect(() => {
@@ -739,6 +843,41 @@ export function WordSong({
     const beatOpts = isStoryCard
       ? { holdMs: STORY_TAP_HOLD_MS, capMs: STORY_BEAT_CEILING_MS }
       : {}
+    /**
+     * The word-tap cue (PR #599), from the mount's first story beat: the
+     * hand at + 600, word 0 through the tap path at + 1,000 (never holding
+     * the beat), the hand gone at + 2,400. Skipped (and spent) when word 0
+     * is not measured by + 600.
+     */
+    const startStoryCue = () => {
+      if (storyCueSpentRef.current) return
+      storyCueSpentRef.current = true
+      if (!storyCueOn || visibility.getIsHidden()) return
+      const word0 = storyCells(problem.story ?? problem.utterances.hint)[0]
+      if (word0 === undefined) return
+      storyCuePhaseRef.current = 'pending'
+      storyCueTimerRef.current = setTimeout(() => {
+        storyCueTimerRef.current = null
+        if (stale() || storyCuePhaseRef.current !== 'pending') return
+        if (!storyWord0MeasuredRef.current) {
+          storyCuePhaseRef.current = 'idle'
+          return
+        }
+        storyCuePhaseRef.current = 'shown'
+        setStoryCue('run')
+        storyCueTimerRef.current = setTimeout(() => {
+          storyCueTimerRef.current = null
+          if (stale() || storyCuePhaseRef.current !== 'shown') return
+          playStoryWord(word0, { cue: true })
+          storyCueTimerRef.current = setTimeout(() => {
+            storyCueTimerRef.current = null
+            if (storyCuePhaseRef.current !== 'shown') return
+            storyCuePhaseRef.current = 'idle'
+            setStoryCue(null)
+          }, STORY_TAP_CUE_TOTAL_MS - STORY_TAP_CUE_FIRE_MS)
+        }, STORY_TAP_CUE_FIRE_MS)
+      }, STORY_TAP_CUE_DELAY_MS)
+    }
     const startBeat = () => {
       const b = startSilentBeat(
         round.readAloudDelayMs,
@@ -751,6 +890,7 @@ export function WordSong({
       )
       beat = b
       beatRef.current = b
+      if (isStoryCard) startStoryCue()
     }
     // A story card: "Read the story." first, unless the step's own lead
     // just played (it opens with the same words); the beat counts from the
@@ -848,6 +988,7 @@ export function WordSong({
         beat.cancel()
         if (beatRef.current === beat) beatRef.current = null
       }
+      stopStoryCue()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- web parity: re-run on problem / readiness only
   }, [problemIndex, audioReady])
@@ -859,8 +1000,9 @@ export function WordSong({
     if (appHidden) {
       tap.release()
       storyWords.cancelActive()
+      stopStoryCue()
     }
-  }, [appHidden, tap, storyWords])
+  }, [appHidden, tap, storyWords, stopStoryCue])
 
   // ── Tap-to-hear (§ 4) ────────────────────────────────────────────────
 
@@ -923,36 +1065,9 @@ export function WordSong({
     })
   }
 
-  /**
-   * A story word tap (content wave 3 § 4.4): plays that word alone and
-   * lights it for max(400 ms, the clip); holds the reading beat; live from
-   * the card's first frame until the reveal, inert while Emma speaks; a
-   * new tap cuts the last. Not a move: nothing recorded, no Emma reaction.
-   */
-  const onStoryWordPress = (cell: StoryWordCell) => {
-    if (revealingRef.current || linesInFlight.current > 0) return
-    beatRef.current?.letterTapped()
-    const token = ++storyTapTokenRef.current
-    const started = Date.now()
-    if (storyLitTimerRef.current !== null) {
-      clearTimeout(storyLitTimerRef.current)
-      storyLitTimerRef.current = null
-    }
-    setStoryLit([cell.index])
-    setStoryPulses((p) => ({ ...p, [cell.index]: (p[cell.index] ?? 0) + 1 }))
-    const id = storyWordLineId(cell.key)
-    const done = id === null ? Promise.resolve() : storyWords.playLine(id)
-    void done.then(() => {
-      if (unmounted.current || storyTapTokenRef.current !== token) return
-      storyLitTimerRef.current = setTimeout(
-        () => {
-          storyLitTimerRef.current = null
-          if (storyTapTokenRef.current === token) setStoryLit([])
-        },
-        Math.max(0, TAP_LIGHT_MIN_MS - (Date.now() - started)),
-      )
-    })
-  }
+  /** Her tap on a story word. */
+  const onStoryWordPress = (cell: StoryWordCell) =>
+    playStoryWord(cell, { cue: false })
 
   // ── Advance / complete ───────────────────────────────────────────────
 
@@ -1003,6 +1118,8 @@ export function WordSong({
       setStoryLit([])
       setStoryPulses({})
       setStoryCardH(null)
+      stopStoryCue()
+      storyWord0MeasuredRef.current = false
       clearCaption()
       return
     }
@@ -1063,6 +1180,7 @@ export function WordSong({
     speak,
     guide,
     storyWords,
+    stopStoryCue,
   ])
 
   // Back from the background: run the advance that waited for it.
@@ -1577,6 +1695,12 @@ export function WordSong({
                 wordsEnabled={!revealing && !speaking}
                 onWordPress={onStoryWordPress}
                 onHeight={setStoryCardH}
+                tapCue={storyCue !== null}
+                tapCueLeaving={storyCue === 'leave'}
+                tapCueSize={storyTapCueSize(layout.tablet)}
+                onTapCueReady={() => {
+                  storyWord0MeasuredRef.current = true
+                }}
               />
             )}
             {isStory && revealing && storyScene !== null && (
