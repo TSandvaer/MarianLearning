@@ -1,6 +1,6 @@
 # STATE — Marian Tutor live coordination
 
-**Resume next-action:** _2026-10-16: Content wave 1 in review (#575 Word Song, #576 Number Garden); build 8 (#572+#573) in TestFlight and must be on both devices before any wave-1 build; image-tool bake-off waits on Thomas's API keys; Lily render approved once the PRs are reviewed._
+**Resume next-action:** _2026-10-16 evening: Content wave 1 SHIPPED (build 9 on the iPad, production af804cb, voice-QA baseline 55afdf3, Thomas's device check passed). Nothing in flight. Open with Thomas: iPhone to build 9; optional cleanup batch (old scratch worktrees, stale branches, Azure env vars in Vercel); Kyle's open picture questions (redraw the 8 simple-sentence scenes? the web copy of the pictures?). Next content comes from Dave's roadmap (#569) on Thomas's go._
 
 _Earlier headers and log-like sections (2026-08-02 to 2026-10-14) are archived verbatim in [`log/state-archive-2026-08-02-to-2026-10-14.md`](log/state-archive-2026-08-02-to-2026-10-14.md)._
 
