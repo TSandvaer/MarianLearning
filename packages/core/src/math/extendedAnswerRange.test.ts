@@ -1,11 +1,15 @@
 /**
- * The extended kinds never record an answer the progress guard rejects.
+ * The extended kinds never record an answer an older build's progress
+ * guard rejects.
  *
- * `progress/guards.ts` accepts `perProblemAnswerValue` entries in 0..99
- * only; one recorded 100 makes the whole doc fail `isProgressV1`, and it
- * loads as a fresh start (all progress lost). The tapped chip is what gets
- * recorded, so: a problem whose answer is above 99 goes to the static
- * fallback (the parser throws), and no chip is above 99.
+ * Builds before content wave 3's G accept `perProblemAnswerValue` entries
+ * in 0..99 only; one recorded 100 makes the whole doc fail `isProgressV1`
+ * there, and it loads as a fresh start (all progress lost). This build's
+ * guard reads any whole number from 0 up, but writes nothing above 99 until
+ * the hundreds PR raises the cap (`design/native/content-wave-3.md` § 2,
+ * G4). The tapped chip is what gets recorded, so: a problem whose answer is
+ * above 99 goes to the static fallback (the parser throws), and no chip is
+ * above 99.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defaultProgress, isProgressV1, loadProgress } from '../progress'
@@ -36,7 +40,7 @@ function serverPlan(reads: readonly string[]) {
 }
 
 describe('answers above 99 go to the fallback', () => {
-  it('EXTENDED_ANSWER_MAX is the guard’s ceiling, 99', () => {
+  it('EXTENDED_ANSWER_MAX stays 99 until the hundreds PR', () => {
     expect(EXTENDED_ANSWER_MAX).toBe(99)
   })
 
@@ -126,7 +130,7 @@ describe('a recorded top chip survives the progress guard', () => {
     vi.restoreAllMocks()
   })
 
-  it('99s are kept; a 100 would fail the guard (why the cap exists)', () => {
+  it('99s are kept; this guard also reads a 100 (G), older builds do not', () => {
     recordProgressOnSessionEnd({
       surface: 'math',
       totalCorrect: 8,
@@ -148,7 +152,7 @@ describe('a recorded top chip survives the progress guard', () => {
       true,
     )
     expect(isProgressV1(withAnswers([100, 98, 99, 96, 91, 99, 99, 90]))).toBe(
-      false,
+      true,
     )
   })
 })

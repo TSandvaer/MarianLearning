@@ -669,7 +669,7 @@ describe('isProgressV1', () => {
     expect(isProgressV1(broken)).toBe(false)
   })
 
-  it('rejects out-of-range perProblemAnswerValue entries (negative or > 99)', () => {
+  it('rejects negative perProblemAnswerValue entries; accepts any whole number from 0 up (content wave 3, G)', () => {
     const p = defaultProgress()
     const negative = {
       ...p,
@@ -684,7 +684,7 @@ describe('isProgressV1', () => {
     } as unknown
     expect(isProgressV1(negative)).toBe(false)
 
-    const tooLarge = {
+    const threeDigit = {
       ...p,
       history: [
         {
@@ -695,7 +695,7 @@ describe('isProgressV1', () => {
         },
       ],
     } as unknown
-    expect(isProgressV1(tooLarge)).toBe(false)
+    expect(isProgressV1(threeDigit)).toBe(true)
   })
 
   it('rejects non-array perProblemAnswerValue', () => {

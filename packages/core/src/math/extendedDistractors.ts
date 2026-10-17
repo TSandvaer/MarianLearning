@@ -34,8 +34,9 @@ export const RECOGNIZE_CHIP_MAX = 10
 /** Sharing: the chips are shares 1..10 (content wave 2 § 2.6, K5). */
 export const SHARE_CHIP_MAX = 10
 /** Skip counting: every chip stays in 1..99. The spec's § 4 "Skip repair"
- *  says 1..100; 99 is the progress guard's ceiling for a recorded answer
- *  ({@link EXTENDED_ANSWER_MAX}), so a tapped 100 can't reset the doc. */
+ *  says 1..100; 99 is the recorded-answer cap ({@link EXTENDED_ANSWER_MAX},
+ *  the ceiling of an older build's progress guard), so a tapped 100 can't
+ *  reset the doc. */
 export const SKIP_COUNT_CHIP_MIN = 1
 export const SKIP_COUNT_CHIP_MAX = EXTENDED_ANSWER_MAX
 
@@ -57,7 +58,7 @@ const sortPair = (a: number, b: number): [number, number] =>
 /**
  * The multiplication chip ceiling M for a plan: the smallest multiple of 10
  * above its largest answer, `10 × ceil((max + 1) / 10)` (spec § 4), and
- * never above {@link EXTENDED_ANSWER_MAX} (99, the progress guard's ceiling).
+ * never above {@link EXTENDED_ANSWER_MAX} (99, the recorded-answer cap).
  * `mult-2-5-10` → 30, `mult-3-4` → 20, `mult-6-9` → 30. The +1 chip fits
  * under it (below the 99 cap), and no chip reads "99" beside "Six times
  * two".
