@@ -1,6 +1,6 @@
 # STATE — Marian Tutor live coordination
 
-**Resume next-action:** _2026-10-16 evening: Content wave 1 SHIPPED (build 9 on the iPad, production af804cb, voice-QA baseline 55afdf3, Thomas's device check passed). Nothing in flight. Open with Thomas: iPhone to build 9; optional cleanup batch (old scratch worktrees, stale branches, Azure env vars in Vercel); Kyle's open picture questions (redraw the 8 simple-sentence scenes? the web copy of the pictures?). Next content comes from Dave's roadmap (#569) on Thomas's go._
+**Resume next-action:** _2026-10-17: Content wave 2 SHIPPED (build 10 on the iPad, production 2e2675f, smoke green). In flight: Map tap-to-play #592 (Kevin review, Lily render of 60 lines), then Thomas's ear test and iPad look; it has a server change, so `yarn release` BEFORE TestFlight build 11. Voice-QA baseline #590 merging._
 
 _Earlier headers and log-like sections (2026-08-02 to 2026-10-14) are archived verbatim in [`log/state-archive-2026-08-02-to-2026-10-14.md`](log/state-archive-2026-08-02-to-2026-10-14.md)._
 
