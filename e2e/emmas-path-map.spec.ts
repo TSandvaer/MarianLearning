@@ -624,7 +624,8 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
 
     await expect(page.getByTestId('map-stop')).toHaveCount(20)
     await expect(page.getByTestId('map-band')).toHaveCount(7)
-    await expect(page.getByTestId('map-gate')).toHaveCount(5)
+    // A gate before each land after the first (land 7, content wave 3).
+    await expect(page.getByTestId('map-gate')).toHaveCount(6)
     await expect(page.getByTestId('map-emma')).toHaveAttribute(
       'data-node',
       'cvc-words-short-o',
