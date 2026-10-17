@@ -77,6 +77,10 @@
  *   `onPeekEnd`. The back button cuts the line and
  *   calls `onPeekEnd` at once. Nothing is written: no stardust write, no
  *   `onSessionComplete`.
+ * - **Replay** (`replay` with `peek`, `design/native/map-tap-to-play.md`
+ *   § 3): a mastered step's 8 canon problems from the Map, under the same
+ *   rules, opened by "Let's play <name> again!" and closed by "You know
+ *   <name>!". Nothing is written either.
  *
  * Emma herself is App's hoisted `EmmaStage`; this screen reports her pose
  * through `onPoseChange`. Layers: the garden background (below Emma), the
@@ -145,6 +149,7 @@ import {
   leadLinesForRound,
   PEEK_CLOSE_GAP_MS,
   peekGuideLines,
+  replayGuideLines,
   recordAudio,
   SESSION_GUIDE_GAP_MS,
   sessionGuideLine,
@@ -303,6 +308,13 @@ export interface MathProps {
   /** The peek is over (after the closer, or the back button at once). */
   onPeekEnd?: () => void
   /**
+   * With `peek`: a Map replay of this mastered step (map-tap-to-play § 3),
+   * under the peek's rules for its 8 canon problems, with the replay's
+   * opener "Let's play <name> again!" and closer "You know <name>!".
+   * Fixed for the mount.
+   */
+  replay?: boolean
+  /**
    * The focus step's intro lead line (content wave 1 § 6.1), before the
    * scored problem 1's read; `null` / unset = none. The session start
    * decides (a forward session on a step that is not mastered).
@@ -393,6 +405,7 @@ export function MathScreen({
   sessionGuide,
   peek,
   onPeekEnd,
+  replay = false,
   sessionIntro = null,
 }: MathProps) {
   const appHidden = useIsAppHidden(visibility)
@@ -430,7 +443,11 @@ export function MathScreen({
   const isPeek = peekNode !== undefined
   /** The step's opener and closer (§ 8); none for a step without lines. */
   const [peekLines] = useState(() =>
-    peekNode === undefined ? null : peekGuideLines(peekNode),
+    peekNode === undefined
+      ? null
+      : replay
+        ? replayGuideLines(peekNode)
+        : peekGuideLines(peekNode),
   )
   /** `onPeekEnd` fires once. */
   const peekEndedRef = useRef(false)

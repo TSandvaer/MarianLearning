@@ -7,7 +7,9 @@
  * opener "Let's look at <name>!" and closer "<Name> is for later. You will
  * learn it!" (`design/native/fast-track-native.md` §§ 6.3, 7, 8); the lead
  * lines of content wave 1 (`design/native/content-wave-1.md` § 6.1): a new
- * step's intro and "Some flowers are hiding!". All are
+ * step's intro and "Some flowers are hiding!"; and the Map replay's
+ * per-step opener "Let's play <name> again!" and closer "You know <name>!"
+ * (`design/native/map-tap-to-play.md` § 3). All are
  * core `GUIDANCE_LINES` Lily recordings
  * (`/assets/audio/path/guide-session-*.mp3`), played through one manifest
  * line player (`session-guide`) with word ticks for the ribbon. The player
@@ -17,6 +19,7 @@
 import {
   GUIDANCE_LINES,
   peekLines,
+  replayLines,
   sessionIntroLine,
 } from '@marian/core/emmasPath/guidanceLines'
 import type { SkillNode } from '@marian/core/progress'
@@ -31,6 +34,11 @@ export type PeekGuideLineId =
   | `guide.session.peek-open.${SkillNode}`
   | `guide.session.peek-close.${SkillNode}`
 
+/** A replay line of one step (map-tap-to-play § 6). */
+export type ReplayGuideLineId =
+  | `guide.session.replay-open.${SkillNode}`
+  | `guide.session.replay-close.${SkillNode}`
+
 /** A step's intro lead line (content wave 1 § 6.1). */
 export type IntroGuideLineId = `guide.session.intro.${SkillNode}`
 
@@ -40,6 +48,7 @@ export type SessionGuideLineId =
   | 'guide.session.knew'
   | 'guide.session.hiding'
   | PeekGuideLineId
+  | ReplayGuideLineId
   | IntroGuideLineId
 
 /** The line ends → this long → the problem's read line starts (§ 4). */
@@ -87,6 +96,21 @@ export function peekGuideLines(
   return {
     open: lines.open.id as PeekGuideLineId,
     close: lines.close.id as PeekGuideLineId,
+  }
+}
+
+/**
+ * The replay's opener and closer ids for `node` (map-tap-to-play § 3);
+ * every step has both.
+ */
+export function replayGuideLines(node: SkillNode): {
+  open: ReplayGuideLineId
+  close: ReplayGuideLineId
+} {
+  const lines = replayLines(node)
+  return {
+    open: lines.open.id as ReplayGuideLineId,
+    close: lines.close.id as ReplayGuideLineId,
   }
 }
 

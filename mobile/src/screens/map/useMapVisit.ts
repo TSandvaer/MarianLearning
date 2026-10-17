@@ -28,9 +28,20 @@
  * flight and asks App for a peek (`peek`); stop and gate taps wait while
  * it is out, and Home aborts it. It replaces the locked response (poof,
  * wiggle, pointing, requirement line). On failure Emma says the stop's
- * name and taps resume; on success App leaves for the peek. Back from a
- * peek (`returnFromPeek`) the map plays no open line and shows no caption:
- * Emma has just spoken.
+ * name and taps resume; on success App leaves for the peek.
+ *
+ * Native-only, Map tap-to-play (`design/native/map-tap-to-play.md`
+ * §§ 1, 2, 5): the current stop starts the Hub card's session (`play`), a
+ * mastered stop a replay (`replay`). The release cuts the line in flight,
+ * the sticker pops (`launching`) and the launch lock starts: every stop,
+ * gate and Home tap is ignored until the route changes. `LAUNCH_DELAY_MS`
+ * after the release App is asked; a replay that fails says the stop's name
+ * and lifts the lock. A stop tap within `MAP_TAP_ARM_MS` of mount is
+ * ignored (taps already wait for an unlock beat's cheer).
+ *
+ * A map that opens quiet (`quietReturn`: back from a peek, a replay or a
+ * Map-started session) plays no open line and shows no caption: Emma has
+ * just spoken. An unlock still to celebrate plays its beat regardless.
  *
  * Web-only parts not ported: the gesture → audio-unlock calls (native
  * audio needs no unlock, hub-native § 5).
@@ -39,7 +50,7 @@ import type { EmmaPose } from '@marian/core/character/emmaPose'
 import type { PathLine } from '@marian/core/emmasPath/pathLines'
 import { gateLine, stopLine, stopNameLine } from '@marian/core/map/mapLines'
 import type { MapLand, MapStop } from '@marian/core/map/mapModel'
-import { isPeekableStop } from '@marian/core/map/peek'
+import { stopTapAction } from '@marian/core/map/stopTap'
 import {
   LOCKED_TAP_SFX,
   mapBeatView,
@@ -71,6 +82,12 @@ import {
   type MapLinePlayer,
 } from './mapAudio'
 
+/** Map tap-to-play § 2.3: the release → this long → App is asked. */
+export const LAUNCH_DELAY_MS = 200
+
+/** § 5: a stop tap within this long of the map mounting is ignored. */
+export const MAP_TAP_ARM_MS = 400
+
 export interface MapVisitOptions {
   world: MasteryTrack
   /** Test seams. */
@@ -88,8 +105,23 @@ export interface MapVisitOptions {
    * the map is left. Without it a locked stop keeps the old response.
    */
   peek?: (node: SkillNode, signal: AbortSignal) => Promise<boolean>
-  /** Back from a peek (§ 6.4): no open line, an empty caption slot. */
-  returnFromPeek?: boolean
+  /**
+   * Map tap-to-play § 1: the current stop's tap starts the Hub card's
+   * session. Returns `true` once App has left for it. Without it the
+   * current stop says its name.
+   */
+  play?: (node: SkillNode) => boolean
+  /**
+   * § 1, § 3: a mastered stop's tap starts its replay. Resolves `true`
+   * once App has opened it, `false` on any failure; `signal` aborts when
+   * the map unmounts. Without it a mastered stop says its name.
+   */
+  replay?: (node: SkillNode, signal: AbortSignal) => Promise<boolean>
+  /**
+   * Back from a peek, a replay or a Map-started session (fast-track § 6.4,
+   * map-tap-to-play § 4): no open line, an empty caption slot.
+   */
+  quietReturn?: boolean
 }
 
 export interface MapVisitState {
@@ -102,6 +134,12 @@ export interface MapVisitState {
   pose: EmmaPose
   /** Locked-stop taps so far, per stop: one "not yet" wiggle each. */
   wiggles: Readonly<Partial<Record<string, number>>>
+  /** The stop whose launch is under way (it pops), or null. */
+  launching: SkillNode | null
+  /** Does this stop's tap start a session (the press-in visual)? */
+  launches: (stop: MapStop) => boolean
+  /** The launch lock (§ 2.2): Home and Android back are ignored. */
+  launchLocked: () => boolean
   tapStop: (stop: MapStop) => void
   tapGate: (land: MapLand) => void
   /** Call before leaving for the Hub. */
@@ -125,18 +163,21 @@ export function useMapVisit({
   markLeft = markMapLeft,
   wallClock = Date.now,
   peek,
-  returnFromPeek = false,
+  play,
+  replay,
+  quietReturn = false,
 }: MapVisitOptions): MapVisitState {
   const [visit] = useState(() => planMapVisit(readProgress(), world))
   const [player] = useState<MapLinePlayer>(() => createPlayer())
   const [phase, setPhase] = useState<UnlockPhase | null>(visit.phase)
-  // Back from a peek: no open line, so no caption either (§ 6.4).
-  const [quietReturn] = useState(returnFromPeek && visit.unlock === null)
+  // A quiet return: no open line, so no caption either (§ 6.4).
+  const [quiet] = useState(quietReturn && visit.unlock === null)
   const [caption, setCaption] = useState<PathLine | null>(
-    quietReturn ? null : visit.caption,
+    quiet ? null : visit.caption,
   )
   const [pose, setPose] = useState<EmmaPose>(visit.restPose)
   const [wiggles, setWiggles] = useState<Partial<Record<string, number>>>({})
+  const [launching, setLaunching] = useState<SkillNode | null>(null)
   const view = useMemo(() => mapBeatView(visit, phase), [visit, phase])
 
   const sfxRef = useRef<Sfx[]>([])
@@ -146,6 +187,11 @@ export function useMapVisit({
   const leftRef = useRef(false)
   /** The peek request in flight (§ 6.1); taps wait while it is set. */
   const peekRef = useRef<AbortController | null>(null)
+  /** Stop taps count once the map has been up `MAP_TAP_ARM_MS` (§ 5). */
+  const armedRef = useRef(false)
+  /** The launch under way (§ 2.2): set from the release to the route change. */
+  const launchRef = useRef<AbortController | null>(null)
+  const launchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const effect = (sfx: Parameters<CreateMapSfx>[0]): Sfx => {
     const s = createSfx(sfx)
@@ -157,8 +203,7 @@ export function useMapVisit({
   useEffect(() => {
     const { unlock } = visit
     if (unlock === null) {
-      if (visit.caption !== null && !quietReturn)
-        void player.play(visit.caption)
+      if (visit.caption !== null && !quiet) void player.play(visit.caption)
       return
     }
     if (!markedRef.current) {
@@ -191,6 +236,14 @@ export function useMapVisit({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visit, player])
 
+  // § 5: stop taps are armed `MAP_TAP_ARM_MS` after mount.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      armedRef.current = true
+    }, MAP_TAP_ARM_MS)
+    return () => clearTimeout(timer)
+  }, [])
+
   // Unmount: silence, release, and stamp the Hub's clock (map-native § 6;
   // `leave()` stamped it already on the way out through Home).
   useEffect(
@@ -198,6 +251,9 @@ export function useMapVisit({
       leftRef.current = true
       peekRef.current?.abort()
       peekRef.current = null
+      launchRef.current?.abort()
+      launchRef.current = null
+      if (launchTimer.current !== null) clearTimeout(launchTimer.current)
       player.unload()
       sfxRef.current.forEach((s) => s.unload())
       sfxRef.current = []
@@ -239,9 +295,57 @@ export function useMapVisit({
       })
   }
 
+  /** What App does for this stop's tap, if it starts a session. */
+  const launchOf = (stop: MapStop): 'play' | 'replay' | null => {
+    const action = stopTapAction(view.model, stop)
+    if (action === 'play' && play !== undefined) return 'play'
+    if (action === 'replay' && replay !== undefined) return 'replay'
+    return null
+  }
+
+  /** The launch failed or never left: the stop's name, and taps resume. */
+  const failLaunch = (stop: MapStop, controller: AbortController) => {
+    if (launchRef.current !== controller) return
+    launchRef.current = null
+    setLaunching(null)
+    if (leftRef.current || controller.signal.aborted) return
+    speak(stopNameLine(stop))
+  }
+
+  /**
+   * Map tap-to-play § 2: the line in flight is cut, the sticker pops and
+   * the launch lock starts; `LAUNCH_DELAY_MS` later App is asked. Its
+   * route change unmounts the map (which keeps the lock to the end).
+   */
+  const startLaunch = (stop: MapStop, kind: 'play' | 'replay') => {
+    player.cancel()
+    const controller = new AbortController()
+    launchRef.current = controller
+    setLaunching(stop.node)
+    launchTimer.current = setTimeout(() => {
+      launchTimer.current = null
+      if (leftRef.current || launchRef.current !== controller) return
+      if (kind === 'play') {
+        if (!play?.(stop.node)) failLaunch(stop, controller)
+        return
+      }
+      void (replay?.(stop.node, controller.signal) ?? Promise.resolve(false))
+        .catch(() => false)
+        .then((opened) => {
+          if (!opened) failLaunch(stop, controller)
+        })
+    }, LAUNCH_DELAY_MS)
+  }
+
   const tapStop = (stop: MapStop) => {
+    if (!armedRef.current || launchRef.current !== null) return
     if (view.tapsWait || peekRef.current !== null) return
-    if (peek !== undefined && isPeekableStop(view.model, stop)) {
+    const launch = launchOf(stop)
+    if (launch !== null) {
+      startLaunch(stop, launch)
+      return
+    }
+    if (peek !== undefined && stopTapAction(view.model, stop) === 'peek') {
       startPeek(stop, peek)
       return
     }
@@ -260,6 +364,7 @@ export function useMapVisit({
   }
 
   const tapGate = (land: MapLand) => {
+    if (launchRef.current !== null) return
     if (view.tapsWait || peekRef.current !== null) return
     speak(gateLine(view.model, land))
   }
@@ -271,6 +376,9 @@ export function useMapVisit({
     caption,
     pose,
     wiggles,
+    launching,
+    launches: (stop) => launchOf(stop) !== null,
+    launchLocked: () => launchRef.current !== null,
     tapStop,
     tapGate,
     leave,

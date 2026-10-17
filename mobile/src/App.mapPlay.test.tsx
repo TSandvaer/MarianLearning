@@ -270,7 +270,7 @@ it('AC 1: the current stop starts exactly the Hub card’s session — the same 
     date: isoDate(progressNow()),
     trees: ['number-garden'],
   })
-  first.unmount()
+  await first.unmount()
 
   // The Hub card, from the same stored progress.
   resetHubAudioForTests()

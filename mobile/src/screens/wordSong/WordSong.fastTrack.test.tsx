@@ -162,3 +162,36 @@ it('AC 17 peek: the back arrow cuts the line and fires onPeekEnd at once', async
   expect(guide.player.cancelActive).toHaveBeenCalled()
   expect(h.onRequestExit).not.toHaveBeenCalled()
 })
+
+it('Map replay (map-tap-to-play § 3): 8 beads, no stardust; the replay opener → 8 problems → the replay closer → onPeekEnd; no result', async () => {
+  const guide = fakeGuide()
+  const onPeekEnd = jest.fn()
+  const h = await renderWordSong({
+    plan: { ...BLENDING, id: 'replay-word-song', label: 'Replay' },
+    peek: 'blending-cv',
+    replay: true,
+    onPeekEnd,
+    sessionGuide: guide.player,
+  })
+  expect(screen.getAllByTestId(/^word-song-problem-dot-/, HIDDEN)).toHaveLength(
+    8,
+  )
+  expect(screen.queryByTestId('word-song-stardust')).toBeNull()
+  expect(guide.ids()).toEqual(['guide.session.replay-open.blending-cv'])
+  await endGuide(guide.lines[0]!)
+  await advance(SESSION_GUIDE_GAP_MS)
+  for (let i = 0; i < 8; i++) {
+    await answer(h, BLENDING, i, [BLENDING.problems[i]!.target.word])
+    await advance(ADVANCE_AFTER_CORRECT_MS)
+  }
+  expect(screen.queryByTestId('word-song-streak')).toBeNull()
+  await advance(PEEK_CLOSE_GAP_MS)
+  expect(guide.ids()).toEqual([
+    'guide.session.replay-open.blending-cv',
+    'guide.session.replay-close.blending-cv',
+  ])
+  await endGuide(guide.lines[1]!)
+  await advance(PEEK_CLOSE_GAP_MS)
+  expect(onPeekEnd).toHaveBeenCalledTimes(1)
+  expect(h.onSessionComplete).not.toHaveBeenCalled()
+})

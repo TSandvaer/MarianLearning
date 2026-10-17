@@ -89,7 +89,8 @@ function landUnlockDoc(): Progress {
 
 async function mount(doc: Progress) {
   const { player, ids } = fakePlayer()
-  const onPlay = jest.fn()
+  // App's answer: `true` once the route changed.
+  const onPlay = jest.fn<boolean, [SkillNode]>(() => true)
   const replay = fakeRequest()
   const peek = fakeRequest()
   const onHome = jest.fn()

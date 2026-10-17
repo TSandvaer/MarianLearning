@@ -30,6 +30,7 @@ import { sessionPrefetcher, type LoadedSessionAudio } from './audio'
 import { resetLaunchReconcileForTests } from './lifecycle/launchReconcile'
 import { bootNative, type SyncKeyValueBackend } from './platform/native'
 import { resetHubAudioForTests } from './screens/hub/hubAudio'
+import { MAP_TAP_ARM_MS } from './screens/map/useMapVisit'
 import { SPLASH_FADE_OUT_MS } from './screens/Splash'
 import * as peekSession from './session/peekSession'
 
@@ -165,6 +166,7 @@ it('AC 18: a full peek writes nothing — progress JSON and session history byte
   const request = jest
     .spyOn(peekSession, 'requestPeek')
     .mockImplementation(async ({ node }) => ({
+      mode: 'peek',
       world: 'math',
       node,
       plan,
@@ -179,6 +181,8 @@ it('AC 18: a full peek writes nothing — progress JSON and session history byte
 
   await fireEvent.press(screen.getByTestId('hub-map-math'))
   expect(screen.getByTestId('map-math-beat-none')).toBeOnTheScreen()
+  // Stop taps count once the map has been up 400 ms (map-tap-to-play § 5).
+  await advance(MAP_TAP_ARM_MS)
   // The map is open and quiet: everything a peek could touch is on disk.
   const progressBefore = store.get(STORAGE_KEY)
   const historyBefore = store.get(SESSION_HISTORY_KEY)

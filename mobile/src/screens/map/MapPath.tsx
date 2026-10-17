@@ -39,7 +39,8 @@ export function MapPath({
   state: MapVisitState
   reducedMotion: boolean
 }) {
-  const { visit, view, pose, wiggles, tapStop, tapGate } = state
+  const { visit, view, pose, wiggles, launching, launches, tapStop, tapGate } =
+    state
   const { model } = view
   const { pane } = layout
   const k = mapPathScale(pane, model, visit.alsoBadged, layout.landscape)
@@ -145,6 +146,8 @@ export function MapPath({
               bloom={view.bloomNode === stop.node}
               popping={view.poppingNode === stop.node}
               wiggle={wiggles[stop.node] ?? 0}
+              launches={launches(stop)}
+              launching={launching === stop.node}
               onPress={() => tapStop(stop)}
             />
           )
