@@ -32,6 +32,7 @@ import {
   type CanonBlockRef as WireCanonBlockRef,
 } from '../wire/types'
 import { CANON_MATH_FACTS } from './canonMathFacts.generated'
+import { isStoryNode } from '../wordSong/littleStories'
 import { localDateKey } from './clock'
 import { defaultProgress } from './defaults'
 import {
@@ -294,7 +295,9 @@ export function pickReviewBlocks(
  *   last time (else simply the top one); heart 2 the next. Never a
  *   not-yet-due fact, and no fill.
  * - Word Song: the first 2 of `rot(seed)` from the most recently mastered
- *   review step, never the current step; `[]` without one.
+ *   review step, never the current step; `[]` without one. Never a story
+ *   step (content wave 3 § 4.6, D7: a story block takes about 25–30 s, too
+ *   long for a heart), so the newest mastered step before them serves.
  */
 export function pickWarmupBlocks(
   p: Progress,
@@ -306,7 +309,7 @@ export function pickWarmupBlocks(
   if (!isFirstSessionToday(p, world, today)) return []
   const pool = reviewPool(p, world)
   if (world === 'word-song') {
-    const newest = pool[pool.length - 1]
+    const newest = pool.filter((n) => !isStoryNode(n)).at(-1)
     if (newest === undefined) return []
     return rot(seed)
       .slice(0, WARMUP_PROBLEMS)

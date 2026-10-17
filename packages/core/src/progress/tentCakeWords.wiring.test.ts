@@ -37,15 +37,17 @@ const CAKE = 'cake-words' as WordSongNode
 
 describe('tent words and cake words in the Word Song tree (§ 1, § 3.1, § 4.1)', () => {
   it('follow crab words, in both tree lists', () => {
-    expect(LITERACY_TREE.slice(-3)).toEqual(['crab-words', TENT, CAKE])
-    expect(WORD_SONG_NODES_IN_ORDER.slice(-3)).toEqual([
+    // Content wave 3 appends the three story steps after cake words.
+    const at = LITERACY_TREE.indexOf('crab-words')
+    expect(LITERACY_TREE.slice(at, at + 3)).toEqual(['crab-words', TENT, CAKE])
+    expect(WORD_SONG_NODES_IN_ORDER.slice(at, at + 3)).toEqual([
       'crab-words',
       TENT,
       CAKE,
     ])
     expect(nextNode('word-song', 'crab-words')).toBe(TENT)
     expect(nextNode('word-song', TENT)).toBe(CAKE)
-    expect(nextNode('word-song', CAKE)).toBeNull()
+    expect(nextNode('word-song', CAKE)).toBe('fox-stories')
   })
 
   it('are the 3rd and 4th stops of land 6, Big words; LANDS flattened equals both trees (AC 5)', () => {

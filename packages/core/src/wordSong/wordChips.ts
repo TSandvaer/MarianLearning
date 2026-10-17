@@ -13,6 +13,8 @@
  *   matrix, uniform per session).
  * - `letter-names`: two case-matched letters from the 52-glyph pool.
  * - `letter-sounds`: two letters from `LETTER_SOUNDS_POOL`.
+ * - `little-story`: its `LITTLE_STORIES` row's two wrong chips (words of
+ *   the story; content wave 3 § 4.6), not `pickDistractors`.
  *
  * The letter picks are render-time placeholders, not band-tuned to the
  * specs' trap windows (that needs the planner to emit distractor letters;
@@ -22,7 +24,8 @@
  * the order is stable across remounts and tests.
  */
 import { LETTER_SOUNDS_POOL } from './letterSoundsPool'
-import type { WordEntry } from './wordPack'
+import { littleStoryForText } from './littleStories'
+import { getWordEntry, type WordEntry } from './wordPack'
 import { pickDistractors } from './wordDistractors'
 import type { WordSongProblem } from './wordSessionPlans'
 
@@ -42,11 +45,13 @@ export function buildWordChipOrder(
   crossVowel: boolean,
 ): readonly WordEntry[] {
   const [d1, d2] =
-    problem.contentType === 'letter-names'
-      ? pickLetterDistractors(problem.target, problem.index)
-      : problem.contentType === 'letter-sounds'
-        ? pickSoundDistractors(problem.target, problem.index)
-        : pickDistractors(problem.target, problem.index, { crossVowel })
+    problem.contentType === 'little-story'
+      ? storyDistractors(problem)
+      : problem.contentType === 'letter-names'
+        ? pickLetterDistractors(problem.target, problem.index)
+        : problem.contentType === 'letter-sounds'
+          ? pickSoundDistractors(problem.target, problem.index)
+          : pickDistractors(problem.target, problem.index, { crossVowel })
   const values = [problem.target, d1, d2]
   const wordHash = problem.target.word
     .split('')
@@ -58,6 +63,17 @@ export function buildWordChipOrder(
     ;[values[i], values[j]] = [values[j], values[i]]
   }
   return values
+}
+
+/** A little story's two wrong chips, from its row (by the story text). */
+function storyDistractors(
+  problem: WordSongProblem,
+): readonly [WordEntry, WordEntry] {
+  const row = littleStoryForText(problem.story ?? problem.utterances.hint)
+  if (row === undefined) {
+    throw new Error(`no little story for problem ${problem.index}`)
+  }
+  return [getWordEntry(row.wrong[0]), getWordEntry(row.wrong[1])]
 }
 
 /**

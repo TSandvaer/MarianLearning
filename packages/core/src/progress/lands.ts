@@ -84,6 +84,14 @@ export const LANDS: readonly Land[] = [
     name: 'Big words',
     nodes: ['duck-words', 'crab-words', 'tent-words', 'cake-words'],
   },
+  // Content wave 3 (design/native/content-wave-3.md § 1, K6): the three
+  // little-story steps. "Big words" isn't stories.
+  {
+    world: 'word-song',
+    number: 7,
+    name: 'Stories',
+    nodes: ['fox-stories', 'hen-stories', 'bug-stories'],
+  },
 ]
 
 /** The lands of one world, in order. */

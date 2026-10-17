@@ -225,6 +225,14 @@ export interface WordSongProblemUtterances {
  *   in `wordPack.ts` keyed on the frame). Companion canon at
  *   `public/canon/word-song/level-1/simple-sentences.json`.
  *
+ * `little-story` — read a short story, then answer one question about it
+ *   (content wave 3, `design/native/content-wave-3.md` § 4). The read line
+ *   is the question ("Who sat on the rug?"), the `hint` line the story,
+ *   and the target comes from the correct line ("Yes! The fox!"), as the
+ *   cloze tier's does. The parser finds the story's `LITTLE_STORIES` row
+ *   (chips, scene) and sets `story`, `storyId` and `question`. Native
+ *   only: the parser accepts it with `{ littleStories: true }`.
+ *
  * The field is optional on the public type for back-compat: callers that
  * predate the widening (e.g. `STATIC_WORD_SONG_PLANS`) don't set it, and
  * downstream code treats the absence as `blending-cv`. The parser always
@@ -238,6 +246,7 @@ export type WordSongContentType =
   | 'letter-sounds'
   | 'sight-word'
   | 'simple-sentence'
+  | 'little-story'
 
 /** A single problem in the session. */
 export interface WordSongProblem {
@@ -277,6 +286,14 @@ export interface WordSongProblem {
    * wire is utterance-only). See Kyle spec §1.3.
    */
   sceneId?: string
+  /**
+   * `little-story` only (content wave 3 § 4.6): the story on the card
+   * (= `utterances.hint`), its `LITTLE_STORIES` id (`'fox-1'`, the scene
+   * file `story-<id>.webp`) and the question (= `utterances.read`).
+   */
+  story?: string
+  storyId?: string
+  question?: string
 }
 
 /** A full Word Song session plan — exactly 8 problems, all short-a CVC. */
