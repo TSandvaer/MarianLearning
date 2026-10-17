@@ -74,6 +74,10 @@ describe('the sharing read (§ 2.6, AC 1)', () => {
       'thirty on three (more than 20 flowers)',
       'Thirty flowers, three plates. How many on each plate?',
     ],
+    [
+      'fourteen on two (a share of 7: no die face)',
+      'Fourteen flowers, two plates. How many on each plate?',
+    ],
   ])('rejects %s', (_name, read) => {
     expect(() =>
       mathSessionPlanFromServer(planReading(read), { extendedKinds: true }),

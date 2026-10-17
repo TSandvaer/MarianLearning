@@ -1,8 +1,11 @@
 /**
  * Sharing's stage (content wave 2, `design/native/content-wave-2.md`
- * § 2.2–§ 2.5): a pile of T flowers on a cream cloth with a "T" tag, and B
- * empty plates with "?" tags. There is no equation and no division sign
- * (K2, D3). Hidden from accessibility but for its label, the read line.
+ * § 2.2–§ 2.5, amended by Kyle's UX calls on #587): a pile of T flowers on
+ * a pale rose cloth with a "T" tag, and B round plates seen from above (a
+ * white well in a tinted rim) with "?" tags centred above them. The dealt
+ * flowers settle into the share's die face. There is no equation and no
+ * division sign (K2, D3). Hidden from accessibility but for its label, the
+ * read line.
  *
  * The deal: flower k leaves the pile's last occupied cell for plate
  * `k mod B` (`shareDeal.ts`). Each flower has one `Flight`, run on the UI
@@ -45,6 +48,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import {
   pillWidth,
+  SHARE_WELL_RATIO,
   shareGeometry,
   type ShareMetrics,
   type SharePoint,
@@ -87,6 +91,8 @@ import {
  */
 const SHARE_CLOTH_FILL = '#FFE3E8'
 const SHARE_CLOTH_BORDER = 1
+/** The round plate's rim band (the plate call); the well is white. */
+const SHARE_PLATE_RIM = '#FFF0F3'
 
 /** Plates and flowers pulse 1 → 1.06 → 1 (multiply's); the total tag 1.1. */
 const PULSE_PEAK = 1.06
@@ -204,9 +210,13 @@ export function ShareStage({
   const totalTicked = totalWord >= 0 && readRevealed > totalWord
   const platesTicked = platesWord >= 0 && readRevealed > platesWord
 
-  const pileScale = metrics.pileFlower / metrics.groups.flower
-  const tagHeight = metrics.groups.tagHeight
-  const tagFont = metrics.groups.tagFont
+  // One glyph size for both ends of a flight: the pile's s and the plate's
+  // f are scales of it (the landing goes s / f → 1).
+  const glyph = Math.max(metrics.pileFlower, metrics.plateFlower)
+  const homeScale = metrics.pileFlower / glyph
+  const cellScale = metrics.plateFlower / glyph
+  const tagHeight = metrics.tagHeight
+  const tagFont = metrics.tagFont
   return (
     <View
       testID="math-share"
@@ -253,8 +263,9 @@ export function ShareStage({
             target={geometry.plateCells[d.plate]![d.plateCell]!}
             plate={d.plate}
             flight={plan[k] ?? null}
-            pileScale={pileScale}
-            size={metrics.groups.flower}
+            homeScale={homeScale}
+            cellScale={cellScale}
+            size={glyph}
             arc={metrics.arc}
             ripple={flowerRipple}
             reducedMotion={reducedMotion}
@@ -348,7 +359,10 @@ function Plate({
   useOnRise(ripple, () => pulse(PULSE_PEAK, index * STAGGER_MS))
   useOnRise(lit, () => pulse(PULSE_PEAK, index * STAGGER_MS))
   useOnRise(together.n, () => pulse(PULSE_PEAK, together.delay))
-  const g = metrics.groups
+  // A round plate seen from above (Kyle's plate call on #587): a tinted rim
+  // with a pink edge around a centred white well with a pink line. Flat.
+  const d = rect.width
+  const well = SHARE_WELL_RATIO * d
   return (
     <Animated.View
       testID={`math-share-plate-${index}${lit ? '-lit' : ''}`}
@@ -357,14 +371,27 @@ function Plate({
         {
           left: rect.x,
           top: rect.y,
-          width: rect.width,
-          height: rect.height,
-          borderRadius: g.radius,
-          borderWidth: g.border,
+          width: d,
+          height: d,
+          borderRadius: d / 2,
+          borderWidth: metrics.plateBorder,
         },
         style,
       ]}
-    />
+    >
+      <View
+        testID={`math-share-plate-well-${index}`}
+        style={[
+          styles.well,
+          {
+            width: well,
+            height: well,
+            borderRadius: well / 2,
+            borderWidth: metrics.wellBorder,
+          },
+        ]}
+      />
+    </Animated.View>
   )
 }
 
@@ -374,7 +401,8 @@ function ShareFlower({
   target,
   plate,
   flight,
-  pileScale,
+  homeScale,
+  cellScale,
   size,
   arc,
   ripple,
@@ -386,7 +414,9 @@ function ShareFlower({
   target: SharePoint
   plate: number
   flight: Flight | null
-  pileScale: number
+  /** The glyph's scale in the pile (s / size) and on the plate (f / size). */
+  homeScale: number
+  cellScale: number
   size: number
   arc: number
   ripple: number
@@ -457,7 +487,7 @@ function ShareFlower({
       transform: [
         { translateX: x - half },
         { translateY: y - half },
-        { scale: (pileScale + (1 - pileScale) * t) * land.get() },
+        { scale: (homeScale + (cellScale - homeScale) * t) * land.get() },
       ],
     }
   })
@@ -480,7 +510,7 @@ function ShareFlower({
               transform: [
                 { translateX: hx - half },
                 { translateY: hy - half },
-                { scale: pileScale },
+                { scale: homeScale },
               ],
             },
             pileFade,
@@ -494,7 +524,11 @@ function ShareFlower({
             styles.flower,
             box,
             {
-              transform: [{ translateX: tx - half }, { translateY: ty - half }],
+              transform: [
+                { translateX: tx - half },
+                { translateY: ty - half },
+                { scale: cellScale },
+              ],
             },
             cellFade,
           ]}
@@ -645,9 +679,12 @@ const styles = StyleSheet.create({
   },
   plate: {
     position: 'absolute',
-    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: SHARE_PLATE_RIM,
     borderColor: colors.myPink,
   },
+  well: { backgroundColor: colors.white, borderColor: colors.myPink },
   flower: { position: 'absolute', left: 0, top: 0 },
   tag: {
     position: 'absolute',

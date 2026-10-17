@@ -652,7 +652,8 @@ export function parseMissingAddendRead(read: string): {
  *  Template (canon): `"<T> flowers, <B> plates. How many on each plate?"`,
  *  e.g. `"Twelve flowers, three plates. How many on each plate?"` → total
  *  12, plates 3, correct 4. Valid when 2 ≤ B ≤ 5, B divides T, the share is
- *  2..10 and T ≤ 20 (what the plates and the pile can show).
+ *  2..6 (a die face on the plate) and T ≤ 20 (what the plates and the pile
+ *  can show).
  *  Case-insensitive; throws on any drift, an unknown number word or an
  *  out-of-range pair. Disjoint from every other template (none contains
  *  "plates").

@@ -144,14 +144,13 @@ export interface MissingAddendProblem {
   utterances: MathProblemUtterances
 }
 
-/** Sharing's ranges (content wave 2 § 2.6, K4): 2–5 plates (a `GroupsRow`
- *  plate row holds 5), a share of 2–10 (a plate holds 10), at most 20
- *  flowers (two pile rows of 10). The canon itself keeps the share to 2–6
- *  (§ 2.7, the bake lint); the parser takes what a plate can show. */
+/** Sharing's ranges (content wave 2 § 2.6, K4, D2): 2–5 plates (one plate
+ *  row), a share of 2–6 (the round plate has a die face for each; Kyle's
+ *  plate call on #587), at most 20 flowers (two pile rows of 10). */
 export const DIVIDE_PLATES_MIN = 2
 export const DIVIDE_PLATES_MAX = 5
 export const DIVIDE_SHARE_MIN = 2
-export const DIVIDE_SHARE_MAX = 10
+export const DIVIDE_SHARE_MAX = 6
 export const DIVIDE_TOTAL_MAX = 20
 
 /**

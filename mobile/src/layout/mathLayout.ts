@@ -991,13 +991,19 @@ export function numberStripMetrics(
 
 // ── Sharing: the cloth, the pile and the plates (content wave 2 § 2.3) ──
 //
-// `design/native/content-wave-2.md` § 2.2, § 2.3; `shareLayout.test.ts`
-// pins its table. The plates are `GroupsRow`'s (`groupsMetrics`,
-// `plateSize`, `groupsRow`), not a fork; every plate of a plan has the size
-// of the plan's largest share, so a plate's size never gives the answer
-// away. Kyle's UX calls on #587 (amending § 2.2–§ 2.5): the cloth reserves
-// room left of the pile for the total tag (call 2), and a share of 5 or less
-// is one column centred in its plate (call 3).
+// `design/native/content-wave-2.md` § 2.2, § 2.3, amended by Kyle's UX calls
+// on #587; `shareLayout.test.ts` pins the tables.
+//
+// - The cloth reserves room left of the pile for the total tag (call 2).
+// - The plates are round plates seen from above, sharing's own (the plate
+//   call, after Thomas's iPad check: "the plates look like boxes"): a white
+//   well inside a tinted rim, diameter D = 3.5 × the plate-flower size f, in
+//   one row. `GroupsRow`'s trays stay multiply's. f, D and the gap are
+//   computed once per plan from its largest plate count, so a plate's size
+//   never gives the answer away (AC 10).
+// - The dealt flowers settle into the die face of the share (2–6), the k-th
+//   flower on a plate taking the face's k-th slot, so round 1 always lands
+//   top-left.
 
 /** The pile's flowers are at most this big (pt); tablet {@link SHARE_TABLET_FLOWER_MAX}. */
 export const SHARE_PHONE_FLOWER_MAX = 20
@@ -1006,6 +1012,42 @@ export const SHARE_TABLET_FLOWER_MAX = 24
 export const SHARE_TAG_CLEARANCE = 4
 /** Pile rows hold this many flowers (P and tablet); L draws one row. */
 export const SHARE_PILE_ROW = 10
+/** A plate's diameter in plate-flower sizes. */
+export const SHARE_PLATE_FLOWERS = 3.5
+/** The well's diameter as a fraction of the plate's. */
+export const SHARE_WELL_RATIO = 0.74
+/** Die-face slot offsets from the plate's centre, in plate-flower sizes. */
+export const SHARE_SLOT_X = 0.6
+export const SHARE_SLOT_Y = 1.05
+
+/** A slot of the die-face lattice (`T`op / `M`iddle / `B`ottom, `L`eft /
+ *  `R`ight, `C`entre). */
+export type ShareSlot = 'TL' | 'TR' | 'ML' | 'C' | 'MR' | 'BL' | 'BR'
+
+/** The die face of each share, its slots in deal order (round 1 → TL). */
+export const SHARE_FACES: Readonly<Record<number, readonly ShareSlot[]>> = {
+  2: ['TL', 'BR'],
+  3: ['TL', 'C', 'BR'],
+  4: ['TL', 'TR', 'BL', 'BR'],
+  5: ['TL', 'TR', 'C', 'BL', 'BR'],
+  6: ['TL', 'TR', 'ML', 'MR', 'BL', 'BR'],
+}
+
+const SLOT_UNIT: Readonly<Record<ShareSlot, [number, number]>> = {
+  TL: [-1, -1],
+  TR: [1, -1],
+  ML: [-1, 0],
+  C: [0, 0],
+  MR: [1, 0],
+  BL: [-1, 1],
+  BR: [1, 1],
+}
+
+/** A slot's offset from the plate's centre for plate flowers of size `f`. */
+export function shareSlotOffset(slot: ShareSlot, f: number): SharePoint {
+  const [ux, uy] = SLOT_UNIT[slot]
+  return { x: ux * SHARE_SLOT_X * f, y: uy * SHARE_SLOT_Y * f }
+}
 
 export interface ShareMetrics {
   /** The pile's flower size `s`. */
@@ -1024,19 +1066,27 @@ export interface ShareMetrics {
   clothLeftPad: number
   clothRadius: number
   cloth: { width: number; height: number }
+  /** The tags: multiply's pill (28 pt, tablet 32; Fredoka 20, tablet 24). */
+  tagHeight: number
+  tagFont: number
   /** The total tag's width for the plan's largest pile. */
   tagWidth: number
   /** The tag's outer half, `ceil(tagWidth / 2)`, reserved left of the cloth. */
   tagOuter: number
-  /** The plates: `GroupsRow`'s metrics for the plan's largest share. */
-  groups: GroupsMetrics
-  /** Every plate's size (the plan's largest share). */
-  plate: { width: number; height: number }
-  /** The largest share and plate count of the plan. */
-  maxShare: number
+  /** The plate flowers' size f. */
+  plateFlower: number
+  /** Every plate's diameter, `3.5 × f`. */
+  plate: number
+  /** Between the plates of a row. */
+  plateGap: number
+  /** The rim's edge and the well's line. */
+  plateBorder: number
+  wellBorder: number
+  /** A "?" tag's bottom edge sits this far above its plate. */
+  plateTagGap: number
   /** Cloth → plate slot. */
   gap: number
-  /** Cloth + gap + half a tag + plate. */
+  /** Cloth + gap + tag + tag gap + plate. */
   block: number
   /** The deal's arc height h. */
   arc: number
@@ -1070,20 +1120,21 @@ export function shareMetrics(
 ): ShareMetrics {
   const tablet = layout.tablet
   const oneRow = layout.form === 'phone-landscape'
+  const width = layout.problem.width
   const maxPile = problems.reduce((m, p) => Math.max(m, p.total), 0)
-  const maxShare = problems.reduce((m, p) => Math.max(m, p.correct), 0)
-  const maxPlates = problems.reduce((m, p) => Math.max(m, p.plates), 0)
+  const maxPlates = Math.max(
+    1,
+    problems.reduce((m, p) => Math.max(m, p.plates), 0),
+  )
   const pileGap = oneRow ? 2 : tablet ? 6 : 4
   const pileFifthGap = oneRow ? 6 : tablet ? 16 : 12
   const pileRowGap = tablet ? 6 : 4
   const clothPad = tablet ? 8 : 6
-  const groups = groupsMetrics(layout, [
-    { factorA: Math.max(1, maxShare), factorB: Math.max(1, maxPlates) },
-  ])
-  const plate = plateSize(groups, Math.max(1, maxShare))
+  const tagHeight = tablet ? 32 : 28
+  const tagFont = tablet ? 24 : 20
   // Call 2: the tag stays centred on the cloth's left edge; the cloth's left
   // padding clears its inner half, and its outer half is reserved outside.
-  const tagWidth = pillWidth(String(maxPile), groups.tagFont, groups.tagHeight)
+  const tagWidth = pillWidth(String(maxPile), tagFont, tagHeight)
   const tagOuter = Math.ceil(tagWidth / 2)
   const clothLeftPad = tagOuter + SHARE_TAG_CLEARANCE
   const pileRow = oneRow ? Math.max(1, maxPile) : SHARE_PILE_ROW
@@ -1092,13 +1143,30 @@ export function shareMetrics(
     clothLeftPad +
     pileRowWidth(maxPile, pileRow, s, pileGap, pileFifthGap) +
     clothPad
-  const fits = (s: number) => clothWidth(s) + tagOuter <= layout.problem.width
+  const fits = (s: number) => clothWidth(s) + tagOuter <= width
   let s = tablet ? SHARE_TABLET_FLOWER_MAX : SHARE_PHONE_FLOWER_MAX
   while (s > 8 && !fits(s)) s -= 1
   const cloth = {
     width: clothWidth(s),
     height: rows * s + (rows - 1) * pileRowGap + 2 * clothPad,
   }
+  // The plate call: f = min(20, floor((W − 6 (n − 1)) / (3.5 n))), tablet
+  // cap 24 and minimum gap 8; the gap clamp(6, fit, 24), tablet
+  // clamp(8, fit, 32); n = the plan's largest plate count.
+  const gapMin = tablet ? 8 : 6
+  const gapMax = tablet ? 32 : 24
+  const plateFlower = Math.min(
+    tablet ? SHARE_TABLET_FLOWER_MAX : SHARE_PHONE_FLOWER_MAX,
+    Math.floor(
+      (width - gapMin * (maxPlates - 1)) / (SHARE_PLATE_FLOWERS * maxPlates),
+    ),
+  )
+  const plate = SHARE_PLATE_FLOWERS * plateFlower
+  const plateGap =
+    maxPlates <= 1
+      ? gapMax
+      : clamp(gapMin, (width - maxPlates * plate) / (maxPlates - 1), gapMax)
+  const plateTagGap = tablet ? 6 : 4
   return {
     pileFlower: s,
     pileGap,
@@ -1109,14 +1177,18 @@ export function shareMetrics(
     clothLeftPad,
     clothRadius: tablet ? 20 : 16,
     cloth,
+    tagHeight,
+    tagFont,
     tagWidth,
     tagOuter,
-    groups,
+    plateFlower,
     plate,
-    maxShare,
+    plateGap,
+    plateBorder: tablet ? 2.5 : 2,
+    wellBorder: tablet ? 2 : 1.5,
+    plateTagGap,
     gap: layout.problemGap,
-    block:
-      cloth.height + layout.problemGap + groups.tagHeight / 2 + plate.height,
+    block: cloth.height + layout.problemGap + tagHeight + plateTagGap + plate,
     arc: tablet ? 40 : 32,
   }
 }
@@ -1133,16 +1205,13 @@ export interface ShareGeometry {
   totalTag: SharePoint
   /** Pile cell centres, reading order (cell 0 top-left). */
   pile: readonly SharePoint[]
-  /** The plates, left to right. */
+  /** The plates' bounding squares, left to right. */
   plates: readonly { x: number; y: number; width: number; height: number }[]
-  /** Each plate's "?" tag centre (on its top edge). */
+  /** Each plate's "?" tag centre (centred above it). */
   plateTags: readonly SharePoint[]
-  /** Each plate's cell centres for `share` flowers: top to bottom; a share
-   *  of 5 or less is one column centred in the plate, a larger one columns
-   *  of 5, left column first (call 3). */
+  /** Each plate's cell centres for its share: the die face's slots, in deal
+   *  order. */
   plateCells: readonly (readonly SharePoint[])[]
-  /** The plate row's gap. */
-  plateGap: number
 }
 
 /** Where everything of one problem sits in a block `width` wide. */
@@ -1172,41 +1241,33 @@ export function shareGeometry(
       y: m.clothPad + r * (s + m.pileRowGap) + s / 2,
     })
   }
-  const row = groupsRow(m.groups, Math.max(1, m.maxShare), plates, width)
-  const rowX = (width - row.width) / 2
-  const plateY = m.cloth.height + m.gap + m.groups.tagHeight / 2
-  const g = m.groups
+  const rowWidth = plates * m.plate + Math.max(0, plates - 1) * m.plateGap
+  const rowX = (width - rowWidth) / 2
+  const plateY = m.cloth.height + m.gap + m.tagHeight + m.plateTagGap
   const platesOut = Array.from({ length: plates }, (_, k) => ({
-    x: rowX + k * (m.plate.width + row.gap),
+    x: rowX + k * (m.plate + m.plateGap),
     y: plateY,
-    width: m.plate.width,
-    height: m.plate.height,
+    width: m.plate,
+    height: m.plate,
   }))
-  // Call 3: one column (a share of 5 or less) is centred across the plate;
-  // never centred vertically (round 1's height would give the share away).
-  const oneColumn = share <= GROUP_COLUMN
-  const plateCells = platesOut.map((p) =>
-    Array.from({ length: share }, (_, j) => ({
-      x: oneColumn
-        ? p.x + p.width / 2
-        : p.x +
-          g.pad +
-          Math.floor(j / GROUP_COLUMN) * (g.flower + g.flowerGap) +
-          g.flower / 2,
-      y:
-        p.y +
-        g.pad +
-        (j % GROUP_COLUMN) * (g.flower + g.flowerGap) +
-        g.flower / 2,
-    })),
-  )
+  const face = SHARE_FACES[share] ?? []
+  const plateCells = platesOut.map((p) => {
+    const cx = p.x + m.plate / 2
+    const cy = p.y + m.plate / 2
+    return face.map((slot) => {
+      const o = shareSlotOffset(slot, m.plateFlower)
+      return { x: cx + o.x, y: cy + o.y }
+    })
+  })
   return {
     cloth,
     totalTag: { x: clothX, y: m.cloth.height / 2 },
     pile,
     plates: platesOut,
-    plateTags: platesOut.map((p) => ({ x: p.x + p.width / 2, y: p.y })),
+    plateTags: platesOut.map((p) => ({
+      x: p.x + m.plate / 2,
+      y: p.y - m.plateTagGap - m.tagHeight / 2,
+    })),
     plateCells,
-    plateGap: row.gap,
   }
 }
