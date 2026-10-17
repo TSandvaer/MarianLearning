@@ -13,12 +13,18 @@
  *   still shows.
  * - A step intro's spotlight (`./introSpotlight.ts`, content wave 1 § 3.3,
  *   § 4.3) lights its cells too, each after its own delay.
+ * - Tent words' end pulse (content wave 2 § 3.3): a cell given a delay
+ *   pulses once, 1 → 1.08 → 1 over 300 ms, on top of any other scale. Not
+ *   with Reduce Motion (the caller passes none).
+ * - The `'quiet'` cell (content wave 2 § 4.3, the magic e): the glyph is
+ *   `colors.ink` at 35 % opacity (a 200 ms fade each way), with no
+ *   spotlight, so a tap on it lights nothing while it is quiet.
  * - If the row is wider than `maxWidth`, F steps down 4 pt at a time, never
  *   below 0.8 F.
  */
 import { letterHighlighted } from '@marian/core/wordSong/wordRound'
 import { useEffect, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -29,11 +35,18 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated'
-import { fonts } from '../../theme'
+import { colors, fonts } from '../../theme'
 
 const SPOTLIGHT = '#FFB7C5'
 const INK = '#3B3B3B'
 const EASE_OUT = Easing.bezier(0, 0, 0.58, 1)
+/** Tent words' end pulse: 1 → this → 1 (content wave 2 § 3.3). */
+export const END_PULSE_SCALE = 1.08
+/** …over this long in all. */
+export const END_PULSE_MS = 300
+/** A quiet cell's glyph opacity, and its fade each way (§ 4.3). */
+export const QUIET_OPACITY = 0.35
+export const QUIET_FADE_MS = 200
 
 function Cell({
   letter,
@@ -42,6 +55,8 @@ function Cell({
   cellMin,
   lit,
   litDelayMs,
+  endPulseDelayMs,
+  quiet,
   fadeOutMs,
   onPress,
 }: {
@@ -52,6 +67,10 @@ function Cell({
   lit: boolean
   /** How long after `lit` turns on the spotlight fades in (and pulses). */
   litDelayMs: number
+  /** The end pulse's delay (ms from now), or `null` for none. */
+  endPulseDelayMs: number | null
+  /** The `'quiet'` state: the glyph at 35 %, no spotlight. */
+  quiet: boolean
   fadeOutMs: number
   onPress: () => void
 }) {
@@ -59,7 +78,9 @@ function Cell({
   const enter = useSharedValue(reducedMotion ? 1 : 0)
   const opacity = useSharedValue(0)
   const pulse = useSharedValue(1)
+  const endPulse = useSharedValue(1)
   const spot = useSharedValue(0)
+  const glyph = useSharedValue(1)
 
   useEffect(() => {
     if (reducedMotion) {
@@ -89,13 +110,36 @@ function Cell({
     )
   }, [lit, litDelayMs, fadeOutMs, reducedMotion, spot, pulse])
 
+  useEffect(() => {
+    if (endPulseDelayMs === null || reducedMotion) return
+    const half = { duration: END_PULSE_MS / 2, easing: EASE_OUT }
+    endPulse.set(
+      withDelay(
+        endPulseDelayMs,
+        withSequence(withTiming(END_PULSE_SCALE, half), withTiming(1, half)),
+      ),
+    )
+  }, [endPulseDelayMs, reducedMotion, endPulse])
+
+  useEffect(() => {
+    glyph.set(
+      withTiming(quiet ? QUIET_OPACITY : 1, { duration: QUIET_FADE_MS }),
+    )
+  }, [quiet, glyph])
+
   const cellStyle = useAnimatedStyle(() => ({
     opacity: opacity.get(),
-    transform: [{ scale: enter.get() * pulse.get() }],
+    transform: [{ scale: enter.get() * pulse.get() * endPulse.get() }],
   }))
   const spotStyle = useAnimatedStyle(() => ({ opacity: spot.get() }))
+  const glyphStyle = useAnimatedStyle(() => ({ opacity: glyph.get() }))
   return (
-    <Animated.View style={cellStyle}>
+    <Animated.View
+      testID={
+        endPulseDelayMs !== null ? 'word-song-letter-end-pulse' : undefined
+      }
+      style={cellStyle}
+    >
       <Pressable
         testID={`word-song-letter-${index}`}
         accessibilityRole="button"
@@ -119,12 +163,18 @@ function Cell({
             spotStyle,
           ]}
         />
-        <Text
+        <Animated.Text
+          testID={quiet ? 'word-song-letter-quiet' : undefined}
           allowFontScaling={false}
-          style={[styles.letter, { fontSize: font, lineHeight: font * 1.2 }]}
+          style={[
+            styles.letter,
+            { fontSize: font, lineHeight: font * 1.2 },
+            quiet && styles.quiet,
+            glyphStyle,
+          ]}
         >
           {letter}
-        </Text>
+        </Animated.Text>
       </Pressable>
     </Animated.View>
   )
@@ -143,6 +193,13 @@ export interface LetterRowProps {
    * `null` (dark). `null` / unset = no intro spotlight.
    */
   spotlight?: readonly (number | null)[] | null
+  /**
+   * Tent words' end pulse: per letter, the delay before its one pulse, or
+   * `null`. `null` / unset = none.
+   */
+  endPulse?: readonly (number | null)[] | null
+  /** The quiet cell (the magic e), or `null` / unset for none. */
+  quiet?: number | null
   onLetterPress: (index: number) => void
 }
 
@@ -153,6 +210,8 @@ export function LetterRow({
   maxWidth,
   lit,
   spotlight = null,
+  endPulse = null,
+  quiet = null,
   onLetterPress,
 }: LetterRowProps) {
   // The step-down belongs to one F: a rotation (a new F) starts over.
@@ -178,14 +237,17 @@ export function LetterRow({
           font={font}
           cellMin={cellMin}
           lit={
-            letterHighlighted(i, lit, letters.length) ||
-            (spotlight?.[i] ?? null) !== null
+            quiet !== i &&
+            (letterHighlighted(i, lit, letters.length) ||
+              (spotlight?.[i] ?? null) !== null)
           }
           litDelayMs={
             letterHighlighted(i, lit, letters.length)
               ? 0
               : (spotlight?.[i] ?? 0)
           }
+          endPulseDelayMs={endPulse?.[i] ?? null}
+          quiet={quiet === i}
           fadeOutMs={lit === null ? 200 : 120}
           onPress={() => onLetterPress(i)}
         />
@@ -204,4 +266,5 @@ const styles = StyleSheet.create({
     backgroundColor: SPOTLIGHT,
   },
   letter: { fontFamily: fonts.semibold, color: INK },
+  quiet: { color: colors.ink },
 })

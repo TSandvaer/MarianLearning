@@ -112,6 +112,10 @@ export interface WordStageProps {
   lit: number | null
   /** A step intro's letter spotlight (`./introSpotlight.ts`); null = none. */
   spotlight?: readonly (number | null)[] | null
+  /** Tent words' end pulse (`introEndPulse`); null = none. */
+  endPulse?: readonly (number | null)[] | null
+  /** The quiet cell of the quiet-E cue (`quietECue`); null = none. */
+  quiet?: number | null
   revealedCount: number
   resolved: boolean
   showThCue: boolean
@@ -128,6 +132,8 @@ export function WordStage({
   layout: l,
   lit,
   spotlight = null,
+  endPulse = null,
+  quiet = null,
   revealedCount,
   resolved,
   showThCue,
@@ -146,6 +152,8 @@ export function WordStage({
       maxWidth={l.stage.width}
       lit={lit}
       spotlight={spotlight}
+      endPulse={endPulse}
+      quiet={quiet}
       onLetterPress={onLetterPress}
     />
   )

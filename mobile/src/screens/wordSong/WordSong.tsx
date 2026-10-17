@@ -140,7 +140,13 @@ import {
   createSilentMathPlayer,
   type SilentMathPlayer,
 } from '../math/silentPlayer'
-import { INTRO_SPOT_OFF_MS, introSpotlight } from './introSpotlight'
+import {
+  INTRO_SPOT_OFF_MS,
+  introEndPulse,
+  introSpotlight,
+  introTickCue,
+  quietECue,
+} from './introSpotlight'
 import { nativeRound } from './nativeRound'
 import { startSilentBeat, type SilentBeat } from './silentBeat'
 import { ThIntroPanel } from './ThCue'
@@ -408,10 +414,19 @@ export function WordSong({
   const [shakingChip, setShakingChip] = useState<string | null>(null)
   /** The lit letter (blend or tap); `word.length` lights them all. */
   const [lit, setLit] = useState<number | null>(null)
-  /** A step intro's letter spotlight while it plays (§ 3.3, § 4.3). */
+  /**
+   * A step intro's letter spotlight while it plays (§ 3.3, § 4.3), or the
+   * quiet-E cue's lit vowel (content wave 2 § 4.3) until the advance.
+   */
   const [spotlight, setSpotlight] = useState<readonly (number | null)[] | null>(
     null,
   )
+  /** Tent words' end pulse while the intro plays (content wave 2 § 3.3). */
+  const [endPulse, setEndPulse] = useState<readonly (number | null)[] | null>(
+    null,
+  )
+  /** The quiet-E cue's quiet cell (content wave 2 § 4.3); null = none. */
+  const [quiet, setQuiet] = useState<number | null>(null)
   const [celebrating, setCelebrating] = useState(false)
   const [streakFadingOut, setStreakFadingOut] = useState(false)
   const [guidedActive, setGuidedActive] = useState(false)
@@ -572,12 +587,28 @@ export function WordSong({
         leadForRef.current = my
         if (lead === opener) openerStartedRef.current = true
         setPose('listening')
-        if (isIntro && sessionIntro !== null)
-          setSpotlight(
-            introSpotlight(sessionIntro, problem.target.word, reducedMotion),
-          )
-        void speak(sessionGuideLine(lead).text, {
+        const text = sessionGuideLine(lead).text
+        const word = problem.target.word
+        if (isIntro && sessionIntro !== null) {
+          setSpotlight(introSpotlight(sessionIntro, word, reducedMotion))
+          setEndPulse(introEndPulse(sessionIntro, word, reducedMotion))
+        }
+        void speak(text, {
           play: (_text, opts) => guide.playLine(lead, opts),
+          // Cake words' lead (content wave 2 § 4.3): "quiet" dims the e,
+          // "A" lights the vowel.
+          onWordTick: (i) => {
+            if (!isIntro || sessionIntro === null || stale()) return
+            const cue = introTickCue(sessionIntro, text, word, i)
+            if (cue === null) return
+            if ('quiet' in cue) setQuiet(cue.quiet)
+            else
+              setSpotlight((s) =>
+                Array.from({ length: word.length }, (_, k) =>
+                  k === cue.light ? 0 : (s?.[k] ?? null),
+                ),
+              )
+          },
         }).then(() => {
           if (stale()) return
           if (lead === opener) setOpenerDone(true)
@@ -586,6 +617,8 @@ export function WordSong({
             spotOffTimerRef.current = setTimeout(() => {
               spotOffTimerRef.current = null
               setSpotlight(null)
+              setEndPulse(null)
+              setQuiet(null)
             }, INTRO_SPOT_OFF_MS)
             if (round.readAloudDelayMs > 0) {
               read()
@@ -698,6 +731,8 @@ export function WordSong({
     if (problemIndex < plan.problems.length - 1) {
       clearTimers()
       setSpotlight(null)
+      setEndPulse(null)
+      setQuiet(null)
       setProblemIndex((i) => i + 1)
       setProblemState(FRESH)
       resolvedRef.current = false
@@ -798,12 +833,27 @@ export function WordSong({
     }, 0)
   }, [])
 
-  /** The 2nd wrong's blend (letters on the marks) or the hint line. */
+  /**
+   * The 2nd wrong's blend (letters on the marks) or the hint line. On a
+   * cake-words card the hint brings the quiet-E cue (content wave 2 § 4.3,
+   * D8): the e goes quiet and the vowel lights, and both stay until the
+   * advance, so the 3rd try has the cue.
+   */
   const playSecondWrong = useCallback(
     (problem: WordSongProblem) => {
       setPose('attentive-pointing')
       const prompt = secondWrongPrompt(problem)
       if (prompt.kind === 'hint') {
+        const word = problem.target.word
+        const cue = quietECue(word)
+        if (cue !== null) {
+          setQuiet(cue.quiet)
+          setSpotlight(
+            Array.from({ length: word.length }, (_, k) =>
+              k === cue.vowel ? 0 : null,
+            ),
+          )
+        }
         void speak(prompt.text).then(backToIdleSoon)
         return
       }
@@ -1160,6 +1210,8 @@ export function WordSong({
               layout={layout}
               lit={lit}
               spotlight={spotlight}
+              endPulse={endPulse}
+              quiet={quiet}
               revealedCount={caption.revealed}
               resolved={problemState.resolved}
               showThCue={showThCorner}
