@@ -49,36 +49,31 @@ describe.each(WAVE_2_WORD_STEPS)('committed canon: %s', (step) => {
     ).toEqual(bigWordsOf(step).map((w) => `Read the ${w}.`))
   })
 
-  it('leaves exactly the 32 new texts (536 characters) for the Lily render (§ 6.2)', () => {
+  it('leaves exactly the 32 new texts (536 characters) for the Lily render (§ 6.2), none after it', () => {
+    const newTexts = bigWordsOf(step).flatMap((w) => {
+      const W = w.charAt(0).toUpperCase() + w.slice(1)
+      return [
+        `Read the ${w}.`,
+        `Yes! That's a ${w}.`,
+        `Let's look. ${W}.`,
+        `This one is ${w}.`,
+      ]
+    })
+    expect(newTexts).toHaveLength(32)
+    expect(newTexts.reduce((n, t) => n + t.length, 0)).toBe(536)
+    // Before the render: exactly these. After it: none.
     const waiting = awaitingRender(doc)
-    expect(waiting).toHaveLength(32)
-    expect(waiting.reduce((n, t) => n + t.length, 0)).toBe(536)
-    const words = bigWordsOf(step)
-    expect(waiting).toEqual(
-      words.flatMap((w) => {
-        const W = w.charAt(0).toUpperCase() + w.slice(1)
-        return [
-          `Read the ${w}.`,
-          `Yes! That's a ${w}.`,
-          `Let's look. ${W}.`,
-          `This one is ${w}.`,
-        ]
-      }),
-    )
+    expect(waiting).toEqual(waiting.length > 0 ? newTexts : [])
   })
 
   it('reuses duck words’ bytes for the shared lines (the re-prompt and the 20 session-end lines)', () => {
     const duck = committed('duck-words')
     const bytes = new Map(duck.utterances.map((u) => [u.text, u.audio.base64]))
-    const reused = doc.utterances.filter((u) => u.audio.base64 !== '')
+    const reused = doc.utterances.filter(
+      (u) => u.id.startsWith('session.end.') || u.id.endsWith('.reprompt'),
+    )
     expect(reused).toHaveLength(28)
-    for (const u of reused) {
-      expect(bytes.get(u.text), u.id).toBe(u.audio.base64)
-      expect(
-        u.id.startsWith('session.end.') || u.id.endsWith('.reprompt'),
-        u.id,
-      ).toBe(true)
-    }
+    for (const u of reused) expect(bytes.get(u.text), u.id).toBe(u.audio.base64)
   })
 })
 

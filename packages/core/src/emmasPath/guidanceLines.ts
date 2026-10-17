@@ -236,17 +236,9 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: content wave 2's tent-words and cake-words lines (§ 6.2): their peek
- * opener and closer and their intro lead.
+ * Now: none.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
-  'guide.session.peek-open.tent-words',
-  'guide.session.peek-open.cake-words',
-  'guide.session.peek-close.tent-words',
-  'guide.session.peek-close.cake-words',
-  'guide.session.intro.tent-words',
-  'guide.session.intro.cake-words',
-]
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 

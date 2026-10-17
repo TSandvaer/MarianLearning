@@ -176,16 +176,8 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       text: 'The E is quiet. It makes the A say its name.',
       src: '/assets/audio/path/guide-session-intro-cake-words.mp3',
     })
-    // Wave 1 and sharing are rendered in Lily (§ 6.2); wave 2's tent and
-    // cake lines await their render (a separate agent voices them).
-    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([
-      'guide.session.peek-open.tent-words',
-      'guide.session.peek-open.cake-words',
-      'guide.session.peek-close.tent-words',
-      'guide.session.peek-close.cake-words',
-      'guide.session.intro.tent-words',
-      'guide.session.intro.cake-words',
-    ])
+    // Rendered in Lily, like wave 1's and sharing's (content wave 2 § 6.2).
+    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
   })
 
   it('names the step in the peek opener and closer (Thomas 2026-10-15), with the path lines’ spoken names and their verb', () => {
