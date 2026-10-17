@@ -289,4 +289,189 @@ export interface MoreProblem {
   - the 8 answers differ, and every chip follows § 3.6.
 - **Why this order:** P1–P3 can be answered from the flats alone (the gentle chips differ only there). P4 is the first digit-swap trap. P5 says the parts in Danish order (ones before tens), so the spoken-order chip is exactly the slip M6 predicts. P6–P8 then move one place at a time.
 
+## 4. WS-E: little stories (`fox-stories`, `hen-stories`, `bug-stories`)
+
+### 4.1 The steps
+
+- **Three SkillNodes**, after `cake-words` in `LITERACY_TREE` and `WORD_SONG_NODES_IN_ORDER`, in this order. Default `'locked'`.
+- **Each serves its 8 stories from canon, in canon order, every session** (§ 4.7). P1–P3 use gentle chips and P4–P8 trap chips.
+- **One question word per step:** fox stories ask "Who…?" (the answer is a character), hen stories "What…?" (an object) and bug stories "Where…?" (a place). Reviews, peeks and replays mix them later.
+- **Mastery, fast track, pace guard, peek, replay:** the Word Song preset. A secure session needs all 8 right on the first tap. No graduation gate, and no cross-vowel mix.
+- **New content type `'little-story'`.** The rest of this section is its spec.
+
+### 4.2 What she sees
+
+P1 of fox stories, phone portrait (375×667). On the left during the reading beat, on the right in the reveal:
+
+```
++----------------------------+   +----------------------------+
+| [<]           ✦3 (★ 12)    |   | [<]           ✦3 (★ 12)    |
+| ◉ ○ ○ ○ ○ ○ ○ ○            |   | ◉ ○ ○ ○ ○ ○ ○ ○            |
+| (Emma) | Read the story. | |   | (Emma) | The fox sat on  | |
+| (147 ) |                 | |   | (147 ) | the rug. It has | |
+| +------------------------+ |   | +------------------------+ |
+| | The fox sat on the rug.| |   | | The fox sat on the rug.| |  words light as
+| | It has a cup.          | |   | | It has a cup.          | |  Emma reads
+| +------------------------+ |   | +------------------------+ |
+|                            |   |      +--------------+      |
+|   (nothing: no picture     |   |      |    scene     |      |  the scene, only
+|    while she reads)        |   |      |   200 pt     |      |  after the answer
+|                            |   |      +--------------+      |
++----------------------------+   +----------------------------+
+```
+
+When Emma asks "Who sat on the rug?", three picture chips (fox, rug, cup, shuffled) enter in the chip row, under the card. On phone landscape they enter in the right-hand chip column.
+
+**Parts** (new `mobile/src/screens/wordSong/StoryCard.tsx`, `testID="word-story"`, `accessibilityLabel` = the story):
+
+- **The card:** the sentence panel's look (white, 3 pt `#FFC0CB` border, radius 16, its shadow). Fredoka 600, `#3B3B3B`. **Each sentence starts a new line.** The words are separate `Pressable`s, 0.35 em apart (`accessibilityRole="button"`, label "Word fox").
+- **The spotlight:** the letter row's (`word-song-native.md` § 3), drawn behind one word: `#FFB7C5`, the word's width + 4, height F + 8, radius 0.3 F. The word stays dark.
+- **The scene:** a square `Image` (`contain`) of `mobile/assets/scenes/story-<id>.webp` (600 px), radius 16. If a scene is missing, the answer's pack picture is shown at the scene's size instead, so the steps can ship before the scenes.
+
+### 4.3 Layout and sizes
+
+`wordSongLayout` gets the card metrics. The card sits at the **top** of the stage, so the reveal has room under it.
+
+| Form (stage)                      | Font / line height | Padding (h / v) | Text width | Card at 3 lines | Scene in the reveal                |
+| --------------------------------- | ------------------ | --------------- | ---------- | --------------- | ---------------------------------- |
+| P 375×667 (343 × 257)             | 24 / 46            | 16 / 12         | 305        | 168             | 196 (2-line card: 200)             |
+| L 667×375 b21 (376 × 189)         | 22 / 44            | 16 / 10         | 333        | 158             | 99–104, in the chip column's place |
+| Tablet, iPad mini L (stage 325 h) | 32 / 56            | 24 / 16         | ≤ 586      | 206             | 243                                |
+| Tablet portrait 744×1133          | 32 / 56            | 24 / 16         | ≤ 586      | 206             | 280                                |
+
+- **Measured** (my scratch script on 2026-10-17, Fredoka 600 advances read from `Fredoka_600SemiBold.ttf`, no kerning, 0.35 em gaps): every story takes 2 or 3 lines in P at 24 pt in 305 pt, in L at 22 pt in 333 pt, and on a tablet at 32 pt in 512 pt. The widest sentence, "The fox and the crab sat in the sun.", is 383 pt at 24 pt, so it wraps once in P. Four stories take 3 lines in P: fox 8, hen 7, hen 8 and bug 6.
+- **Line height ≥ 44 pt** on every form, so each word's tap area is at least 44 pt tall. A word's box is its width plus half the gap on each side, so the boxes touch. Short words ("a", "it") are narrower than 44 pt. A miss only plays the next word, so they get no extra room (the letter-cell rule, `word-song-native.md` § 3).
+- **The reveal rect** (P and tablet) runs from the card's bottom + 12 to the chips' bottom edge, across the stage's width. Scene = min(rect height, rect width, 200 on phones / 280 on tablets), and never under 120. In L the chip column's rect is the reveal rect: a small scene, on the one form Marian doesn't use.
+- **The question** goes in the ribbon's fixed slot (3 lines in P, 2 in L). The longest is 21 characters.
+
+### 4.4 Beats, problem by problem
+
+1. **The card enters** (any opener or lead first, as today). Emma is `listening`.
+2. **"Read the story."** (`guide.story.read`) plays on every story card. It is skipped only when the step's own intro lead plays, because that lead starts with the same words. After a peek, review or replay opener: the opener, 400 ms, then this line.
+3. **The reading beat** starts when that line (or the lead) ends. It lasts `clamp(6000, 900 × words, 12000)` ms of foreground time: 9 s for 10 words, 12 s for 14. Word taps hold the question: it starts no sooner than 2000 ms after the last tap, and never later than 20 s after the beat began. **Nothing on screen counts down.** (`STORY_READ_MS_PER_WORD = 900`; D3.)
+4. **The question:** Emma reads the `read` line ("Who sat on the rug?"), and the ribbon walks it. The three chips enter as it starts, closed (0.6 opacity), and open when it ends (Word Song's gate). The card stays: she may read it again and tap words.
+5. **Wrong 1:** the poof, the shake, `puzzled-tilt`, "Hmm... try again?", then 400 ms and the question again.
+6. **Wrong 2:** "Hmm... try again?", then 600 ms, then **Emma reads the story** (the `hint` clip) with the read-along (§ 4.5), `attentive-pointing`. Then 400 ms and the question again.
+7. **Wrong 3:** "This one is the fox." and the guided glow. The guided tap plays the correct moment. Never a red X.
+8. **Correct:** today's chip burst, sparkle, plink and `celebration`, and "Yes! The fox!".
+9. **The reveal** (after a correct or guided tap): 300 ms after the correct line ends, the chips fade out and the scene enters. 400 ms after it lands, Emma reads the story with the read-along, `attentive-pointing`. Then 800 ms, then today's 250 ms exit.
+
+**Word taps** (the reading support):
+
+- A tap plays that word alone (`guide.story.word.<word>`, § 5.1) and lights it.
+- They work from the card's first frame until the reveal starts.
+- They do nothing while Emma speaks any line, as the letters don't. A new tap cuts the word in flight; there is no queue.
+- They aren't moves: no attempt, no streak change, no Emma reaction, nothing recorded.
+- Tapping a word never shows a picture.
+
+**Decode first (K8):** no picture is on screen before her first answer. The chips aren't mounted during the beat, because picture chips would let her guess the nouns (`phonics-sequence-marian.md` Q6). The scene comes only in the reveal.
+
+### 4.5 Motion brief (Reanimated; Reduce Motion in brackets)
+
+- **Card entrance:** opacity 0 → 1 and `translateY` 12 → 0 on a spring (stiffness 260, damping 20). [A 150 ms fade.]
+- **Tapped word:** the spotlight fades in over 120 ms, and the word scales 1 → 1.08 → 1 over 300 ms `EASE_OUT`. It stays lit for max(400 ms, the clip), then fades out over 200 ms. [The spotlight only, no scale.]
+- **Read-along** (hint and reveal): the spotlight walks the words, each fading in over 120 ms at its mark − 40 ms (the blend's early-not-late rule) while the one before fades out. No scale. Everything goes dark 200 ms after the clip ends. [Unchanged: it is colour, not motion.]
+- **Marks:** `mobile/scripts/export-assets.mjs` writes `storyMarks.generated.ts`, keyed by each story's hint text, with the clip's byte length. `silencedetect` at −35 dB on silences ≥ 250 ms gives one segment per sentence; there must be exactly as many segments as sentences, or there is no entry. Inside a sentence, word k starts at `on + (off − on) × (characters before word k) ÷ (the sentence's characters)`. With no entry or a byte mismatch, the whole clip is split by characters (the caption clock's fallback).
+  - **Prediction (hypothesis):** words light within about ±150 ms of the voice. If the device check sees them out of step, set `STORY_READ_ALONG = 'sentence'`: the whole sentence lights for its segment instead.
+- **Chips:** today's entrance; on the reveal they fade out over 200 ms (`FadeOut`).
+- **Scene entrance:** scale 0.92 → 1 on a spring (stiffness 260, damping 20), with opacity 0 → 1 over 250 ms. [A 200 ms fade.]
+- **No new sounds** beyond Emma's lines and the word clips.
+
+### 4.6 Data model, parser, chips, session end
+
+**The story table** is the single source for the canon splice, the parser and the scenes: `packages/core/src/wordSong/littleStories.ts`. These are the exact names:
+
+```ts
+export type StoryNode = 'fox-stories' | 'hen-stories' | 'bug-stories'
+export const STORY_NODES: readonly StoryNode[]
+export interface LittleStory {
+  id: string // 'fox-1' … 'bug-8'; the scene file is story-<id>.webp
+  node: StoryNode
+  story: string // = the canon `hint` text
+  question: string // = the canon `read` text
+  answer: string // a pack word with a picture
+  wrong: readonly [string, string] // pack words with pictures, both in the story
+}
+export const LITTLE_STORIES: readonly LittleStory[] // the 24 rows of § 4.7
+export function littleStoryForText(story: string): LittleStory | undefined
+```
+
+**The wire stays utterance-only, with the same 5 slots** (K10):
+
+- `read` = the question.
+- `hint` = the story. Emma reads it as the hint and in the reveal, and the card displays it.
+- `correct` = "Yes! The fox!" or "Yes! In the cup!".
+- `giveAnswer` = "This one is the fox.".
+- `reprompt` = "Hmm... try again?".
+
+**Parser** (`wordSongSessionPlanFromServer`, the cloze precedent of resolving the target outside the read):
+
+- A read matching `^(Who|What|Where)\b[^?]*\?$` is a `'little-story'` problem. No existing read starts that way.
+- The target comes from the correct line, `^Yes! (?:The|(?:In|On|To) the) ([a-z]+)!$`.
+- `littleStoryForText(hint)` must find the row, and its `answer` must equal the target. Otherwise the plan throws `PlanFromServerError` and the session falls back.
+- The problem carries `story`, `storyId` and `question`. The chips are `[answer, ...wrong]` through `buildChipOrder`'s shuffle, **not** `TARGET_PAIRINGS`. No `TARGET_PAIRINGS` or `FORBIDDEN_PAIRS` rows are added, but no trio holds a forbidden pair (§ 4.7).
+
+**Session end:** `surface: 'word-song'`, with `targetWords` = the answers and `perProblemAnswerWord` = the tapped words, as today. The recap phrase is "reading stories".
+
+**Warm-up and review:**
+
+- `pickWarmupBlocks` (Word Song) takes the newest mastered review step **not in `STORY_NODES`**. A story block is about 20 s long, and a heart should be a quick win.
+- Once mastered, story blocks join the review pool like any block, and a review block plays the full flow, reveal included.
+
+### 4.7 The 24 stories (binding: the splice writes exactly this)
+
+Every problem also has the reprompt "Hmm... try again?" (reused) and the giveAnswer "This one is the <answer>." (17 + the answer's length, e.g. "This one is the fox." is 20). `hint` = the story.
+
+**Fox stories ("Who…?")**
+
+| P   | Story (words / characters)                                            | Question (characters)       | Answer | Wrong chips | Correct line          |
+| --- | --------------------------------------------------------------------- | --------------------------- | ------ | ----------- | --------------------- |
+| 1   | "The fox sat on the rug. It has a cup." (10 / 37)                     | "Who sat on the rug?" (19)  | fox    | rug, cup    | "Yes! The fox!" (13)  |
+| 2   | "The fox has a hat. The hat is in the box." (11 / 41)                 | "Who has a hat?" (14)       | fox    | hat, box    | "Yes! The fox!"       |
+| 3   | "The fox is in the tent. The tent is on a rock." (12 / 46)            | "Who is in the tent?" (19)  | fox    | tent, rock  | "Yes! The fox!"       |
+| 4   | "The fox sat on the bed. The hen ran to the van." (12 / 47)           | "Who ran to the van?" (19)  | hen    | fox, van    | "Yes! The hen!" (13)  |
+| 5   | "The dog has a bone. The fox has a fig." (10 / 38)                    | "Who has a fig?" (14)       | fox    | dog, bone   | "Yes! The fox!"       |
+| 6   | "The frog sat on a log. The fox hid in the shed." (12 / 47)           | "Who hid in the shed?" (20) | fox    | frog, log   | "Yes! The fox!"       |
+| 7   | "The pig got a kite. The fox ran to the pig." (11 / 43)               | "Who got a kite?" (15)      | pig    | fox, kite   | "Yes! The pig!" (13)  |
+| 8   | "The fox and the crab sat in the sun. The crab got a plum." (14 / 57) | "Who got a plum?" (15)      | crab   | fox, sun    | "Yes! The crab!" (14) |
+
+**Hen stories ("What…?")**
+
+| P   | Story (words / characters)                                      | Question (characters)        | Answer | Wrong chips | Correct line          |
+| --- | --------------------------------------------------------------- | ---------------------------- | ------ | ----------- | --------------------- |
+| 1   | "The hen has a cake. She is in the van." (10 / 38)              | "What has the hen got?" (21) | cake   | hen, van    | "Yes! The cake!" (14) |
+| 2   | "The hen has a tent. A pen is in the tent." (11 / 41)           | "What is in the tent?" (20)  | pen    | hen, tent   | "Yes! The pen!" (13)  |
+| 3   | "The hen has a bag. A plum is in the bag." (11 / 40)            | "What is in the bag?" (19)   | plum   | hen, bag    | "Yes! The plum!" (14) |
+| 4   | "A pot is on the desk. The hen has a cup." (11 / 40)            | "What is on the desk?" (20)  | pot    | cup, desk   | "Yes! The pot!" (13)  |
+| 5   | "The hen has a drum. The pig has a kite." (10 / 39)             | "What has the hen got?"      | drum   | kite, pig   | "Yes! The drum!" (14) |
+| 6   | "The hen has a hat. A wig is in the pond!" (11 / 40)            | "What is in the pond?" (20)  | wig    | hat, pond   | "Yes! The wig!" (13)  |
+| 7   | "The hen has a box and a lamp. A ring is in the box." (14 / 51) | "What is in the box?" (19)   | ring   | lamp, box   | "Yes! The ring!" (14) |
+| 8   | "The hen got a jug. Jam is in it. She has a cup." (13 / 47)     | "What is in the jug?" (19)   | jam    | cup, jug    | "Yes! The jam!" (13)  |
+
+**Bug stories ("Where…?")**
+
+| P   | Story (words / characters)                                          | Question (characters)        | Answer | Wrong chips | Correct line             |
+| --- | ------------------------------------------------------------------- | ---------------------------- | ------ | ----------- | ------------------------ |
+| 1   | "The bug is in the cup. It has a fig." (10 / 36)                    | "Where is the bug?" (17)     | cup    | bug, fig    | "Yes! In the cup!" (16)  |
+| 2   | "The bug is on the bed. It has a nut." (10 / 36)                    | "Where is the bug?"          | bed    | bug, nut    | "Yes! On the bed!" (16)  |
+| 3   | "The bug got a gem. It ran to the tent." (10 / 38)                  | "Where did the bug go?" (21) | tent   | bug, gem    | "Yes! To the tent!" (17) |
+| 4   | "The bug is on the rug. The cat is on the bed." (12 / 45)           | "Where is the bug?"          | rug    | bed, cat    | "Yes! On the rug!" (16)  |
+| 5   | "The bug is in the bag. The bag is in the van." (12 / 45)           | "Where is the bag?" (17)     | van    | bag, bug    | "Yes! In the van!" (16)  |
+| 6   | "The dog ran to the pond. The bug hid. It is in the tub." (14 / 55) | "Where did the dog go?" (21) | pond   | tub, dog    | "Yes! To the pond!" (17) |
+| 7   | "The bug is in the nest. The hen is on a log." (12 / 44)            | "Where is the hen?" (17)     | log    | nest, bug   | "Yes! On the log!" (16)  |
+| 8   | "The bug is on a lid. The lid is on the pot." (12 / 43)             | "Where is the lid?" (17)     | pot    | lid, bug    | "Yes! On the pot!" (16)  |
+
+**The rules these tables meet** (a splice lint checks them; my scratch check found no breach on 2026-10-17):
+
+- **Taught words only (D2).** Every word is:
+  - a target word of a Word Song canon file, or
+  - a word she has read in the sight-words or simple-sentences canon (a, the, is, it, in, on, to, she, has, sat, ran…), or
+  - one of 3 decodable extras built only from patterns she has mastered: _and_ (end blend nd, tent words), _got_ and _hid_ (CVC).
+  - No plurals and no -s or -ed endings. _shed_ is the one noun without a picture, and it is never a chip.
+- **Shape:** 2–3 sentences and 10–14 words. Bug 6 and hen 8 have 3 sentences. Each pronoun has one clear referent (_It_ = the subject of the sentence before; _She_ = the hen).
+- **Chips:** every chip word has a pack picture and appears in the story, and no trio holds a `FORBIDDEN_PAIRS` pair (cat–dog, duck–hen, bus–van and the rest).
+  - **P1–P3 (gentle):** both wrong chips are a different kind than the question asks: things for "who"; the character and a place for "what"; the character and a thing for "where".
+  - **P4–P8 (trap):** one wrong chip is the same kind and is in the story (another character, object or place), so she has to read who did what. Fox 4 and 7 are answered by the friend, not the fox.
+- **Why the order:** the step's gentle stories come first, and the 14-word and 3-sentence stories sit at P6–P8.
+
 <!-- wave3:next -->
