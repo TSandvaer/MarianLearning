@@ -123,3 +123,287 @@ All step names are working names; the spoken names are Kyle's to choose.
 - M5 tested adults. Whether facts trained in English come out quickly in Danish for an 8-year-old is unknown. Keeping digits on screen is a low-cost hedge, not a proven fix.
 - The Danish goals here come from search excerpts (M2). Her school's own year plan outranks both curricula: if it teaches clock time or fractions in grade 3, revisit section 2.
 - Age-fit check: none of these steps adds a timer, currency, streak or loss mechanic. The fast track's pace guard is unchanged.
+
+---
+
+## Addendum, 2026-10-18: content wave 4
+
+**For:** Matt and the coordinator, relayed to Thomas; Kyle writes the spec. **Status:** research only. Thomas said go on 2026-10-18 ("go with next content wave from daves roadmap"). Step numbers continue the tables above.
+
+### State check (read in code, 2026-10-18)
+
+- **Shipped:** every step above except Number Garden step 15.
+  - `packages/core/src/progress/types.ts`: `mult-mix` (line 46), `div-share` (49), `hundreds` (52); `duck-words`, `crab-words` (95–96), `tent-words`, `cake-words` (99–100), `fox-stories` … `bug-stories` (103–105).
+  - Missing numbers shipped as the `'missing-addend'` kind (`packages/core/src/math/extendedProblems.ts:79`).
+  - Names changed in the build: start blends are `crab-words`, not frog words (the frog is skip counting's stop, `design/native/content-wave-1.md` § 4.1); end blends are `tent-words`, not jump words.
+- **Step 15 needs no guard change.** The guard reads any whole number from 0 up (`packages/core/src/progress/guards.ts:209-222`), and `EXTENDED_ANSWER_MAX = 999` (`extendedProblems.ts:63`). Land 5 holds only `hundreds` (`packages/core/src/progress/lands.ts:48`); wave 3 says step 15 joins it (`design/native/content-wave-3.md:42`).
+- **Pictures:**
+  - The native pack has 89 pictures (`ls mobile/assets/pictures | wc -l`).
+  - The sh, ch and th words have none yet: _ship_, _sheep_ and _shark_ show as written words (`design/native/word-song-native.md:209`).
+  - The _jam_ picture is "a glass jar of rose-red jam" (`design/word-song/picture-manifest.json:423`).
+  - _star_ is already a stop: `'sight-words': 'star words'` (`packages/core/src/sessionEnd/friendlyNodeName.ts:173`).
+- **Voice:** Lily is British (`content-wave-1.md:299`), so _car_ is /kɑː/ with no r sound.
+
+### Bottom line
+
+- **Number Garden, step 15:** confirmed, with one refinement: change **one place per problem**, 2–4 hundreds or 2–4 tens.
+  - Adding in P1–P5, taking away in P6–P8. No regrouping, no zero digit.
+  - It is the hundreds picture with more blocks dropping in or lifting out, plus one new word, _less_.
+- **Word Song:** two phonics steps, then a second round of stories.
+  - **19 bee words** (ee, ea), then **20 car words** (ar), then **21 sheep stories**: new stories with the new words, and the question word changes from story to story.
+  - _or_ and _er/ir/ur_ wait: each has fewer than 8 picturable nouns.
+- **Stories round 2 beats a third phonics step** in this wave.
+- **Order:** Number Garden and Word Song run in parallel. Word Song goes bee words → car words → sheep stories.
+
+### New evidence
+
+**Reading**
+
+- **R6. UFLI Foundations Toolbox (official), fetched 2026-10-18.**
+  - Lessons 77–83 are r-controlled vowels: 77 ar; 78 or, ore; 79 review; 80 er; 81 ir, ur; 82 spelling /er/; 83 review. https://ufli.education.ufl.edu/foundations/toolbox/77-83/
+  - Lessons 84–88 are vowel teams: 84 ai, ay; 85 ee, ea, ey; 86 oa, ow, oe; 87 ie, igh; 88 review. https://ufli.education.ufl.edu/foundations/toolbox/84-88/
+  - Each lesson comes with a decodable passage (search summary of the 77–83 table). This confirms R3's order from the official source.
+- **R7. Letters and Sounds (UK, DfES 2007), Phase 3.** The order is ai, ee, igh, oa, oo, then ar, or, ur. https://www.twinkl.com/resources/literacy-phonics/letters-and-sounds/phase-3/3 This is a secondary source (Twinkl); I did not open the DfES PDF. _Use:_ the two programmes disagree on vowel teams vs r-controlled first, so neither order is strong evidence.
+- **R8. Philippine English**, Oxford Companion entry on Encyclopedia.com: https://www.encyclopedia.com/doc/1O29-PHILIPPINEENGLISH.html I saw it only via a search summary.
+  - Philippine English is rhotic, with a flapped r.
+  - Speakers "have varying success with the vowel contrasts in sheep/ship".
+  - Informational, not graded. _Use:_ _sheep / ship_ is a known Filipino-English vowel contrast, so it is a fair, useful trap.
+- **R9. Cheatham & Allor (2012)**, "The influence of decodability in early reading text on reading achievement: a review of the evidence", _Reading and Writing_ 25:2223–2246, doi:10.1007/s11145-011-9355-2. https://www.readingrockets.org/resources/resource-library/influence-decodability-early-reading-text-reading-achievement-review
+  - Decodable text helps early decoding accuracy.
+  - The authors warn against decodability as the only criterion. Later summaries call the comprehension evidence thin.
+  - Moderate for accuracy, weak for comprehension; I read the abstract only.
+
+**Maths**
+
+- **M8. Common Core, fetched 2026-10-18.**
+  - 2.NBT.B.7: "Add and subtract within 1000, using concrete models or drawings and strategies based on place value".
+  - 2.NBT.B.8: "Mentally add 10 or 100 to a given number 100-900, and mentally subtract 10 or 100 from a given number 100-900."
+  - 1.NBT.C.5 words it as "10 more or 10 less".
+  - Sources: https://www.thecorestandards.org/Math/Content/2/NBT/ and https://www.thecorestandards.org/Math/Content/1/NBT/. Standards, not evidence of effect.
+- **M2, update.**
+  - The 2024 PDF linked in M2 now returns 404 (fetched 2026-10-18).
+  - A UVM text found via search: since 1 January 2025 the skill goals are advisory, and the opmærksomhedspunkter in mathematics stay binding.
+  - The two binding points after grade 3, as search snippets give them: "anvende trecifrede tal til at beskrive antal og rækkefølge" and "addere og subtrahere enkle naturlige tal med hovedregning og lommeregner".
+  - Still unverified against the PDF.
+- **M9. Zuber, Pixner, Moeller & Nuerk (2009)**, _J Exp Child Psychol_, doi:10.1016/j.jecp.2008.04.003.
+  - About half of German first graders' number-writing errors were inversions, and digit-order errors were more common in three-digit numbers.
+  - Steiner et al. (2021, _Journal of Numerical Cognition_) found many inversion errors in German children and very few in English children.
+  - I saw both only via citing papers. Moderate. _Use:_ backs M6's digit-swap chip, now with three-digit data.
+- **M10. Fyfe, McNeil, Son & Goldstone (2014)**, "Concreteness fading in mathematics and science instruction: a systematic review", _Educational Psychology Review_ 26:9–25. https://pc.cogs.indiana.edu/?p=885
+  - The case is for starting with concrete materials and fading them gradually to symbols.
+  - Moderate: a systematic review, and a 2020 paper questions how far it generalises. I read the abstract only.
+- **M11. Carbonneau, Marley & Selig (2013)**, "A meta-analysis of the efficacy of teaching mathematics with concrete manipulatives", _J Educ Psychol_ 105:380–400.
+  - 55 studies; small to moderate effects in favour of manipulatives, larger for retention.
+  - Moderate to strong; I saw the summary only. _Use:_ the blocks earn their place, but they should fade.
+
+### 1. Number Garden step 15: adding hundreds (refined)
+
+**What it is:** three-digit numbers changed by whole hundreds or whole tens, adding and taking away, in her head. This is the binding Danish point (M2) and 2.NBT.B.8, widened from ±10 / ±100 to ±20–40 / ±200–400. It joins land 5 after `hundreds`; the working name is "adding hundreds", and the spoken name is Kyle's.
+
+**Why one place per problem** (refining "add and take away tens and hundreds"):
+
+- M2 asks for _simple_ numbers in her head.
+- A three-digit + three-digit read is too long to hear and hold: "Two hundred and forty-three plus three hundred and twenty-four. How many?" is 73 characters. Hundreds' reads are 46–60 (`content-wave-3.md:139`).
+- Three-digit + three-digit belongs to a later step, with an equation or a written method.
+
+**The picture:** hundreds' `PlaceValueStage`, unchanged in look.
+
+- The start number sits in the trays, with its number tag and a pill such as "+200" or "−30". Digits are language-free (M5), and there is no "=" (D11).
+- **Adding:** the blocks of the change drop into their tray (hundreds' added-block motion, with up to 4 blocks).
+- **Taking away:** blocks lift out and fade. This is the one new motion.
+- **Fading (M10):** each operation's opening problems move their blocks during the read (P1–P3 for adding, P6 for taking away). After that the blocks move only at hint 2, so she works from the tag and the pill.
+- My assumption: the changed tray's tag shows "?" until her tap.
+
+**Reads:** reuse hundreds' "more" frame, and add its mirror "less", which is the standards' own pair (M8). "How many are left?" would push reads past 60 characters.
+
+**Suggested canon** (the numbers may change; the rules below are binding):
+
+| P   | Read (characters)                                               | Answer | Blocks move on the read | Wrong chips                                               |
+| --- | --------------------------------------------------------------- | ------ | ----------------------- | --------------------------------------------------------- |
+| 1   | "Two hundred and thirty-five. What is two hundred more?" (54)   | 435    | yes                     | gentle: 635, 835                                          |
+| 2   | "Three hundred and twenty-four. What is thirty more?" (51)      | 354    | yes                     | gentle: 554, 754                                          |
+| 3   | "Four hundred and twenty-six. What is three hundred more?" (56) | 726    | yes                     | gentle: 526, 326                                          |
+| 4   | "Five hundred and thirty-two. What is thirty more?" (49)        | 562    | at hint 2               | wrong place 535, digit swap 526                           |
+| 5   | "Two hundred and forty-five. What is four hundred more?" (54)   | 645    | at hint 2               | wrong place 285, digit swap 654                           |
+| 6   | "Six hundred and fifty-three. What is two hundred less?" (54)   | 453    | yes (first take-away)   | wrong op 853, digit swap 435                              |
+| 7   | "Seven hundred and sixty-five. What is thirty less?" (50)       | 735    | at hint 2               | wrong op 795, digit swap 753                              |
+| 8   | "Three hundred and sixty-eight. What is forty less?" (50)       | 328    | at hint 2               | wrong place 364 (wrong op 408 has a zero), digit swap 382 |
+
+**Rules:**
+
+- **Change:** one place, by 2–4 hundreds or 2–4 tens.
+- **Numbers:** no regrouping. No zero digit in the start or the answer; the start's and the answer's digits are each all different, so a digit swap always exists.
+- **Block counts:** no more than 7 flats, 6 rods and 8 cubes at any point. These are hundreds' measured maxima, so its sizes (§ 3.3) hold.
+- **Chips:** all three different, in 100–999.
+- **Wrong-chip classes** (hundreds' names where they exist):
+  - `'gentle'` (P1–P3): the hundreds digit ±2 and ±4.
+  - `'wrong-place'`: the change made in the neighbouring place, the error the trays are there to fix.
+  - `'digit-swap'`: tens and ones swapped (M6, M9). This is the slip a Danish inner voice predicts: "fem hundrede og toogtres" (562) says the 2 before the 6. That example is my own Danish, not a cited source.
+  - `'wrong-op'`, taking away only: she added instead. When that number breaks the rules, `'wrong-place'` replaces it.
+
+**Taking away: yes, in this step.**
+
+- Both standards pair it with adding (M2, M8).
+- The path has already taken her through taking away to 20 and two-digit taking away (`sub-to-20`, `two-digit-addsub-*` come before `hundreds`).
+- With the blocks, taking away is the same picture run backwards. A separate step would double the path for one idea.
+
+**Not in it:**
+
+- Zeros (305, 500) and "one hundred" as a start. These stay the first hundreds deepening (wave 3 D8) and come next in Number Garden.
+- Regrouping.
+- Three-digit + three-digit.
+- A Leitner fact, and so warm-up hearts (as hundreds, K7). Mastered blocks join reviews.
+
+**Words:** one new core word, _less_. No canon or guidance line uses it (`grep`, 2026-10-18). _more_ and _hundred_ are in use, so the cap goes from about 176 to 177.
+
+### 2. Word Song steps 19–21
+
+Steps 19 and 20 use `cvc-word` exactly as land 6 does:
+
+- "Read the <word>." with the word card, 3 picture chips, the 1500 ms silent beat, the hint "Let's look. <Word>." and no blend clip.
+- 8 words from canon in order (K9), gentle chips on P1–P3 and trap chips on P4–P8.
+- Every word takes "Yes! That's a <word>." (consonant-first count nouns).
+- **Lead:** reuse duck words' "Two letters, one sound!", with the 2 team cells lit together. For ee, ea and ar it is literally true in Lily's British English. It adds no new word, and the bake de-duplicates exact text.
+
+**Step 19: bee words.** ee and ea both say E's name (/iː/), as UFLI lesson 85 teaches them together. Two spellings in one step follow duck words (ck, ng) and cake words (4 patterns).
+
+| P   | Word  | Team | Trap: the short word she already reads | Second trap                        |
+| --- | ----- | ---- | -------------------------------------- | ---------------------------------- |
+| 1   | bee   | ee   | bed                                    | tree (same ee)                     |
+| 2   | tree  | ee   | tent (t, short e)                      | bee                                |
+| 3   | leaf  | ea   | leg                                    | seal (same ea)                     |
+| 4   | sheep | ee   | **ship** (R8's contrast; new picture)  | jeep (rhyme)                       |
+| 5   | jeep  | ee   | jet                                    | sheep                              |
+| 6   | seal  | ea   | sun (s, short vowel; no twin exists)   | seed (same start, read to the end) |
+| 7   | peach | ea   | pen                                    | leaf                               |
+| 8   | seed  | ee   | sock (s, short vowel)                  | seal                               |
+
+- **Reserves** if a picture fails Thomas's sheet: _bean_, _beach_.
+- **Kept out:**
+  - _queen_ (qu is never taught: no Q line in the letter-sound canon; and it is a crowned figure next to _king_).
+  - _wheel_ (wh is never taught).
+  - _feet_ and _teeth_ (plurals).
+  - _cheese_ and _tea_ ("Yes! That's a cheese." breaks).
+  - _sweet_ (British for candy, but she would say "candy").
+- **Why jeep:** a jeep is the base of the Filipino jeepney, so it is likely familiar to her (my judgment).
+
+**Step 20: car words.** ar says /ɑː/, and the r changes the vowel (UFLI lesson 77).
+
+| P   | Word  | Trap: the short word she already reads | Second trap                             |
+| --- | ----- | -------------------------------------- | --------------------------------------- |
+| 1   | car   | cat                                    | star (rhyme)                            |
+| 2   | star  | sun (s, short vowel)                   | car (rhyme)                             |
+| 3   | barn  | bag                                    | harp (same ar)                          |
+| 4   | cart  | **cat: cart without the r**            | car (read to the end)                   |
+| 5   | shark | ship (sh, short vowel)                 | star (same ar)                          |
+| 6   | scarf | sack (s, short a)                      | shark (same ar)                         |
+| 7   | card  | cap                                    | **cart (only the last letter differs)** |
+| 8   | harp  | hat                                    | barn (same ar)                          |
+
+- **Reserves:** _dart_, _yarn_. Yarn is weak: British English says "wool", the _sledge_ rule.
+- **Kept out:**
+  - _jar_: its picture would match _jam_'s jar.
+  - _arm_: needs "an".
+  - _farm_, _park_: scenes, not objects.
+  - _tart_: reads as cake.
+- **Never put _bath_ in a car-words trio.** In British English its vowel is the same /ɑː/ (the _mask/raft_ rule, wave 2 § 3.2).
+- **Tagalog fit:** /ɑː/ is near Tagalog /a/ (R5). Philippine English says the r (R8), Lily doesn't. Either way "ar" is one stable unit when she reads.
+
+**New `FORBIDDEN_PAIRS` candidates** (Thomas's picture review may add more):
+
+| Pair                                  | Why                                             |
+| ------------------------------------- | ----------------------------------------------- |
+| bee – bug                             | small insects                                   |
+| tree – pine                           | both trees                                      |
+| seed – nut, seed – egg                | small ovals                                     |
+| peach – plum                          | round fruits                                    |
+| sheep – dog, sheep – pig, sheep – cat | four-legged animals in side view (the pig rule) |
+| jeep – van, jeep – bus, jeep – car    | vehicles in side view                           |
+| car – van, car – bus                  | vehicles in side view                           |
+| barn – tent                           | pointed roofs                                   |
+| scarf – belt                          | long cloth strips                               |
+| card – gift                           | flat rectangles                                 |
+| seal – shark                          | grey sea animals                                |
+| jar – jam                             | only if _jar_ ever comes back                   |
+
+**New pictures:** 17 (16 targets + _ship_). _ship_ also gives the sh step its first native picture.
+
+**Why bee words before car words** (my judgment; UFLI and Letters and Sounds disagree, R6 vs R7):
+
+- /iː/ exists in Tagalog as /i/, so only the spelling is new.
+- Its traps are the short words she reads, the cake-words logic she has mastered.
+- Six of its eight words have a pictured short-vowel trap with the same start (all but _seal_ and _seed_).
+- Car words then bring one new idea, that r changes the vowel.
+
+**Why not _or_ and _er/ir/ur_ now:**
+
+- **Too few words.** My count of consonant-first, picturable count nouns:
+  - or: fork, corn, horn. Thin: cork, fort, stork, thorn. _torch_ means a flashlight in British English.
+  - er/ir/ur: bird, girl, shirt, skirt, church. _nurse_ and _purse_ carry an e that looks like magic e.
+- **Hard sounds.** /ɔː/ and /ɜː/ have no Tagalog counterpart. `design/research/digraph-sh-long-vowel-addendum.md` already flagged /ɔːr/ as a perception risk for her.
+- **Where they fit:** a later format that doesn't need a picture for every word.
+
+**Step 21: sheep stories (little stories, round 2).**
+
+- **Format:** exactly wave 3's (`LITTLE_STORIES`, `StoryCard`, decode first, the 1500 ms-a-word reading beat, look-back, word taps, the scene only after the answer). 8 stories in one canon file.
+- **The one new thing:** the question word changes from story to story. P1–P3 are Who, What, Where, one each with gentle chips; P4–P8 mix them. She has to understand the question itself, and that is the language comprehension R1 says limits her.
+- **Words:** wave 3's taught-word rule (D2), plus the 16 bee and car words.
+  - Each story uses at least 2 of them.
+  - The sheep is in every story, not always the answer (K3). _sheep_ is a bee-words target, so the name only works after step 19.
+  - 10–14 words in 2–3 sentences; the chip rules are wave 3's § 4.7.
+- **Examples** (not binding):
+  - "The sheep sat in the jeep. It has a peach." → "Who sat in the jeep?" → **sheep** / jeep, peach.
+  - "The seal has a scarf. It sat in the barn." → "What does the seal have?" → **scarf** / seal, barn.
+  - "The sheep ran to the barn. A star is on it." → "Where did the sheep go?" → **barn** / sheep, star.
+- **Lead:** "Read the story. Who, what or where?" uses only words in use.
+- **Cost:** 8 scenes (wave 3's generator scene mode) and a "<Word>." clip for each new story word.
+
+**Stories round 2 beats a third phonics step this wave:**
+
+- Her limit is language, not decoding (R1, R2). The story step is the only one that trains it.
+- UFLI follows each pattern lesson with connected decodable text (R6), and decodable text supports accuracy (R9; the comprehension gain is thinly evidenced).
+- It needs no new interaction. ai/ay and oa have about 6 strong picturable words each (my count), so they wait for wave 5.
+
+### 3. Order, tracks and what must hold
+
+**Tracks** (all in parallel except where noted):
+
+- **NG:** step 15.
+  - Core: Kevin widens the hundreds `more` kind to ±20–40 and ±200–400 with "less", plus the chip classes.
+  - Stage: Devon builds multi-block drops and the lift-out.
+  - No pictures; canon is spliced, then rendered.
+- **WS words:** bee words, then car words on the path. Both are content in the land-6 format and can be built together: tables, 17 pictures, render, voice QA.
+- **WS stories:** sheep stories start once the bee and car pictures are approved, because the scenes use them as references.
+
+**Lands:**
+
+- Step 15 joins Number Garden land 5.
+- Steps 19–21 make a new Word Song land 8, because the path is linear after land 7. Its name is Kyle's.
+- An 8th band needs wave 3's map-fit check (`content-wave-3.md` § 1, T6).
+
+**What must hold true:**
+
+1. **Never tie fingers to "not yet".** No line, mechanic or mastery rule mentions or reads finger use. The blocks invite counting, and counting is a route to recall (M3).
+2. **No speed signal.** No timer, no countdown, no "fast". Latency is recorded and never shown. The fast track gates on accuracy only (`speed-feedback-automaticity-marian.md`).
+3. **Never a red X.** Poof, shake, `puzzled-tilt`, "Hmm... try again?"; hints at the 2nd wrong, the guided answer at the 3rd.
+4. **Decode first.**
+   - Word steps: no picture before the chips, and Emma never says the target before the 2nd wrong's hint.
+   - Stories: no picture while she reads, and the scene only after the answer (`phonics-sequence-marian.md` Q6).
+5. **Taught words only in stories.** A new pattern appears in a story only after its own step.
+6. **Every chip reads at 96 pt.** No forbidden pair in a trio, British-valid words, and "Yes! That's a <word>." works.
+7. **Digits on screen for every maths problem (M5).** No "=" in the place-value steps.
+8. **One new idea per step.**
+9. **About 177 core words** of the ~200 cap.
+10. **No mechanics added:** no currency, streak, loss or timer.
+
+### Thomas decides
+
+- **Picture spend:** 17 word pictures and 8 scenes. My estimate at wave 3's rates (`content-wave-3.md` § 6) is about $1.70 + $0.90 ≈ $2.60, plus retakes; `--dry-run` prints the real figure. Recommendation: approve.
+- **One check, when she reaches land 7:** does she answer the story questions on her first tap? If she often doesn't, sheep stories keep one question word per stretch (Who, then What, then Where) instead of mixing them. Everything else stands.
+
+### Risks / counter-evidence
+
+- The vowel-team-before-r order rests on my judgment plus R7, and R6 says the opposite. The cost of being wrong is low, because both steps are content in a shipped format.
+- R8 is a reference-work summary, not a study of children. _sheep / ship_ is a good trap for reading even if she hears the vowels the same.
+- Hypothesis: _seed_ and _peach_ are the weakest pictures, and the reserves exist for them.
+- M2's binding wording is still from search excerpts. Her school's year plan outranks it.
