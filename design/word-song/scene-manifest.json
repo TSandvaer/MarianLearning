@@ -190,5 +190,73 @@
     "subject": "A grey cooking pot with its lid on, the pink bug sitting on the lid.",
     "avoid": ["steam or fire"],
     "refs": ["bug", "lid", "pot"]
+  },
+  {
+    "scene": "sheep-1",
+    "tier": "sheep-stories",
+    "batch": 4,
+    "subject": "The sheep sitting in the open-top jeep, a peach on the seat beside it.",
+    "avoid": ["a driver"],
+    "refs": ["sheep", "jeep", "peach"]
+  },
+  {
+    "scene": "sheep-2",
+    "tier": "sheep-stories",
+    "batch": 4,
+    "subject": "The sheep running to the wooden hand cart; behind it, the red barn with its doors open and a small harp inside.",
+    "avoid": [
+      "other farm animals",
+      "the sheep in the barn",
+      "the harp in the cart"
+    ],
+    "refs": ["sheep", "barn", "harp", "cart"]
+  },
+  {
+    "scene": "sheep-3",
+    "tier": "sheep-stories",
+    "batch": 4,
+    "subject": "The wooden hand cart; the sheep hiding in it, peeking over the side, holding a green leaf.",
+    "avoid": ["a horse or a person"],
+    "refs": ["sheep", "leaf", "cart"]
+  },
+  {
+    "scene": "sheep-4",
+    "tier": "sheep-stories",
+    "batch": 4,
+    "subject": "The bee holding a big striped seed; beside it, the sheep holding an open card.",
+    "avoid": ["flowers", "the bee with the card"],
+    "refs": ["bee", "seed", "sheep", "card"]
+  },
+  {
+    "scene": "sheep-5",
+    "tier": "sheep-stories",
+    "batch": 4,
+    "subject": "The seal lying on a grey rock in front; behind, the sheep running to a round tree.",
+    "avoid": ["water", "the sheep on the rock"],
+    "refs": ["seal", "rock", "sheep", "tree"]
+  },
+  {
+    "scene": "sheep-6",
+    "tier": "sheep-stories",
+    "batch": 4,
+    "subject": "The sheep sitting in the rose-red car; beside it, the bee on a round tree.",
+    "avoid": ["the bee in the car"],
+    "refs": ["sheep", "car", "bee", "tree"]
+  },
+  {
+    "scene": "sheep-7",
+    "tier": "sheep-stories",
+    "batch": 4,
+    "subject": "The sheep and the shark sitting side by side on the deck of the small sailing ship; the shark holds a peach.",
+    "avoid": ["the shark in the water", "the sheep with the peach"],
+    "refs": ["sheep", "shark", "ship", "peach"]
+  },
+  {
+    "scene": "sheep-8",
+    "tier": "sheep-stories",
+    "batch": 4,
+    "subject": "A wooden hand cart with a gold star on it; beside it, the sheep in a rose scarf, holding an open card.",
+    "avoid": ["the star in the sky", "the sheep on the cart"],
+    "refs": ["sheep", "star", "scarf", "card"]
   }
 ]
