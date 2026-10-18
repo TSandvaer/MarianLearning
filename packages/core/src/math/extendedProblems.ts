@@ -344,7 +344,9 @@ export function moreChange(
 /** More and less's problem (content wave 4 § 2): anything but hundreds'
  *  own ten / one hundred more (count 1, 'more'), which keeps its look and
  *  its chips. */
-export function isMoreAndLess(problem: MoreProblem): boolean {
+export function isMoreAndLess(
+  problem: Pick<MoreProblem, 'count' | 'direction'>,
+): boolean {
   return !(problem.count === 1 && problem.direction === 'more')
 }
 
