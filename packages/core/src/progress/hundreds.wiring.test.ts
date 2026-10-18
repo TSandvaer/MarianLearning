@@ -171,8 +171,7 @@ describe('the hundreds lines (§ 5.1, AC 7)', () => {
     const p = PATH_IDS.map((id) => BAKED_PATH_LINES.find((l) => l.id === id))
     expect(p.every((l) => l !== undefined)).toBe(true)
     expect(p.reduce((n, l) => n + l!.text.length, 0)).toBe(228)
-    // Hundreds' lines are rendered (content wave 4's Word Song lines
-    // await theirs).
+    // Hundreds' lines are rendered.
     for (const l of g)
       expect(GUIDANCE_LINES_AWAITING_RENDER).not.toContain(l.id)
     for (const l of p) expect(PATH_LINES_AWAITING_RENDER).not.toContain(l!.id)

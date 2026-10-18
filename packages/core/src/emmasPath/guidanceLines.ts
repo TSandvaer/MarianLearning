@@ -326,20 +326,9 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: content wave 4's Word Song lines (§ 8.1): land 8's peeks and
- * replays, sheep stories' lead and the 17 new story words. Bee and car
- * words' leads are duck words' text, so their files are copies of its clip
- * (the bytes the render writes for that text).
+ * Now: none.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] =
-  GUIDANCE_LINES.filter(
-    (l) =>
-      (l.kind === 'story-word' && l.input !== undefined) ||
-      (['bee-words', 'car-words', 'sheep-stories'].some((n) =>
-        l.id.endsWith(`.${n}`),
-      ) &&
-        l.text !== SESSION_INTRO_TEXTS['duck-words']),
-  ).map((l) => l.id)
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 

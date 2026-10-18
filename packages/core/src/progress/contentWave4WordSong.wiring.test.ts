@@ -193,7 +193,7 @@ describe('the lines (§ 8.1, AC 8)', () => {
     expect(storyWordLine('sat')?.input).toBeUndefined()
   })
 
-  it('32 guidance lines (30 new texts, 477 characters) and 18 path lines (628 characters) of this half; every new text awaits its Lily render', () => {
+  it('32 guidance lines (30 new texts, 477 characters) and 18 path lines (628 characters) of this half, rendered in Lily', () => {
     const g = GUIDANCE_LINES.filter(
       (l) =>
         NEW.some((n) => l.id.endsWith(`.${n}`)) ||
@@ -217,9 +217,8 @@ describe('the lines (§ 8.1, AC 8)', () => {
     expect(p).toHaveLength(18)
     expect(p.reduce((n, l) => n + l.text.length, 0)).toBe(628)
     for (const l of g)
-      if (l.text !== 'Two letters, one sound!')
-        expect(GUIDANCE_LINES_AWAITING_RENDER).toContain(l.id)
-    for (const l of p) expect(PATH_LINES_AWAITING_RENDER).toContain(l.id)
+      expect(GUIDANCE_LINES_AWAITING_RENDER).not.toContain(l.id)
+    for (const l of p) expect(PATH_LINES_AWAITING_RENDER).not.toContain(l.id)
   })
 
   it("the bee and car leads have their own files, copies of duck words' clip (the render writes the same bytes)", () => {
