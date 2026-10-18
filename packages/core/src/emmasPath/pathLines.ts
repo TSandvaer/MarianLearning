@@ -216,9 +216,15 @@ export const BAKED_PATH_LINES: readonly (PathLine & { src: string })[] =
  * tests expect exactly these to be missing. The render commit sets this
  * list to `[]`.
  *
- * Now: none.
+ * Now: content wave 4's more and less (§ 8.1), the 2nd stop of land 5.
  */
-export const PATH_LINES_AWAITING_RENDER: readonly string[] = []
+export const PATH_LINES_AWAITING_RENDER: readonly string[] = [
+  'path.open.hundreds-addsub',
+  'path.stop.hundreds-addsub',
+  'path.locked.next.hundreds-addsub',
+  'end.bud.hundreds-addsub',
+  'end.unlock.hundreds-addsub',
+]
 
 const BY_ID = new Map(PATH_LINES.map((l) => [l.id, l]))
 

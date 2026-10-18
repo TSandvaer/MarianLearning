@@ -28,8 +28,8 @@ const DIV_SHARE = 'div-share' as NumberGardenNode
 
 describe('div-share in the Number Garden tree (§ 1, § 2.1)', () => {
   it('follows mult-mix in both tree lists; hundreds follows it (content wave 3)', () => {
-    expect(MATH_TREE.slice(-3, -1)).toEqual(['mult-mix', DIV_SHARE])
-    expect(MATH_NODES_IN_ORDER.slice(-3, -1)).toEqual(['mult-mix', DIV_SHARE])
+    expect(MATH_TREE.slice(-4, -2)).toEqual(['mult-mix', DIV_SHARE])
+    expect(MATH_NODES_IN_ORDER.slice(-4, -2)).toEqual(['mult-mix', DIV_SHARE])
     expect(nextNode('math', 'mult-mix')).toBe(DIV_SHARE)
     expect(nextNode('math', DIV_SHARE)).toBe('hundreds')
   })

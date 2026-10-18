@@ -52,6 +52,7 @@
  */
 
 import type { MathFact } from '../progress/types'
+import { GENTLE_RAMP_THROUGH } from './distractors'
 import type { MathProblem, MathProblemUtterances } from './sessionPlans'
 
 /**
@@ -225,10 +226,14 @@ export interface PlaceValueProblem {
 }
 
 /**
- * A "ten / one hundred more" problem (content wave 3 § 3, D10): Emma names
- * a number shown in blocks and asks for ten or one hundred more. e.g. "Two
- * hundred and forty-three. What is ten more?" → start 243, step 10,
- * correct 253. No zero digit in `start` and no regrouping.
+ * A "more" or "less" problem: Emma names a number shown in blocks and asks
+ * for some tens or hundreds more or less. Hundreds (content wave 3 § 3,
+ * D10) asks ten or one hundred more: "Two hundred and forty-three. What is
+ * ten more?" → start 243, step 10, count 1, 'more', correct 253. More and
+ * less (content wave 4 § 2.6) asks 2–4 of them, added or taken away: "Six
+ * hundred and fifty-three. What is two hundred less?" → start 653, step
+ * 100, count 2, 'less', correct 453. No zero digit in `start` or
+ * `correct`, and no regrouping.
  */
 export interface MoreProblem {
   kind: 'more'
@@ -236,13 +241,24 @@ export interface MoreProblem {
   index: number
   /** The number read, three digits with no zero. */
   start: number
-  /** Ten more or one hundred more. */
+  /** The place that changes: the tens or the hundreds. */
   step: 10 | 100
-  /** `start + step`, at most {@link EXTENDED_ANSWER_MAX}. */
+  /** How many tens or hundreds change; hundreds' problems are 1. */
+  count: MoreCount
+  /** Added or taken away; hundreds' problems are 'more'. */
+  direction: MoreDirection
+  /** `start ± count × step`, in 100..{@link EXTENDED_ANSWER_MAX}. */
   correct: number
   /** Pre-canned utterance lines, same slots as arithmetic problems. */
   utterances: MathProblemUtterances
 }
+
+/** How many tens or hundreds a "more" problem changes (content wave 4
+ *  § 2.6: 1 in hundreds, 2–4 in more and less). */
+export type MoreCount = 1 | 2 | 3 | 4
+
+/** A "more" problem adds or takes away. */
+export type MoreDirection = 'more' | 'less'
 
 /** One problem in an extended plan. Switch on `kind`. */
 export type ExtendedMathProblem =
@@ -316,6 +332,42 @@ export function isMoreProblem(
 
 /** A hundreds problem: a place-value read or a ten / one hundred more. */
 export type HundredsProblem = PlaceValueProblem | MoreProblem
+
+/** A "more" problem's change, signed: +200, +30, −200, −30. */
+export function moreChange(
+  problem: Pick<MoreProblem, 'step' | 'count' | 'direction'>,
+): number {
+  const size = problem.count * problem.step
+  return problem.direction === 'less' ? -size : size
+}
+
+/** More and less's problem (content wave 4 § 2): anything but hundreds'
+ *  own ten / one hundred more (count 1, 'more'), which keeps its look and
+ *  its chips. */
+export function isMoreAndLess(problem: MoreProblem): boolean {
+  return !(problem.count === 1 && problem.direction === 'more')
+}
+
+/** The problem where more and less first takes away, and so moves its
+ *  blocks on the read once more (content wave 4 § 2.4, D2). */
+export const MORE_AND_LESS_FIRST_LESS_INDEX = 6
+
+/**
+ * Whether a more-and-less problem's change blocks move on the read (on its
+ * "more" / "less"), else at hint 2 (content wave 4 § 2.4, D1, D2): P1–P3
+ * (the concrete model) and P6, the first taking away. On those the changed
+ * tray's tag is "?" from the first frame. Like sharing's deal, the rule is
+ * the problem's position, so a review block at P2 moves too. Hundreds'
+ * own problems never move on the read (content wave 3, D11).
+ */
+export function moreBlocksMoveOnRead(problem: MoreProblem): boolean {
+  if (!isMoreAndLess(problem)) return false
+  return (
+    problem.index <= GENTLE_RAMP_THROUGH ||
+    (problem.direction === 'less' &&
+      problem.index === MORE_AND_LESS_FIRST_LESS_INDEX)
+  )
+}
 
 export function isHundredsProblem(
   problem: ExtendedMathProblem,

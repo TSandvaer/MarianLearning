@@ -59,6 +59,7 @@ const MATH = [
   'mult-mix',
   'div-share',
   'hundreds',
+  'hundreds-addsub',
 ] as const
 
 function pastDayISO(daysAgo: number): string {
