@@ -15,22 +15,25 @@ import {
 
 /** Spec §4.5 word list (carrier + name + land-name words), lower-case;
  *  plus "the" of "all the groups" (content wave 1 K7, Thomas 2026-10-16)
- *  and "sharing", "tent" and "cake" (content wave 2 K7, Thomas 2026-10-17). */
+ *  and "sharing", "tent" and "cake" (content wave 2 K7, Thomas 2026-10-17),
+ *  and "fox", "hen", "bug", "stories" (content wave 3 T1, Thomas
+ *  2026-10-17). */
 const SPEC_VOCAB = new Set(
   `here is your path you are on did all of it look at flowers flower a new for
   learned now can do land first then this not yet numbers adding taking away to
   ten twenty big making tens skip counting groups two three four five and letter
   letters names sounds blending words reading sentences cat dog sun pig bed ship
-  chick thumb star sound pairs the duck crab sharing tent cake`.split(/\s+/),
+  chick thumb star sound pairs the duck crab sharing tent cake fox hen bug
+  stories`.split(/\s+/),
 )
-const NUMERALS = new Set(['1', '2', '3', '4', '5', '6'])
+const NUMERALS = new Set(['1', '2', '3', '4', '5', '6', '7'])
 
 describe('STAGE_SPOKEN_NAMES (spec §4.3)', () => {
-  it('gives all 30 stages a name and no two the same', () => {
+  it('gives all 33 stages a name and no two the same', () => {
     const nodes = [...MATH_TREE, ...LITERACY_TREE]
-    expect(nodes).toHaveLength(30)
+    expect(nodes).toHaveLength(33)
     const names = nodes.map((n) => STAGE_SPOKEN_NAMES[n])
-    expect(new Set(names).size).toBe(30)
+    expect(new Set(names).size).toBe(33)
   })
 })
 
@@ -56,17 +59,17 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
     const counts: Record<string, number> = {}
     for (const l of PATH_LINES) counts[l.kind] = (counts[l.kind] ?? 0) + 1
     expect(counts).toEqual({
-      open: 30,
+      open: 33,
       'open-done': 2,
-      stop: 30,
-      land: 10,
-      'locked-next': 28,
-      'locked-later': 186,
-      'gate-locked': 51,
-      'end-bud': 30,
-      'end-unlock': 28,
-      'end-land': 8,
-      'end-land-no-number': 8,
+      stop: 33,
+      land: 11,
+      'locked-next': 31,
+      'locked-later': 237,
+      'gate-locked': 68,
+      'end-bud': 33,
+      'end-unlock': 31,
+      'end-land': 9,
+      'end-land-no-number': 9,
     })
     expect(new Set(PATH_LINES.map((l) => l.id)).size).toBe(PATH_LINES.length)
   })
@@ -175,9 +178,11 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
       expect(l.src === null).toBe(DEFERRED_PATH_LINE_KINDS.has(l.kind))
     // Content wave 1: + 5 (all the groups) + 13 (duck words, crab words,
     // land 6) = 159, the spec's § 6.2 count. Content wave 2: + 5 (sharing)
-    // + 10 (tent words, cake words) = 174, the spec's + 15.
-    expect(BAKED_PATH_LINES).toHaveLength(174)
-    expect(new Set(BAKED_PATH_LINES.map((l) => l.text)).size).toBe(173)
+    // + 10 (tent words, cake words) = 174, the spec's + 15. Content wave
+    // 3: + 18 (the three story steps, land 7; § 5.1's +26 without
+    // hundreds' 8) = 192.
+    expect(BAKED_PATH_LINES).toHaveLength(192)
+    expect(new Set(BAKED_PATH_LINES.map((l) => l.text)).size).toBe(191)
   })
 
   it('has a bundled MP3 for every baked line but the ones awaiting their render', () => {
@@ -187,7 +192,8 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
     // Exactly the awaiting list: the render commit adds the clips AND
     // empties `PATH_LINES_AWAITING_RENDER`.
     expect(missing.sort()).toEqual([...PATH_LINES_AWAITING_RENDER].sort())
-    // Content wave 2's tent and cake lines are rendered in Lily (§ 6.2).
+    // Content wave 2's tent and cake lines (§ 6.2) and content wave 3's 18
+    // (§ 5.1) are rendered in Lily.
     expect(PATH_LINES_AWAITING_RENDER).toEqual([])
   })
 

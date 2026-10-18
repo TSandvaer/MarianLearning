@@ -114,8 +114,10 @@ function blockPlanFromServer(
       }
     : {
         world,
+        // The native app plays the little stories (content wave 3).
         plan: wordSongSessionPlanFromServer(serverPlan, {
           problemCount: count,
+          littleStories: true,
         }),
       }
 }

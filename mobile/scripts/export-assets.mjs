@@ -19,6 +19,12 @@
  * - `src/audio/blendMarks.generated.ts` the sound segments of every baked
  *                                  Word Song blend clip (needs `ffmpeg`)
  * - `assets/scenes/<id>.webp`      every `public/assets/scenes/scene-*.svg`
+ * - `assets/scenes/story-<id>.webp` kept as they are: the little stories'
+ *                                  scenes (content wave 3 § 4.2, § 6), which
+ *                                  the scene generator writes here; only
+ *                                  registered (`/native/scenes/...`)
+ * - `src/audio/storyMarks.generated.ts` the sentence segments of every
+ *                                  baked little-story clip (needs `ffmpeg`)
  * - `assets/path/*.webp`           `public/assets/path/*.webp`, copied as-is
  * - `assets/path/*-256-muted.webp` the Hub's muted "next" stickers
  * - `assets/path/<step>-256-locked.webp` the map's frosted locked stops
@@ -212,14 +218,19 @@ for (const name of sorted(join(webAssets, 'pictures'), /^picture-.+\.svg$/)) {
   }
 }
 
-// Simple-sentences scenes. The little-story scenes (`story-<id>.webp`) are
-// written here directly by `generatePackPictures.ts --scenes --pick` and have
-// no web source, so the clear-out keeps them.
+// Simple-sentences scenes. The little stories' scenes (`story-<id>.webp`,
+// content wave 3 § 4.2, § 6) are written here directly by
+// `generatePackPictures.ts --scenes --pick`, not exported from the web, so
+// the clear-out keeps them and they are registered as they are (native
+// only: keyed under /native/scenes/).
 mkdirSync(join(out, 'scenes'), { recursive: true })
 for (const name of readdirSync(join(out, 'scenes'))) {
   if (!/^story-.+\.webp$/.test(name)) {
     rmSync(join(out, 'scenes', name), { recursive: true, force: true })
   }
+}
+for (const name of sorted(join(out, 'scenes'), /^story-.+\.webp$/)) {
+  registry.push([`/native/scenes/${name}`, join(out, 'scenes', name)])
 }
 for (const name of sorted(join(webAssets, 'scenes'), /^scene-.+\.svg$/)) {
   const id = name.slice('scene-'.length, -'.svg'.length)
@@ -331,6 +342,15 @@ function clipHash(mp3) {
 }
 
 function blendSegments(path) {
+  return clipSegments(path, 0.3, 4)
+}
+
+/**
+ * The sound segments of a clip: the first onset is the end of the leading
+ * silence (>= 30 ms); later boundaries are silences of >= `minSilence` s.
+ * Exactly `count` segments, or null.
+ */
+function clipSegments(path, minSilence, count) {
   const probe = spawnSync(
     'ffprobe',
     ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', path],
@@ -371,12 +391,12 @@ function blendSegments(path) {
   const segments = []
   for (const s of rest) {
     if (s === trailing) break
-    if (s.end - s.start < 0.3) continue
+    if (s.end - s.start < minSilence) continue
     segments.push([on, s.start])
     on = s.end
   }
   segments.push([on, trailing ? trailing.start : duration])
-  if (segments.length !== 4) return null
+  if (segments.length !== count) return null
   return segments.map(([a, b]) => [Math.round(a * 1000), Math.round(b * 1000)])
 }
 
@@ -420,6 +440,81 @@ ${body}
     await prettier.format(source, { ...config, parser: 'typescript' }),
   )
   console.log(`${marks.size} blend marks`)
+}
+
+// Little-story marks (content wave 3 § 4.5): the sentence segments of
+// every baked story clip (`word.p*.hint` of a `*-stories` canon file),
+// measured with ffmpeg `silencedetect` at -35 dB, silences >= 250 ms. One
+// segment per sentence, or no entry (the app then splits the whole clip by
+// characters). Keyed by the story text, with the byte length (the app's
+// check) and the content hash (the drift check), as the blend marks.
+const storyMarks = new Map()
+{
+  const canonRoot = join(repoRoot, 'public', 'canon', 'word-song', 'level-1')
+  const tmp = join(tmpdir(), `story-${process.pid}.mp3`)
+  for (const name of sorted(canonRoot, /-stories\.json$/)) {
+    const json = JSON.parse(readFileSync(join(canonRoot, name), 'utf8'))
+    for (const u of json.utterances ?? []) {
+      if (!/^word\.[pw]\d+\.hint$/.test(u.id) || !u.audio?.base64) continue
+      const mp3 = Buffer.from(u.audio.base64, 'base64')
+      const sha256 = clipHash(mp3)
+      const prev = storyMarks.get(u.text)
+      if (prev && prev.sha256 !== sha256) {
+        throw new Error(`story "${u.text}" has two different clips`)
+      }
+      if (prev) continue
+      writeFileSync(tmp, mp3)
+      const sentences = (u.text.match(/[^.!?]+[.!?]/g) ?? [u.text]).length
+      const segments = clipSegments(tmp, 0.25, sentences)
+      if (segments === null) {
+        console.warn(
+          `story "${u.text}" (${name}): not ${sentences} segments, skipped`,
+        )
+        continue
+      }
+      storyMarks.set(u.text, { bytes: mp3.length, sha256, segments })
+    }
+  }
+  rmSync(tmp, { force: true })
+  const marksPath = join(mobileRoot, 'src', 'audio', 'storyMarks.generated.ts')
+  const body = [...storyMarks.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(
+      ([text, m]) =>
+        `  ${JSON.stringify(text)}: { bytes: ${m.bytes}, sha256: ${JSON.stringify(m.sha256)}, segments: ${JSON.stringify(m.segments)} },`,
+    )
+    .join('\n')
+  const source = `/**
+ * GENERATED by \`mobile/scripts/export-assets.mjs\`. Do not edit by hand:
+ * re-run \`npm run export-assets\` after a canon render.
+ *
+ * Every baked little-story clip (\`word.p*.hint\` in
+ * \`public/canon/word-song/level-1/*-stories.json\`), keyed by its text: the
+ * MP3's byte length (the app's check), its content hash (the first 16 hex
+ * digits of its SHA-256: \`storyMarks.test.ts\` fails when a render changes
+ * a clip) and one sound segment \`[onMs, offMs]\` per sentence, from ffmpeg
+ * \`silencedetect\` at -35 dB, silences >= 250 ms
+ * (design/native/content-wave-3.md § 4.5). Read through \`./storyMarks.ts\`.
+ */
+export const STORY_MARKS: Readonly<
+  Record<
+    string,
+    {
+      bytes: number
+      sha256: string
+      segments: readonly (readonly [number, number])[]
+    }
+  >
+> = {
+${body}
+}
+`
+  const config = await prettier.resolveConfig(marksPath)
+  writeFileSync(
+    marksPath,
+    await prettier.format(source, { ...config, parser: 'typescript' }),
+  )
+  console.log(`${storyMarks.size} story marks`)
 }
 
 // Registry.

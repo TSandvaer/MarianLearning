@@ -96,6 +96,9 @@ export const FRIENDLY_NODE_NAMES: Record<SkillNode, string> = {
   'crab-words': 'reading words',
   'tent-words': 'reading words',
   'cake-words': 'reading words',
+  'fox-stories': 'reading stories',
+  'hen-stories': 'reading stories',
+  'bug-stories': 'reading stories',
 }
 
 /**
@@ -173,6 +176,11 @@ export const STAGE_SPOKEN_NAMES: Record<SkillNode, string> = {
   // words" (an action can't be a picture word).
   'tent-words': 'tent words',
   'cake-words': 'cake words',
+  // Content wave 3 (design/native/content-wave-3.md § 1, K3, T1): named
+  // after the stop picture, like the word steps.
+  'fox-stories': 'fox stories',
+  'hen-stories': 'hen stories',
+  'bug-stories': 'bug stories',
 }
 
 /**
@@ -216,6 +224,9 @@ export const STAGE_SPOKEN_NAME_VERBS: Record<SkillNode, 'is' | 'are'> = {
   'crab-words': 'are',
   'tent-words': 'are',
   'cake-words': 'are',
+  'fox-stories': 'are',
+  'hen-stories': 'are',
+  'bug-stories': 'are',
 }
 
 /** "adding to ten" → "Adding to ten" (sentence-start form). */

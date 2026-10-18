@@ -95,6 +95,11 @@ export type WordSongNode =
   // 3rd and 4th steps. End blends, then magic e.
   | 'tent-words'
   | 'cake-words'
+  // Content wave 3 (design/native/content-wave-3.md § 4): land 7,
+  // "Stories". Read a little story, then answer who, what or where.
+  | 'fox-stories'
+  | 'hen-stories'
+  | 'bug-stories'
 
 export type SkillNode = NumberGardenNode | WordSongNode
 

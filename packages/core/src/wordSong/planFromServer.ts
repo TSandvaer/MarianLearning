@@ -59,6 +59,7 @@ import {
   type WordSongSessionPlan,
   type WordSongUtteranceSlot,
 } from './wordSessionPlans'
+import { littleStoryForText } from './littleStories'
 import {
   SIMPLE_SENTENCE_TARGET_SET,
   TARGET_WORDS,
@@ -313,6 +314,65 @@ function parseSimpleSentenceProblem(
   return { entry, sentenceFrame, sceneId }
 }
 
+/**
+ * A little story's question (content wave 3 § 4.6): "Who sat on the rug?",
+ * "What is in the tent?", "Where is the bug?". No other read starts so.
+ */
+const LITTLE_STORY_READ_PATTERN = /^(Who|What|Where)\b[^?]*\?$/
+
+/** The story's answer, from the correct line ("Yes! The fox!", "Yes! In
+ *  the cup!"); the question doesn't carry it. */
+const LITTLE_STORY_CORRECT_PATTERN = /^Yes! (?:The|(?:In|On|To) the) ([a-z]+)!$/
+
+function isLittleStoryRead(read: string): boolean {
+  return LITTLE_STORY_READ_PATTERN.test(read)
+}
+
+/**
+ * A `'little-story'` problem: the story rides in `hint` and must be a row
+ * of `LITTLE_STORIES` whose answer is the correct line's word, else the
+ * plan is rejected (the session falls back). The chips and the scene come
+ * from that row (`buildWordChipOrder`, `storyId`).
+ */
+function parseLittleStoryProblem(
+  index: number,
+  utterances: WordSongProblemUtterances,
+): WordSongProblem {
+  const match = utterances.correct.match(LITTLE_STORY_CORRECT_PATTERN)
+  if (!match) {
+    throw new PlanFromServerError(
+      `word-song little-story correct line "${utterances.correct}" did not ` +
+        `match "Yes! The <word>!" / "Yes! <In|On|To> the <word>!"`,
+    )
+  }
+  const answer = match[1]!
+  const row = littleStoryForText(utterances.hint)
+  if (row === undefined || row.answer !== answer) {
+    throw new PlanFromServerError(
+      `word-song little-story "${utterances.hint}" is not a story of ` +
+        `LITTLE_STORIES with the answer "${answer}"`,
+    )
+  }
+  let target: WordEntry
+  try {
+    target = getWordEntry(answer)
+  } catch (err) {
+    throw new PlanFromServerError(
+      `word-song little-story wordPack lookup failed for "${answer}": ` +
+        `${err instanceof Error ? err.message : String(err)}`,
+    )
+  }
+  return {
+    index,
+    target,
+    utterances,
+    contentType: 'little-story',
+    story: row.story,
+    storyId: row.id,
+    question: utterances.read,
+  }
+}
+
 /** Does a read line carry the `Finish the sentence:` discriminant? Used at
  *  the assembly level to route to the simple-sentence path before the
  *  generic `parseReadLine`. */
@@ -354,6 +414,13 @@ export interface WordSongPlanFromServerOptions {
    * later numbers ignored (the web app's behaviour).
    */
   readonly problemCount?: number
+  /**
+   * Accept content wave 3's little stories (`'little-story'`,
+   * `design/native/content-wave-3.md` § 4.6). Native only: the frozen web
+   * parses without it, so a story read throws there and the web plays its
+   * silent static plan (wave 1 § 1.9's rule).
+   */
+  readonly littleStories?: boolean
 }
 
 /**
@@ -405,7 +472,7 @@ export function wordSongSessionPlanFromServer(
         `server plan missing problem index ${index}`,
       )
     }
-    problems.push(problemFromBucket(index, bucket))
+    problems.push(problemFromBucket(index, bucket, options))
   }
 
   return {
@@ -420,6 +487,7 @@ export function wordSongSessionPlanFromServer(
 function problemFromBucket(
   index: number,
   bucket: Partial<WordSongProblemUtterances>,
+  options?: WordSongPlanFromServerOptions,
 ): WordSongProblem {
   for (const slot of ALL_SLOTS) {
     if (typeof bucket[slot] !== 'string') {
@@ -434,6 +502,10 @@ function problemFromBucket(
   // the read gaps the answer, so the target comes from `correct` and the
   // frame + sceneId are derived from the read. Route to the dedicated
   // path before the generic `parseReadLine` (Kyle spec §1.2).
+  if (options?.littleStories === true && isLittleStoryRead(utterances.read)) {
+    return parseLittleStoryProblem(index, utterances)
+  }
+
   if (isSimpleSentenceRead(utterances.read)) {
     const { entry, sentenceFrame, sceneId } = parseSimpleSentenceProblem(
       utterances.read,
@@ -472,6 +544,7 @@ export interface WordSongWarmupProblem {
  */
 export function wordSongWarmupFromServer(
   serverPlan: unknown,
+  options?: Pick<WordSongPlanFromServerOptions, 'littleStories'>,
 ): WordSongWarmupProblem[] {
   if (!isServerPlan(serverPlan)) return []
   const byBlock = new Map<number, Partial<WordSongProblemUtterances>>()
@@ -487,7 +560,7 @@ export function wordSongWarmupFromServer(
     try {
       out.push({
         block,
-        problem: problemFromBucket(block, byBlock.get(block)!),
+        problem: problemFromBucket(block, byBlock.get(block)!, options),
       })
     } catch (err) {
       if (!(err instanceof PlanFromServerError)) throw err

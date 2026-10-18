@@ -24,6 +24,7 @@ import {
   STAGE_SPOKEN_NAMES,
   capitalizeSpokenName,
 } from '../sessionEnd/friendlyNodeName'
+import { STORY_WORDS } from '../wordSong/littleStories'
 import { pathLineSrc, pathStepsOf } from './pathLines'
 
 /** A world (`'math'` | `'word-song'`). */
@@ -54,6 +55,8 @@ export type GuidanceLineKind =
   | 'session-hiding'
   | 'session-replay-open'
   | 'session-replay-close'
+  | 'story-read'
+  | 'story-word'
 
 export interface GuidanceLine {
   /** Dotted id, e.g. `guide.hub.suggest.math`. */
@@ -219,6 +222,17 @@ function buildLines(): GuidanceLine[] {
         `You know ${STAGE_SPOKEN_NAMES[n]}!`,
         w,
       )
+  // Little stories (content wave 3 § 4.4, § 5.1): "Read the story." on a
+  // story card, and one clip per distinct story word that a word tap plays
+  // ("Fox."). The word list comes from `LITTLE_STORIES`.
+  add(STORY_READ_ID, 'story-read', 'Read the story.', 'word-song')
+  for (const word of STORY_WORDS)
+    add(
+      storyWordId(word),
+      'story-word',
+      `${word.charAt(0).toUpperCase()}${word.slice(1)}.`,
+      'word-song',
+    )
   return lines
 }
 
@@ -237,6 +251,11 @@ const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {
   // Word Song land 6 (content wave 2 § 3.3, § 4.3, § 6.2; Thomas 2026-10-17).
   'tent-words': 'Read to the end!',
   'cake-words': 'The E is quiet. It makes the A say its name.',
+  // Word Song land 7 (content wave 3 § 5.1, D12; Thomas 2026-10-17): one
+  // frame for all three, "Read the story. Who / What / Where is it?".
+  'fox-stories': 'Read the story. Who is it?',
+  'hen-stories': 'Read the story. What is it?',
+  'bug-stories': 'Read the story. Where is it?',
 }
 
 const sessionIntroId = (n: SkillNode) => `guide.session.intro.${n}`
@@ -251,6 +270,8 @@ const peekOpenId = (n: SkillNode) => `guide.session.peek-open.${n}`
 const peekCloseId = (n: SkillNode) => `guide.session.peek-close.${n}`
 const replayOpenId = (n: SkillNode) => `guide.session.replay-open.${n}`
 const replayCloseId = (n: SkillNode) => `guide.session.replay-close.${n}`
+const STORY_READ_ID = 'guide.story.read'
+const storyWordId = (word: string) => `guide.story.word.${word}`
 
 /** Every guidance line: Hub, then session end, then in session. */
 export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
@@ -276,6 +297,16 @@ export function guidanceLine(id: string): GuidanceLine | undefined {
 /** The intro lead line of `node` (§ 6.1), or undefined for a step with none. */
 export function sessionIntroLine(node: SkillNode): GuidanceLine | undefined {
   return BY_ID.get(sessionIntroId(node))
+}
+
+/** "Read the story." (content wave 3 § 4.4): before a story card's beat. */
+export function storyReadLine(): GuidanceLine {
+  return BY_ID.get(STORY_READ_ID)!
+}
+
+/** A story word's own clip ("Fox."), or undefined for a word without one. */
+export function storyWordLine(word: string): GuidanceLine | undefined {
+  return BY_ID.get(storyWordId(word))
 }
 
 /** "Some flowers are hiding!" (§ 6.1): before a round's first missing number. */

@@ -8,6 +8,11 @@
  *
  * so Emma never says the word over her decoding, and a tapping game never
  * stalls the problem. `base` is core's `SILENT_TEXT_WINDOW_MS` (1500).
+ *
+ * A little story's reading beat (content wave 3 § 4.4 step 3) is the same
+ * clock with its own numbers: `base` = `storyReadBeatMs` (12–21 s), a word
+ * tap holds it to ≥ 2000 ms after the tap, never past 30 s (`holdMs`,
+ * `capMs`).
  */
 export const LETTER_TAP_HOLD_MS = 1000
 export const SILENT_BEAT_CAP_MS = 5000
@@ -24,6 +29,10 @@ export interface SilentBeat {
 }
 
 export interface SilentBeatDeps {
+  /** A tap holds the beat to at least this long after it (default 1000). */
+  holdMs?: number
+  /** The beat never runs past this much foreground time (default 5000). */
+  capMs?: number
   now?: () => number
   setTimer?: (fn: () => void, ms: number) => unknown
   clearTimer?: (id: unknown) => void
@@ -54,8 +63,11 @@ export function startSilentBeat(
     timer = null
     if (over || since === null) return
     const target = Math.min(
-      SILENT_BEAT_CAP_MS,
-      Math.max(baseMs, lastTap === null ? 0 : lastTap + LETTER_TAP_HOLD_MS),
+      deps.capMs ?? SILENT_BEAT_CAP_MS,
+      Math.max(
+        baseMs,
+        lastTap === null ? 0 : lastTap + (deps.holdMs ?? LETTER_TAP_HOLD_MS),
+      ),
     )
     timer = setTimer(
       () => {

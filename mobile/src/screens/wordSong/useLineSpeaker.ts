@@ -36,6 +36,11 @@ export interface SpeakHooks {
   revealAt?: (ms: number) => number
   /** Another player for this line (the session guide's lines). */
   play?: PlayWordSongUtteranceFn
+  /**
+   * Leave the ribbon alone: it keeps its last line (a little story read
+   * aloud, whose caption is the card's read-along; content wave 3 § 4.2).
+   */
+  keepCaption?: boolean
 }
 
 export interface LineSpeaker {
@@ -66,10 +71,13 @@ export function useLineSpeaker(
 
   const speak = useCallback<LineSpeaker['speak']>(
     async (text, hooks) => {
-      const myLine = ++generationRef.current
-      setCaption({ text, revealed: 0, visible: false, generation: myLine })
+      const quiet = hooks?.keepCaption === true
+      const myLine = quiet ? -1 : ++generationRef.current
+      if (!quiet)
+        setCaption({ text, revealed: 0, visible: false, generation: myLine })
       const words = text.split(/\s+/).filter(Boolean).length
       const mine = () => !unmounted.current && myLine === generationRef.current
+      const live = () => !unmounted.current
       const reveal = (n: number) =>
         setCaption((c) => (n > c.revealed ? { ...c, revealed: n } : c))
       const opts: PlayWordSongUtteranceOptions = {
@@ -77,11 +85,19 @@ export function useLineSpeaker(
           if (mine()) setCaption((c) => ({ ...c, visible: true }))
         },
         onWordTick: (i) => {
+          if (quiet) {
+            if (live()) hooks?.onWordTick?.(i)
+            return
+          }
           if (!mine()) return
           if (!hooks?.revealAt) reveal(i + 1)
           hooks?.onWordTick?.(i)
         },
         onTime: (ms) => {
+          if (quiet) {
+            if (live()) hooks?.onTime?.(ms)
+            return
+          }
           if (!mine()) return
           if (hooks?.revealAt) reveal(hooks.revealAt(ms))
           hooks?.onTime?.(ms)

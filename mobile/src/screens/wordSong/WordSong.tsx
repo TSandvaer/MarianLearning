@@ -59,9 +59,23 @@
  * (`./introSpotlight.ts`), and on a CVC card the 1500 ms silent beat starts
  * at the intro's end instead of after the 400 ms gap.
  *
+ * Native-only, content wave 3's little stories (`design/native/content-
+ * wave-3.md` § 4.4): decode first. The card (`./StoryCard.tsx`) shows the
+ * story with no picture; "Read the story." (none right after the step's own
+ * lead, which opens with the same words); the reading beat (1500 ms a word,
+ * 12–21 s, foreground time; a word tap holds it ≥ 2 s, never past 30 s);
+ * the question, as the chips mount closed and open at its end. A tapped
+ * word plays its own clip and lights; taps are live until the reveal and
+ * inert while Emma speaks, and record nothing. Wrong 1 asks again; wrong 2
+ * has Emma read the story with the read-along, then asks again; wrong 3
+ * gives the answer. A right (or guided) tap: "Yes! The fox!", then the
+ * reveal: the chips fade, the scene (or the answer's picture) enters, Emma
+ * reads the story with the read-along, 800 ms, the advance.
+ *
  * Emma is App's `EmmaStage`; this screen reports her pose (`onPoseChange`).
  */
 import type { EmmaPose } from '@marian/core/character/emmaPose'
+import { storyReadLine } from '@marian/core/emmasPath/guidanceLines'
 import type { SkillLevel, SkillNode } from '@marian/core/progress'
 import {
   ADVANCE_AFTER_CORRECT_MS,
@@ -89,6 +103,10 @@ import {
   type WordSongProblem,
   type WordSongSessionPlan,
 } from '@marian/core/wordSong/wordSessionPlans'
+import {
+  STORY_BEAT_CEILING_MS,
+  STORY_TAP_HOLD_MS,
+} from '@marian/core/wordSong/wordRound'
 import {
   useCallback,
   useEffect,
@@ -121,16 +139,30 @@ import {
   sessionGuideLine,
   sessionGuidePlayer,
   SFX_SOURCES,
+  sentenceOfWord,
+  STORY_READ_ALONG,
+  STORY_READ_LINE,
+  storyGuidePlayer,
+  storyLitAt,
+  storyMarksFor,
+  storyWordLineId,
+  storyWordPlayer,
+  storyWordStarts,
   wordWindow,
   type IntroGuideLineId,
   type Segment,
   type SessionGuideLineId,
   type SessionGuidePlayer,
   type Sfx,
+  type StoryGuidePlayer,
   type TapClipPlayer,
 } from '../../audio'
 import { CaptionRibbon } from '../../components/CaptionRibbon'
-import type { WordSongLayout } from '../../layout/wordSongLayout'
+import {
+  storyCardHeight,
+  storyRevealScene,
+  type WordSongLayout,
+} from '../../layout/wordSongLayout'
 import {
   appVisibility,
   useIsAppHidden,
@@ -153,6 +185,15 @@ import {
 } from './introSpotlight'
 import { nativeRound } from './nativeRound'
 import { startSilentBeat, type SilentBeat } from './silentBeat'
+import { StoryCard, StoryScene } from './StoryCard'
+import { storyCells, type StoryWordCell } from './storyCells'
+import {
+  STORY_TAP_CUE_CANCEL_OUT_MS,
+  STORY_TAP_CUE_DELAY_MS,
+  STORY_TAP_CUE_FIRE_MS,
+  STORY_TAP_CUE_TOTAL_MS,
+  storyTapCueSize,
+} from './storyTapCueMotion'
 import { ThIntroPanel } from './ThCue'
 import { useLineSpeaker, type SpeakHooks } from './useLineSpeaker'
 import { WordChip } from './WordChip'
@@ -169,7 +210,26 @@ export const WORD_SONG_EXIT_MS = 250
 export const TAP_LIGHT_MIN_MS = 400
 /** Review spec § 5: the stage fades in over 200 ms after the opener. */
 export const STAGE_FADE_MS = 200
+
+/** Little stories (content wave 3 § 4.4, § 4.5). */
+/** "Yes! The fox!" ends → this long → the reveal (chips out, scene in). */
+export const STORY_REVEAL_DELAY_MS = 300
+/** The chips fade out over this at the reveal. */
+export const STORY_CHIPS_OUT_MS = 200
+/** The scene's entrance: it has landed this long after it mounts. */
+export const STORY_SCENE_LAND_MS = 300
+/** The scene has landed → this long → Emma reads the story. */
+export const STORY_REVEAL_READ_GAP_MS = 400
+/** The reveal's read ends → this long → the advance. */
+export const STORY_REVEAL_HOLD_MS = 800
+/** The read-along goes dark this long after the story clip. */
+export const STORY_READ_DARK_MS = 200
+/** The 1st wrong's re-prompt (and the 2nd's story) → this long → the question. */
+export const STORY_ASK_AGAIN_MS = 400
 const STAGE_EASE = Easing.bezier(0, 0, 0.58, 1)
+
+/** "Read the story." (core's `guide.story.read`). */
+const STORY_READ_TEXT = storyReadLine().text
 
 /** The three effects, with the web's volumes. Test seam. */
 export interface WordSongSfx {
@@ -258,6 +318,15 @@ export interface WordSongProps {
    * decides (a forward session on a step that is not mastered).
    */
   sessionIntro?: IntroGuideLineId | null
+  /** Test seam: "Read the story." (content wave 3 § 4.4). */
+  storyGuide?: StoryGuidePlayer
+  /** Test seam: the word taps' one-word clips. */
+  storyWords?: StoryGuidePlayer
+  /**
+   * Debug builds only (`EXPO_PUBLIC_DEBUG=1`): the word-tap cue's
+   * `[story-cue] ...` lines to Metro (device check, 2026-10-17).
+   */
+  debugLog?: (line: string) => void
 }
 
 interface PerProblemState {
@@ -313,6 +382,9 @@ export function WordSong({
   onPeekEnd,
   replay = false,
   sessionIntro = null,
+  storyGuide: storyGuideProp,
+  storyWords: storyWordsProp,
+  debugLog,
 }: WordSongProps) {
   const appHidden = useIsAppHidden(visibility)
   const reducedMotion = useReducedMotion()
@@ -330,12 +402,15 @@ export function WordSong({
   const [tap] = useState(() => tapPlayer ?? createTapClipPlayer(audioEngine))
   const [cancelEmmaLine] = useState(() => cancelLine)
   const [guide] = useState(() => sessionGuide ?? sessionGuidePlayer())
+  const [storyGuide] = useState(() => storyGuideProp ?? storyGuidePlayer())
+  const [storyWords] = useState(() => storyWordsProp ?? storyWordPlayer())
   const playRef = useRef<PlayWordSongUtteranceFn>(silent.play)
   const clipForRef = useRef(clipFor)
   const onSessionCompleteRef = useRef(onSessionComplete)
   const onPoseChangeRef = useRef(onPoseChange)
   const onRequestExitRef = useRef(onRequestExit)
   const onPeekEndRef = useRef(onPeekEnd)
+  const debugLogRef = useRef(debugLog)
   useLayoutEffect(() => {
     playRef.current = playUtterance ?? silent.play
     clipForRef.current = clipFor
@@ -343,6 +418,7 @@ export function WordSong({
     onPoseChangeRef.current = onPoseChange
     onRequestExitRef.current = onRequestExit
     onPeekEndRef.current = onPeekEnd
+    debugLogRef.current = debugLog
   })
   /** A peek is fixed for the mount (App mounts a fresh screen per peek). */
   const [peekNode] = useState(peek)
@@ -446,6 +522,43 @@ export function WordSong({
   const [celebrating, setCelebrating] = useState(false)
   const [streakFadingOut, setStreakFadingOut] = useState(false)
   const [guidedActive, setGuidedActive] = useState(false)
+  // A little story's card (content wave 3 § 4.4).
+  /** The question has started: the chips mount (closed until its end). */
+  const [storyAsked, setStoryAsked] = useState(false)
+  /** The reveal: the chips fade, the scene shows, word taps end. */
+  const [revealing, setRevealing] = useState(false)
+  const revealingRef = useRef(false)
+  /** The lit words (a tap's, or the read-along's). */
+  const [storyLit, setStoryLit] = useState<readonly number[]>([])
+  /** Per word, its tap count (the pulse). */
+  const [storyPulses, setStoryPulses] = useState<Record<number, number>>({})
+  /** The card's measured height (the scene sits below it). */
+  const [storyCardH, setStoryCardH] = useState<number | null>(null)
+  /** Bumped by each word tap and each line of Emma's: a stale light stays out. */
+  const storyTapTokenRef = useRef(0)
+  /** "Read the story." started for this problem (one per problem). */
+  const storyPromptForRef = useRef(-1)
+  /**
+   * The word-tap cue (Kyle's call on PR #599): the hand taps word 0 once on
+   * the mount's first story card, forward on a step not yet mastered or in
+   * a peek; never in a review or a Map replay. Read from the session's
+   * props, not fixed at mount: App mounts the screen while the session
+   * start is in flight (no intro yet) and the intro comes with the plan
+   * (Thomas's device check, 2026-10-17: no hand after a QA jump).
+   */
+  const storyCueOn = !review && (isPeek ? !replay : sessionIntro !== null)
+  /** What the card draws: the hand up, or leaving after her tap. */
+  const [storyCue, setStoryCue] = useState<'run' | 'leave' | null>(null)
+  /** pending = scheduled, no hand yet; shown; leaving = her tap's fade. */
+  const storyCuePhaseRef = useRef<'idle' | 'pending' | 'shown' | 'leaving'>(
+    'idle',
+  )
+  /** At most once per mount: spent by its run, her tap, or a skip. */
+  const storyCueSpentRef = useRef(false)
+  /** The card's word 0 is measured (the hand can be placed). */
+  const storyWord0MeasuredRef = useRef(false)
+  /** The cue's eligibility line went to Metro (debug, once per mount). */
+  const storyCueLoggedRef = useRef(false)
 
   const advanceTimerRef = useRef<Timer>(null)
   const ceilingTimerRef = useRef<Timer>(null)
@@ -455,6 +568,10 @@ export function WordSong({
   const streakFadeTimerRef = useRef<Timer>(null)
   const litTimerRef = useRef<Timer>(null)
   const spotOffTimerRef = useRef<Timer>(null)
+  const storyLitTimerRef = useRef<Timer>(null)
+  const storyCueTimerRef = useRef<Timer>(null)
+  const askAgainTimerRef = useRef<Timer>(null)
+  const readOffTimerRef = useRef<Timer>(null)
   const beatRef = useRef<SilentBeat | null>(null)
   /** Bumped by every tap sound; a stale one never darkens a newer light. */
   const tapTokenRef = useRef(0)
@@ -463,6 +580,10 @@ export function WordSong({
   const advanceFiredRef = useRef(false)
   const pendingAdvanceRef = useRef(false)
   const problemIndexRef = useRef(problemIndex)
+  /** `[story-cue] card=<i> <what>` to Metro, in debug builds. */
+  const logCue = useCallback((what: string) => {
+    debugLogRef.current?.(`[story-cue] card=${problemIndexRef.current} ${what}`)
+  }, [])
 
   const round = useMemo(
     () => nativeRound(plan.problems[problemIndex]!, crossVowelMixing),
@@ -481,6 +602,10 @@ export function WordSong({
       spotOffTimerRef,
       leadInTimerRef,
       closerTimerRef,
+      storyLitTimerRef,
+      storyCueTimerRef,
+      askAgainTimerRef,
+      readOffTimerRef,
     ]) {
       if (ref.current !== null) {
         clearTimeout(ref.current)
@@ -491,6 +616,48 @@ export function WordSong({
     beatRef.current = null
   }, [])
 
+  /**
+   * The word-tap cue ends at once (a line starts, the background, a new
+   * card, unmount): the hand goes, no fire. It is already spent.
+   */
+  const stopStoryCue = useCallback(() => {
+    if (storyCuePhaseRef.current === 'idle') return
+    logCue(`stopped (${storyCuePhaseRef.current})`)
+    storyCuePhaseRef.current = 'idle'
+    if (storyCueTimerRef.current !== null) {
+      clearTimeout(storyCueTimerRef.current)
+      storyCueTimerRef.current = null
+    }
+    setStoryCue(null)
+  }, [logCue])
+
+  /**
+   * Her tap wins: before the hand shows, the cue never runs; once it shows,
+   * the hand fades out over 200 ms (a 2nd tap keeps the 1st's deadline).
+   * It never comes back in this mount.
+   */
+  const fadeStoryCue = useCallback(() => {
+    storyCueSpentRef.current = true
+    const phase = storyCuePhaseRef.current
+    if (phase === 'idle' || phase === 'leaving') return
+    logCue(`cancelled-by-tap (${phase})`)
+    if (storyCueTimerRef.current !== null) {
+      clearTimeout(storyCueTimerRef.current)
+      storyCueTimerRef.current = null
+    }
+    if (phase === 'pending') {
+      storyCuePhaseRef.current = 'idle'
+      return
+    }
+    storyCuePhaseRef.current = 'leaving'
+    setStoryCue('leave')
+    storyCueTimerRef.current = setTimeout(() => {
+      storyCueTimerRef.current = null
+      storyCuePhaseRef.current = 'idle'
+      setStoryCue(null)
+    }, STORY_TAP_CUE_CANCEL_OUT_MS)
+  }, [logCue])
+
   useEffect(() => {
     // Read at unmount on purpose: the latest line count.
     const lines = linesInFlight
@@ -500,6 +667,8 @@ export function WordSong({
       silent.cancel()
       if (lines.current > 0) cancelEmmaLine()
       guide.cancelActive()
+      storyGuide.cancelActive()
+      storyWords.cancelActive()
       tap.release()
       sfx.sparkle.unload()
       sfx.poof.unload()
@@ -535,10 +704,116 @@ export function WordSong({
         litTimerRef.current = null
       }
       setLit(null)
+      // A story word's clip and its light too (content wave 3 § 4.4).
+      storyTapTokenRef.current += 1
+      storyWords.cancelActive()
+      for (const ref of [storyLitTimerRef, readOffTimerRef]) {
+        if (ref.current !== null) {
+          clearTimeout(ref.current)
+          ref.current = null
+        }
+      }
+      setStoryLit([])
+      // A line starting ends the word-tap cue at once (PR #599).
+      stopStoryCue()
       return speakLine(text, hooks)
     },
-    [tap, speakLine],
+    [tap, speakLine, storyWords, stopStoryCue],
   )
+
+  /**
+   * Emma reads a little story (the 2nd wrong's and the reveal's read): the
+   * ribbon keeps its last line, and the spotlight walks the card's words on
+   * the clip's marks, else on the line's word ticks (§ 4.5); all dark 200 ms
+   * after the clip.
+   */
+  const readStory = useCallback(
+    (problem: WordSongProblem) => {
+      const text = problem.story ?? problem.utterances.hint
+      const clip = clipForRef.current?.(text)
+      const marks = clip ? storyMarksFor(text, clip.bytes) : null
+      const starts = marks !== null ? storyWordStarts(text, marks) : null
+      const light = (k: number | null) =>
+        setStoryLit(
+          k === null
+            ? []
+            : STORY_READ_ALONG === 'sentence'
+              ? sentenceOfWord(text, k)
+              : [k],
+        )
+      const hooks: SpeakHooks =
+        starts !== null
+          ? { keepCaption: true, onTime: (ms) => light(storyLitAt(starts, ms)) }
+          : { keepCaption: true, onWordTick: (i) => light(i) }
+      return speak(text, hooks).then(() => {
+        if (unmounted.current) return
+        readOffTimerRef.current = setTimeout(() => {
+          readOffTimerRef.current = null
+          setStoryLit([])
+        }, STORY_READ_DARK_MS)
+      })
+    },
+    [speak, unmounted],
+  )
+
+  /**
+   * The question again, `STORY_ASK_AGAIN_MS` later (wrong 1, wrong 2), for
+   * the `wrongs`-th wrong tap: a newer wrong tap owns what comes next, so
+   * no stray question lands in its sequence (§ 4.4 steps 5–6).
+   */
+  const askAgainSoon = useCallback(
+    (problem: WordSongProblem, wrongs: number) => {
+      const my = problemIndexRef.current
+      if (askAgainTimerRef.current !== null)
+        clearTimeout(askAgainTimerRef.current)
+      askAgainTimerRef.current = setTimeout(() => {
+        askAgainTimerRef.current = null
+        if (unmounted.current || problemIndexRef.current !== my) return
+        if (resolvedRef.current || guidedPlayedRef.current) return
+        if (wrongCountRef.current !== wrongs) return
+        setPose('listening')
+        void speak(problem.utterances.read).then(() => {
+          setPose((c) => (c === 'listening' ? 'idle' : c))
+        })
+      }, STORY_ASK_AGAIN_MS)
+    },
+    [speak, unmounted],
+  )
+
+  /**
+   * A story word plays (content wave 3 § 4.4): that word alone, lit for
+   * max(400 ms, the clip); live from the card's first frame until the
+   * reveal, inert while Emma speaks; a new one cuts the last. Not a move:
+   * nothing recorded, no Emma reaction. Her tap holds the reading beat and
+   * ends the word-tap cue; the cue's own tap (`cue`) does neither (D3).
+   */
+  const playStoryWord = (cell: StoryWordCell, { cue }: { cue: boolean }) => {
+    if (revealingRef.current || linesInFlight.current > 0) return
+    if (!cue) {
+      beatRef.current?.letterTapped()
+      fadeStoryCue()
+    }
+    const token = ++storyTapTokenRef.current
+    const started = Date.now()
+    if (storyLitTimerRef.current !== null) {
+      clearTimeout(storyLitTimerRef.current)
+      storyLitTimerRef.current = null
+    }
+    setStoryLit([cell.index])
+    setStoryPulses((p) => ({ ...p, [cell.index]: (p[cell.index] ?? 0) + 1 }))
+    const id = storyWordLineId(cell.key)
+    const done = id === null ? Promise.resolve() : storyWords.playLine(id)
+    void done.then(() => {
+      if (unmounted.current || storyTapTokenRef.current !== token) return
+      storyLitTimerRef.current = setTimeout(
+        () => {
+          storyLitTimerRef.current = null
+          if (storyTapTokenRef.current === token) setStoryLit([])
+        },
+        Math.max(0, TAP_LIGHT_MIN_MS - (Date.now() - started)),
+      )
+    })
+  }
 
   // ── The read-aloud (+ the silent beat) ───────────────────────────────
 
@@ -547,10 +822,13 @@ export function WordSong({
     if (audioReady === false) return // session start in flight
     const problem = plan.problems[problemIndex]!
     const my = problemIndex
+    const isStoryCard = problem.contentType === 'little-story'
     const dispatch = () => {
       if (unmounted.current || problemIndexRef.current !== my) return
       if (spokeReadAloudRef.current) return
       spokeReadAloudRef.current = true
+      // A story's chips mount as its question starts (§ 4.4 step 4).
+      if (isStoryCard) setStoryAsked(true)
       setPose('listening')
       void speak(problem.utterances.read).then(() => {
         if (unmounted.current || problemIndexRef.current !== my) return
@@ -578,12 +856,61 @@ export function WordSong({
     let beat: SilentBeat | null = null
     const stale = () =>
       cancelled || unmounted.current || problemIndexRef.current !== my
-    const read = () => {
-      if (stale()) return
-      if (round.readAloudDelayMs === 0) {
-        dispatch()
+    // A story's beat: a word tap holds it ≥ 2 s, never past 30 s (§ 4.4).
+    const beatOpts = isStoryCard
+      ? { holdMs: STORY_TAP_HOLD_MS, capMs: STORY_BEAT_CEILING_MS }
+      : {}
+    /**
+     * The word-tap cue (PR #599), from the mount's first story beat: the
+     * hand at + 600, word 0 through the tap path at + 1,000 (never holding
+     * the beat), the hand gone at + 2,400. Skipped (and spent) when word 0
+     * is not measured by + 600.
+     */
+    const startStoryCue = () => {
+      const skip = (why: string) => logCue(`skipped:${why}`)
+      if (storyCueSpentRef.current) {
+        skip('spent')
         return
       }
+      storyCueSpentRef.current = true
+      if (!storyCueOn || visibility.getIsHidden()) {
+        skip(storyCueOn ? 'hidden' : 'off')
+        return
+      }
+      const word0 = storyCells(problem.story ?? problem.utterances.hint)[0]
+      if (word0 === undefined) {
+        skip('no-word0')
+        return
+      }
+      logCue('started')
+      storyCuePhaseRef.current = 'pending'
+      storyCueTimerRef.current = setTimeout(() => {
+        storyCueTimerRef.current = null
+        if (stale() || storyCuePhaseRef.current !== 'pending') return
+        if (!storyWord0MeasuredRef.current) {
+          logCue(`skipped:unmeasured@${STORY_TAP_CUE_DELAY_MS}`)
+          storyCuePhaseRef.current = 'idle'
+          return
+        }
+        logCue('shown')
+        storyCuePhaseRef.current = 'shown'
+        setStoryCue('run')
+        storyCueTimerRef.current = setTimeout(() => {
+          storyCueTimerRef.current = null
+          if (stale() || storyCuePhaseRef.current !== 'shown') return
+          logCue('fired')
+          playStoryWord(word0, { cue: true })
+          storyCueTimerRef.current = setTimeout(() => {
+            storyCueTimerRef.current = null
+            if (storyCuePhaseRef.current !== 'shown') return
+            logCue('done')
+            storyCuePhaseRef.current = 'idle'
+            setStoryCue(null)
+          }, STORY_TAP_CUE_TOTAL_MS - STORY_TAP_CUE_FIRE_MS)
+        }, STORY_TAP_CUE_FIRE_MS)
+      }, STORY_TAP_CUE_DELAY_MS)
+    }
+    const startBeat = () => {
       const b = startSilentBeat(
         round.readAloudDelayMs,
         visibility.getIsHidden(),
@@ -591,12 +918,40 @@ export function WordSong({
           if (beatRef.current === b) beatRef.current = null
           dispatch()
         },
+        beatOpts,
       )
       beat = b
       beatRef.current = b
+      if (isStoryCard) startStoryCue()
+    }
+    // A story card: "Read the story." first, unless the step's own lead
+    // just played (it opens with the same words); the beat counts from the
+    // line's end (§ 4.4 steps 2–3).
+    if (isStoryCard && isIntro) storyPromptForRef.current = my
+    const read = () => {
+      if (stale()) return
+      if (isStoryCard && storyPromptForRef.current !== my) {
+        storyPromptForRef.current = my
+        setPose('listening')
+        const text = STORY_READ_TEXT
+        void speak(text, {
+          play: (_text, opts) => storyGuide.playLine(STORY_READ_LINE, opts),
+        }).then(() => {
+          if (stale()) return
+          setPose((c) => (c === 'listening' ? 'idle' : c))
+          startBeat()
+        })
+        return
+      }
+      if (round.readAloudDelayMs === 0) {
+        dispatch()
+        return
+      }
+      startBeat()
     }
     if (lead === null) {
-      read()
+      if (isStoryCard) microtask(read)
+      else read()
     } else {
       microtask(() => {
         if (stale() || leadForRef.current === my) return
@@ -665,16 +1020,41 @@ export function WordSong({
         beat.cancel()
         if (beatRef.current === beat) beatRef.current = null
       }
+      stopStoryCue()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- web parity: re-run on problem / readiness only
   }, [problemIndex, audioReady])
+
+  // Debug: the word-tap cue's eligibility, once per mount, when a story
+  // session is ready (App's first snapshot has no intro yet).
+  useEffect(() => {
+    if (audioReady === false || storyCueLoggedRef.current) return
+    if (!plan.problems.some((p) => p.contentType === 'little-story')) return
+    storyCueLoggedRef.current = true
+    debugLogRef.current?.(
+      `[story-cue] eligible=${storyCueOn} review=${review} peek=${isPeek} replay=${replay} intro=${sessionIntro} warmups=${warmups}`,
+    )
+  }, [
+    audioReady,
+    plan,
+    storyCueOn,
+    review,
+    isPeek,
+    replay,
+    sessionIntro,
+    warmups,
+  ])
 
   // Background: the beat pauses; a tap sound stops for good (its own end
   // callback, or its light's timer, puts the light out).
   useEffect(() => {
     beatRef.current?.setHidden(appHidden)
-    if (appHidden) tap.release()
-  }, [appHidden, tap])
+    if (appHidden) {
+      tap.release()
+      storyWords.cancelActive()
+      stopStoryCue()
+    }
+  }, [appHidden, tap, storyWords, stopStoryCue])
 
   // ── Tap-to-hear (§ 4) ────────────────────────────────────────────────
 
@@ -737,6 +1117,10 @@ export function WordSong({
     })
   }
 
+  /** Her tap on a story word. */
+  const onStoryWordPress = (cell: StoryWordCell) =>
+    playStoryWord(cell, { cue: false })
+
   // ── Advance / complete ───────────────────────────────────────────────
 
   const planLength = plan.problems.length
@@ -778,6 +1162,16 @@ export function WordSong({
       setGuidedActive(false)
       setStreakFadingOut(false)
       setCelebrating(false)
+      setStoryAsked(false)
+      revealingRef.current = false
+      setRevealing(false)
+      storyTapTokenRef.current += 1
+      storyWords.cancelActive()
+      setStoryLit([])
+      setStoryPulses({})
+      setStoryCardH(null)
+      stopStoryCue()
+      storyWord0MeasuredRef.current = false
       clearCaption()
       return
     }
@@ -837,6 +1231,8 @@ export function WordSong({
     peekLines,
     speak,
     guide,
+    storyWords,
+    stopStoryCue,
   ])
 
   // Back from the background: run the advance that waited for it.
@@ -869,6 +1265,16 @@ export function WordSong({
   const playSecondWrong = useCallback(
     (problem: WordSongProblem) => {
       setPose('attentive-pointing')
+      // A little story: Emma reads it with the read-along, then asks again
+      // (content wave 3 § 4.4 step 6).
+      if (problem.contentType === 'little-story') {
+        const wrongs = wrongCountRef.current
+        void readStory(problem).then(() => {
+          setPose((c) => (c === 'attentive-pointing' ? 'idle' : c))
+          askAgainSoon(problem, wrongs)
+        })
+        return
+      }
       const prompt = secondWrongPrompt(problem)
       if (prompt.kind === 'hint') {
         const word = problem.target.word
@@ -903,11 +1309,16 @@ export function WordSong({
         setPose((c) => (c === 'attentive-pointing' ? 'idle' : c))
       })
     },
-    [speak, backToIdleSoon],
+    [speak, backToIdleSoon, readStory, askAgainSoon],
   )
 
   const handleWrongTap = useCallback(
     (word: string, problem: WordSongProblem) => {
+      // A little story's last wrong may still be about to ask again.
+      if (askAgainTimerRef.current !== null) {
+        clearTimeout(askAgainTimerRef.current)
+        askAgainTimerRef.current = null
+      }
       sfx.poof.play()
       setShakingChip(word)
       if (shakeTimerRef.current !== null) clearTimeout(shakeTimerRef.current)
@@ -959,6 +1370,9 @@ export function WordSong({
         if (resolvedRef.current) return
         if (!outcome.scheduleHint && !outcome.scheduleGuided) {
           backToIdleSoon()
+          // A little story's 1st wrong asks the question again (§ 4.4).
+          if (problem.contentType === 'little-story')
+            askAgainSoon(problem, outcome.wrongCount)
         }
         if (outcome.scheduleGuided) {
           setGuidedActive(true)
@@ -974,7 +1388,16 @@ export function WordSong({
         }
       })
     },
-    [sfx, speak, streak, unmounted, backToIdleSoon, playSecondWrong, isPeek],
+    [
+      sfx,
+      speak,
+      streak,
+      unmounted,
+      backToIdleSoon,
+      playSecondWrong,
+      isPeek,
+      askAgainSoon,
+    ],
   )
 
   const handleCorrectTap = useCallback(
@@ -1037,6 +1460,42 @@ export function WordSong({
         }
         fire()
       }
+      // A little story (content wave 3 § 4.4 step 9): "Yes! The fox!" →
+      // 300 ms → the reveal (the chips fade, the scene enters) → the scene
+      // has landed + 400 ms → Emma reads the story → 800 ms → the advance.
+      // No 4 s ceiling: the reveal is part of the problem.
+      if (problem.contentType === 'little-story') {
+        if (askAgainTimerRef.current !== null) {
+          clearTimeout(askAgainTimerRef.current)
+          askAgainTimerRef.current = null
+        }
+        const my = problemIndexRef.current
+        const live = () => !unmounted.current && problemIndexRef.current === my
+        void speak(problem.utterances.correct).then(() => {
+          if (!live()) return
+          backToIdleSoon()
+          advanceTimerRef.current = setTimeout(() => {
+            advanceTimerRef.current = null
+            if (!live()) return
+            revealingRef.current = true
+            setRevealing(true)
+            advanceTimerRef.current = setTimeout(() => {
+              advanceTimerRef.current = null
+              if (!live()) return
+              void readStory(problem).then(() => {
+                if (!live()) return
+                advanceTimerRef.current = setTimeout(() => {
+                  advanceTimerRef.current = null
+                  minDwellElapsedRef.current = true
+                  correctSpeakResolvedRef.current = true
+                  tryAdvance()
+                }, STORY_REVEAL_HOLD_MS)
+              })
+            }, STORY_SCENE_LAND_MS + STORY_REVEAL_READ_GAP_MS)
+          }, STORY_REVEAL_DELAY_MS)
+        })
+        return
+      }
       void speak(problem.utterances.correct).then(() => {
         if (unmounted.current) return
         correctSpeakResolvedRef.current = true
@@ -1058,7 +1517,16 @@ export function WordSong({
         fire()
       }, ADVANCE_HARD_CEILING_MS)
     },
-    [sfx, speak, advanceToNext, visibility, unmounted, backToIdleSoon, isPeek],
+    [
+      sfx,
+      speak,
+      advanceToNext,
+      visibility,
+      unmounted,
+      backToIdleSoon,
+      isPeek,
+      readStory,
+    ],
   )
 
   const onChipTap = useCallback(
@@ -1121,6 +1589,8 @@ export function WordSong({
   const exit = useCallback(() => {
     tapTokenRef.current += 1
     tap.cut()
+    storyWords.cancelActive()
+    storyGuide.cancelActive()
     cancelEmmaLine()
     if (isPeek) {
       if (peekEndedRef.current) return
@@ -1132,7 +1602,16 @@ export function WordSong({
       return
     }
     onRequestExitRef.current()
-  }, [tap, cancelEmmaLine, isPeek, clearTimers, silent, guide])
+  }, [
+    tap,
+    cancelEmmaLine,
+    isPeek,
+    clearTimers,
+    silent,
+    guide,
+    storyWords,
+    storyGuide,
+  ])
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       exit()
@@ -1144,6 +1623,15 @@ export function WordSong({
   // ── Render ───────────────────────────────────────────────────────────
 
   const problem = plan.problems[problemIndex]!
+  const isStory = problem.contentType === 'little-story'
+  /** A story's chips: from its question until the reveal (§ 4.4). */
+  const chipsShown = !isStory || (storyAsked && !revealing)
+  const storyScene = isStory
+    ? storyRevealScene(
+        layout.story,
+        storyCardH ?? storyCardHeight(layout.story, 3),
+      )
+    : null
   const showStreak = streak >= 2 || streakFadingOut
   const showThCorner =
     digraphsThNodeLevel === 'intro' || digraphsThNodeLevel === 'practicing'
@@ -1247,41 +1735,77 @@ export function WordSong({
               onPicturePress={onPicturePress}
               onReplayRead={onReplayRead}
             />
-            <View
-              testID="word-song-chips"
-              style={[
-                styles.abs,
-                styles.center,
-                {
-                  left: chips.rect.x,
-                  top: chips.rect.y,
-                  width: chips.rect.width,
-                  height: chips.rect.height,
-                  flexDirection: chips.axis === 'row' ? 'row' : 'column',
-                  gap: chips.gap,
-                },
-              ]}
-            >
-              {round.chips.map((entry) => {
-                const isCorrect = isCorrectChip(problem, entry.word)
-                return (
-                  <WordChip
-                    key={entry.word}
-                    entry={entry}
-                    face={round.chipFace}
-                    label={chipLabel(round.chipFace, entry.word)}
-                    size={chips.size}
-                    ready={readAloudPlayed}
-                    resolved={problemState.resolved}
-                    dimForGuided={guidedActive && !isCorrect}
-                    glow={guidedActive && isCorrect}
-                    shaking={shakingChip === entry.word}
-                    bursting={celebrating && isCorrect}
-                    onTap={onChipTap}
-                  />
-                )
-              })}
-            </View>
+            {isStory && (
+              <StoryCard
+                key={`story-${problemIndex}`}
+                story={problem.story ?? problem.utterances.hint}
+                metrics={layout.story}
+                x={stage.x + (stage.width - layout.story.width) / 2}
+                y={stage.y}
+                lit={storyLit}
+                pulses={storyPulses}
+                wordsEnabled={!revealing && !speaking}
+                onWordPress={onStoryWordPress}
+                onHeight={setStoryCardH}
+                tapCue={storyCue !== null}
+                tapCueLeaving={storyCue === 'leave'}
+                tapCueSize={storyTapCueSize(layout.tablet)}
+                onTapCueReady={() => {
+                  if (!storyWord0MeasuredRef.current) logCue('word0-measured')
+                  storyWord0MeasuredRef.current = true
+                }}
+              />
+            )}
+            {isStory && revealing && storyScene !== null && (
+              <StoryScene
+                key={`scene-${problemIndex}`}
+                storyId={problem.storyId}
+                answer={problem.target}
+                x={storyScene.x}
+                y={storyScene.y}
+                size={storyScene.size}
+              />
+            )}
+            {chipsShown && (
+              <Animated.View
+                testID="word-song-chips"
+                exiting={
+                  isStory ? FadeOut.duration(STORY_CHIPS_OUT_MS) : undefined
+                }
+                style={[
+                  styles.abs,
+                  styles.center,
+                  {
+                    left: chips.rect.x,
+                    top: chips.rect.y,
+                    width: chips.rect.width,
+                    height: chips.rect.height,
+                    flexDirection: chips.axis === 'row' ? 'row' : 'column',
+                    gap: chips.gap,
+                  },
+                ]}
+              >
+                {round.chips.map((entry) => {
+                  const isCorrect = isCorrectChip(problem, entry.word)
+                  return (
+                    <WordChip
+                      key={entry.word}
+                      entry={entry}
+                      face={round.chipFace}
+                      label={chipLabel(round.chipFace, entry.word)}
+                      size={chips.size}
+                      ready={readAloudPlayed}
+                      resolved={problemState.resolved}
+                      dimForGuided={guidedActive && !isCorrect}
+                      glow={guidedActive && isCorrect}
+                      shaking={shakingChip === entry.word}
+                      bursting={celebrating && isCorrect}
+                      onTap={onChipTap}
+                    />
+                  )
+                })}
+              </Animated.View>
+            )}
           </StageLayer>
         )}
 

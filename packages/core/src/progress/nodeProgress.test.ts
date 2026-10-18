@@ -64,7 +64,8 @@ describe('nodeProgress — basic fields', () => {
     expect(nodeProgress(p, 'mult-mix').unlocksNext).toBe('div-share')
     expect(nodeProgress(p, 'div-share').unlocksNext).toBeNull()
     expect(nodeProgress(p, 'crab-words').unlocksNext).toBe('tent-words')
-    expect(nodeProgress(p, 'cake-words').unlocksNext).toBeNull()
+    expect(nodeProgress(p, 'cake-words').unlocksNext).toBe('fox-stories')
+    expect(nodeProgress(p, 'bug-stories').unlocksNext).toBeNull()
   })
 
   it('lastSuccessRate is the most recent session on THIS step only', () => {

@@ -622,7 +622,7 @@
         'other',
       ]
 
-      // Canon files — 13 math + 18 word-song. Iterated in alphabetical
+      // Canon files — 13 math + 21 word-song. Iterated in alphabetical
       // (group, file-stem) order so the dedup canonical-member choice is
       // deterministic across runs. A stem whose file is not baked yet
       // (404) is skipped with a console note, so a new step can be listed
@@ -634,9 +634,10 @@
       // from the committed files, not by hand. Every PR that adds or
       // re-voices canon updates this number. Content wave 2's div-share
       // (sharing) adds 16 with its Lily render (#587), tent-words +
-      // cake-words add 64 with theirs (#589). A line awaiting its render
+      // cake-words add 64 with theirs (#589), and content wave 3's three
+      // story files add 85 with theirs (#599). A line awaiting its render
       // (empty audio) is not counted.
-      const EXPECTED_CANON_UNIQUE = 937
+      const EXPECTED_CANON_UNIQUE = 1022
       const CANON_FILES = [
         // math/level-1
         ['math', 'add-to-10'],
@@ -654,6 +655,7 @@
         ['math', 'two-digit-addsub-with-regroup'],
         // word-song/level-1
         ['word-song', 'blending-cv'],
+        ['word-song', 'bug-stories'],
         ['word-song', 'cake-words'],
         ['word-song', 'crab-words'],
         ['word-song', 'cvc-words'],
@@ -665,6 +667,8 @@
         ['word-song', 'digraphs-sh'],
         ['word-song', 'digraphs-th-voiceless'],
         ['word-song', 'duck-words'],
+        ['word-song', 'fox-stories'],
+        ['word-song', 'hen-stories'],
         ['word-song', 'letter-names'],
         ['word-song', 'letter-sounds'],
         ['word-song', 'letter-sounds-audit'],
@@ -847,6 +851,18 @@
               'path-open-cake-words.mp3',
               'Here is your path! You are on cake words.',
             ],
+            [
+              'path-open-fox-stories.mp3',
+              'Here is your path! You are on fox stories.',
+            ],
+            [
+              'path-open-hen-stories.mp3',
+              'Here is your path! You are on hen stories.',
+            ],
+            [
+              'path-open-bug-stories.mp3',
+              'Here is your path! You are on bug stories.',
+            ],
           ],
         ],
         [
@@ -882,6 +898,9 @@
             ['path-stop-crab-words.mp3', 'Crab words.'],
             ['path-stop-tent-words.mp3', 'Tent words.'],
             ['path-stop-cake-words.mp3', 'Cake words.'],
+            ['path-stop-fox-stories.mp3', 'Fox stories.'],
+            ['path-stop-hen-stories.mp3', 'Hen stories.'],
+            ['path-stop-bug-stories.mp3', 'Bug stories.'],
           ],
         ],
         [
@@ -897,6 +916,7 @@
             ['path-land-word-song-4.mp3', 'Land 4: Sound pairs.'],
             ['path-land-word-song-5.mp3', 'Land 5: Sentences.'],
             ['path-land-word-song-6.mp3', 'Land 6: Big words.'],
+            ['path-land-word-song-7.mp3', 'Land 7: Stories.'],
           ],
         ],
         [
@@ -1014,6 +1034,18 @@
               'path-locked-next-cake-words.mp3',
               'Cake words! First, tent words. Then this!',
             ],
+            [
+              'path-locked-next-fox-stories.mp3',
+              'Fox stories! First, cake words. Then this!',
+            ],
+            [
+              'path-locked-next-hen-stories.mp3',
+              'Hen stories! First, fox stories. Then this!',
+            ],
+            [
+              'path-locked-next-bug-stories.mp3',
+              'Bug stories! First, hen stories. Then this!',
+            ],
           ],
         ],
         [
@@ -1100,6 +1132,9 @@
             ['end-bud-crab-words.mp3', 'Look! A new flower for crab words!'],
             ['end-bud-tent-words.mp3', 'Look! A new flower for tent words!'],
             ['end-bud-cake-words.mp3', 'Look! A new flower for cake words!'],
+            ['end-bud-fox-stories.mp3', 'Look! A new flower for fox stories!'],
+            ['end-bud-hen-stories.mp3', 'Look! A new flower for hen stories!'],
+            ['end-bud-bug-stories.mp3', 'Look! A new flower for bug stories!'],
           ],
         ],
         [
@@ -1217,6 +1252,18 @@
               'end-unlock-cake-words.mp3',
               'You learned tent words! Now you can do cake words!',
             ],
+            [
+              'end-unlock-fox-stories.mp3',
+              'You learned cake words! Now you can do fox stories!',
+            ],
+            [
+              'end-unlock-hen-stories.mp3',
+              'You learned fox stories! Now you can do hen stories!',
+            ],
+            [
+              'end-unlock-bug-stories.mp3',
+              'You learned hen stories! Now you can do bug stories!',
+            ],
           ],
         ],
         [
@@ -1233,6 +1280,7 @@
             ['end-land-word-song-4.mp3', 'A new land! Land 4: Sound pairs!'],
             ['end-land-word-song-5.mp3', 'A new land! Land 5: Sentences!'],
             ['end-land-word-song-6.mp3', 'A new land! Land 6: Big words!'],
+            ['end-land-word-song-7.mp3', 'A new land! Land 7: Stories!'],
           ],
         ],
         [
@@ -1249,6 +1297,7 @@
             ['end-land-word-song-4-no-number.mp3', 'A new land: Sound pairs!'],
             ['end-land-word-song-5-no-number.mp3', 'A new land: Sentences!'],
             ['end-land-word-song-6-no-number.mp3', 'A new land: Big words!'],
+            ['end-land-word-song-7-no-number.mp3', 'A new land: Stories!'],
           ],
         ],
       ]
@@ -1394,6 +1443,18 @@
         ['guide-session-peek-open-tent-words.mp3', "Let's look at tent words!"],
         ['guide-session-peek-open-cake-words.mp3', "Let's look at cake words!"],
         [
+          'guide-session-peek-open-fox-stories.mp3',
+          "Let's look at fox stories!",
+        ],
+        [
+          'guide-session-peek-open-hen-stories.mp3',
+          "Let's look at hen stories!",
+        ],
+        [
+          'guide-session-peek-open-bug-stories.mp3',
+          "Let's look at bug stories!",
+        ],
+        [
           'guide-session-peek-close-add-to-10.mp3',
           'Adding to ten is for later. You will learn it!',
         ],
@@ -1505,6 +1566,18 @@
           'guide-session-peek-close-cake-words.mp3',
           'Cake words are for later. You will learn it!',
         ],
+        [
+          'guide-session-peek-close-fox-stories.mp3',
+          'Fox stories are for later. You will learn it!',
+        ],
+        [
+          'guide-session-peek-close-hen-stories.mp3',
+          'Hen stories are for later. You will learn it!',
+        ],
+        [
+          'guide-session-peek-close-bug-stories.mp3',
+          'Bug stories are for later. You will learn it!',
+        ],
         ['guide-session-intro-duck-words.mp3', 'Two letters, one sound!'],
         ['guide-session-intro-crab-words.mp3', 'Read all the letters!'],
         ['guide-session-intro-tent-words.mp3', 'Read to the end!'],
@@ -1512,6 +1585,9 @@
           'guide-session-intro-cake-words.mp3',
           'The E is quiet. It makes the A say its name.',
         ],
+        ['guide-session-intro-fox-stories.mp3', 'Read the story. Who is it?'],
+        ['guide-session-intro-hen-stories.mp3', 'Read the story. What is it?'],
+        ['guide-session-intro-bug-stories.mp3', 'Read the story. Where is it?'],
         ['guide-session-intro-mult-mix.mp3', "Let's play all the groups!"],
         ['guide-session-intro-div-share.mp3', "Let's share the flowers!"],
         ['guide-session-hiding.mp3', 'Some flowers are hiding!'],
@@ -1635,6 +1711,18 @@
           'guide-session-replay-open-cake-words.mp3',
           "Let's play cake words again!",
         ],
+        [
+          'guide-session-replay-open-fox-stories.mp3',
+          "Let's play fox stories again!",
+        ],
+        [
+          'guide-session-replay-open-hen-stories.mp3',
+          "Let's play hen stories again!",
+        ],
+        [
+          'guide-session-replay-open-bug-stories.mp3',
+          "Let's play bug stories again!",
+        ],
         ['guide-session-replay-close-number-recog.mp3', 'You know numbers!'],
         ['guide-session-replay-close-add-to-10.mp3', 'You know adding to ten!'],
         [
@@ -1716,6 +1804,64 @@
         ['guide-session-replay-close-crab-words.mp3', 'You know crab words!'],
         ['guide-session-replay-close-tent-words.mp3', 'You know tent words!'],
         ['guide-session-replay-close-cake-words.mp3', 'You know cake words!'],
+        ['guide-session-replay-close-fox-stories.mp3', 'You know fox stories!'],
+        ['guide-session-replay-close-hen-stories.mp3', 'You know hen stories!'],
+        ['guide-session-replay-close-bug-stories.mp3', 'You know bug stories!'],
+        ['guide-story-read.mp3', 'Read the story.'],
+        ['guide-story-word-the.mp3', 'The.'],
+        ['guide-story-word-fox.mp3', 'Fox.'],
+        ['guide-story-word-sat.mp3', 'Sat.'],
+        ['guide-story-word-on.mp3', 'On.'],
+        ['guide-story-word-rug.mp3', 'Rug.'],
+        ['guide-story-word-it.mp3', 'It.'],
+        ['guide-story-word-has.mp3', 'Has.'],
+        ['guide-story-word-a.mp3', 'A.'],
+        ['guide-story-word-cup.mp3', 'Cup.'],
+        ['guide-story-word-hat.mp3', 'Hat.'],
+        ['guide-story-word-is.mp3', 'Is.'],
+        ['guide-story-word-in.mp3', 'In.'],
+        ['guide-story-word-box.mp3', 'Box.'],
+        ['guide-story-word-tent.mp3', 'Tent.'],
+        ['guide-story-word-rock.mp3', 'Rock.'],
+        ['guide-story-word-bed.mp3', 'Bed.'],
+        ['guide-story-word-hen.mp3', 'Hen.'],
+        ['guide-story-word-ran.mp3', 'Ran.'],
+        ['guide-story-word-to.mp3', 'To.'],
+        ['guide-story-word-van.mp3', 'Van.'],
+        ['guide-story-word-dog.mp3', 'Dog.'],
+        ['guide-story-word-bone.mp3', 'Bone.'],
+        ['guide-story-word-fig.mp3', 'Fig.'],
+        ['guide-story-word-frog.mp3', 'Frog.'],
+        ['guide-story-word-log.mp3', 'Log.'],
+        ['guide-story-word-hid.mp3', 'Hid.'],
+        ['guide-story-word-shed.mp3', 'Shed.'],
+        ['guide-story-word-pig.mp3', 'Pig.'],
+        ['guide-story-word-got.mp3', 'Got.'],
+        ['guide-story-word-kite.mp3', 'Kite.'],
+        ['guide-story-word-and.mp3', 'And.'],
+        ['guide-story-word-crab.mp3', 'Crab.'],
+        ['guide-story-word-sun.mp3', 'Sun.'],
+        ['guide-story-word-plum.mp3', 'Plum.'],
+        ['guide-story-word-cake.mp3', 'Cake.'],
+        ['guide-story-word-she.mp3', 'She.'],
+        ['guide-story-word-pen.mp3', 'Pen.'],
+        ['guide-story-word-bag.mp3', 'Bag.'],
+        ['guide-story-word-pot.mp3', 'Pot.'],
+        ['guide-story-word-desk.mp3', 'Desk.'],
+        ['guide-story-word-drum.mp3', 'Drum.'],
+        ['guide-story-word-wig.mp3', 'Wig.'],
+        ['guide-story-word-pond.mp3', 'Pond.'],
+        ['guide-story-word-lamp.mp3', 'Lamp.'],
+        ['guide-story-word-ring.mp3', 'Ring.'],
+        ['guide-story-word-jug.mp3', 'Jug.'],
+        ['guide-story-word-jam.mp3', 'Jam.'],
+        ['guide-story-word-bug.mp3', 'Bug.'],
+        ['guide-story-word-nut.mp3', 'Nut.'],
+        ['guide-story-word-gem.mp3', 'Gem.'],
+        ['guide-story-word-cat.mp3', 'Cat.'],
+        ['guide-story-word-tub.mp3', 'Tub.'],
+        ['guide-story-word-nest.mp3', 'Nest.'],
+        ['guide-story-word-lid.mp3', 'Lid.'],
       ]
 
       // ── State ────────────────────────────────────────────────────────────

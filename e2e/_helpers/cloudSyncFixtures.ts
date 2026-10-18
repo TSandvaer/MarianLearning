@@ -256,6 +256,9 @@ export function buildCloudProgressBlob(opts: {
     'crab-words': 'locked',
     'tent-words': 'locked',
     'cake-words': 'locked',
+    'fox-stories': 'locked',
+    'hen-stories': 'locked',
+    'bug-stories': 'locked',
   }
   return {
     schemaVersion: 1,

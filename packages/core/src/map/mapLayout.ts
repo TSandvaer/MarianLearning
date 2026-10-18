@@ -311,6 +311,17 @@ export function landscapeNeed(lands: number, rooms = 1): number {
   )
 }
 
+/**
+ * Lands a portrait path holds in its pane. Content wave 1 measured 6 (land
+ * 1 ends ≤ 13.6 pt below the pane at 820×1180, PR #575). Content wave 3's
+ * 7th Word Song land misses the portrait bars at the 820 px reference
+ * (land pills over gates; the current stop 22 pt below the pane), so a
+ * world with more lands is laid out on `landscapeNeed`'s bands and scrolls
+ * on portrait too (content-wave-3.md § 1, T6, Thomas 2026-10-17). The
+ * native map does it (`mapPathScale`); the frozen web lays it out as is.
+ */
+export const PORTRAIT_FIT_LANDS = 6
+
 /** Scale (≤ 1) that fits `lands` landscape bands into `height` px. */
 export function landscapeScale(
   lands: number,

@@ -62,6 +62,9 @@ const SKILL_NODES: ReadonlySet<SkillNode> = new Set<SkillNode>([
   'crab-words',
   'tent-words',
   'cake-words',
+  'fox-stories',
+  'hen-stories',
+  'bug-stories',
 ])
 
 const SKILL_LEVELS: ReadonlySet<SkillLevel> = new Set<SkillLevel>([

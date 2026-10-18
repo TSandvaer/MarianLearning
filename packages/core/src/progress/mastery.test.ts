@@ -160,7 +160,10 @@ describe('nextNode', () => {
     expect(nextNode('word-song', 'duck-words')).toBe('crab-words')
     expect(nextNode('word-song', 'crab-words')).toBe('tent-words')
     expect(nextNode('word-song', 'tent-words')).toBe('cake-words')
-    expect(nextNode('word-song', 'cake-words')).toBeNull()
+    expect(nextNode('word-song', 'cake-words')).toBe('fox-stories')
+    expect(nextNode('word-song', 'fox-stories')).toBe('hen-stories')
+    expect(nextNode('word-song', 'hen-stories')).toBe('bug-stories')
+    expect(nextNode('word-song', 'bug-stories')).toBeNull()
   })
 
   it('returns null when the node does not appear in the track', () => {

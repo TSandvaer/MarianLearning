@@ -190,7 +190,8 @@ export async function renderWordSong(props: Partial<WordSongProps> = {}) {
   const onSessionComplete = jest.fn()
   const poses: string[] = []
   const cancelLine = jest.fn()
-  const utils = await render(
+  const storage = memoryStorage()
+  const element = (next: Partial<WordSongProps>) => (
     <WordSong
       layout={wordSongLayout(PORTRAIT)}
       plan={BLENDING}
@@ -202,14 +203,20 @@ export async function renderWordSong(props: Partial<WordSongProps> = {}) {
       cancelLine={cancelLine}
       sfx={sfx}
       tapPlayer={tap.player}
-      storage={memoryStorage()}
+      storage={storage}
       visibility={vis.store}
-      {...props}
-    />,
+      {...next}
+    />
   )
+  const utils = await render(element(props))
   await flush()
   return {
     ...utils,
+    /** The same mount, new props (App's session snapshot changing). */
+    async update(next: Partial<WordSongProps>) {
+      await utils.rerender(element({ ...props, ...next }))
+      await flush()
+    },
     voice,
     sfx,
     tap,
