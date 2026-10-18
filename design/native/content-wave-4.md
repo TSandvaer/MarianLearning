@@ -1,6 +1,6 @@
 # Content wave 4: more and less, bee words, car words, sheep stories (native)
 
-**Status:** spec only. Thomas said go on 2026-10-18 ("go with next content wave from daves roadmap", quoted in the roadmap addendum's status line). Nothing is built, rendered or generated until Thomas approves § 13.
+**Status:** spec only. Thomas said go on 2026-10-18 ("go with next content wave from daves roadmap", quoted in the roadmap addendum's status line). Dave checked D1–D10 on 2026-10-18: 7 confirmed, 3 changed (D1, D3, D9), all applied (§ 14). Thomas approved T1–T6 by popup on 2026-10-18 (§ 13).
 
 **Scope:** `@marian/core`, the native app, canon, the pack manifest and the scene manifest. The web is frozen: a new read throws there and the web plays its silent static plan (`content-wave-1.md` § 1.9). Rules follow `content-wave-3.md` (#595) unless stated.
 
@@ -89,8 +89,11 @@ P1, phone portrait (375×667), after the read has dropped the two flats in:
 +----------------------------+
 ```
 
-- **From the first frame:** the start blocks, the number tag with the start number, its pill ("+200", "+30", "−200", "−30"), and the tray tags. The unchanged trays' tags show their digits. **The changed tray's tag shows "?"** until her right tap or the given answer (Dave's assumption, D1).
-- **Pills:** "+" or "−" (U+2212, the sign the take-away equations already draw, `mobile/src/screens/math/Math.tsx:1630`), then the change in digits. Digits are language-free (M5), and there is still no "=".
+- **From the first frame:** the start blocks, the number tag with the start number, its pill ("+200", "+30", "−200", "−30"), and the tray tags. The unchanged trays' tags show their digits.
+- **The "?" tag (D1, changed by Dave):**
+  - **P1–P3 and P6** (their blocks move on the read): the changed tray's tag shows "?" from the first frame until her right tap or the given answer.
+  - **P4, P5, P7, P8:** every tag shows the start digits from the first frame (hundreds' P6–P8 rule, `content-wave-3.md:112`). The changed tray's tag turns "?" when its blocks move at hint 2.
+- **Pills:** "+" or "−" (U+2212, the sign the take-away equations already draw, `mobile/src/screens/math/Math.tsx:1630`), then the change in digits. The "−" is drawn at the same size and weight as the "+" (Dave, D4). Digits are language-free (M5), and there is still no "=".
 - Layout, glyphs, tags and placement are hundreds' (`content-wave-3.md` § 3.2).
 
 ### 2.3 Layout and sizes
@@ -99,24 +102,24 @@ P1, phone portrait (375×667), after the read has dropped the two flats in:
 
 ### 2.4 Beats, problem by problem
 
-- **Lead** (scored P1, forward sessions until mastered): "More and less!". The number tag's pill pulses on the word tick "More" and again on "less". 400 ms, then the read.
+- **Lead** (scored P1, forward sessions until mastered): "More and less!". The number tag's pill pulses on the word tick "More" only, never on "less" (D1, changed by Dave): P1's pill reads "+200", and _less_ first meets its meaning at P6's lift-out. 400 ms, then the read.
 - **Read:** the number tag pulses on the first word tick, the pill on the change word ("hundred", "thirty", "forty").
   - **P1–P3 (adding) and P6 (the first taking away):** the change blocks move on the word tick "more" or "less": they drop into their tray, or lift out of it.
-  - **P4, P5, P7, P8:** nothing moves during the read. She works from the tag and the pill (fading, M10).
+  - **P4, P5, P7, P8:** nothing moves during the read, and every tray tag shows its start digit. She works from the tag and the pill (fading, M10).
   - Chips open on `onPlay`, as today.
 - **Wrong 1, 2:** "Hmm... try again?", poof, shake, `puzzled-tilt`. The picture doesn't change.
 - **Hints** (600 ms after the 2nd wrong's reprompt):
   1. "Look at the hundreds." / "Look at the tens.": the changed tray ripples.
-  2. "Two more hundreds." / "Take away three tens.": the change blocks drop in or lift out. On P1–P3 and P6 they have already moved, so the tray ripples instead.
+  2. "Two more hundreds." / "Take away three tens.": the change blocks drop in or lift out, and on P4, P5, P7, P8 the changed tray's tag turns "?" as they move. On P1–P3 and P6 they have already moved, so the tray ripples instead.
   3. The read's question again ("What is two hundred more?"): the number tag and its pill pulse.
-- **giveAnswer** (3rd wrong): the "?" tag fills with sharing's 4 pt `colors.myRose` ring; blocks that haven't moved move at once; the guided tap plays the correct moment.
-- **Correct** ("Yes! Four hundred and thirty-five!"): blocks that haven't moved move fast; the "?" tag ticks to its digit; the number tag ticks to the answer as its pill fades, so "235 +200" never shows beside the answer. Burst, sparkle, plink, `celebration`; 250 ms exit.
+- **giveAnswer** (3rd wrong): blocks that haven't moved move at once, and the changed tray's tag turns "?" if it hasn't; the "?" tag fills with sharing's 4 pt `colors.myRose` ring; the guided tap plays the correct moment.
+- **Correct** ("Yes! Four hundred and thirty-five!"): blocks that haven't moved move fast; the changed tray's tag ticks to its answer digit, from "?" or, on P4, P5, P7, P8 before hint 2, from its start digit (as hundreds' P6–P8); the number tag ticks to the answer as its pill fades, so "235 +200" never shows beside the answer. Burst, sparkle, plink, `celebration`; 250 ms exit.
 
 ### 2.5 Motion brief (Reanimated; Reduce Motion in brackets)
 
 - **Drop-in (many blocks):** hundreds' added-block motion per block (starts 40 pt above its tray, spring 220 / 18), `BUILD_STAGGER_MS` (90 ms, `PlaceValueStage.tsx:74`) apart, **without per-block pills**: the number tag's pill says the change. On a fast right tap: spring 300 / 22. [200 ms crossfade per block.]
 - **Lift-out (new):** the blocks placed last leave first (the top of the fan, the rightmost rods, the top cubes of the last column), 90 ms apart. Each rises 24 pt (tablet 32) and fades out over 250 ms, `EASE_OUT`. The blocks that stay never move, so nothing reflows. On a fast right tap: 150 ms. [200 ms fade, no rise.]
-- **Tag tick, tag fill, ripple, pulse:** hundreds' (§ 3.5).
+- **Tag tick, tag fill, ripple, pulse:** hundreds' (§ 3.5). A digit turning "?" at hint 2 uses the tag tick.
 - One shared value per block via `withDelay`, at most 18 (P7: 765 is 18 blocks). Rotation mid-move lands every block in its end state. No new sounds.
 
 ### 2.6 Data model, parser, chips, session end
@@ -144,7 +147,7 @@ export interface MoreProblem {
 
 **Chips** (`hundredsDistractors`, `packages/core/src/math/extendedDistractors.ts:227-274`): a `'more'` problem with count 1 and 'more' keeps hundreds' rule (`'wrong-place'`: the other two of +1, +10, +100). Any other `'more'` problem:
 
-- **P1–P3, `'gentle'`:** the answer's hundreds digit + 2 and + 4 (− 2 and − 4 above 5), hundreds' gentle rule.
+- **P1–P3, `'gentle'`:** the digit of the place that changes, + 2 and + 4 (− 2 and − 4 above 5): hundreds' gentle step, moved to the changing place (D3, changed by Dave). P2 (+30) varies the tens: 354, 374, 394.
 - **P4–P8, two traps:**
   - **First:** `'wrong-place'` when adding (the same count in the next place down: a tens change is made in the ones, a hundreds change in the tens), or `'wrong-op'` when taking away (she added: start + count × step). A `'wrong-op'` value with a zero digit, a regroup or a value outside 100–999 is replaced by `'wrong-place'` (P8: 408 → 364).
   - **Second:** `'digit-swap'`, the answer's tens and ones swapped (M6, M9).
@@ -160,7 +163,7 @@ Dave's suggested canon, checked against his rules (no zero in any start or answe
 | P   | Read (characters)                                               | Answer | Change | Blocks move | Chips (correct first) | Class       |
 | --- | --------------------------------------------------------------- | ------ | ------ | ----------- | --------------------- | ----------- |
 | 1   | "Two hundred and thirty-five. What is two hundred more?" (54)   | 435    | +200   | on the read | 435, 635, 835         | gentle      |
-| 2   | "Three hundred and twenty-four. What is thirty more?" (51)      | 354    | +30    | on the read | 354, 554, 754         | gentle      |
+| 2   | "Three hundred and twenty-four. What is thirty more?" (51)      | 354    | +30    | on the read | 354, 374, 394         | gentle      |
 | 3   | "Four hundred and twenty-six. What is three hundred more?" (56) | 726    | +300   | on the read | 726, 526, 326         | gentle      |
 | 4   | "Five hundred and thirty-two. What is thirty more?" (49)        | 562    | +30    | at hint 2   | 562, 535, 526         | wrong-place |
 | 5   | "Two hundred and forty-five. What is four hundred more?" (54)   | 645    | +400   | at hint 2   | 645, 285, 654         | wrong-place |
@@ -264,7 +267,7 @@ As § 3.3: "Two letters, one sound!" with the `'ending-pair'` cue; on P1, _car_,
 Each problem also has "Hmm... try again?" (reused) and "This one is the <answer>." (21–22 characters). Correct lines: "Yes! The <answer>!", or "Yes! <In/On> the <answer>!" for Where (14–17). Recap: "You worked on reading stories today!" (reused). Each row: story (characters) → question (characters) → **answer** / wrong chips.
 
 1. "The sheep sat in the jeep. It has a peach." (42) → "Who sat in the jeep?" (20) → **sheep** / jeep, peach
-2. "The sheep ran to the barn. A harp is in the barn." (49) → "What is in the barn?" (20) → **harp** / sheep, barn
+2. "The sheep ran to the cart. A harp is in the barn." (49) → "What is in the barn?" (20) → **harp** / sheep, barn
 3. "The sheep has a leaf. It hid in the cart." (41) → "Where is the sheep?" (19) → **cart** (In) / sheep, leaf
 4. "The bee has a seed. The sheep has a card." (41) → "What does the bee have?" (23) → **seed** / card, bee
 5. "The seal sat on a rock. The sheep ran to the tree." (50) → "Who sat on a rock?" (18) → **seal** / sheep, rock
@@ -315,7 +318,7 @@ Canon lines are in § 2.7, § 3.2, § 4.2 and § 6.2.
 - `path.locked.next` "<Name>! First, <previous>. Then this!" (42 / 41 / 39 / 43); `end.bud` "Look! A new flower for <name>!" (37 / 33 / 33 / 37); `end.unlock` "You learned <previous>! Now you can do <name>!" (51 / 50 / 48 / 52). Previous: hundreds, bug stories, bee words, car words.
 - Land 8: "Land 8: Words and stories." (26), "A new land! Land 8: Words and stories!" (38), "A new land: Words and stories!" (30).
 
-**Total: 185 distinct new texts, 4,557 Lily characters.**
+**Total: 185 distinct new texts, 4,557 Lily characters** (recounted after Dave's changes on 2026-10-18: unchanged, since story 2's new text is also 49 characters and D1 and D3 change no spoken line). Thomas approved up to 5,000 (T2).
 
 | Surface                 | Texts | Characters |
 | ----------------------- | ----- | ---------- |
@@ -355,10 +358,10 @@ Canon lines are in § 2.7, § 3.2, § 4.2 and § 6.2.
 **Cost**, at the rates the ledgers record (read in the tools worktree on 2026-10-18; the ledgers are gitignored, `.gitignore:63`):
 
 - **Words:** $0.0776 a call (90 calls, $0.0774–0.0781 each, n = 2), so 17 × $0.0776 ≈ **$1.32**. Wave 2's 16 words cost $1.24 with no retakes.
-- **Scenes:** $0.127 with 3 references, $0.143 with 4 (28 wave-3 calls). § 9.2 has 3 three-reference and 5 four-reference scenes, ≈ **$1.10**.
-- **Total ≈ $2.42**, or about **$3.01** with a second round on 4 words (seed, peach, card, harp: +$0.31) and 2 scenes (sheep-7, sheep-8: +$0.29). Dave's ~$2.60 used $0.10 a word and $0.11 a scene. Wave 3's scene estimate used the same $0.11 and came in at $3.73 for 28 calls, so the ledger rate is the one to trust. `--dry-run` prints the real figure.
+- **Scenes:** $0.127 with 3 references, $0.143 with 4 (28 wave-3 calls). § 9.2 has 2 three-reference and 6 four-reference scenes (sheep-2 gained _cart_, D9), ≈ **$1.11**.
+- **Total ≈ $2.43**, or about **$3.03** with a second round on 4 words (seed, peach, card, harp: +$0.31) and 2 scenes (sheep-7, sheep-8: +$0.29). Thomas approved up to $3.50 (T4). Dave's ~$2.60 used $0.10 a word and $0.11 a scene. Wave 3's scene estimate used the same $0.11 and came in at $3.73 for 28 calls, so the ledger rate is the one to trust. `--dry-run` prints the real figure.
 - **If a word fails its second round, stop and tell Matt;** a swap goes back through Dave (reserves in § 3.2 and § 4.2).
-- **Don't append to either manifest before T4:** the generator reads the whole file.
+- **Append the 17 word entries first, and the 8 scene entries only after Thomas approves the bee and car contact sheets** (T4's order): the generator reads the whole file.
 
 ### 9.1 The 17 manifest entries (batches 11 and 12, riskiest first)
 
@@ -409,7 +412,7 @@ Entries `{ word, tier, batch, subject, avoid, distinctFrom }`. Batch 11 holds th
 Appended to `design/word-song/scene-manifest.json` as tier `sheep-stories`, batch 4, with wave 3's `SCENE_RULES` and the approved pack PNG of each `refs` word (≤ 4). Output: `mobile/assets/scenes/story-sheep-<n>.webp`, 600 px, with a contact sheet for Thomas.
 
 - **sheep-1** [sheep, jeep, peach]: The sheep sitting in the open-top jeep, a peach on the seat beside it. _Avoid:_ a driver.
-- **sheep-2** [sheep, barn, harp]: The sheep running to the red barn; through its open doors, a small harp inside. _Avoid:_ other farm animals.
+- **sheep-2** [sheep, barn, harp, cart]: The sheep running to the wooden hand cart; behind it, the red barn with its doors open and a small harp inside. _Avoid:_ other farm animals; the sheep in the barn; the harp in the cart.
 - **sheep-3** [sheep, leaf, cart]: The wooden hand cart; the sheep hiding in it, peeking over the side, holding a green leaf. _Avoid:_ a horse or a person.
 - **sheep-4** [bee, seed, sheep, card]: The bee holding a big striped seed; beside it, the sheep holding an open card. _Avoid:_ flowers; the bee with the card.
 - **sheep-5** [seal, rock, sheep, tree]: The seal lying on a grey rock in front; behind, the sheep running to a round tree. _Avoid:_ water; the sheep on the rock.
@@ -437,7 +440,7 @@ The 5 clay pieces (§ 1) are made as the clay set was, with Thomas's tool.
 - **Names:** `STAGE_SPOKEN_NAMES`, `STAGE_SPOKEN_NAME_VERBS`, `FRIENDLY_NODE_NAMES`, the recap list in `api/_planner.ts`, `scripts/recapFocusCopy.ts`.
 - **Map, lines:** `LANDS` (land 5 + 1 node, + land 8), `PATH_LINES` (+23 baked), `PATH_ART_SET` (+4), `LandArtId` (+1), `GUIDANCE_LINES`: peeks 8, leads 4, replays 8, story words 17, so ids 221 → 258.
   - `guidanceLines.test.ts:54-56` asserts one text per id (221 = 221). Bee and car words share duck words' lead text, so after this wave texts = 256 while ids and srcs = 258.
-- **Math:** `MoreProblem` `count` and `direction`, the widened template, `hundredsDistractors` and `hundredsOfferedClass` for § 2.6, `HundredsOfferedClass` + `'wrong-op'`, `CANON_MATH_FACTS`. `PlaceValueStage`: many-block drops without pills, the lift-out, "−" pills, the "?" tag on the changed tray, the lead's pill pulses.
+- **Math:** `MoreProblem` `count` and `direction`, the widened template, `hundredsDistractors` and `hundredsOfferedClass` for § 2.6, `HundredsOfferedClass` + `'wrong-op'`, `CANON_MATH_FACTS`. `PlaceValueStage`: many-block drops without pills, the lift-out, "−" pills at the "+"'s size and weight, the "?" tag on the changed tray (from the first frame on P1–P3 and P6, from hint 2 on P4, P5, P7, P8), the lead's pill pulse on "More" only.
 - **Word Song:** `BIG_WORDS_STEPS` + 2 steps, 16 rows (`BigWordsStep`, `BIG_WORDS_STEP_IDS`); `BigWordCategory` + `'celestial'`; § 5's per-step rows and the two spread skips; `wordPack.ts` + 14 entries (not sheep or shark), 17 `FORBIDDEN_PAIRS`; `_plannerWordList.ts`, `bigWordsCanonCheck.ts`; `introSpotlight.ts` `PATTERNS` + the two leads as `'ending-pair'`; `wordDistractors.test.ts`' CVC-axis treatment for the new rows.
 - **Stories:** `StoryNode`, `STORY_NODES`, 8 `LITTLE_STORIES` rows (a `sheep` row builder), `storyMarks.generated.ts`, the scene registry, the "Word," render input for the 17 new clips (§ 8.1).
 - **Canon, pictures:** `spliceContentWave4Canon.ts` (with the _seed_ exemption, § 6.2), `PENDING_CANON_NODES` + 4, both manifests after T4.
@@ -459,8 +462,8 @@ The 5 clay pieces (§ 1) are made as the clay set was, with Thomas's tool.
 
 **Native (jest):**
 
-10. More and less P1: two flats drop in on the tick of "more", 90 ms apart, with no pill of their own; the "+200" pill is up from the first frame; the hundreds tag reads "?" and the tens and ones tags 3 and 5; a right tap ticks the tag to 4 and the number tag to 435 as its pill fades.
-11. P6: two flats lift out on "less"; P7: nothing moves on the read, and hint 2 lifts three rods; the given answer moves the blocks at once and rings the "?" tag.
+10. More and less P1: the lead pulses the pill on "More" and not on "less"; two flats drop in on the tick of "more", 90 ms apart, with no pill of their own; the "+200" pill is up from the first frame; the hundreds tag reads "?" and the tens and ones tags 3 and 5; a right tap ticks the tag to 4 and the number tag to 435 as its pill fades.
+11. P6: two flats lift out on "less", and the hundreds tag reads "?" from the first frame. P7: nothing moves on the read and the tags read 7, 6, 5; hint 2 lifts three rods and turns the tens tag "?"; the given answer rings the "?" tag. P4 answered right before any hint: the tens tag ticks 3 → 6.
 12. Bee words and car words P1: the lead lights the last two cells together; no lead on P2–P8, in reviews, peeks or hearts.
 13. Sheep stories P1–P8 follow wave 3's story ACs (beat, look-back, wrongs, reveal, word taps); the lead plays once before P1; Reduce Motion gives § 2.5's bracketed forms.
 
@@ -472,22 +475,37 @@ The 5 clay pieces (§ 1) are made as the clay set was, with Thomas's tool.
 
 ## 13. Thomas decides
 
-- **T1. Names:** "more and less" (id `hundreds-addsub`), "bee words", "car words", "sheep stories"; "Land 8: Words and stories". Recommendation: approve.
-- **T2. Lily budget (§ 8.1):** 185 texts, **4,557 characters**, chiefly the two leads ("More and less!", "Read the story. Who, what or where?"), the "Take away two hundreds." hint form and 17 one-word clips sent as "Word,". Recommendation: approve.
-- **T3. 5 clay pieces (§ 1):** a seesaw, a bee, a toy car, a sheep, a windmill. The look is judged when they are made. Recommendation: approve the subjects.
-- **T4. Picture spend (§ 9):** 17 pictures and 8 scenes, about **$2.42**, about **$3.01** with retakes, after an OpenAI top-up if the balance needs one. Recommendation: approve; the scenes come only after the bee and car contact sheets are approved.
-- **T5. Dave's check at land 7:** does she answer the story questions on her first tap? If she often doesn't, sheep stories play in question-word stretches: canon order 1, 5, 7 (Who), 2, 4, 8 (What), 3, 6 (Where). Only the splice order changes. Recommendation: build mixed now and reorder only on the check.
-- **T6. Map:** 8 Word Song lands scroll on portrait (the shipped rule), and the 1133×744 landscape form is predicted to start scrolling too. Recommendation: approve now, so a failed bar doesn't stall the build.
+Thomas approved T1–T6 by popup on 2026-10-18.
+
+- **T1. Names:** "more and less" (id `hundreds-addsub`), "bee words", "car words", "sheep stories"; "Land 8: Words and stories". **Approved (Thomas, 2026-10-18).**
+- **T2. Lily budget (§ 8.1):** 185 texts, **4,557 characters**, chiefly the two leads ("More and less!", "Read the story. Who, what or where?"), the "Take away two hundreds." hint form and 17 one-word clips sent as "Word,". **Approved (Thomas, 2026-10-18) up to 5,000 characters.** The render is 4,557, recounted after Dave's changes (unchanged); `--dry-run` prints the real number before any spend.
+- **T3. 5 clay pieces (§ 1):** a seesaw, a bee, a toy car, a sheep, a windmill. **Approved (Thomas, 2026-10-18): the subjects.** The look is judged when they are made.
+- **T4. Picture spend (§ 9):** 17 pictures and 8 scenes, about **$2.43**, about **$3.03** with retakes ($2.42 / $3.01 before sheep-2 gained a fourth reference, D9). **Approved (Thomas, 2026-10-18) up to $3.50.**
+  - The 17 pack pictures come first, judged on the bee and car contact sheets. The 8 scenes are generated only after those are approved.
+  - Top up OpenAI first if the balance is low.
+- **T5. Dave's check at land 7:** does she answer the story questions on her first tap? If she often doesn't, sheep stories play in question-word stretches: canon order 1, 5, 7 (Who), 2, 4, 8 (What), 3, 6 (Where). Only the splice order changes. **Approved (Thomas, 2026-10-18): build mixed now,** and reorder only if the land-7 check calls for it.
+- **T6. Map:** 8 Word Song lands scroll on portrait (the shipped rule), and the 1133×744 landscape form is predicted to start scrolling too. **Approved (Thomas, 2026-10-18),** so a failed bar doesn't stall the build.
 
 ## 14. Pedagogy assumptions for Dave (D1…)
 
-- **D1.** More and less: the start number, its pill and the unchanged trays' digits show from the first frame, and the changed tray's tag shows "?" until her answer (your assumption, kept). The lead is "More and less!", with the pill pulsing on both words.
-- **D2.** Fading as you set it: the blocks move on the read in P1–P3 and P6, at hint 2 otherwise. The hint ladder: "Look at the tens." → "Three more tens." / "Take away three tens." (the blocks move) → the question again. _Take away_ is already in the take-away canon ("Take away three. How many now?").
-- **D3.** Chips: the second trap is always the digit swap; "wrong place" is the next place down (tens → ones, hundreds → tens); the recorded class is the first trap's.
-- **D4.** The "−" in the pill is the first minus in the place-value steps (the take-away equations already show it).
-- **D5.** The 16 gentle pairs in § 3.2 and § 4.2 are mine, by the CVC rule (another category, first sound and vowel letter); your traps are verbatim.
-- **D6.** Bee and car words reuse "Two letters, one sound!" with duck words' last-two-cells cue on P1 only, and no cue on the hint.
-- **D7.** _sheep_ and _shark_ keep their sh-step chips in the sh step and take your rows in bee and car words (§ 5).
-- **D8.** Once _ship_, _sheep_ and _shark_ have pictures, two sh-step trios are fully pictured: ship's trap trio (ship, sip, sheep; P8 in a forward session) and shark's gentle trio (shark, ship, sheep; only when a review puts shark at P1–P3). Those problems become picture problems; the rest stay written words (`word-song-native.md:200`). Recommendation: accept, since the sh step was designed for pictures (`:209`).
-- **D9.** The 8 sheep stories are mine (§ 6.2): your example 1 verbatim; example 2 out (no sheep, and its question is 24 characters); example 3 out (its _it_ could be the sheep or the barn). P4–P8 run What, Who, Where, Who, What. No _she_.
-- **D10.** Story 8 has two same-kind wrong chips (star / scarf, card), the hardest trio, placed last.
+**Dave checked all ten on 2026-10-18 (read-only): D2, D4, D5, D6, D7, D8 and D10 confirmed; D1, D3 and D9 changed.** All three changes and D4's note are applied above.
+
+- **D1. Changed by Dave.**
+  - The "?" shows only on P1–P3 and P6, the problems whose blocks move on the read. There the changed tray's tag is "?" from the first frame.
+  - On P4, P5, P7 and P8 every tag shows the start digits (hundreds' P6–P8 rule, `content-wave-3.md:112`), and the changed tag turns "?" when its blocks move at hint 2.
+  - The lead's pill pulses on "More" only, never on "less": P1's pill reads "+200", and _less_ first meets its meaning at P6's lift-out.
+  - Applied in § 2.2, § 2.4, § 2.5, § 11 and AC 10–11. Was: the changed tray's tag "?" on every problem from the first frame, and the pill pulsing on both words of the lead.
+- **D2.** Fading as Dave set it: the blocks move on the read in P1–P3 and P6, at hint 2 otherwise. The hint ladder: "Look at the tens." → "Three more tens." / "Take away three tens." (the blocks move) → the question again. _Take away_ is already in the take-away canon ("Take away three. How many now?"). **Confirmed (Dave, 2026-10-18).**
+- **D3. Changed by Dave (the gentle rule only).**
+  - Gentle chips (P1–P3) vary the digit of the place that changes, + 2 and + 4 (− 2 and − 4 above 5). P2 (+30) is now 354, 374, 394 (was 354, 554, 754, from the hundreds digit). P1 and P3 change the hundreds, so their chips stand (§ 2.6, § 2.7).
+  - **Confirmed as written:** the second trap is always the digit swap; "wrong place" is the next place down (tens → ones, hundreds → tens); the recorded class is the first trap's.
+- **D4.** The "−" in the pill is the first minus in the place-value steps (the take-away equations already show it). **Confirmed (Dave, 2026-10-18), with a note:** draw the "−" at the same size and weight as the "+" (§ 2.2, § 11).
+- **D5.** The 16 gentle pairs in § 3.2 and § 4.2 are mine, by the CVC rule (another category, first sound and vowel letter); Dave's traps are verbatim. **Confirmed (Dave, 2026-10-18).**
+- **D6.** Bee and car words reuse "Two letters, one sound!" with duck words' last-two-cells cue on P1 only, and no cue on the hint. **Confirmed (Dave, 2026-10-18).**
+- **D7.** _sheep_ and _shark_ keep their sh-step chips in the sh step and take Dave's rows in bee and car words (§ 5). **Confirmed (Dave, 2026-10-18).**
+- **D8.** Once _ship_, _sheep_ and _shark_ have pictures, two sh-step trios are fully pictured: ship's trap trio (ship, sip, sheep; P8 in a forward session) and shark's gentle trio (shark, ship, sheep; only when a review puts shark at P1–P3). Those problems become picture problems; the rest stay written words (`word-song-native.md:200`), since the sh step was designed for pictures (`:209`). **Confirmed (Dave, 2026-10-18).**
+- **D9. Changed by Dave.**
+  - Story 2 is now "The sheep ran to the cart. A harp is in the barn." (was "The sheep ran to the barn. A harp is in the barn."). Its question ("What is in the barn?"), answer (_harp_) and chips (sheep, barn) stay, and scene sheep-2's refs gain _cart_ (§ 6.2, § 9.2).
+  - The new text is 49 characters and 12 words, and still meets § 6.2's rules (checked by hand, 2026-10-18). The Lily total is unchanged (§ 8.1); the scene estimate rises by $0.016 (§ 9).
+  - The rest stands: the 8 sheep stories are mine; Dave's example 1 is verbatim; example 2 is out (no sheep, and its question is 24 characters); example 3 is out (its _it_ could be the sheep or the barn). P4–P8 run What, Who, Where, Who, What. No _she_.
+- **D10.** Story 8 has two same-kind wrong chips (star / scarf, card), the hardest trio, placed last. **Confirmed (Dave, 2026-10-18).**
