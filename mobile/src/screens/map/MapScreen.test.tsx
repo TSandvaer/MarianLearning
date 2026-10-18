@@ -222,7 +222,10 @@ it('the land beat: one marker write at mount, 0 / 400 / 1100 / 1500 / 2100 ms, t
   expect(screen.getByTestId('map-padlock-pop')).toBeOnTheScreen()
   expect(newStop().getByTestId('map-stop-state-current')).toBeOnTheScreen()
   expect(h.sfx.played()).toEqual(['/assets/sfx-chime-soft.mp3'])
-  expect(screen.getByTestId('map-gate-closed')).toBeOnTheScreen()
+  // Land 3's gate (land 5's stays closed too, content wave 3).
+  expect(
+    within(screen.getByTestId('map-gate-3')).getByTestId('map-gate-closed'),
+  ).toBeOnTheScreen()
 
   await advance(400) // 1500: gate swings + cheer
   expect(screen.getByTestId('map-gate-swing')).toBeOnTheScreen()

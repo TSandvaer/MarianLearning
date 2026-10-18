@@ -44,6 +44,7 @@ const MATH = [
   'mult-6-9',
   'mult-mix',
   'div-share',
+  'hundreds',
 ] as const
 const WORD = [
   'letter-names',
@@ -312,11 +313,11 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
       'data-node',
       'add-to-10',
     )
-    await expect(page.getByTestId('map-stop')).toHaveCount(13)
-    await expect(page.getByTestId('map-plinth')).toHaveCount(13)
-    await expect(page.getByTestId('map-band')).toHaveCount(4)
-    await expect(page.getByTestId('map-gate')).toHaveCount(3)
-    await expect(page.getByTestId('map-land-pill')).toHaveCount(4)
+    await expect(page.getByTestId('map-stop')).toHaveCount(14)
+    await expect(page.getByTestId('map-plinth')).toHaveCount(14)
+    await expect(page.getByTestId('map-band')).toHaveCount(5)
+    await expect(page.getByTestId('map-gate')).toHaveCount(4)
+    await expect(page.getByTestId('map-land-pill')).toHaveCount(5)
     await expect(page.getByTestId('map-title')).toHaveText('Number Garden')
     await expect(ribbon(page)).toHaveText(
       'Here is your path! You are on adding to ten.',
@@ -486,7 +487,7 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
       stop(page, current).locator('[data-testid="map-bud"][data-open="true"]'),
     ).toHaveCount(2)
     // Mastered stops carry the bloom badge; locked ones are pale + padlock
-    // (every stop after the current one: 7 since sharing, content wave 2).
+    // (every stop after the current one: 8 since hundreds, content wave 3).
     const lockedStops = MATH.length - 6
     await expect(page.getByTestId('map-flower-badge')).toHaveCount(5)
     await expect(page.getByTestId('map-stop-frost')).toHaveCount(lockedStops)
@@ -497,11 +498,12 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
       .evaluate((n) => getComputedStyle(n).filter)
     expect(frost).toContain('saturate(0.2)')
     expect(frost).toContain('opacity(0.62)')
-    // Gates: 2 and 3 open (first step not locked), 4 closed. The closed
-    // arch art carries its own padlock: nothing is overlaid on a gate.
+    // Gates: 2 and 3 open (first step not locked), 4 and 5 closed. The
+    // closed arch art carries its own padlock: nothing is overlaid on a gate.
     await expect(gate(page, 2)).toHaveAttribute('data-open', 'true')
     await expect(gate(page, 3)).toHaveAttribute('data-open', 'true')
     await expect(gate(page, 4)).toHaveAttribute('data-open', 'false')
+    await expect(gate(page, 5)).toHaveAttribute('data-open', 'false')
     await expect(
       gate(page, 2).locator('img[data-art="ui-arch-open"]'),
     ).toHaveCount(1)
@@ -519,9 +521,10 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     const firstAhead = stones.indexOf('false')
     expect(firstAhead).toBeGreaterThan(0)
     expect(stones.slice(firstAhead).every((w) => w === 'false')).toBe(true)
-    // Land pills with their numbers (showLevelToMarian on).
-    await expect(page.getByTestId('map-land-pill')).toHaveCount(4)
-    await expect(page.getByTestId('map-land-number')).toHaveCount(4)
+    // Land pills with their numbers (showLevelToMarian on): 5 since
+    // hundreds (content wave 3).
+    await expect(page.getByTestId('map-land-pill')).toHaveCount(5)
+    await expect(page.getByTestId('map-land-number')).toHaveCount(5)
     await expectArtLoaded(page)
     await page.screenshot({ path: `${SHOTS}/map-math-mid-tree.png` })
 
@@ -669,7 +672,7 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     )
     await expect(page.getByTestId('map-emma')).toHaveAttribute(
       'data-node',
-      'div-share',
+      'hundreds',
     )
     await expect(page.getByTestId('map-emma')).toHaveAttribute(
       'data-pose',
@@ -718,9 +721,9 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
   }) => {
     await arm(page, seedProgress({ math: 3, showLevelToMarian: false }))
     await openMapFromHub(page, 'math')
-    await expect(page.getByTestId('map-land-pill')).toHaveCount(4)
+    await expect(page.getByTestId('map-land-pill')).toHaveCount(5)
     await expect(page.getByTestId('map-land-number')).toHaveCount(0)
-    await expect(page.getByTestId('map-stop')).toHaveCount(13)
-    await expect(page.getByTestId('map-gate')).toHaveCount(3)
+    await expect(page.getByTestId('map-stop')).toHaveCount(14)
+    await expect(page.getByTestId('map-gate')).toHaveCount(4)
   })
 })

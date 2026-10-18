@@ -32,9 +32,14 @@
  * `A × B = ?` over `GroupsRow`; a sharing problem (content wave 2 § 2)
  * shows `ShareStage`, a pile dealt onto plates with no equation, its P1–P3
  * dealing on their own 300 ms after the read (Emma `attentive-pointing`
- * during the deal, then `listening`). Their chips come from
- * `buildExtendedChipOrder`, their hint lines set `hintStep` (arithmetic keeps
- * `hintBeat`), and the subitising scaffolds never run for them.
+ * during the deal, then `listening`); a hundreds problem (content wave 3
+ * § 3) shows `PlaceValueStage`, trays of flats, rods and cubes that the
+ * read builds on its word ticks (P6–P8: a number tag with its "+10" /
+ * "+100" pill), the lead "Hundreds, tens and ones!" pulsing the trays.
+ * Their chips come from `buildExtendedChipOrder` (a 3-digit numeral steps
+ * its font down to fit, `chipNumeralFont`), their hint lines set
+ * `hintStep` (arithmetic keeps `hintBeat`), and the subitising scaffolds
+ * never run for them.
  * - Background: an advance due while the app is hidden waits for its
  *   return; the dot card's timers pause.
  *
@@ -92,9 +97,10 @@ import {
   shouldShowDotCard,
   subMinuendFromProblem,
 } from '@marian/core/math/dotCard'
-import type {
-  ExtendedMathProblem,
-  ExtendedMathSessionPlan,
+import {
+  isHundredsProblem,
+  type ExtendedMathProblem,
+  type ExtendedMathSessionPlan,
 } from '@marian/core/math/extendedProblems'
 import { GENTLE_RAMP_THROUGH } from '@marian/core/math/distractors'
 import {
@@ -161,10 +167,12 @@ import {
 } from '../../audio'
 import { CaptionRibbon } from '../../components/CaptionRibbon'
 import {
+  chipNumeralFont,
   countingMetrics,
   groupsAreDrawn,
   groupsMetrics,
   numberStripMetrics,
+  placeValueMetrics,
   shareMetrics,
   skipTrackMetrics,
   type ExtendedMathLayout,
@@ -191,6 +199,7 @@ import type {
   PlayMathUtteranceOptions,
 } from './mathTypes'
 import { NumberStrip } from './NumberStrip'
+import { PlaceValueStage } from './PlaceValueStage'
 import { ScaffoldFlash } from './ScaffoldFlash'
 import { ShareStage } from './ShareStage'
 import { AUTO_DEAL_DELAY_MS, FILL_HOLD_MS } from './shareDeal'
@@ -574,6 +583,9 @@ export function MathScreen({
    *  deal, raised 300 ms after the read ends. Both reset per problem. */
   const [readRevealed, setReadRevealed] = useState(0)
   const [autoDeal, setAutoDeal] = useState(false)
+  /** Hundreds (content wave 3 § 3.4): the step lead's words revealed so
+   *  far; its ticks pulse the trays. Reset per problem. */
+  const [leadRevealed, setLeadRevealed] = useState(0)
   const [shakingChip, setShakingChip] = useState<number | null>(null)
   const [captionText, setCaptionText] = useState('')
   const [captionRevealed, setCaptionRevealed] = useState(0)
@@ -768,10 +780,11 @@ export function MathScreen({
     )
   }, [planLength])
 
-  /** A guide line through the ribbon (never rejects). */
+  /** A guide line through the ribbon (never rejects); `onWords` gets its
+   *  word ticks. */
   const speakGuide = useCallback(
-    (id: SessionGuideLineId) =>
-      speak(sessionGuideLine(id).text, false, undefined, (_text, opts) =>
+    (id: SessionGuideLineId, onWords?: (revealed: number) => void) =>
+      speak(sessionGuideLine(id).text, false, onWords, (_text, opts) =>
         guide.playLine(id, opts),
       ),
     [speak, guide],
@@ -800,7 +813,13 @@ export function MathScreen({
       void (async () => {
         if (lead !== null) {
           if (lead === opener) openerStartedRef.current = true
-          await speakGuide(lead)
+          // Hundreds' lead pulses the trays on its word ticks (§ 3.4).
+          await speakGuide(
+            lead,
+            lead === sessionIntro && isHundredsProblem(problem)
+              ? setLeadRevealed
+              : undefined,
+          )
           if (!live()) return
           if (lead === opener) setOpenerDone(true)
           await new Promise<void>((resolve) => {
@@ -820,13 +839,21 @@ export function MathScreen({
             openChipGate('fallback')
           }, CHIP_GATE_FALLBACK_MS)
         }
-        // Sharing's read drives its stage (the total tag, the plates).
+        // Sharing's and hundreds' reads drive their stages (the total tag
+        // and the plates; the trays' build, the number tag and its pill).
+        const drivesStage =
+          problem.kind === 'divide' || isHundredsProblem(problem)
         await speak(
           problem.utterances.read,
           true,
-          problem.kind === 'divide' ? setReadRevealed : undefined,
+          drivesStage ? setReadRevealed : undefined,
         )
         if (!live()) return
+        // A read that ended without its ticks still builds the trays.
+        if (isHundredsProblem(problem)) {
+          const words = problem.utterances.read.split(/\s+/).filter(Boolean)
+          setReadRevealed((r) => Math.max(r, words.length))
+        }
         readAloudPlayedRef.current = true
         setReadAloudPlayed(true)
         setPose((current) => (current === 'listening' ? 'idle' : current))
@@ -937,6 +964,7 @@ export function MathScreen({
       setHint2Lit(0)
       setBudReveal('hidden')
       setReadRevealed(0)
+      setLeadRevealed(0)
       setAutoDeal(false)
       shareHoldRef.current = false
       tryAdvanceRef.current = null
@@ -1562,6 +1590,15 @@ export function MathScreen({
       ),
     [layout, plan],
   )
+  const hundreds = useMemo(
+    () => placeValueMetrics(layout, plan.problems.filter(isHundredsProblem)),
+    [layout, plan],
+  )
+  // A 3-digit numeral steps the chips' font down to fit (§ 3.3).
+  const chipFont = useMemo(
+    () => chipNumeralFont(chipOrderWithClass.values, chips.size, chips.font),
+    [chipOrderWithClass.values, chips.size, chips.font],
+  )
   const strip = numberStripMetrics(layout)
   const multiply = currentProblem.kind === 'multiply' ? currentProblem : null
   const groupsDrawn =
@@ -1714,6 +1751,19 @@ export function MathScreen({
                   onFillScheduled={onShareFillScheduled}
                 />
               )}
+              {isHundredsProblem(currentProblem) && (
+                <PlaceValueStage
+                  key={`hundreds-${problemIndex}`}
+                  problem={currentProblem}
+                  metrics={hundreds}
+                  width={area.width}
+                  readRevealed={readRevealed}
+                  leadRevealed={leadRevealed}
+                  hintStep={hintStep}
+                  guided={guidedActive}
+                  answered={problemState.resolved}
+                />
+              )}
               {equation !== null && (
                 <View
                   testID="math-symbolic"
@@ -1857,7 +1907,7 @@ export function MathScreen({
                     key={value}
                     value={value}
                     size={chips.size}
-                    font={chips.font}
+                    font={chipFont}
                     radius={chips.radius}
                     gateOpen={chipGateOpen}
                     resolved={problemState.resolved}

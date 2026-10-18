@@ -245,6 +245,8 @@ const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {
   'mult-mix': "Let's play all the groups!",
   // Number Garden land 4 (content wave 2 § 2.4, § 6.2; Thomas 2026-10-17).
   'div-share': "Let's share the flowers!",
+  // Number Garden land 5 (content wave 3 § 5.1; Thomas approved T2).
+  hundreds: 'Hundreds, tens and ones!',
   // Word Song land 6 (content wave 1 § 3.3, § 4.3).
   'duck-words': 'Two letters, one sound!',
   'crab-words': 'Read all the letters!',

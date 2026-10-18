@@ -576,6 +576,8 @@ export type MathLayoutKind =
   | 'multiply'
   | 'missing-addend'
   | 'divide'
+  | 'place-value'
+  | 'more'
 
 export interface ExtendedMathLayout extends MathLayout {
   /** The chips' row (Math's) or the right-edge column (Word Song's L). */
@@ -594,13 +596,13 @@ const COLUMN_CHIP_GAP = 16
  *
  * - arithmetic, missing numbers, number recognition, and every tablet
  *   form: `mathLayout`.
- * - Phone portrait, skip / multiply / divide: Math's P frame; the ribbon is
+ * - Phone portrait, skip / multiply / divide / hundreds: Math's P frame; the ribbon is
  *   capped at 4 lines (they end at 253 pt on the 375×667 floor, above the
  *   problem's top at 259).
- * - Phone landscape, skip / multiply / divide: Word Song's L frame
+ * - Phone landscape, skip / multiply / divide / hundreds: Word Song's L frame
  *   (`wordSongLayout.ts`, mirrored here: importing it would be a require
  *   cycle): Math's Emma column and back arrow, the HUD row, the ribbon at
- *   safe y + 60 in a 2-line (skip, divide) or 1-line (multiply) slot, the
+ *   safe y + 60 in a 2-line (skip, divide, hundreds) or 1-line (multiply) slot, the
  *   chip column
  *   clamp(88, ⌊(safe h − 56) / 3⌋, 104) on the right, and the stage between
  *   as the problem rect.
@@ -635,8 +637,15 @@ export function extendedMathLayout(
   const paneX = s.x + column
   const paneW = chipX - 16 - paneX
   const hudRow = { x: paneX, y: s.y + 8, width: paneW, height: 44 }
-  // Sharing takes skip's 2-line slot (content wave 2 § 2.3).
-  const ribbonLines = kind === 'skip-count' || kind === 'divide' ? 2 : 1
+  // Sharing takes skip's 2-line slot (content wave 2 § 2.3), and hundreds
+  // takes sharing's frames (content wave 3 § 3.3).
+  const ribbonLines =
+    kind === 'skip-count' ||
+    kind === 'divide' ||
+    kind === 'place-value' ||
+    kind === 'more'
+      ? 2
+      : 1
   const ribbonH = ribbonSlot(
     PHONE_CAPTION_PT,
     PHONE_RIBBON_PADDING,
@@ -1270,4 +1279,361 @@ export function shareGeometry(
     })),
     plateCells,
   }
+}
+
+// ── Hundreds: trays of flats, rods and cubes (content wave 3 § 3.2–§ 3.3) ──
+//
+// `design/native/content-wave-3.md` § 3.3; `placeValueLayout.test.ts` pins
+// its table. One unit u per plan, from the largest counts shown at any
+// point (a "more" problem's start and its answer), so a tray's size never
+// gives the answer away:
+//
+// - Width: the trays, hundreds (10 + 1.2 (H − 1)) u, tens (1.3 T − 0.3) u,
+//   ones 2.3 u (two columns of 5), each padded 0.5 u, 2 gaps g (12, tablet
+//   16) between them; L and TL add the number tag's column + 8.
+// - Height: the fan (10 + 1.2 (H − 1)) u + u, the tag row (36, tablet 42);
+//   P and TP add the number-tag row on top when the plan has a "more".
+// - u: the largest whole number ≤ 10 (tablet ≤ 20) that fits the problem
+//   rect.
+
+/** A flat's side, a rod's length (in u). */
+export const PV_TEN = 10
+/** The flats' fan step (up and right), in u. */
+export const PV_FAN_STEP = 1.2
+/** Between rods, and between the two cube columns, in u. */
+export const PV_ROD_GAP = 0.3
+/** Cubes stack in columns of this many, bottom up. */
+export const PV_CUBE_COLUMN = 5
+/** A tray's padding, in u. */
+export const PV_TRAY_PAD = 0.5
+/** The largest u on a phone / a tablet. */
+export const PV_PHONE_U_MAX = 10
+export const PV_TABLET_U_MAX = 20
+
+type Place = 'hundreds' | 'tens' | 'ones'
+const PLACES: readonly Place[] = ['hundreds', 'tens', 'ones']
+
+/** What the hundreds layout reads of a problem (core's `HundredsProblem`). */
+export type PlaceValueLayoutProblem =
+  | {
+      kind: 'place-value'
+      hundreds: number
+      tens: number
+      ones: number
+      correct: number
+    }
+  | { kind: 'more'; start: number; step: 10 | 100; correct: number }
+
+const digitsOf = (n: number): Record<Place, number> => ({
+  hundreds: Math.floor(n / 100) % 10,
+  tens: Math.floor(n / 10) % 10,
+  ones: n % 10,
+})
+
+/** The digits a problem shows first (a "more" problem: its start). */
+export function startDigits(p: PlaceValueLayoutProblem): Record<Place, number> {
+  return p.kind === 'more'
+    ? digitsOf(p.start)
+    : { hundreds: p.hundreds, tens: p.tens, ones: p.ones }
+}
+
+export interface PlaceValueMetrics {
+  u: number
+  /** The plan's largest counts shown at any point. */
+  maxFlats: number
+  maxRods: number
+  maxCubes: number
+  /** Ones' columns (of 5). */
+  cubeColumns: number
+  /** Between the trays. */
+  trayGap: number
+  trayRadius: number
+  trayWidths: Record<Place, number>
+  trayHeight: number
+  /** The three trays and their two gaps. */
+  traysWidth: number
+  /** The tags: sharing's pill (28 pt, tablet 32; Fredoka 20, tablet 24),
+   *  `tagGap` (8, tablet 10) under each tray. */
+  tagHeight: number
+  tagFont: number
+  tagGap: number
+  /** The plan has a "more" problem: the number tag's row / column. */
+  numberTag: boolean
+  numberTagSide: 'top' | 'left'
+  /** The widest number tag the plan shows (its starts and answers). */
+  numberTagWidth: number
+  /** The "+10" / "+100" pills: 20 pt high (tablet 24). */
+  pillHeight: number
+  pillFont: number
+  /** The widest pill the plan shows. */
+  pillWidth: number
+  /** Tag → its pill. */
+  pillGap: number
+  /** L and TL: the number tag's column (its tag or its pill, the wider). */
+  numberColumn: number
+  /** The block the stage centres in the problem rect. */
+  block: { width: number; height: number }
+  /** A built block drops this far (16, tablet 24); an added one 40. */
+  drop: number
+  addedRise: number
+  /** The grid line and the outline. */
+  gridLine: number
+  outline: number
+  /** Whether `u` fits the problem rect (the test's "largest" check). */
+  fits: (u: number) => boolean
+}
+
+/** A pill's width for a "+10" / "+100": 6 pt side padding, at least as wide
+ *  as it is tall. */
+export function smallPillWidth(text: string, font: number, height: number) {
+  return Math.max(height, Math.ceil(fredokaBoldWidth(text, font)) + 12)
+}
+
+/** Hundreds' sizes for a plan of hundreds problems (§ 3.3). */
+export function placeValueMetrics(
+  layout: Pick<MathLayout, 'tablet' | 'form' | 'problem'>,
+  problems: readonly PlaceValueLayoutProblem[],
+): PlaceValueMetrics {
+  const tablet = layout.tablet
+  const side: 'top' | 'left' =
+    layout.form === 'phone-landscape' || layout.form === 'tablet-landscape'
+      ? 'left'
+      : 'top'
+  let maxFlats = 1
+  let maxRods = 1
+  let maxCubes = 1
+  const numbers: number[] = []
+  const pills: string[] = []
+  for (const p of problems) {
+    for (const d of [startDigits(p), digitsOf(p.correct)]) {
+      maxFlats = Math.max(maxFlats, d.hundreds)
+      maxRods = Math.max(maxRods, d.tens)
+      maxCubes = Math.max(maxCubes, d.ones)
+    }
+    if (p.kind === 'more') {
+      numbers.push(p.start, p.correct)
+      pills.push(`+${p.step}`)
+    }
+  }
+  const numberTag = numbers.length > 0
+  const cubeColumns = Math.ceil(maxCubes / PV_CUBE_COLUMN)
+  const trayGap = tablet ? 16 : 12
+  const tagHeight = tablet ? 32 : 28
+  const tagFont = tablet ? 24 : 20
+  const tagGap = tablet ? 10 : 8
+  const pillHeight = tablet ? 24 : 20
+  const pillFont = tablet ? 17 : 14
+  const pillGap = 6
+  const numberTagWidth = numbers.reduce(
+    (w, n) => Math.max(w, pillWidth(String(n), tagFont, tagHeight)),
+    0,
+  )
+  const pillW = pills.reduce(
+    (w, t) => Math.max(w, smallPillWidth(t, pillFont, pillHeight)),
+    0,
+  )
+  const numberColumn = numberTag ? Math.max(numberTagWidth, pillW) : 0
+  const fan = PV_TEN + PV_FAN_STEP * (maxFlats - 1)
+  const pad = 2 * PV_TRAY_PAD
+  const widthsIn = {
+    hundreds: fan + pad,
+    tens: (1 + PV_ROD_GAP) * maxRods - PV_ROD_GAP + pad,
+    ones: (1 + PV_ROD_GAP) * cubeColumns - PV_ROD_GAP + pad,
+  }
+  const tagRow = tagHeight + tagGap
+  const numberRow = numberTag && side === 'top' ? tagHeight + tagGap : 0
+  const sizeFor = (u: number) => {
+    const traysWidth =
+      (widthsIn.hundreds + widthsIn.tens + widthsIn.ones) * u + 2 * trayGap
+    const trayHeight = (fan + pad) * u
+    const width =
+      side === 'left' && numberTag
+        ? numberColumn + 8 + traysWidth
+        : Math.max(traysWidth, numberTagWidth + pillGap + pillW)
+    const height =
+      side === 'left'
+        ? Math.max(
+            trayHeight + tagRow,
+            numberTag ? tagHeight + pillGap + pillHeight : 0,
+          )
+        : numberRow + trayHeight + tagRow
+    return { traysWidth, trayHeight, width, height }
+  }
+  const fits = (u: number) => {
+    const s = sizeFor(u)
+    return s.width <= layout.problem.width && s.height <= layout.problem.height
+  }
+  let u = tablet ? PV_TABLET_U_MAX : PV_PHONE_U_MAX
+  while (u > 2 && !fits(u)) u -= 1
+  const size = sizeFor(u)
+  return {
+    u,
+    maxFlats,
+    maxRods,
+    maxCubes,
+    cubeColumns,
+    trayGap,
+    trayRadius: tablet ? 16 : 12,
+    trayWidths: {
+      hundreds: widthsIn.hundreds * u,
+      tens: widthsIn.tens * u,
+      ones: widthsIn.ones * u,
+    },
+    trayHeight: size.trayHeight,
+    traysWidth: size.traysWidth,
+    tagHeight,
+    tagFont,
+    tagGap,
+    numberTag,
+    numberTagSide: side,
+    numberTagWidth,
+    pillHeight,
+    pillFont,
+    pillWidth: pillW,
+    pillGap,
+    numberColumn,
+    block: { width: size.width, height: size.height },
+    drop: tablet ? 24 : 16,
+    addedRise: 40,
+    gridLine: 1,
+    outline: 1.5,
+    fits: (n: number) =>
+      n <= (tablet ? PV_TABLET_U_MAX : PV_PHONE_U_MAX) && fits(n),
+  }
+}
+
+export interface PlaceValueRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface PlaceValueGeometry {
+  /** Each tray, in the block's frame (origin: the stage's top-left). */
+  trays: Record<Place, PlaceValueRect>
+  /** The blocks shown from the start, in build order (flat 0 lowest). */
+  flats: readonly PlaceValueRect[]
+  rods: readonly PlaceValueRect[]
+  cubes: readonly PlaceValueRect[]
+  /** A "more" problem's added block (the next in its tray) and its pill. */
+  added: { place: Place; rect: PlaceValueRect; pill: SharePoint } | null
+  /** Each tray's tag centre (under it). */
+  tags: Record<Place, SharePoint>
+  /** A "more" problem's number tag centre and its pill's; else `null`. */
+  numberTag: SharePoint | null
+  numberPill: SharePoint | null
+}
+
+/** Where everything of one problem sits in a stage `width` wide. */
+export function placeValueGeometry(
+  m: PlaceValueMetrics,
+  problem: PlaceValueLayoutProblem,
+  width: number,
+): PlaceValueGeometry {
+  const { u } = m
+  const pad = PV_TRAY_PAD * u
+  const x0 = (width - m.block.width) / 2
+  const left = m.numberTag && m.numberTagSide === 'left'
+  const traysX = left
+    ? x0 + m.numberColumn + 8
+    : x0 + (m.block.width - m.traysWidth) / 2
+  const trayTop =
+    m.numberTag && m.numberTagSide === 'top' ? m.tagHeight + m.tagGap : 0
+  const trays = {} as Record<Place, PlaceValueRect>
+  let x = traysX
+  for (const p of PLACES) {
+    trays[p] = { x, y: trayTop, width: m.trayWidths[p], height: m.trayHeight }
+    x += m.trayWidths[p] + m.trayGap
+  }
+  const bottom = trayTop + m.trayHeight - pad
+  const flat = (k: number): PlaceValueRect => ({
+    x: trays.hundreds.x + pad + PV_FAN_STEP * u * k,
+    y: bottom - PV_TEN * u - PV_FAN_STEP * u * k,
+    width: PV_TEN * u,
+    height: PV_TEN * u,
+  })
+  const rod = (k: number): PlaceValueRect => ({
+    x: trays.tens.x + pad + (1 + PV_ROD_GAP) * u * k,
+    y: bottom - PV_TEN * u,
+    width: u,
+    height: PV_TEN * u,
+  })
+  const cube = (k: number): PlaceValueRect => ({
+    x:
+      trays.ones.x +
+      pad +
+      (1 + PV_ROD_GAP) * u * Math.floor(k / PV_CUBE_COLUMN),
+    y: bottom - u * ((k % PV_CUBE_COLUMN) + 1),
+    width: u,
+    height: u,
+  })
+  const d = startDigits(problem)
+  const range = (n: number) => Array.from({ length: n }, (_, k) => k)
+  let added: PlaceValueGeometry['added'] = null
+  if (problem.kind === 'more') {
+    const place: Place = problem.step === 100 ? 'hundreds' : 'tens'
+    const rect = place === 'hundreds' ? flat(d.hundreds) : rod(d.tens)
+    added = {
+      place,
+      rect,
+      pill: {
+        x: rect.x + rect.width / 2,
+        y: rect.y - 4 - m.pillHeight / 2,
+      },
+    }
+  }
+  const tagY = trayTop + m.trayHeight + m.tagGap + m.tagHeight / 2
+  const tags = {} as Record<Place, SharePoint>
+  for (const p of PLACES)
+    tags[p] = { x: trays[p].x + trays[p].width / 2, y: tagY }
+  let numberTag: SharePoint | null = null
+  let numberPill: SharePoint | null = null
+  if (problem.kind === 'more') {
+    if (left) {
+      const stack = m.tagHeight + m.pillGap + m.pillHeight
+      const top = trayTop + (m.trayHeight - stack) / 2
+      const cx = x0 + m.numberColumn / 2
+      numberTag = { x: cx, y: top + m.tagHeight / 2 }
+      numberPill = {
+        x: cx,
+        y: top + m.tagHeight + m.pillGap + m.pillHeight / 2,
+      }
+    } else {
+      const group = m.numberTagWidth + m.pillGap + m.pillWidth
+      const gx = x0 + (m.block.width - group) / 2
+      numberTag = { x: gx + m.numberTagWidth / 2, y: m.tagHeight / 2 }
+      numberPill = {
+        x: gx + m.numberTagWidth + m.pillGap + m.pillWidth / 2,
+        y: m.tagHeight / 2,
+      }
+    }
+  }
+  return {
+    trays,
+    flats: range(d.hundreds).map(flat),
+    rods: range(d.tens).map(rod),
+    cubes: range(d.ones).map(cube),
+    added,
+    tags,
+    numberTag,
+    numberPill,
+  }
+}
+
+/**
+ * The chip numerals' font for one chip set (§ 3.3): `font`, stepped down
+ * 2 pt while a numeral is wider than the chip − 16. One size for the set,
+ * so its chips match.
+ */
+export function chipNumeralFont(
+  values: readonly number[],
+  size: number,
+  font: number,
+): number {
+  let f = font
+  const room = size - 16
+  while (f > 12 && values.some((v) => fredokaBoldWidth(String(v), f) > room))
+    f -= 2
+  return f
 }

@@ -148,13 +148,13 @@ describe('sessionEndGuidance (Guidance G2)', () => {
   })
 
   it('finishing the last step of a world: "3 of 3!" then Emma says "You grew your whole garden!" with its clip', () => {
-    const d1 = entry('div-share', 3, 1)
-    const d2 = entry('div-share', 4, 1)
-    const today = entry('div-share', 6, 1)
-    const open = { 'div-share': 'practicing' } as const
+    const d1 = entry('hundreds', 3, 1)
+    const d2 = entry('hundreds', 4, 1)
+    const today = entry('hundreds', 6, 1)
+    const open = { hundreds: 'practicing' } as const
     const before = doc([d1, d2], open, open)
-    const after = doc([d1, d2, today], { 'div-share': 'mastered' }, open)
-    const g = run(before, after, 'div-share', 8)
+    const after = doc([d1, d2, today], { hundreds: 'mastered' }, open)
+    const g = run(before, after, 'hundreds', 8)
     expect(g.day).toBe('world-done')
     expect(g.countText).toBe('3 of 3!')
     const last = g.lines[g.lines.length - 1]!

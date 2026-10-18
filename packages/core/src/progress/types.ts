@@ -47,6 +47,9 @@ export type NumberGardenNode =
   // Content wave 2 § 2 (sharing): a pile of flowers dealt onto 2–5
   // plates; "How many on each plate?". Served from canon; no Leitner fact.
   | 'div-share'
+  // Content wave 3 § 3 (hundreds): numbers to 999 built from flats, rods
+  // and cubes, then ten / one hundred more. Served from canon; no fact.
+  | 'hundreds'
 
 // cvc-words = short-a CVC. Subsequent vowels get sibling nodes
 // (cvc-words-short-o, cvc-words-short-u, cvc-words-short-i,

@@ -72,6 +72,7 @@ describe('MATH_NODES_IN_ORDER / WORD_SONG_NODES_IN_ORDER', () => {
       'mult-6-9',
       'mult-mix',
       'div-share',
+      'hundreds',
     ])
   })
 
@@ -156,7 +157,7 @@ describe('pickFocusNode — math', () => {
 
   it('falls back to the last math node when every node is mastered (defensive)', () => {
     const progress = buildProgress() // every level → mastered via helper
-    expect(pickFocusNode(progress, 'math').node).toBe('div-share')
+    expect(pickFocusNode(progress, 'math').node).toBe('hundreds')
   })
 
   it('walks the default Progress doc — Marian lands on add-to-10 (matches diagnostic)', () => {
@@ -695,7 +696,7 @@ describe('pickFocusNode — CVC review mode integration (ticket 86c9qa6n3)', () 
     const pick = pickFocusNode(progress, 'math', CVC_REVIEW_PERIOD_SESSIONS)
     expect(pick.mode).toBe('forward')
     // Every math node mastered → defensive fallback to the last node.
-    expect(pick.node).toBe('div-share')
+    expect(pick.node).toBe('hundreds')
   })
 })
 

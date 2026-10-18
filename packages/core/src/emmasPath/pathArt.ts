@@ -29,6 +29,7 @@ export type LandArtId =
   | 'land-ng-2'
   | 'land-ng-3'
   | 'land-ng-4'
+  | 'land-ng-5'
   | 'land-ws-1'
   | 'land-ws-2'
   | 'land-ws-3'
@@ -65,6 +66,7 @@ const PATH_ART_SET: Readonly<Record<PathArtId, true>> = {
   'mult-6-9': true,
   'mult-mix': true,
   'div-share': true,
+  hundreds: true,
   // Word Song stages
   'letter-names': true,
   'letter-sounds': true,
@@ -91,6 +93,7 @@ const PATH_ART_SET: Readonly<Record<PathArtId, true>> = {
   'land-ng-2': true,
   'land-ng-3': true,
   'land-ng-4': true,
+  'land-ng-5': true,
   'land-ws-1': true,
   'land-ws-2': true,
   'land-ws-3': true,

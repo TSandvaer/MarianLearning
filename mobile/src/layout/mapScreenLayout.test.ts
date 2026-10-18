@@ -127,8 +127,38 @@ describe('mapPathScale: the § 1 sizes table', () => {
     else expect(Math.round(w.scroll!)).toBe(scroll)
   })
 
-  it('Number Garden scrolls less in L (369 pt content)', () => {
-    expect(Math.round(worst(vp(667, 375), 'math').scroll!)).toBe(369)
+  // Content wave 3 added Number Garden land 5 (`content-wave-3.md` § 1):
+  // L scrolls further (369 → 448 pt, measured 2026-10-18).
+  it('Number Garden scrolls less in L (448 pt content)', () => {
+    expect(Math.round(worst(vp(667, 375), 'math').scroll!)).toBe(448)
+  })
+
+  // Content wave 3 § 1 ("Map fit, not measured"): Number Garden's 5 lands
+  // were predicted to fit the portrait forms. Measured 2026-10-18: no
+  // portrait form scrolls, the sizes are the Word Song table's or larger,
+  // and the current stop's worst overhang is +0.8 pt at 820×1180 (the bar
+  // is 14).
+  it('Number Garden: 5 lands fit every portrait form; the current stop ends ≤ 14 pt below the pane', () => {
+    const overhangs: Record<string, number> = {}
+    for (const [name, v] of TABLE) {
+      const layout = mapScreenLayout(v)
+      if (layout.form !== 'P' && layout.form !== 'W') continue
+      let worstPt = -Infinity
+      for (let cur = 0; cur < MATH_TREE.length; cur++) {
+        const model = buildMapModel(seed(MATH_TREE, cur), 'math')
+        expect(model.lands).toHaveLength(5)
+        const k = mapPathScale(layout.pane, model, [], layout.landscape)
+        expect(k.scrolls).toBe(false)
+        const geo = layoutMap(model, k.virtualW, k.virtualH)
+        const at = geo.stops.find((x) => x.node === model.current)!
+        worstPt = Math.max(worstPt, (at.y + at.size / 2 - k.virtualH) * k.s)
+      }
+      overhangs[name] = Math.round(worstPt * 10) / 10
+    }
+    expect(Object.keys(overhangs)).toHaveLength(4)
+    for (const pt of Object.values(overhangs))
+      expect(pt).toBeLessThanOrEqual(14)
+    expect(overhangs['820×1180 (t24 b20)']).toBe(0.8)
   })
 
   it('Word Song scrolls on every form but tablet landscape (T6); Number Garden only in phone landscape', () => {

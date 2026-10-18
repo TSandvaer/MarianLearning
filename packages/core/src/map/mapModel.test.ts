@@ -58,9 +58,9 @@ function entry(d: number, node: SkillNode, rate: number): SessionHistoryEntry {
 }
 
 describe('buildMapModel', () => {
-  it('13 math stops in 4 lands, 20 word stops in 7 lands, tree order', () => {
+  it('14 math stops in 5 lands, 20 word stops in 7 lands, tree order', () => {
     const math = buildMapModel(seed(MATH_TREE, 0), 'math')
-    expect(math.lands.map((l) => l.stops.length)).toEqual([1, 4, 3, 5])
+    expect(math.lands.map((l) => l.stops.length)).toEqual([1, 4, 3, 5, 1])
     expect(stopsInOrder(math).map((s) => s.node)).toEqual([...MATH_TREE])
     const word = buildMapModel(seed(LITERACY_TREE, 0), 'word-song')
     expect(word.lands.map((l) => l.stops.length)).toEqual([2, 1, 5, 3, 2, 4, 3])
@@ -101,12 +101,19 @@ describe('buildMapModel', () => {
 
   it('gate open iff the land first step is not locked; land 1 always open', () => {
     const m = buildMapModel(seed(MATH_TREE, 4), 'math') // sub-to-20 current
-    expect(m.lands.map((l) => l.open)).toEqual([true, true, false, false])
+    expect(m.lands.map((l) => l.open)).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+    ])
     const p = seed(MATH_TREE, 5)
     expect(buildMapModel(p, 'math').lands.map((l) => l.open)).toEqual([
       true,
       true,
       true,
+      false,
       false,
     ])
   })
@@ -114,7 +121,7 @@ describe('buildMapModel', () => {
   it('whole world mastered: complete, Emma on the last step, no current state', () => {
     const m = buildMapModel(seed(MATH_TREE, -1), 'math')
     expect(m.complete).toBe(true)
-    expect(m.current).toBe('div-share')
+    expect(m.current).toBe('hundreds')
     expect(stopsInOrder(m).every((s) => s.state === 'mastered')).toBe(true)
   })
 

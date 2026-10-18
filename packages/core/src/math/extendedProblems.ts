@@ -35,6 +35,12 @@
  *    the answer is the share, total / plates (content wave 2 § 2.6). Only
  *    in the sharing step (`div-share`); there is no division sign on
  *    screen and no Leitner fact.
+ *  - place-value: `"Two hundreds, three tens and four ones. What number is
+ *    it?"` — the answer is the number the three places build (content wave
+ *    3 § 3.6). Only in the hundreds step (`hundreds`).
+ *  - more: `"Two hundred and forty-three. What is ten more?"` — the answer
+ *    is the number plus ten or one hundred (§ 3.6). Also only in hundreds.
+ *    Neither hundreds kind has a Leitner fact or an equation on screen.
  *
  * Answer chips
  * ------------
@@ -49,16 +55,20 @@ import type { MathFact } from '../progress/types'
 import type { MathProblem, MathProblemUtterances } from './sessionPlans'
 
 /**
- * The largest answer (and chip) an extended problem may have. A build
- * before content wave 3's G accepts recorded answers in 0..99 only
- * (`progress/guards.ts`, `perProblemAnswerValue`); one recorded 100 makes
- * the whole progress doc fail its guard and load as a fresh start. This
- * build's guard reads any whole number from 0 up, but the cap stays 99
- * until the hundreds PR (`design/native/content-wave-3.md` § 2, G4). So
- * the parser sends a problem whose answer is above this to the static
- * fallback, and the chip pickers never offer more.
+ * The largest answer (and chip) an extended problem may have: 999, the
+ * hundreds step's (`design/native/content-wave-3.md` § 2, G4). The progress
+ * guard reads any whole number from 0 up since G, which is on both devices
+ * before any build with hundreds (T5); a build before G accepted 0..99 only.
  */
-export const EXTENDED_ANSWER_MAX = 99
+export const EXTENDED_ANSWER_MAX = 999
+
+/**
+ * The two-digit kinds' cap (G4): skip counting and multiplication keep
+ * their answers and chips in 1..99, as before G (their track and groups are
+ * drawn for two digits), so a read above it still goes to the static
+ * fallback and their chips do not change.
+ */
+export const TWO_DIGIT_CHIP_MAX = 99
 
 /** The problem kinds of an {@link ExtendedMathSessionPlan}. */
 export type ExtendedMathProblemKind =
@@ -68,6 +78,8 @@ export type ExtendedMathProblemKind =
   | 'multiply'
   | 'missing-addend'
   | 'divide'
+  | 'place-value'
+  | 'more'
 
 /** An addition or subtraction problem in an extended plan: a
  *  {@link MathProblem}, tagged so the union can discriminate. Assignable to
@@ -177,6 +189,61 @@ export interface DivideProblem {
   utterances: MathProblemUtterances
 }
 
+/** Hundreds' digits (content wave 3 § 3.6, D8): every place 2..9, so no
+ *  zero and no "one hundred" until a deepening. */
+export const PLACE_DIGIT_MIN = 2
+export const PLACE_DIGIT_MAX = 9
+
+/** A place of a three-digit number, largest first. */
+export type PlacePart = 'hundreds' | 'tens' | 'ones'
+
+/** The places in place order (hundreds, tens, ones). */
+export const PLACE_PARTS: readonly PlacePart[] = ['hundreds', 'tens', 'ones']
+
+/**
+ * A place-value problem (content wave 3 § 3, NG-D): Emma builds a number
+ * from hundred-flats, ten-rods and one-cubes as she names each place; the
+ * child taps the number. e.g. "Two hundreds, three tens and four ones. What
+ * number is it?" → hundreds 2, tens 3, ones 4, correct 234. P5 names the
+ * places in Danish order ("Three hundreds, six ones and two tens.").
+ */
+export interface PlaceValueProblem {
+  kind: 'place-value'
+  /** 1-based position in the session (1..8). */
+  index: number
+  /** Each place's digit ({@link PLACE_DIGIT_MIN}..{@link PLACE_DIGIT_MAX}). */
+  hundreds: number
+  tens: number
+  ones: number
+  /** The places in the order the read names them, e.g. `['hundreds',
+   *  'ones', 'tens']`. */
+  spokenOrder: readonly PlacePart[]
+  /** `100 × hundreds + 10 × tens + ones`. */
+  correct: number
+  /** Pre-canned utterance lines, same slots as arithmetic problems. */
+  utterances: MathProblemUtterances
+}
+
+/**
+ * A "ten / one hundred more" problem (content wave 3 § 3, D10): Emma names
+ * a number shown in blocks and asks for ten or one hundred more. e.g. "Two
+ * hundred and forty-three. What is ten more?" → start 243, step 10,
+ * correct 253. No zero digit in `start` and no regrouping.
+ */
+export interface MoreProblem {
+  kind: 'more'
+  /** 1-based position in the session (1..8). */
+  index: number
+  /** The number read, three digits with no zero. */
+  start: number
+  /** Ten more or one hundred more. */
+  step: 10 | 100
+  /** `start + step`, at most {@link EXTENDED_ANSWER_MAX}. */
+  correct: number
+  /** Pre-canned utterance lines, same slots as arithmetic problems. */
+  utterances: MathProblemUtterances
+}
+
 /** One problem in an extended plan. Switch on `kind`. */
 export type ExtendedMathProblem =
   | ArithmeticProblem
@@ -185,6 +252,8 @@ export type ExtendedMathProblem =
   | MultiplyProblem
   | MissingAddendProblem
   | DivideProblem
+  | PlaceValueProblem
+  | MoreProblem
 
 /** A Math session plan with the extended problem kinds: exactly 8 problems. */
 export interface ExtendedMathSessionPlan {
@@ -233,14 +302,44 @@ export function isDivideProblem(
   return problem.kind === 'divide'
 }
 
+export function isPlaceValueProblem(
+  problem: ExtendedMathProblem,
+): problem is PlaceValueProblem {
+  return problem.kind === 'place-value'
+}
+
+export function isMoreProblem(
+  problem: ExtendedMathProblem,
+): problem is MoreProblem {
+  return problem.kind === 'more'
+}
+
+/** A hundreds problem: a place-value read or a ten / one hundred more. */
+export type HundredsProblem = PlaceValueProblem | MoreProblem
+
+export function isHundredsProblem(
+  problem: ExtendedMathProblem,
+): problem is HundredsProblem {
+  return problem.kind === 'place-value' || problem.kind === 'more'
+}
+
+/** The three digits of a number in 0..999, place order. */
+export function placeDigits(n: number): Record<PlacePart, number> {
+  return {
+    hundreds: Math.floor(n / 100) % 10,
+    tens: Math.floor(n / 10) % 10,
+    ones: n % 10,
+  }
+}
+
 /**
  * The Leitner fact a problem practises, or `null` for one that is not an
- * a/b fact (number recognition, skip counting, sharing). Arithmetic is `a ± b`;
+ * a/b fact (number recognition, skip counting, sharing, hundreds). Arithmetic is `a ± b`;
  * multiplication `A * B` in read order (`2*3` is not `3*2`); a missing
  * number is the bond it completes, `{ a: addendA, b: correct, op: '+' }`,
  * the key plain addition uses (content wave 1 K4). Sharing records none
- * (content wave 2 K6). One reading for the session end, the canon fact
- * table and the review picker.
+ * (content wave 2 K6), nor does hundreds (content wave 3 K7). One reading
+ * for the session end, the canon fact table and the review picker.
  */
 export function problemFact(
   problem: MathProblem | ExtendedMathProblem,
@@ -256,6 +355,8 @@ export function problemFact(
     case 'recognize':
     case 'skip-count':
     case 'divide':
+    case 'place-value':
+    case 'more':
       return null
   }
 }
