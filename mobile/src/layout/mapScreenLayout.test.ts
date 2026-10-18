@@ -161,10 +161,16 @@ describe('mapPathScale: the § 1 sizes table', () => {
     expect(overhangs['820×1180 (t24 b20)']).toBe(0.8)
   })
 
-  it('Word Song scrolls on every form but tablet landscape (T6); Number Garden only in phone landscape', () => {
-    for (const [, v] of TABLE) {
+  // Content wave 4 § 1 (T6, predicted by hand): with Word Song's 8th land
+  // the 1133×744 tablet landscape drops under MAP_MIN_SCALE and starts to
+  // scroll on the existing scroll path; 1180×820 still fits.
+  it('Word Song scrolls on every form but 1180×820 tablet landscape (T6, 8 lands); Number Garden only in phone landscape', () => {
+    for (const [name, v] of TABLE) {
       const w = worst(v, 'word-song')
-      expect(w.scroll !== null).toBe(w.form !== 'TL')
+      expect([name, w.scroll !== null]).toEqual([
+        name,
+        name !== '1180×820 (b20)',
+      ])
       const m = worst(v, 'math')
       expect(m.scroll !== null).toBe(m.form === 'L')
     }
@@ -175,7 +181,7 @@ describe('mapPathScale: the § 1 sizes table', () => {
     const layout = mapScreenLayout(vp(375, 667))
     const ws = buildMapModel(seed(LITERACY_TREE, 0), 'word-song')
     const ng = buildMapModel(seed(MATH_TREE, 0), 'math')
-    expect(ws.lands).toHaveLength(7)
+    expect(ws.lands).toHaveLength(8)
     const k = mapPathScale(layout.pane, ws, [], false)
     expect(k.scrolls).toBe(true)
     expect(k.s).toBeCloseTo(375 / 820)

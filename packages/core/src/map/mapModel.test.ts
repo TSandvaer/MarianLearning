@@ -58,12 +58,14 @@ function entry(d: number, node: SkillNode, rate: number): SessionHistoryEntry {
 }
 
 describe('buildMapModel', () => {
-  it('14 math stops in 5 lands, 20 word stops in 7 lands, tree order', () => {
+  it('14 math stops in 5 lands, 23 word stops in 8 lands, tree order', () => {
     const math = buildMapModel(seed(MATH_TREE, 0), 'math')
     expect(math.lands.map((l) => l.stops.length)).toEqual([1, 4, 3, 5, 1])
     expect(stopsInOrder(math).map((s) => s.node)).toEqual([...MATH_TREE])
     const word = buildMapModel(seed(LITERACY_TREE, 0), 'word-song')
-    expect(word.lands.map((l) => l.stops.length)).toEqual([2, 1, 5, 3, 2, 4, 3])
+    expect(word.lands.map((l) => l.stops.length)).toEqual([
+      2, 1, 5, 3, 2, 4, 3, 3,
+    ])
     expect(stopsInOrder(word).map((s) => s.node)).toEqual([...LITERACY_TREE])
   })
 

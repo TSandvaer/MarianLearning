@@ -103,6 +103,12 @@ export type WordSongNode =
   | 'fox-stories'
   | 'hen-stories'
   | 'bug-stories'
+  // Content wave 4 (design/native/content-wave-4.md § 3, § 4, § 6): land 8,
+  // "Words and stories". Vowel teams ee / ea and ar, then stories that mix
+  // who, what and where.
+  | 'bee-words'
+  | 'car-words'
+  | 'sheep-stories'
 
 export type SkillNode = NumberGardenNode | WordSongNode
 

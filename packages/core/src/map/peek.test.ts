@@ -54,14 +54,14 @@ describe('isPeekableStop (§ 6.1)', () => {
   })
 
   it('a complete world has none', () => {
-    const p = progressAtStep('bug-stories')
-    p.skillLevels['bug-stories'] = 'mastered'
+    const p = progressAtStep('sheep-stories')
+    p.skillLevels['sheep-stories'] = 'mastered'
     const model = buildMapModel(p, 'word-song')
     expect(model.complete).toBe(true)
     expect(stopsInOrder(model).filter((s) => isPeekableStop(model, s))).toEqual(
       [],
     )
-    expect(LITERACY_TREE.at(-1)).toBe('bug-stories')
+    expect(LITERACY_TREE.at(-1)).toBe('sheep-stories')
   })
 })
 

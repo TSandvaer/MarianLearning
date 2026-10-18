@@ -47,8 +47,15 @@ const BUG = 'bug-stories' as WordSongNode
 
 describe('the three story steps in the Word Song tree (§ 1, § 4.1)', () => {
   it('follow cake words, in both tree lists', () => {
-    expect(LITERACY_TREE.slice(-4)).toEqual(['cake-words', FOX, HEN, BUG])
-    expect(WORD_SONG_NODES_IN_ORDER.slice(-4)).toEqual([
+    // Content wave 4 appends land 8 after bug stories.
+    const at = LITERACY_TREE.indexOf('cake-words')
+    expect(LITERACY_TREE.slice(at, at + 4)).toEqual([
+      'cake-words',
+      FOX,
+      HEN,
+      BUG,
+    ])
+    expect(WORD_SONG_NODES_IN_ORDER.slice(at, at + 4)).toEqual([
       'cake-words',
       FOX,
       HEN,
@@ -57,13 +64,14 @@ describe('the three story steps in the Word Song tree (§ 1, § 4.1)', () => {
     expect(nextNode('word-song', 'cake-words')).toBe(FOX)
     expect(nextNode('word-song', FOX)).toBe(HEN)
     expect(nextNode('word-song', HEN)).toBe(BUG)
-    expect(nextNode('word-song', BUG)).toBeNull()
-    expect(STORY_NODES).toEqual([FOX, HEN, BUG])
+    expect(nextNode('word-song', BUG)).toBe('bee-words')
+    expect(STORY_NODES).toEqual([FOX, HEN, BUG, 'sheep-stories'])
   })
 
-  it('are land 7, Stories, of 7 Word Song lands; LANDS flattened equals both trees (AC 7)', () => {
+  it('are land 7, Stories, of the Word Song lands; LANDS flattened equals both trees (AC 7)', () => {
     const ws = LANDS.filter((l) => l.world === 'word-song')
-    expect(ws).toHaveLength(7)
+    // Content wave 4 adds land 8.
+    expect(ws).toHaveLength(8)
     expect(ws[6]).toEqual({
       world: 'word-song',
       number: 7,
@@ -119,11 +127,14 @@ describe('the story lines (§ 5.1, AC 7)', () => {
       text: 'Read the story.',
       src: '/assets/audio/path/guide-story-read.mp3',
     })
-    const words = GUIDANCE_LINES.filter((l) => l.kind === 'story-word')
+    // Wave 3's 54; content wave 4's 17 follow, rendered from "Word,".
+    const words = GUIDANCE_LINES.filter(
+      (l) => l.kind === 'story-word' && l.input === undefined,
+    )
     expect(words).toHaveLength(54)
     expect(words.reduce((n, l) => n + l.text.length, 0)).toBe(224)
     expect(words.map((l) => l.id)).toEqual(
-      STORY_WORDS.map((w) => `guide.story.word.${w}`),
+      STORY_WORDS.slice(0, 54).map((w) => `guide.story.word.${w}`),
     )
     expect(storyWordLine('fox')).toMatchObject({
       text: 'Fox.',
@@ -152,8 +163,8 @@ describe('the story lines (§ 5.1, AC 7)', () => {
     const g = GUIDANCE_LINES.filter(
       (l) =>
         l.kind === 'story-read' ||
-        l.kind === 'story-word' ||
-        STORY_NODES.some((n) => l.id.endsWith(`.${n}`)),
+        (l.kind === 'story-word' && l.input === undefined) ||
+        [FOX, HEN, BUG].some((n) => l.id.endsWith(`.${n}`)),
     )
     expect(g).toHaveLength(70)
     expect(g.reduce((n, l) => n + l.text.length, 0)).toBe(683)
@@ -280,6 +291,9 @@ describe('the warm-up never serves a story block (AC 6, D7)', () => {
     const levels = { ...seed.skillLevels } as SkillLevels
     for (const n of LITERACY_TREE) levels[n] = 'mastered'
     levels[BUG] = 'practicing'
+    // Land 8 (content wave 4) is still ahead of her.
+    for (const n of LITERACY_TREE.slice(LITERACY_TREE.indexOf(BUG) + 1))
+      levels[n] = 'locked'
     const p: Progress = { ...seed, skillLevels: levels, history: [] }
     const now = Date.parse('2026-10-17T10:00:00Z')
     for (let seedN = 0; seedN < 8; seedN++) {

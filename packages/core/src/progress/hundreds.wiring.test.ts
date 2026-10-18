@@ -83,7 +83,8 @@ describe('hundreds in the Number Garden tree (§ 1, § 3.1)', () => {
       name: 'Hundreds',
       nodes: [HUNDREDS],
     })
-    expect(LANDS.filter((l) => l.world === 'word-song')).toHaveLength(7)
+    // Content wave 4 adds Word Song land 8.
+    expect(LANDS.filter((l) => l.world === 'word-song')).toHaveLength(8)
     expect(LANDS.flatMap((l) => l.nodes)).toEqual([
       ...MATH_TREE,
       ...LITERACY_TREE,
@@ -170,8 +171,11 @@ describe('the hundreds lines (§ 5.1, AC 7)', () => {
     const p = PATH_IDS.map((id) => BAKED_PATH_LINES.find((l) => l.id === id))
     expect(p.every((l) => l !== undefined)).toBe(true)
     expect(p.reduce((n, l) => n + l!.text.length, 0)).toBe(228)
-    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
-    expect(PATH_LINES_AWAITING_RENDER).toEqual([])
+    // Hundreds' lines are rendered (content wave 4's Word Song lines
+    // await theirs).
+    for (const l of g)
+      expect(GUIDANCE_LINES_AWAITING_RENDER).not.toContain(l.id)
+    for (const l of p) expect(PATH_LINES_AWAITING_RENDER).not.toContain(l!.id)
   })
 })
 

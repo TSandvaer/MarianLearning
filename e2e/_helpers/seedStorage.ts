@@ -180,6 +180,10 @@ const DEFAULT_SKILL_LEVELS = {
   'fox-stories': 'locked',
   'hen-stories': 'locked',
   'bug-stories': 'locked',
+  // Content wave 4: land 8.
+  'bee-words': 'locked',
+  'car-words': 'locked',
+  'sheep-stories': 'locked',
 } as const
 
 export interface SeedSessionHistoryOptions {

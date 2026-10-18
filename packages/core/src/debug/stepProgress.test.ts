@@ -55,18 +55,18 @@ const treeOf = (w: MasteryTrack): readonly SkillNode[] =>
   w === 'math' ? MATH_TREE : LITERACY_TREE
 
 describe('the step list', () => {
-  it('covers every step of both trees, once, in tree order (14 + 20)', () => {
-    expect(CASES).toHaveLength(34)
+  it('covers every step of both trees, once, in tree order (14 + 23)', () => {
+    expect(CASES).toHaveLength(37)
     expect(QA_STEPS.map((s) => s.node)).toEqual([
       ...MATH_TREE,
       ...LITERACY_TREE,
     ])
     expect(QA_STEPS.filter((s) => s.world === 'math')).toHaveLength(14)
-    expect(QA_STEPS.filter((s) => s.world === 'word-song')).toHaveLength(20)
+    expect(QA_STEPS.filter((s) => s.world === 'word-song')).toHaveLength(23)
   })
 
   it('gives each step a distinct readable name and its position', () => {
-    expect(new Set(QA_STEPS.map((s) => s.name)).size).toBe(34)
+    expect(new Set(QA_STEPS.map((s) => s.name)).size).toBe(37)
     expect(QA_STEPS.find((s) => s.node === 'cvc-words-short-o')).toEqual({
       node: 'cvc-words-short-o',
       world: 'word-song',
@@ -100,10 +100,16 @@ describe('the step list', () => {
       position: 20,
       land: 7,
     })
+    // Content wave 4 § 1: bee words, car words, sheep stories, land 8.
+    expect(QA_STEPS.find((s) => s.node === 'sheep-stories')).toMatchObject({
+      position: 23,
+      name: 'Sheep stories',
+      land: 8,
+    })
   })
 
-  it('isStepNode accepts the 34 steps and nothing else', () => {
-    expect(QA_STEPS.filter((s) => isStepNode(s.node))).toHaveLength(34)
+  it('isStepNode accepts the 37 steps and nothing else', () => {
+    expect(QA_STEPS.filter((s) => isStepNode(s.node))).toHaveLength(37)
     expect(
       ['', 'digraphs', 'two-digit-addsub', 'banana'].filter(isStepNode),
     ).toEqual([])

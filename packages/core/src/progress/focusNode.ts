@@ -143,6 +143,9 @@ export const WORD_SONG_NODES_IN_ORDER: readonly WordSongNode[] = [
   'fox-stories',
   'hen-stories',
   'bug-stories',
+  'bee-words',
+  'car-words',
+  'sheep-stories',
 ]
 
 /**

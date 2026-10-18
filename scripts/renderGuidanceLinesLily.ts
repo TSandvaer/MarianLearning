@@ -5,8 +5,11 @@
  * Line list = `GUIDANCE_LINES` in src/lib/emmasPath/guidanceLines.ts,
  * written to each line's `src` under
  * public/assets/audio/path/. Same request + cache shape as
- * renderPathLinesLily.ts (no tier, cache key `lily|eleven_v4|<text>` in
- * tmp/revoice-cache/), de-duplicated on text, with at most 2 requests in
+ * renderPathLinesLily.ts (no tier, cache key `lily|eleven_v4|<input>` in
+ * tmp/revoice-cache/). The input is the line's `input` when it has one
+ * (content wave 4's one-word story clips go as "Word,", so Lily doesn't
+ * read them as abbreviations), else its caption `text`. De-duplicated on
+ * the input, with at most 2 requests in
  * flight so another job can keep one of the Starter plan's 3 slots. 429s
  * are retried by `synthesizeElevenLabs`' backoff.
  *
@@ -82,11 +85,12 @@ async function main() {
   })
   for (const t of RETAKES) rmSync(cachePath(t), { force: true })
 
-  const texts = [...new Set(GUIDANCE_LINES.map((l) => l.text))]
+  const inputOf = (l: (typeof GUIDANCE_LINES)[number]) => l.input ?? l.text
+  const texts = [...new Set(GUIDANCE_LINES.map(inputOf))]
   const todo = texts.filter((t) => !existsSync(cachePath(t)))
   const chars = todo.reduce((n, t) => n + t.length, 0)
   console.log(
-    `${GUIDANCE_LINES.length} guidance lines, ${texts.length} unique texts; ` +
+    `${GUIDANCE_LINES.length} guidance lines, ${texts.length} unique inputs; ` +
       `${todo.length} not cached (~${chars} characters to bill).`,
   )
   if (DRY) return
@@ -105,10 +109,11 @@ async function main() {
 
   const written = new Set<string>()
   const long: string[] = []
-  for (const { id, text, src } of GUIDANCE_LINES) {
+  for (const line of GUIDANCE_LINES) {
+    const { id, text, src } = line
     const out = join(ROOT, 'public', src)
     if (!written.has(src)) {
-      writeFileSync(out, await render(text))
+      writeFileSync(out, await render(inputOf(line)))
       written.add(src)
     }
     const s = durationSeconds(out)

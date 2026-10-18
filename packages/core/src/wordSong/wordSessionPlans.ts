@@ -38,7 +38,12 @@
  */
 
 import type { Utterance } from '../wire/types'
-import { TARGET_WORDS, getWordEntry, type WordEntry } from './wordPack'
+import {
+  TARGET_WORDS,
+  getWordEntry,
+  type TargetPairings,
+  type WordEntry,
+} from './wordPack'
 
 /** Wire-shape source row — one entry per problem × slot. Mirrors Math. */
 export interface WordSongUtteranceSource {
@@ -294,6 +299,14 @@ export interface WordSongProblem {
   story?: string
   storyId?: string
   question?: string
+  /**
+   * A big-words problem's own step row (content wave 4 § 5, K4), attached
+   * by the plan adapter from the step the plan or the block came from, so
+   * it holds through reviews and warm-ups. sheep and shark are also
+   * sh-step targets: a bee-words sheep deals bee words' chips, the sh
+   * step's sheep its matrix row. `undefined` = the by-word matrix.
+   */
+  chipRow?: TargetPairings
 }
 
 /** A full Word Song session plan — exactly 8 problems, all short-a CVC. */

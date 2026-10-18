@@ -52,6 +52,7 @@ import {
   TARGET_PAIRINGS_CROSSVOWEL,
   getWordEntry,
   isForbiddenPair,
+  type TargetPairings,
   type WordEntry,
 } from './wordPack'
 
@@ -92,6 +93,12 @@ export function pickTier(problemIndex: number): DistractorTier {
  */
 export interface PickDistractorsOptions {
   crossVowel?: boolean
+  /**
+   * The problem's own step row (content wave 4 § 5, K4): used instead of
+   * either matrix, with every check below unchanged. A bee-words sheep
+   * deals bee words' chips while the sh step keeps its matrix row.
+   */
+  row?: TargetPairings
 }
 
 /**
@@ -126,7 +133,7 @@ export function pickDistractors(
   const tier = pickTier(problemIndex)
   const useCrossVowel = options?.crossVowel === true
   const matrix = useCrossVowel ? TARGET_PAIRINGS_CROSSVOWEL : TARGET_PAIRINGS
-  const pairings = matrix[target.word]
+  const pairings = options?.row ?? matrix[target.word]
   if (!pairings) {
     throw new Error(
       `[wordDistractors] no pairing matrix entry for target "${target.word}" ` +

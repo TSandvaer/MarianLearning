@@ -355,6 +355,11 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'fox-stories',
   'hen-stories',
   'bug-stories',
+  // Content wave 4 (design/native/content-wave-4.md § 3, § 4, § 6): land 8.
+  // Written by scripts/spliceContentWave4Canon.ts.
+  'bee-words',
+  'car-words',
+  'sheep-stories',
 ]
 
 /**
@@ -386,6 +391,9 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
  *   `scripts/spliceContentWave3Canon.ts` from `LITTLE_STORIES`, NEVER
  *   Haiku-baked (the planner has no story prompt: a bake would write the
  *   blending-cv stub); their new lines are rendered the same way.
+ * - bee-words, car-words, sheep-stories (content wave 4 § 8.1): written by
+ *   `scripts/spliceContentWave4Canon.ts`, never Haiku-baked; rendered the
+ *   same way.
  *
  * The deliberate render runs `npx tsx scripts/generateSessionCanon.ts
  * --include-pending`; an existing file is still skipped without `--force`.
@@ -403,6 +411,9 @@ export const PENDING_CANON_NODES: ReadonlySet<string> = new Set([
   'fox-stories',
   'hen-stories',
   'bug-stories',
+  'bee-words',
+  'car-words',
+  'sheep-stories',
 ])
 
 /** The combos a run bakes: missing (or all, with `--force`), minus pending. */

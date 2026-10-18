@@ -9,7 +9,9 @@
  * it.
  *
  * - Duck words, "Two letters, one sound!": the word's last two cells (c k /
- *   n g) light together.
+ *   n g) light together. Bee and car words reuse the line and the cue
+ *   (`content-wave-4.md` § 3.3, § 4.3, D6): on bee and car, the team (e e /
+ *   a r).
  * - Crab words, "Read all the letters!": every cell lights, one after
  *   another from the left, `INTRO_STAGGER_MS` apart; with Reduce Motion
  *   they light at once.
@@ -33,6 +35,8 @@ type Pattern = 'ending-pair' | 'left-to-right'
 
 const PATTERNS: Readonly<Partial<Record<IntroGuideLineId, Pattern>>> = {
   'guide.session.intro.duck-words': 'ending-pair',
+  'guide.session.intro.bee-words': 'ending-pair',
+  'guide.session.intro.car-words': 'ending-pair',
   'guide.session.intro.crab-words': 'left-to-right',
   'guide.session.intro.tent-words': 'left-to-right',
 }

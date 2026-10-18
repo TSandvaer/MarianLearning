@@ -10,7 +10,8 @@
  * Per content type:
  * - CVC / sight words / simple sentences: core's `pickDistractors` (the
  *   curated gentle / trap matrix; `crossVowel` reads the cross-vowel
- *   matrix, uniform per session).
+ *   matrix, uniform per session), or the problem's own step row when it
+ *   carries one (`chipRow`, content wave 4 § 5).
  * - `letter-names`: two case-matched letters from the 52-glyph pool.
  * - `letter-sounds`: two letters from `LETTER_SOUNDS_POOL`.
  * - `little-story`: its `LITTLE_STORIES` row's two wrong chips (words of
@@ -51,7 +52,10 @@ export function buildWordChipOrder(
         ? pickLetterDistractors(problem.target, problem.index)
         : problem.contentType === 'letter-sounds'
           ? pickSoundDistractors(problem.target, problem.index)
-          : pickDistractors(problem.target, problem.index, { crossVowel })
+          : pickDistractors(problem.target, problem.index, {
+              crossVowel,
+              row: problem.chipRow,
+            })
   const values = [problem.target, d1, d2]
   const wordHash = problem.target.word
     .split('')
