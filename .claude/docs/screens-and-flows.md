@@ -206,6 +206,7 @@ Note: `mathFacts` is the 5th persisted per-problem field on `SessionHistoryEntry
 
 **Behaviour highlights**:
 
+- **Native (`mobile/`): Word Song mounts before its session is ready, so never freeze a session-derived decision at mount.** App mounts the screen on the session start's first snapshot (`mobile/src/session/wordSongSession.ts`, intro `null`), and the step intro, warm-ups and plan arrive later with the ready plan. A `useState(() => …)` initializer reading `sessionIntro`/plan props sees the empty snapshot and stays wrong for the whole session; read such props live. Incident: PR #599's story word-tap cue (`storyCueOn`) never showed on Thomas's iPhone after a QA jump (2026-10-17) and the jest harness mounted ready, so it passed. Cost: a failed device check, a fix commit (`870f910`) and an extra review. Tests for session-gated behaviour should mount before the session is ready (see `WordSong.stories.test.tsx`, "App mounts before the session start").
 - 8 CVC problems per session; current focus tier is `cvc-words` (short-a) with `cvc-words-short-o` shipping in PR #151-#155.
 - Read-line caption pattern: the on-screen line renders as `["Read", "the", "<word>."]` — all three words tick word-by-word. The picture renders alongside but is the meaning-anchor, not the chip target.
 - 3-chip picker (vs. Math's 4) — picture-grounded; the word text under each picture also reveals.
