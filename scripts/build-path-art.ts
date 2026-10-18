@@ -12,8 +12,10 @@
  * pixels are fully transparent — the run fails if one is not.
  *
  * Usage:
- *   yarn path-art <source-dir>
+ *   yarn path-art <source-dir> [id ...]
  *   e.g. yarn path-art ~/DEV/MarianLearning/design/emmas-path/redesign/assets
+ *   With ids, only those pieces are built (and only their PNGs are needed),
+ *   e.g. a content wave's new stops: yarn path-art ./clay hundreds land-ng-5
  *
  * sharp is a devDependency only; nothing here enters the app bundle.
  */
@@ -33,18 +35,30 @@ const ALPHA_FLOOR = 4
 
 const sourceDir = process.argv[2]
 if (!sourceDir || !existsSync(sourceDir)) {
-  console.error('Usage: yarn path-art <source-dir of transparent PNGs>')
+  console.error(
+    'Usage: yarn path-art <source-dir of transparent PNGs> [id ...]',
+  )
   process.exit(1)
 }
+const only = process.argv.slice(3)
+const unknown = only.filter(
+  (id) => !(PATH_ART_IDS as readonly string[]).includes(id),
+)
+if (unknown.length > 0) {
+  console.error(`Not in the manifest: ${unknown.join(', ')}`)
+  process.exit(1)
+}
+const ids =
+  only.length > 0
+    ? PATH_ART_IDS.filter((id) => only.includes(id))
+    : PATH_ART_IDS
 
 const outDir = join('public', PATH_ART_DIR)
 mkdirSync(outDir, { recursive: true })
 
 // Driven by the manifest, so stray files in the source dir (e.g. the uncut
 // ui-arch-closed-white.png) are ignored and a missing source fails loudly.
-const missing = PATH_ART_IDS.filter(
-  (id) => !existsSync(join(sourceDir, `${id}.png`)),
-)
+const missing = ids.filter((id) => !existsSync(join(sourceDir, `${id}.png`)))
 if (missing.length > 0) {
   console.error(`Missing source PNGs: ${missing.join(', ')}`)
   process.exit(1)
@@ -68,7 +82,7 @@ async function cornersTransparent(file: string): Promise<boolean> {
 }
 
 const totals: Record<number, number> = {}
-for (const id of PATH_ART_IDS) {
+for (const id of ids) {
   for (const size of PATH_ART_SIZES) {
     const outPath = join(outDir, `${id}-${size}.webp`)
     const { data, info: raw } = await sharp(join(sourceDir, `${id}.png`))
@@ -95,8 +109,6 @@ for (const id of PATH_ART_IDS) {
 
 const all = Object.values(totals).reduce((a, b) => a + b, 0)
 for (const size of PATH_ART_SIZES) {
-  console.log(`${size}px: ${PATH_ART_IDS.length} files, ${totals[size]} B`)
+  console.log(`${size}px: ${ids.length} files, ${totals[size]} B`)
 }
-console.log(
-  `total: ${PATH_ART_IDS.length * PATH_ART_SIZES.length} files, ${all} B`,
-)
+console.log(`total: ${ids.length * PATH_ART_SIZES.length} files, ${all} B`)

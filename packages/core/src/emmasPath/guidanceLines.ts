@@ -245,6 +245,8 @@ const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {
   'mult-mix': "Let's play all the groups!",
   // Number Garden land 4 (content wave 2 § 2.4, § 6.2; Thomas 2026-10-17).
   'div-share': "Let's share the flowers!",
+  // Number Garden land 5 (content wave 3 § 5.1; Thomas approved T2).
+  hundreds: 'Hundreds, tens and ones!',
   // Word Song land 6 (content wave 1 § 3.3, § 4.3).
   'duck-words': 'Two letters, one sound!',
   'crab-words': 'Read all the letters!',
@@ -283,9 +285,15 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: none.
+ * Now: content wave 3's hundreds lines (§ 5.1): its lead, peek and replay.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
+  'guide.session.peek-open.hundreds',
+  'guide.session.peek-close.hundreds',
+  'guide.session.intro.hundreds',
+  'guide.session.replay-open.hundreds',
+  'guide.session.replay-close.hundreds',
+]
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 

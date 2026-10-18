@@ -75,6 +75,8 @@ export const FRIENDLY_NODE_NAMES: Record<SkillNode, string> = {
   'mult-mix': 'counting in groups',
   // Content wave 2 § 1: the recap names the step itself.
   'div-share': 'sharing',
+  // Content wave 3 § 1 (T1, Thomas 2026-10-17): the recap names the step.
+  hundreds: 'hundreds',
 
   // ── Word Song (literacy) ──────────────────────────────────────────────
   'letter-names': 'your letters',
@@ -153,6 +155,8 @@ export const STAGE_SPOKEN_NAMES: Record<SkillNode, string> = {
   'mult-mix': 'all the groups',
   // Content wave 2 § 1 (K7, Thomas 2026-10-17).
   'div-share': 'sharing',
+  // Content wave 3 § 1 (T1, Thomas 2026-10-17).
+  hundreds: 'hundreds',
 
   // ── Word Song (literacy) ──────────────────────────────────────────────
   'letter-names': 'letter names',
@@ -205,6 +209,7 @@ export const STAGE_SPOKEN_NAME_VERBS: Record<SkillNode, 'is' | 'are'> = {
   'mult-6-9': 'are',
   'mult-mix': 'are',
   'div-share': 'is',
+  hundreds: 'are',
 
   // ── Word Song (literacy) ──────────────────────────────────────────────
   'letter-names': 'are',

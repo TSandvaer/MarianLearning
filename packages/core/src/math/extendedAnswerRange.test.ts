@@ -1,15 +1,13 @@
 /**
- * The extended kinds never record an answer an older build's progress
- * guard rejects.
+ * The two-digit kinds keep their answers and chips in 1..99.
  *
  * Builds before content wave 3's G accept `perProblemAnswerValue` entries
- * in 0..99 only; one recorded 100 makes the whole doc fail `isProgressV1`
- * there, and it loads as a fresh start (all progress lost). This build's
- * guard reads any whole number from 0 up, but writes nothing above 99 until
- * the hundreds PR raises the cap (`design/native/content-wave-3.md` § 2,
- * G4). The tapped chip is what gets recorded, so: a problem whose answer is
- * above 99 goes to the static fallback (the parser throws), and no chip is
- * above 99.
+ * in 0..99 only; G (on both devices before any hundreds build, T5) reads
+ * any whole number from 0 up, and the hundreds PR raises the extended cap
+ * to 999 (`design/native/content-wave-3.md` § 2, G4). Skip counting and
+ * multiplication move to `TWO_DIGIT_CHIP_MAX` (99) so nothing about them
+ * changes: a problem whose answer is above 99 still goes to the static
+ * fallback (the parser throws), and no chip of theirs is above 99.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defaultProgress, isProgressV1, loadProgress } from '../progress'
@@ -17,6 +15,7 @@ import { recordProgressOnSessionEnd } from '../sessionEnd/progressHistory'
 import { extendedDistractors, multiplyChipCeiling } from './extendedDistractors'
 import {
   EXTENDED_ANSWER_MAX,
+  TWO_DIGIT_CHIP_MAX,
   type ExtendedMathProblem,
 } from './extendedProblems'
 import {
@@ -40,8 +39,9 @@ function serverPlan(reads: readonly string[]) {
 }
 
 describe('answers above 99 go to the fallback', () => {
-  it('EXTENDED_ANSWER_MAX stays 99 until the hundreds PR', () => {
-    expect(EXTENDED_ANSWER_MAX).toBe(99)
+  it('G4: EXTENDED_ANSWER_MAX is 999 (hundreds); the two-digit cap stays 99', () => {
+    expect(EXTENDED_ANSWER_MAX).toBe(999)
+    expect(TWO_DIGIT_CHIP_MAX).toBe(99)
   })
 
   it.each([

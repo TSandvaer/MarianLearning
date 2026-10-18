@@ -59,6 +59,7 @@ const MATH = [
   'mult-6-9',
   'mult-mix',
   'div-share',
+  'hundreds',
 ] as const
 
 function mathLevels(current: number): Record<string, string> {

@@ -42,6 +42,7 @@ export const RECAP_FRIENDLY_NODE_NAMES: Record<string, string> = {
   'mult-6-9': 'counting in groups',
   'mult-mix': 'counting in groups',
   'div-share': 'sharing',
+  hundreds: 'hundreds',
   // Word Song (literacy)
   'letter-names': 'your letters',
   'letter-sounds': 'letter sounds',

@@ -1,14 +1,14 @@
 /**
- * Content wave 3's Word Song canon, the little stories: fox stories, hen
- * stories and bug stories (`design/native/content-wave-3.md` § 4.6, § 4.7,
- * § 5.1), written deterministically from `LITTLE_STORIES`.
+ * Content wave 3's canon, written deterministically: the little stories,
+ * fox stories, hen stories and bug stories (`design/native/content-wave-
+ * 3.md` § 4.6, § 4.7, § 5.1) from `LITTLE_STORIES`, and Number Garden's
+ * hundreds (§ 3.7) from `HUNDREDS_PLAN` (`hundredsCanonCheck.ts`).
  *
  * Why a splice, not a Haiku bake: every line is fixed by the spec (the
- * story, its question and its three answer lines), so a script writes it
- * exactly and spends no Anthropic credit, as `spliceContentWave2WordCanon.ts`
- * did for tent and cake words. The three steps are in `PENDING_CANON_NODES`,
- * so an ordinary bake never draws them. (Wave 3's hundreds step joins this
- * script in its own PR.)
+ * story, its question and its three answer lines; hundreds' § 3.7 table),
+ * so a script writes it exactly and spends no Anthropic credit, as
+ * `spliceContentWave2WordCanon.ts` did for tent and cake words. The four
+ * steps are in `PENDING_CANON_NODES`, so an ordinary bake never draws them.
  *
  * - The 8 problems per step, in `LITTLE_STORIES` order (§ 4.6's wire):
  *   `read` = the question, `correct` = "Yes! The fox!" / "Yes! In the
@@ -21,6 +21,13 @@
  * Before anything is written, `storyCanonViolations` holds the lines to the
  * table and the taught-words rule (D2) to the committed canon.
  *
+ * - Hundreds' 8 problems: `HUNDREDS_PLAN`'s lines, held to § 3.7's lint
+ *   (`hundredsCanonViolations`); `session.end.*`: every math file's lines
+ *   (taken from div-share's), with the recap "You worked on hundreds
+ *   today!". Math lines render with no tier, so a text any math canon file
+ *   already carries reuses those bytes (wave 2's rule): "Hmm... try
+ *   again?" and the session-end lines.
+ *
  * Audio: a text that a Word Song canon file already carries reuses those
  * bytes when its ElevenLabs request is the same (`renderElevenLabsText`
  * with that file's tier), as wave 2's splice: "Hmm... try again?" and the
@@ -32,6 +39,7 @@
  * Idempotent: a second run (also after the render) writes the same bytes.
  *
  * Run: npx tsx scripts/spliceContentWave3Canon.ts
+ * Then: npx tsx scripts/generateCanonMathFacts.ts
  */
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -48,7 +56,16 @@ import {
   type StoryNode,
 } from '@marian/core/wordSong/littleStories'
 import { renderElevenLabsText } from '../api/_tts_elevenlabs.js'
+import {
+  HUNDREDS_PLAN,
+  HUNDREDS_RECAP_FOCUS,
+  HUNDREDS_SLOTS,
+  hundredsCanonViolations,
+  hundredsLines,
+  hundredsRuleViolations,
+} from './hundredsCanonCheck.ts'
 import { tierFor } from './lilyCanonLib.ts'
+import { MATH_CANON_DIR } from './spliceContentWave1Canon.ts'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 export const WORD_CANON_DIR = join(
@@ -261,6 +278,73 @@ export function spliceStoryStep(
   }
 }
 
+/** Hundreds' canon file stem (`math/level-1/hundreds.json`). */
+export const HUNDREDS_FILE = 'hundreds'
+
+/** The math file whose `session.end.*` lines hundreds takes. */
+const MATH_SESSION_END_SOURCE = 'div-share'
+
+const readMathDoc = (stem: string): CanonDoc =>
+  JSON.parse(readFileSync(join(MATH_CANON_DIR, `${stem}.json`), 'utf8'))
+
+/** text → bytes over every math canon file (the first rendered copy). Math
+ *  lines render with no tier, so the same text is the same request. */
+function mathAudioIndex(): Map<string, string> {
+  const index = new Map<string, string>()
+  for (const f of readdirSync(MATH_CANON_DIR)
+    .filter((f) => f.endsWith('.json'))
+    .sort())
+    for (const u of readMathDoc(f.replace(/\.json$/, '')).utterances)
+      if (u.audio.base64 !== '' && !index.has(u.text))
+        index.set(u.text, u.audio.base64)
+  return index
+}
+
+/** The hundreds file's content (its plan, then its audio-bearing lines). */
+export function spliceHundreds(): CanonDoc {
+  const broken = hundredsRuleViolations(HUNDREDS_PLAN)
+  if (broken.length > 0)
+    throw new Error(`hundreds plan breaks § 3.7:\n  ${broken.join('\n  ')}`)
+  const audio = mathAudioIndex()
+  const line = (id: string, text: string): AudioLine => ({
+    id,
+    text,
+    audio: {
+      kind: 'inline',
+      base64: audio.get(text) ?? '',
+      mime: 'audio/mpeg',
+    },
+  })
+  const utterances: AudioLine[] = HUNDREDS_PLAN.flatMap((spec, i) => {
+    const lines = hundredsLines(spec)
+    return HUNDREDS_SLOTS.map((slot, k) =>
+      line(`math.p${i + 1}.${slot}`, lines[k]!),
+    )
+  })
+  for (const u of readMathDoc(MATH_SESSION_END_SOURCE).utterances) {
+    if (!u.id.startsWith('session.end.')) continue
+    utterances.push(
+      line(
+        u.id,
+        u.id === 'session.end.recap.focus' ? HUNDREDS_RECAP_FOCUS : u.text,
+      ),
+    )
+  }
+  const drift = hundredsCanonViolations(utterances)
+  if (drift.length > 0)
+    throw new Error(`hundreds splice drifted:\n  ${drift.join('\n  ')}`)
+  return {
+    ok: true,
+    kind: 'session-start',
+    plan: {
+      id: 'hundreds-level-1',
+      label: 'Hundreds — Level 1',
+      utterances: utterances.map(({ id, text }) => ({ id, text })),
+    },
+    utterances,
+  }
+}
+
 /** The file's distinct texts whose audio is not rendered yet, in order. */
 export function awaitingRender(doc: CanonDoc): string[] {
   return [
@@ -285,6 +369,17 @@ function main(): void {
     for (const t of waiting) console.log(`  ${t.length}\t${t}`)
   }
   console.log(`${LITTLE_STORIES.length} stories, ${seen.size} new texts`)
+  const hundreds = spliceHundreds()
+  writeFileSync(
+    join(MATH_CANON_DIR, `${HUNDREDS_FILE}.json`),
+    JSON.stringify(hundreds),
+  )
+  const waiting = awaitingRender(hundreds)
+  console.log(
+    `wrote ${HUNDREDS_FILE}; ${waiting.length} new texts awaiting their ` +
+      `render (${waiting.reduce((n, t) => n + t.length, 0)} characters):`,
+  )
+  for (const t of waiting) console.log(`  ${t.length}\t${t}`)
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

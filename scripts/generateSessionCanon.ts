@@ -133,6 +133,7 @@ import {
   bigWordsCanonViolations,
   isBigWordsStep,
 } from './bigWordsCanonCheck.ts'
+import { hundredsCanonViolations } from './hundredsCanonCheck.ts'
 import { shareCanonViolations } from './shareCanonCheck.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -252,6 +253,9 @@ const MATH_FOCUS_NODES: readonly string[] = [
   // Content wave 2 § 2.7: written by scripts/spliceContentWave2Canon.ts,
   // held to the spec by `shareCanonCheck.ts` below.
   'div-share',
+  // Content wave 3 § 3.7: written by scripts/spliceContentWave3Canon.ts,
+  // held to the spec by `hundredsCanonCheck.ts` below.
+  'hundreds',
 ]
 
 // Word-song first-class content modes — must match the
@@ -368,6 +372,10 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
  * - div-share (content wave 2 § 2.7): written by
  *   `scripts/spliceContentWave2Canon.ts` from the binding table, never
  *   Haiku-baked; its new lines are rendered the same way.
+ * - hundreds (content wave 3 § 3.7): written by
+ *   `scripts/spliceContentWave3Canon.ts` from the binding table, NEVER
+ *   Haiku-baked (the planner has no hundreds prompt); its new lines are
+ *   rendered the same way.
  * - duck-words, crab-words: a deliberate bake (Thomas OKs the credit use),
  *   held to the spec by `bigWordsCanonCheck.ts`, then the Lily render and
  *   the ear test. Their committed files are hand-checked.
@@ -387,6 +395,7 @@ export const PENDING_CANON_NODES: ReadonlySet<string> = new Set([
   'add-to-20',
   'mult-mix',
   'div-share',
+  'hundreds',
   'duck-words',
   'crab-words',
   'tent-words',
@@ -751,6 +760,20 @@ export async function bakeOne(
     if (drift.length > 0) {
       const message =
         `[sharing] div-share: ${drift.length} line(s) off the spec:\n` +
+        drift.map((d) => `  - ${d}`).join('\n')
+      if (lintWarn)
+        console.warn(`\n${message}\n(writing anyway: --lint-warn)\n`)
+      else throw new Error(message)
+    }
+  }
+
+  // Hundreds (content wave 3 § 3.7, binding): a bake must land the spec's
+  // 8 problems and lines exactly (with no hundreds prompt, it never does).
+  if (combo.track === 'math' && combo.focusNode === 'hundreds') {
+    const drift = hundredsCanonViolations(response.utterances)
+    if (drift.length > 0) {
+      const message =
+        `[hundreds] hundreds: ${drift.length} line(s) off the spec:\n` +
         drift.map((d) => `  - ${d}`).join('\n')
       if (lintWarn)
         console.warn(`\n${message}\n(writing anyway: --lint-warn)\n`)

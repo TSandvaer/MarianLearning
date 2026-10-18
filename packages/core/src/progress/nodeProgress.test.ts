@@ -62,7 +62,8 @@ describe('nodeProgress — basic fields', () => {
   it('last step of each tree unlocks nothing', () => {
     const p = build(levels())
     expect(nodeProgress(p, 'mult-mix').unlocksNext).toBe('div-share')
-    expect(nodeProgress(p, 'div-share').unlocksNext).toBeNull()
+    expect(nodeProgress(p, 'div-share').unlocksNext).toBe('hundreds')
+    expect(nodeProgress(p, 'hundreds').unlocksNext).toBeNull()
     expect(nodeProgress(p, 'crab-words').unlocksNext).toBe('tent-words')
     expect(nodeProgress(p, 'cake-words').unlocksNext).toBe('fox-stories')
     expect(nodeProgress(p, 'bug-stories').unlocksNext).toBeNull()

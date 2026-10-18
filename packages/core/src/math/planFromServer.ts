@@ -55,8 +55,10 @@
  * `{ extendedKinds: true }` also reads the number-recognition ("Tap the
  * seven."), skip-count ("Two, four, six, eight. What is next?"),
  * multiplication ("Two times three. How many?"), missing-number ("Seven
- * and what make ten?") and sharing ("Twelve flowers, three plates. How
- * many on each plate?") read lines and returns an
+ * and what make ten?"), sharing ("Twelve flowers, three plates. How
+ * many on each plate?") and hundreds ("Two hundreds, three tens and four
+ * ones. What number is it?", "Two hundred and forty-three. What is ten
+ * more?") read lines and returns an
  * `ExtendedMathSessionPlan` (see `extendedProblems.ts`). Without the option (the frozen web app's call) the
  * output is exactly what it was before: arithmetic only, and those read
  * lines throw.
@@ -74,8 +76,14 @@ import {
   DIVIDE_TOTAL_MAX,
   EXTENDED_ANSWER_MAX,
   MISSING_ADDEND_TOTAL_MAX,
+  PLACE_DIGIT_MAX,
+  PLACE_DIGIT_MIN,
+  PLACE_PARTS,
+  placeDigits,
+  TWO_DIGIT_CHIP_MAX,
   type ExtendedMathProblem,
   type ExtendedMathSessionPlan,
+  type PlacePart,
 } from './extendedProblems'
 import {
   type MathProblem,
@@ -180,12 +188,27 @@ const NUMBER_WORDS: Record<string, number> = {
  *  [1, 9] check rejects nonsense like "thirty-eleven" or "thirty-twenty"
  *  rather than silently accepting them.
  *
+ *  Hundreds (content wave 3 § 3.6, British): "<one…nine> hundred",
+ *  optionally followed by "and <1…99>" ("two hundred and forty-three" →
+ *  243). Only the hundreds read passes a multi-word phrase; every other
+ *  template captures one token.
+ *
  *  Inputs are expected to be lowercased — callers in this file pass
  *  `.toLowerCase()` before lookup. */
 export function wordToNumber(word: string): number | undefined {
   // Single-token form first — covers 0..20 and the round decades.
   const direct = NUMBER_WORDS[word]
   if (direct !== undefined) return direct
+
+  const hundreds = /^([a-z]+) hundred(?: and ([a-z-]+))?$/.exec(word)
+  if (hundreds) {
+    const digit = NUMBER_WORDS[hundreds[1]!]
+    if (digit === undefined || digit < 1 || digit > 9) return undefined
+    if (hundreds[2] === undefined) return digit * 100
+    const rest = wordToNumber(hundreds[2])
+    if (rest === undefined || rest < 1 || rest > 99) return undefined
+    return digit * 100 + rest
+  }
 
   // Compositional decade-units form: "thirty-one", "ninety-nine", …
   const dashIdx = word.indexOf('-')
@@ -203,6 +226,23 @@ export function wordToNumber(word: string): number | undefined {
   if (decade < 20 || decade > 90 || decade % 10 !== 0) return undefined
   if (unit < 1 || unit > 9) return undefined
   return decade + unit
+}
+
+const NUMBER_NAMES: readonly string[] = Object.keys(NUMBER_WORDS)
+
+/** The English (British) words for a whole number in 0..999, lower case:
+ *  `234` → "two hundred and thirty-four", `300` → "three hundred". The
+ *  inverse of {@link wordToNumber} on that range. */
+export function numberToWords(n: number): string {
+  if (!Number.isInteger(n) || n < 0 || n > 999) {
+    throw new RangeError(`numberToWords covers 0..999, got ${n}`)
+  }
+  const name = (v: number) => NUMBER_NAMES.find((w) => NUMBER_WORDS[w] === v)!
+  const belowHundred = (v: number): string =>
+    v <= 20 || v % 10 === 0 ? name(v) : `${name(v - (v % 10))}-${name(v % 10)}`
+  if (n < 100) return belowHundred(n)
+  const head = `${name(Math.floor(n / 100))} hundred`
+  return n % 100 === 0 ? head : `${head} and ${belowHundred(n % 100)}`
 }
 
 /** Flat plan shape returned by /api/claude — mirrors `PlannerPlan` in
@@ -414,8 +454,9 @@ function arithmeticProblem(
 
 /** One problem of an extended plan, dispatched on the read line's template.
  *  The templates are disjoint ("Tap the", comma list + "What is next?",
- *  "and what make", "plates", "times", "plus" / "minus" / "take away"), so
- *  the order only decides which error a near-miss gets. */
+ *  "and what make", "plates", "What number is it?", "more?", "times",
+ *  "plus" / "minus" / "take away"), so the order only decides which error a
+ *  near-miss gets. */
 function extendedProblemFromRead(
   index: number,
   utterances: MathProblemUtterances,
@@ -444,6 +485,14 @@ function extendedProblemFromRead(
   if (divide) {
     return { kind: 'divide', index, ...divide, utterances }
   }
+  const placeValue = matchPlaceValueRead(read)
+  if (placeValue) {
+    return { kind: 'place-value', index, ...placeValue, utterances }
+  }
+  const more = matchMoreRead(read)
+  if (more) {
+    return { kind: 'more', index, ...more, utterances }
+  }
   const multiply = matchMultiplyRead(read)
   if (multiply) {
     assertRecordableAnswer(read, multiply.factorA * multiply.factorB)
@@ -470,7 +519,9 @@ function extendedProblemFromRead(
       `How many are left?"; number recognition "Tap the <W>."; skip-count ` +
       `"<W>, <W>, <W>. What is next?"; multiplication "<W> times <W>. How ` +
       `many?"; missing number "<W> and what make <W>?"; sharing "<W> ` +
-      `flowers, <W> plates. How many on each plate?")`,
+      `flowers, <W> plates. How many on each plate?"; hundreds "<W> ` +
+      `<place>, <W> <place> and <W> <place>. What number is it?" or "<W>. ` +
+      `What is ten more?" / "What is one hundred more?")`,
   )
 }
 
@@ -708,6 +759,145 @@ function matchDivideRead(
   return { total, plates, correct: share }
 }
 
+/** Extract the digits and the number from a place-value `read` line
+ *  (content wave 3 § 3.6).
+ *
+ *  Template (canon): `"<D> <place>, <D> <place> and <D> <place>. What
+ *  number is it?"`, where each place (hundreds, tens, ones) comes once, in
+ *  any order, e.g. `"Two hundreds, three tens and four ones. What number is
+ *  it?"` → 2, 3, 4, correct 234, or P5's `"Three hundreds, six ones and two
+ *  tens. …"` (spoken order hundreds, ones, tens) → 326. Every digit is
+ *  {@link PLACE_DIGIT_MIN}..{@link PLACE_DIGIT_MAX} (D8: no zero, no one).
+ *  Case-insensitive; throws on any drift. Disjoint from every other
+ *  template (none ends "What number is it?").
+ *
+ *  Opt-in kind: only `mathSessionPlanFromServer(plan, { extendedKinds: true
+ *  })` reads this template. */
+export function parsePlaceValueRead(read: string): {
+  hundreds: number
+  tens: number
+  ones: number
+  spokenOrder: PlacePart[]
+  correct: number
+} {
+  const placeValue = matchPlaceValueRead(read)
+  if (placeValue) return placeValue
+  throw new PlanFromServerError(
+    `math read line "${read}" did not match the place-value read template ` +
+      `"<W> <place>, <W> <place> and <W> <place>. What number is it?"`,
+  )
+}
+
+/** {@link parsePlaceValueRead}'s template: `null` on a miss; throws on an
+ *  unknown number word, a place named twice or a digit outside 2..9. */
+function matchPlaceValueRead(read: string): {
+  hundreds: number
+  tens: number
+  ones: number
+  spokenOrder: PlacePart[]
+  correct: number
+} | null {
+  const match = read.match(
+    /^\s*([a-z]+)\s+(hundreds|tens|ones),\s+([a-z]+)\s+(hundreds|tens|ones)\s+and\s+([a-z]+)\s+(hundreds|tens|ones)\s*\.\s*what\s+number\s+is\s+it\s*\?\s*$/i,
+  )
+  if (!match) return null
+  const digits: Partial<Record<PlacePart, number>> = {}
+  const spokenOrder: PlacePart[] = []
+  for (const k of [1, 3, 5]) {
+    const digit = wordToNumber(match[k]!.toLowerCase())
+    const place = match[k + 1]!.toLowerCase() as PlacePart
+    if (digit === undefined) {
+      throw new PlanFromServerError(
+        `math read line "${read}" had unrecognised number word(s)`,
+      )
+    }
+    if (digits[place] !== undefined) {
+      throw new PlanFromServerError(
+        `math read line "${read}" names the ${place} twice`,
+      )
+    }
+    if (digit < PLACE_DIGIT_MIN || digit > PLACE_DIGIT_MAX) {
+      throw new PlanFromServerError(
+        `math read line "${read}" has ${digit} ${place}; hundreds builds ` +
+          `every place from ${PLACE_DIGIT_MIN} to ${PLACE_DIGIT_MAX}`,
+      )
+    }
+    digits[place] = digit
+    spokenOrder.push(place)
+  }
+  const [hundreds, tens, ones] = PLACE_PARTS.map((p) => digits[p]!) as [
+    number,
+    number,
+    number,
+  ]
+  return {
+    hundreds,
+    tens,
+    ones,
+    spokenOrder,
+    correct: 100 * hundreds + 10 * tens + ones,
+  }
+}
+
+/** Extract the start, the step and the answer from a "ten / one hundred
+ *  more" `read` line (content wave 3 § 3.6).
+ *
+ *  Template (canon): `"<number>. What is ten more?"` or `"<number>. What is
+ *  one hundred more?"`, the number in British words, e.g. `"Two hundred and
+ *  forty-three. What is ten more?"` → start 243, step 10, correct 253.
+ *  Valid when the start has three digits and no zero, nothing regroups
+ *  (tens ≤ 8 for +10, hundreds ≤ 8 for +100) and the answer is at most
+ *  {@link EXTENDED_ANSWER_MAX}. Case-insensitive; throws on any drift.
+ *  Disjoint from every other template (none ends "more?").
+ *
+ *  Opt-in kind: only `mathSessionPlanFromServer(plan, { extendedKinds: true
+ *  })` reads this template. */
+export function parseMoreRead(read: string): {
+  start: number
+  step: 10 | 100
+  correct: number
+} {
+  const more = matchMoreRead(read)
+  if (more) return more
+  throw new PlanFromServerError(
+    `math read line "${read}" did not match the more read template ` +
+      `"<W>. What is ten more?" / "<W>. What is one hundred more?"`,
+  )
+}
+
+/** {@link parseMoreRead}'s template: `null` on a miss; throws on an unknown
+ *  number or a start the step can't take without a zero or a regroup. */
+function matchMoreRead(
+  read: string,
+): { start: number; step: 10 | 100; correct: number } | null {
+  const match = read.match(
+    /^\s*([a-z][a-z -]*?)\s*\.\s*what\s+is\s+(ten|one\s+hundred)\s+more\s*\?\s*$/i,
+  )
+  if (!match) return null
+  const start = wordToNumber(match[1]!.toLowerCase().replace(/\s+/g, ' '))
+  if (start === undefined) {
+    throw new PlanFromServerError(
+      `math read line "${read}" had unrecognised number word(s)`,
+    )
+  }
+  const step: 10 | 100 = /^ten$/i.test(match[2]!) ? 10 : 100
+  const d = placeDigits(start)
+  const regroups = step === 10 ? d.tens > 8 : d.hundreds > 8
+  if (
+    start < 100 ||
+    d.tens === 0 ||
+    d.ones === 0 ||
+    regroups ||
+    start + step > EXTENDED_ANSWER_MAX
+  ) {
+    throw new PlanFromServerError(
+      `math read line "${read}" asks for ${step} more than ${start}; ` +
+        `hundreds needs three digits with no zero and no regrouping`,
+    )
+  }
+  return { start, step, correct: start + step }
+}
+
 /** {@link parseMissingAddendRead}'s template: `null` on a miss; throws on an
  *  unknown number word or a pair outside 1 ≤ A < T ≤ 20. */
 function matchMissingAddendRead(
@@ -791,15 +981,15 @@ function matchSkipCountRead(
   return { sequence, step, next }
 }
 
-/** Throws when an extended problem's answer can't be recorded: an older
- *  build's progress guard holds answers up to {@link EXTENDED_ANSWER_MAX}
- *  (99), and the session falls back rather than lose the progress doc. */
+/** Throws when a skip-count or multiplication answer is above
+ *  {@link TWO_DIGIT_CHIP_MAX} (99): their chips, track and groups are drawn
+ *  for two digits (content wave 3 § 2, G4), so the session falls back. */
 function assertRecordableAnswer(read: string, answer: number): void {
-  if (answer > EXTENDED_ANSWER_MAX) {
+  if (answer > TWO_DIGIT_CHIP_MAX) {
     throw new PlanFromServerError(
       `math read line "${read}" has the answer ${answer}, above ` +
-        `${EXTENDED_ANSWER_MAX} (the progress record holds answers up to ` +
-        `${EXTENDED_ANSWER_MAX})`,
+        `${TWO_DIGIT_CHIP_MAX} (skip counting and multiplication answer ` +
+        `up to ${TWO_DIGIT_CHIP_MAX})`,
     )
   }
 }

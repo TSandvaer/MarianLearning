@@ -164,8 +164,11 @@ describe('the story lines (§ 5.1, AC 7)', () => {
     )
     expect(p).toHaveLength(18)
     expect(p.reduce((n, l) => n + l.text.length, 0)).toBe(614)
-    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
-    expect(PATH_LINES_AWAITING_RENDER).toEqual([])
+    // None of the story lines awaits a render (hundreds' do, its PR).
+    for (const l of [...g, ...p]) {
+      expect(GUIDANCE_LINES_AWAITING_RENDER).not.toContain(l.id)
+      expect(PATH_LINES_AWAITING_RENDER).not.toContain(l.id)
+    }
   })
 
   it('the path lines name the land and the steps', () => {
