@@ -146,7 +146,7 @@ describe('the more-and-less lines (§ 8.1, AC 8)', () => {
     )
   })
 
-  it('5 guidance lines and 5 path lines (143 / 188 characters), awaiting their Lily render', () => {
+  it('5 guidance lines and 5 path lines (143 / 188 characters), rendered in Lily', () => {
     expect(GUIDANCE.reduce((n, [, t]) => n + t.length, 0)).toBe(143)
     expect(
       GUIDANCE_LINES.filter((l) => l.id.endsWith('.hundreds-addsub')),
@@ -157,11 +157,10 @@ describe('the more-and-less lines (§ 8.1, AC 8)', () => {
       ),
     ).toEqual(PATH.map(([id]) => id))
     expect(PATH.reduce((n, [, t]) => n + t.length, 0)).toBe(188)
-    // Before the render: listed (the players walk the captions silently).
-    // The render commit removes them from both lists.
     for (const [id] of GUIDANCE)
-      expect(GUIDANCE_LINES_AWAITING_RENDER).toContain(id)
-    for (const [id] of PATH) expect(PATH_LINES_AWAITING_RENDER).toContain(id)
+      expect(GUIDANCE_LINES_AWAITING_RENDER).not.toContain(id)
+    for (const [id] of PATH)
+      expect(PATH_LINES_AWAITING_RENDER).not.toContain(id)
   })
 
   it("land 5's lines are unchanged: it is not new", () => {

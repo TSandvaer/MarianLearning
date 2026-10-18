@@ -100,16 +100,12 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     )
     expect(Math.max(...[...open, ...close].map((l) => l.text.length))).toBe(45)
     // Rendered in Lily, the story steps' 6 and hundreds' pair too (content
-    // wave 3 § 5.1); more and less's pair awaits its render (content wave 4
-    // § 8.1).
+    // wave 3 § 5.1), and more and less's pair (content wave 4 § 8.1).
     expect(
-      [...open, ...close]
-        .filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id))
-        .map((l) => l.id),
-    ).toEqual([
-      'guide.session.replay-open.hundreds-addsub',
-      'guide.session.replay-close.hundreds-addsub',
-    ])
+      [...open, ...close].filter((l) =>
+        GUIDANCE_LINES_AWAITING_RENDER.includes(l.id),
+      ),
+    ).toEqual([])
   })
 
   it('bakes each world and count variant', () => {
