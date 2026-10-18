@@ -498,11 +498,12 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
       .evaluate((n) => getComputedStyle(n).filter)
     expect(frost).toContain('saturate(0.2)')
     expect(frost).toContain('opacity(0.62)')
-    // Gates: 2 and 3 open (first step not locked), 4 closed. The closed
-    // arch art carries its own padlock: nothing is overlaid on a gate.
+    // Gates: 2 and 3 open (first step not locked), 4 and 5 closed. The
+    // closed arch art carries its own padlock: nothing is overlaid on a gate.
     await expect(gate(page, 2)).toHaveAttribute('data-open', 'true')
     await expect(gate(page, 3)).toHaveAttribute('data-open', 'true')
     await expect(gate(page, 4)).toHaveAttribute('data-open', 'false')
+    await expect(gate(page, 5)).toHaveAttribute('data-open', 'false')
     await expect(
       gate(page, 2).locator('img[data-art="ui-arch-open"]'),
     ).toHaveCount(1)
@@ -520,9 +521,10 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     const firstAhead = stones.indexOf('false')
     expect(firstAhead).toBeGreaterThan(0)
     expect(stones.slice(firstAhead).every((w) => w === 'false')).toBe(true)
-    // Land pills with their numbers (showLevelToMarian on).
-    await expect(page.getByTestId('map-land-pill')).toHaveCount(4)
-    await expect(page.getByTestId('map-land-number')).toHaveCount(4)
+    // Land pills with their numbers (showLevelToMarian on): 5 since
+    // hundreds (content wave 3).
+    await expect(page.getByTestId('map-land-pill')).toHaveCount(5)
+    await expect(page.getByTestId('map-land-number')).toHaveCount(5)
     await expectArtLoaded(page)
     await page.screenshot({ path: `${SHOTS}/map-math-mid-tree.png` })
 
