@@ -176,9 +176,10 @@ describe.each([
       const rows = BIG_WORDS_STEPS[`${word}-words` as BigWordsStep]
       for (let i = 0; i < 8; i++) {
         const row = rows[i]!
-        expect(chipWords(), row.word).toEqual(
+        expect([row.word, chipWords()]).toEqual([
+          row.word,
           [row.word, ...(i < 3 ? row.gentle : row.trap)].sort(),
-        )
+        ])
         await answerRight(h, plan, i)
       }
       expect(guide.lines.map((l) => l.id)).toEqual([intro])

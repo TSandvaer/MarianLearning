@@ -221,6 +221,28 @@ describe('the Map replay (map-tap-to-play § 3)', () => {
     })
   })
 
+  it("a bee-words replay deals bee words' own chip rows (content wave 4 § 5)", () => {
+    const replay = replayPlanFromServer(
+      'word-song',
+      replayOf('word-song', 'bee-words'),
+      'bee-words',
+    )
+    if (replay.world !== 'word-song') throw new Error('a Word Song replay')
+    expect(replay.plan.problems[3]!.target.word).toBe('sheep')
+    expect(replay.plan.problems[3]!.chipRow?.trap).toEqual(['ship', 'jeep'])
+    const peek = peekPlanFromServer(
+      'word-song',
+      peekOf('word-song', 'car-words'),
+      'car-words',
+    )
+    if (peek.world !== 'word-song') throw new Error('a Word Song peek')
+    expect(peek.plan.problems.map((p) => p.chipRow?.gentle)).toEqual([
+      ['dog', 'pen'],
+      ['hen', 'cup'],
+      ['fox', 'pen'],
+    ])
+  })
+
   it('accepts only a replay- plan of exactly 8 readable problems', () => {
     expect(
       replayPlanFromServer('math', replayOf('math', 'add-to-10')).plan.problems,
