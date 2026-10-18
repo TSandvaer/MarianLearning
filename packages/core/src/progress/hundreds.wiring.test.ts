@@ -161,19 +161,17 @@ describe('the hundreds lines (§ 5.1, AC 7)', () => {
     ])
   })
 
-  it('5 guidance lines and 8 path lines (133 / 228 characters) await their Lily render', () => {
+  it('5 guidance lines and 8 path lines (133 / 228 characters), rendered in Lily', () => {
     const g = GUIDANCE_IDS.map((id) => guidanceLine(id)!)
     expect(g.reduce((n, l) => n + l.text.length, 0)).toBe(133)
     expect(
       GUIDANCE_LINES.filter((l) => l.id.endsWith('.hundreds')),
     ).toHaveLength(5)
-    expect([...GUIDANCE_LINES_AWAITING_RENDER].sort()).toEqual(
-      [...GUIDANCE_IDS].sort(),
-    )
     const p = PATH_IDS.map((id) => BAKED_PATH_LINES.find((l) => l.id === id))
     expect(p.every((l) => l !== undefined)).toBe(true)
     expect(p.reduce((n, l) => n + l!.text.length, 0)).toBe(228)
-    expect([...PATH_LINES_AWAITING_RENDER].sort()).toEqual([...PATH_IDS].sort())
+    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
+    expect(PATH_LINES_AWAITING_RENDER).toEqual([])
   })
 })
 

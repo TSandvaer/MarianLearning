@@ -14,8 +14,8 @@
  *   render; "Hmm... try again?" and the session-end lines keep their bytes.
  * - The step is pending (never Haiku-baked) and voice-QA lists it.
  *
- * The 32 new texts have empty audio until their Lily render
- * (`npx tsx scripts/revoiceCanonLily.ts --unrendered`); that red lives in
+ * The 32 new texts had empty audio until their Lily render
+ * (`npx tsx scripts/revoiceCanonLily.ts --unrendered`); that red lived in
  * `canonIntegrity.test.ts` (a), which has no exemption by design.
  */
 import { readFileSync } from 'node:fs'
@@ -155,15 +155,29 @@ describe('hundreds.json (§ 3.7, AC 3)', () => {
     )
   })
 
-  it('leaves § 5.1’s 32 texts (1,190 characters) for the Lily render; the rest keep their bytes', () => {
+  it('leaves § 5.1’s 32 texts (1,190 characters) for the Lily render, none after it; the rest keep their bytes', () => {
+    const newTexts = [
+      ...new Set(
+        doc.utterances
+          .filter(
+            (u) =>
+              !u.id.endsWith('.reprompt') &&
+              (!u.id.startsWith('session.end.') ||
+                u.id === 'session.end.recap.focus'),
+          )
+          .map((u) => u.text),
+      ),
+    ]
+    expect(newTexts).toHaveLength(32)
+    expect(newTexts.reduce((n, t) => n + t.length, 0)).toBe(1190)
+    expect(newTexts).toContain(HUNDREDS_RECAP_FOCUS)
+    // Before the render: exactly these. After it: none.
     const waiting = awaitingRender(doc)
-    expect(waiting).toHaveLength(32)
-    expect(waiting.reduce((n, t) => n + t.length, 0)).toBe(1190)
+    expect(waiting).toEqual(waiting.length > 0 ? newTexts : [])
     const audio = (t: string) =>
       doc.utterances.find((u) => u.text === t)!.audio.base64
     expect(audio('Hmm... try again?')).not.toBe('')
     expect(audio('You did it!')).not.toBe('')
-    expect(waiting).toContain(HUNDREDS_RECAP_FOCUS)
   })
 })
 

@@ -193,8 +193,8 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
     // empties `PATH_LINES_AWAITING_RENDER`.
     expect(missing.sort()).toEqual([...PATH_LINES_AWAITING_RENDER].sort())
     // Content wave 2's tent and cake lines (§ 6.2) and content wave 3's 18
-    // story lines (§ 5.1) are rendered in Lily; hundreds' 8 await theirs.
-    expect(PATH_LINES_AWAITING_RENDER).toHaveLength(8)
+    // story lines and hundreds' 8 (§ 5.1) are rendered in Lily.
+    expect(PATH_LINES_AWAITING_RENDER).toEqual([])
   })
 
   it('stays inside the spec §4.5 vocabulary', () => {

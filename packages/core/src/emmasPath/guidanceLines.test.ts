@@ -99,16 +99,13 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       "Let's play groups of two, five and ten again!",
     )
     expect(Math.max(...[...open, ...close].map((l) => l.text.length))).toBe(45)
-    // Rendered in Lily, the story steps' 6 too (content wave 3 § 5.1); only
-    // hundreds' pair awaits its render.
+    // Rendered in Lily, the story steps' 6 and hundreds' pair too (content
+    // wave 3 § 5.1).
     expect(
-      [...open, ...close]
-        .filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id))
-        .map((l) => l.id),
-    ).toEqual([
-      'guide.session.replay-open.hundreds',
-      'guide.session.replay-close.hundreds',
-    ])
+      [...open, ...close].filter((l) =>
+        GUIDANCE_LINES_AWAITING_RENDER.includes(l.id),
+      ),
+    ).toEqual([])
   })
 
   it('bakes each world and count variant', () => {
