@@ -110,10 +110,9 @@ describe('native asset registry', () => {
   })
 
   // Content wave 4 (content-wave-4.md § 9.1, AC 4): the 16 bee and car
-  // words and ship draw as pictures. Until Thomas picks the 17 pictures
-  // (branch kevin/wave4-pictures) a missing one draws its problem as
-  // written words, the shipped fallback; enable this when they are merged.
-  it.skip('has a picture for every bee-words and car-words word and ship (AC 4)', () => {
+  // words and ship draw as pictures (Thomas's 17 picks; a missing one
+  // would draw its problem as written words, the shipped fallback).
+  it('has a picture for every bee-words and car-words word and ship (AC 4)', () => {
     const keys = [
       ...(['bee-words', 'car-words'] as const).flatMap((step) =>
         BIG_WORDS_STEPS[step].map((r) => r.word),
