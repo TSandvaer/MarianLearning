@@ -2,7 +2,8 @@
  * Math's inline vector glyphs, drawn exactly as the web's inline SVGs in
  * `src/screens/Math/Math.tsx` (`SparkleGlyph`, `FlowerGlyph`, the back
  * chevron) and `DotCardCell.tsx` / `TenFrameCell.tsx`; plus the native
- * `BudGlyph` (content wave 1 § 1.4).
+ * `BudGlyph` (content wave 1 § 1.4) and hundreds' blocks, `CubeGlyph`,
+ * `RodGlyph` and `FlatGlyph` (content wave 3 § 3.2).
  */
 import Svg, { Circle, Path, Rect } from 'react-native-svg'
 import { colors } from '../../theme'
@@ -211,4 +212,55 @@ export function TenFrameCell({
       ))}
     </Svg>
   )
+}
+
+/** Hundreds' blocks (content wave 3 § 3.2): a pink fill, a 1.5 pt rose
+ *  outline and a 1 pt grid, `cols` × `rows` cells of `u` each. Exact
+ *  counts: a rod has 10 cells, a flat 10 × 10. */
+function BlockGlyph({
+  u,
+  cols,
+  rows,
+}: {
+  u: number
+  cols: number
+  rows: number
+}) {
+  const w = cols * u
+  const h = rows * u
+  const grid: string[] = []
+  for (let c = 1; c < cols; c++) grid.push(`M${c * u} 0 V${h}`)
+  for (let r = 1; r < rows; r++) grid.push(`M0 ${r * u} H${w}`)
+  return (
+    <Svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+      <Rect x={0} y={0} width={w} height={h} fill={colors.myPink} />
+      {grid.length > 0 && (
+        <Path d={grid.join(' ')} stroke={colors.myRose} strokeWidth={1} />
+      )}
+      <Rect
+        x={0.75}
+        y={0.75}
+        width={w - 1.5}
+        height={h - 1.5}
+        fill="none"
+        stroke={colors.myRose}
+        strokeWidth={1.5}
+      />
+    </Svg>
+  )
+}
+
+/** A one-cube, `u` square. */
+export function CubeGlyph({ u }: { u: number }) {
+  return <BlockGlyph u={u} cols={1} rows={1} />
+}
+
+/** A ten-rod: `u` wide, 10 cells tall. */
+export function RodGlyph({ u }: { u: number }) {
+  return <BlockGlyph u={u} cols={1} rows={10} />
+}
+
+/** A hundred-flat: 10 × 10 cells. */
+export function FlatGlyph({ u }: { u: number }) {
+  return <BlockGlyph u={u} cols={10} rows={10} />
 }
