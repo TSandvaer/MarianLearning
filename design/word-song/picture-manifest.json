@@ -66,6 +66,7 @@
     "distinctFrom": [
       "cap",
       "bag",
+      "barn",
       "bat",
       "brick",
       "bug",
@@ -76,9 +77,11 @@
       "fox",
       "gum",
       "hand",
+      "harp",
       "hot",
       "hut",
       "jug",
+      "leaf",
       "log",
       "mom",
       "nut",
@@ -107,6 +110,8 @@
       "bus",
       "cake",
       "cape",
+      "card",
+      "cart",
       "cat",
       "cup",
       "dog",
@@ -115,7 +120,9 @@
       "mat",
       "mop",
       "pan",
-      "tap"
+      "seal",
+      "tap",
+      "tree"
     ]
   },
   {
@@ -144,7 +151,7 @@
       "letters, numbers or place names",
       "an X mark"
     ],
-    "distinctFrom": ["cap", "dog", "mat", "sun"]
+    "distinctFrom": ["cap", "dog", "mat", "sheep", "sun"]
   },
   {
     "word": "mat",
@@ -187,6 +194,7 @@
     "distinctFrom": [
       "dog",
       "pig",
+      "sheep",
       "bag",
       "bat",
       "box",
@@ -195,6 +203,8 @@
       "cake",
       "cap",
       "cape",
+      "car",
+      "cart",
       "cup",
       "desk",
       "hat",
@@ -210,6 +220,8 @@
       "plum",
       "pot",
       "rug",
+      "seed",
+      "star",
       "sun",
       "tub",
       "tube"
@@ -297,6 +309,7 @@
       "net",
       "sack",
       "lock",
+      "barn",
       "bat",
       "box",
       "bug",
@@ -308,6 +321,7 @@
       "flag",
       "fox",
       "frog",
+      "harp",
       "hat",
       "jam",
       "jug",
@@ -363,6 +377,8 @@
     ],
     "distinctFrom": [
       "bus",
+      "car",
+      "jeep",
       "cup",
       "fan",
       "fox",
@@ -386,6 +402,7 @@
     ],
     "distinctFrom": [
       "clock",
+      "bee",
       "box",
       "bug",
       "bun",
@@ -531,6 +548,8 @@
       "mop",
       "nut",
       "pond",
+      "shark",
+      "sheep",
       "sun",
       "swing"
     ]
@@ -572,6 +591,7 @@
       "pan",
       "pop",
       "pot",
+      "seal",
       "sun",
       "top"
     ]
@@ -603,6 +623,7 @@
     "distinctFrom": [
       "cat",
       "pig",
+      "sheep",
       "bag",
       "bike",
       "box",
@@ -612,6 +633,7 @@
       "can",
       "cap",
       "cape",
+      "car",
       "cup",
       "drum",
       "duck",
@@ -631,18 +653,21 @@
       "mom",
       "mop",
       "pan",
+      "peach",
       "pen",
       "pine",
       "plum",
       "pot",
       "ring",
       "rug",
+      "scarf",
       "sock",
       "sun",
       "tag",
       "tap",
       "tent",
       "top",
+      "tree",
       "tub"
     ]
   },
@@ -675,6 +700,7 @@
       "fox",
       "hot",
       "jug",
+      "leaf",
       "log",
       "man",
       "mom",
@@ -738,6 +764,7 @@
     "avoid": ["a dog's floppy ears", "a cat", "a scary or hunting fox"],
     "distinctFrom": [
       "bag",
+      "barn",
       "belt",
       "box",
       "bug",
@@ -746,6 +773,7 @@
       "cup",
       "dog",
       "drum",
+      "harp",
       "hat",
       "hot",
       "jug",
@@ -776,6 +804,7 @@
     "distinctFrom": [
       "cup",
       "drum",
+      "ship",
       "bag",
       "box",
       "bug",
@@ -808,6 +837,7 @@
       "tub",
       "bat",
       "bed",
+      "bee",
       "box",
       "bug",
       "bus",
@@ -835,6 +865,8 @@
       "rat",
       "rock",
       "rug",
+      "seed",
+      "star",
       "sun",
       "tag",
       "tap",
@@ -946,6 +978,7 @@
     ],
     "distinctFrom": [
       "egg",
+      "seed",
       "bun",
       "bus",
       "cat",
@@ -982,6 +1015,7 @@
       "mom",
       "nut",
       "rug",
+      "scarf",
       "sun",
       "tub"
     ]
@@ -1000,6 +1034,8 @@
     ],
     "distinctFrom": [
       "van",
+      "car",
+      "jeep",
       "bag",
       "box",
       "bug",
@@ -1011,6 +1047,7 @@
       "dog",
       "fan",
       "hand",
+      "harp",
       "hut",
       "jam",
       "king",
@@ -1019,6 +1056,7 @@
       "mom",
       "nap",
       "nut",
+      "peach",
       "pen",
       "pot",
       "rat",
@@ -1047,6 +1085,8 @@
       "bun",
       "bus",
       "can",
+      "car",
+      "cart",
       "cat",
       "crab",
       "cup",
@@ -1061,6 +1101,7 @@
       "hen",
       "hot",
       "hut",
+      "jeep",
       "jet",
       "jug",
       "kite",
@@ -1076,7 +1117,10 @@
       "rope",
       "rug",
       "sack",
+      "seal",
+      "seed",
       "sock",
+      "star",
       "tub",
       "van"
     ]
@@ -1093,6 +1137,7 @@
       "a scary, realistic insect"
     ],
     "distinctFrom": [
+      "bee",
       "bag",
       "box",
       "bus",
@@ -1169,7 +1214,7 @@
       "a mouth or a hand",
       "a bowl with steam"
     ],
-    "distinctFrom": ["bin", "fig", "lid", "pin", "wig"]
+    "distinctFrom": ["bin", "fig", "lid", "pin", "sheep", "ship", "wig"]
   },
   {
     "word": "lid",
@@ -1220,10 +1265,13 @@
     "distinctFrom": [
       "dog",
       "cat",
+      "sheep",
       "bib",
       "bin",
+      "card",
       "drum",
       "fig",
+      "jeep",
       "jet",
       "lid",
       "plum",
@@ -1346,6 +1394,7 @@
       "bun",
       "rock",
       "nest",
+      "seed",
       "bed",
       "gem",
       "hen",
@@ -1364,7 +1413,7 @@
       "a whole chair",
       "a table"
     ],
-    "distinctFrom": ["bed", "egg", "gem", "hen", "net"]
+    "distinctFrom": ["bed", "egg", "gem", "hen", "leaf", "net", "seal"]
   },
   {
     "word": "pen",
@@ -1379,11 +1428,13 @@
     ],
     "distinctFrom": [
       "bag",
+      "barn",
       "bed",
       "bike",
       "box",
       "bus",
       "cake",
+      "car",
       "crab",
       "cup",
       "dog",
@@ -1391,9 +1442,11 @@
       "gem",
       "hen",
       "jet",
+      "leaf",
       "mat",
       "net",
       "pan",
+      "peach",
       "sun",
       "tag",
       "van"
@@ -1438,6 +1491,8 @@
     "distinctFrom": [
       "duck",
       "bed",
+      "card",
+      "cart",
       "cat",
       "cup",
       "egg",
@@ -1451,6 +1506,7 @@
       "pond",
       "rock",
       "rope",
+      "star",
       "sun",
       "tube",
       "web"
@@ -1469,6 +1525,7 @@
     ],
     "distinctFrom": [
       "desk",
+      "bee",
       "belt",
       "cup",
       "egg",
@@ -1478,7 +1535,9 @@
       "leg",
       "net",
       "pen",
+      "shark",
       "tent",
+      "tree",
       "web"
     ]
   },
@@ -1499,10 +1558,12 @@
       "clock",
       "gem",
       "hen",
+      "jeep",
       "net",
       "pen",
       "pig",
       "sack",
+      "sheep",
       "sun",
       "web"
     ]
@@ -1531,7 +1592,17 @@
       "potatoes or things spilling out",
       "a sock"
     ],
-    "distinctFrom": ["bag", "rope", "jet", "pig", "rock", "sock", "sun"]
+    "distinctFrom": [
+      "bag",
+      "rope",
+      "jet",
+      "pig",
+      "rock",
+      "scarf",
+      "shark",
+      "sock",
+      "sun"
+    ]
   },
   {
     "word": "rock",
@@ -1638,6 +1709,8 @@
       "rock",
       "rug",
       "sack",
+      "seal",
+      "seed",
       "sun"
     ]
   },
@@ -1716,7 +1789,7 @@
     "batch": 8,
     "subject": "One round plum with deep purple skin, a soft groove down one side, a short brown stem and one green leaf.",
     "avoid": ["a teardrop fig", "grapes", "a cut plum", "a ball"],
-    "distinctFrom": ["fig", "cat", "dog", "drum", "hen", "pig"]
+    "distinctFrom": ["fig", "peach", "cat", "dog", "drum", "hen", "pig"]
   },
   {
     "word": "flag",
@@ -1793,7 +1866,7 @@
       "trousers or a person wearing it",
       "a watch strap"
     ],
-    "distinctFrom": ["bed", "fox", "sun", "tent"]
+    "distinctFrom": ["scarf", "bed", "fox", "sun", "tent"]
   },
   {
     "word": "nest",
@@ -1819,7 +1892,7 @@
       "more than one present",
       "a cake"
     ],
-    "distinctFrom": ["box", "fig", "gem", "pot", "sun"]
+    "distinctFrom": ["box", "card", "fig", "gem", "pot", "sun"]
   },
   {
     "word": "lamp",
@@ -1858,7 +1931,18 @@
       "a flag on top",
       "people or a campfire"
     ],
-    "distinctFrom": ["bed", "belt", "cup", "dog", "nest", "net", "tap"]
+    "distinctFrom": [
+      "barn",
+      "bed",
+      "bee",
+      "belt",
+      "cup",
+      "dog",
+      "nest",
+      "net",
+      "tap",
+      "tree"
+    ]
   },
   {
     "word": "pine",
@@ -1871,7 +1955,7 @@
       "a forest or a hill",
       "a pot"
     ],
-    "distinctFrom": ["cup", "dog", "kite", "pin"]
+    "distinctFrom": ["tree", "cup", "dog", "kite", "pin"]
   },
   {
     "word": "tube",
@@ -1963,5 +2047,245 @@
       "a car"
     ],
     "distinctFrom": ["bib", "dog", "king", "kite", "pen"]
+  },
+  {
+    "word": "seed",
+    "tier": "bee-words",
+    "batch": 11,
+    "subject": "One big sunflower seed on its own, drawn large: a teardrop shape with dark-grey and cream stripes along its length.",
+    "avoid": [
+      "a sprout or a plant",
+      "a pile of seeds",
+      "a round brown nut",
+      "a plain egg"
+    ],
+    "distinctFrom": ["egg", "nut", "cat", "cup", "seal", "sock", "sun"]
+  },
+  {
+    "word": "peach",
+    "tier": "bee-words",
+    "batch": 11,
+    "subject": "One round peach with a soft orange-pink blush, a crease down one side and a short brown stem, no leaf.",
+    "avoid": [
+      "a plum (purple)",
+      "a red apple",
+      "a cut half with a stone",
+      "a bite"
+    ],
+    "distinctFrom": ["plum", "bus", "dog", "leaf", "pen"]
+  },
+  {
+    "word": "ship",
+    "tier": "digraphs-sh",
+    "batch": 11,
+    "subject": "A small sailing ship in side view: a warm-brown wooden hull, one tall mast with two cream sails and a small rose flag, on a thin line of blue water.",
+    "avoid": [
+      "a rowing boat with no sails",
+      "big waves",
+      "people",
+      "marks on the flag"
+    ],
+    "distinctFrom": ["tub", "jeep", "shark", "sheep", "sip", "star"]
+  },
+  {
+    "word": "leaf",
+    "tier": "bee-words",
+    "batch": 11,
+    "subject": "One big green leaf: an oval with a pointed tip, a centre vein and side veins, and a short stem.",
+    "avoid": ["a branch or a tree", "several leaves", "a feather"],
+    "distinctFrom": ["box", "hat", "leg", "peach", "pen", "seal"]
+  },
+  {
+    "word": "seal",
+    "tier": "bee-words",
+    "batch": 11,
+    "subject": "A grey seal lying on its tummy, head up: round dark eyes, whiskers, two front flippers.",
+    "avoid": ["a ball on its nose", "a fin like a shark's", "water splashes"],
+    "distinctFrom": [
+      "shark",
+      "cap",
+      "leaf",
+      "leg",
+      "mop",
+      "seed",
+      "sock",
+      "sun"
+    ]
+  },
+  {
+    "word": "jeep",
+    "tier": "bee-words",
+    "batch": 11,
+    "subject": "An open-top jeep in side view: a sturdy green body, a flat bonnet, a spare wheel on the back and two big black tyres.",
+    "avoid": [
+      "a roof",
+      "a van, a bus or a car shape",
+      "a driver",
+      "jeepney paint or words"
+    ],
+    "distinctFrom": ["bus", "car", "van", "jet", "pig", "sheep", "ship", "sun"]
+  },
+  {
+    "word": "sheep",
+    "tier": "bee-words",
+    "batch": 11,
+    "subject": "A fluffy sheep in side view: a round cream fleece of soft curls, a dark-grey face and ears, and four thin dark legs.",
+    "avoid": [
+      "a goat's horns or beard",
+      "a lamb with its mother",
+      "a dog",
+      "a cloud shape"
+    ],
+    "distinctFrom": [
+      "cat",
+      "dog",
+      "pig",
+      "jeep",
+      "jet",
+      "map",
+      "pot",
+      "shark",
+      "ship",
+      "sip"
+    ]
+  },
+  {
+    "word": "tree",
+    "tier": "bee-words",
+    "batch": 11,
+    "subject": "One round leafy tree: a brown trunk and a big round green crown.",
+    "avoid": ["a pointed pine", "fruit (the apple-tree land art)", "a forest"],
+    "distinctFrom": ["pine", "bed", "bee", "cap", "dog", "tent"]
+  },
+  {
+    "word": "bee",
+    "tier": "bee-words",
+    "batch": 11,
+    "subject": "One honeybee seen from above at a slight angle: a round golden body with three brown stripes, two clear wings and short antennae.",
+    "avoid": [
+      "a beehive",
+      "a ladybird or a beetle",
+      "a big smiling face",
+      "flowers"
+    ],
+    "distinctFrom": ["bug", "bed", "cup", "fan", "tent", "tree"]
+  },
+  {
+    "word": "card",
+    "tier": "car-words",
+    "batch": 12,
+    "subject": "One folded greeting card standing open: cream, with a big rose-red heart on the front.",
+    "avoid": [
+      "a wrapped present or a bow",
+      "an envelope",
+      "letters or numbers",
+      "a playing card"
+    ],
+    "distinctFrom": ["gift", "cap", "cart", "hen", "pig"]
+  },
+  {
+    "word": "harp",
+    "tier": "car-words",
+    "batch": 12,
+    "subject": "A small golden harp in side view: a curved wooden frame in a rough triangle and about eight thin strings.",
+    "avoid": ["a person playing it", "a guitar or a lyre", "music notes"],
+    "distinctFrom": ["bag", "barn", "bus", "fox", "hat"]
+  },
+  {
+    "word": "scarf",
+    "tier": "car-words",
+    "batch": 12,
+    "subject": "One knitted scarf in soft rose with cream stripes, lying in a loose S curve, with a short fringe at both ends.",
+    "avoid": [
+      "a person wearing it",
+      "a buckle like a belt",
+      "a flat mat",
+      "a towel"
+    ],
+    "distinctFrom": ["belt", "bun", "dog", "sack", "shark"]
+  },
+  {
+    "word": "cart",
+    "tier": "car-words",
+    "batch": 12,
+    "subject": "A wooden hand cart in side view: an open box of warm-brown planks, two big spoked wheels and two long handles.",
+    "avoid": [
+      "a horse or a person pulling it",
+      "a shopping trolley",
+      "a car",
+      "a load"
+    ],
+    "distinctFrom": ["cap", "car", "card", "cat", "hen", "sun"]
+  },
+  {
+    "word": "barn",
+    "tier": "car-words",
+    "batch": 12,
+    "subject": "A red farm barn in front view: a tall pointed roof, a big double door with white diagonal braces and a small round window above it.",
+    "avoid": [
+      "a house with a chimney",
+      "a tent",
+      "animals or a farmer",
+      "a silo"
+    ],
+    "distinctFrom": ["tent", "bag", "fox", "harp", "hat", "pen"]
+  },
+  {
+    "word": "star",
+    "tier": "car-words",
+    "batch": 12,
+    "subject": "One plump five-pointed star with soft rounded points, warm gold.",
+    "avoid": [
+      "rays or a face like the sun picture",
+      "a starfish",
+      "several stars",
+      "a sky"
+    ],
+    "distinctFrom": ["car", "cat", "cup", "hen", "shark", "ship", "sun"]
+  },
+  {
+    "word": "shark",
+    "tier": "car-words",
+    "batch": 12,
+    "subject": "A grey shark in side view: a pointed nose, a tall back fin, a white tummy and a closed, gently smiling mouth.",
+    "avoid": [
+      "sharp teeth or blood",
+      "a dolphin",
+      "whiskers",
+      "water splashes"
+    ],
+    "distinctFrom": [
+      "seal",
+      "bed",
+      "pot",
+      "sack",
+      "scarf",
+      "sheep",
+      "ship",
+      "star"
+    ]
+  },
+  {
+    "word": "car",
+    "tier": "car-words",
+    "batch": 12,
+    "subject": "A small rose-red car in side view: a rounded roof, two windows and two black tyres.",
+    "avoid": [
+      "a long van or bus body",
+      "an open top like the jeep",
+      "a driver",
+      "a number plate"
+    ],
+    "distinctFrom": [
+      "bus",
+      "jeep",
+      "van",
+      "cart",
+      "cat",
+      "dog",
+      "pen",
+      "star",
+      "sun"
+    ]
   }
 ]

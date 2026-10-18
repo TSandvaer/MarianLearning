@@ -93,7 +93,7 @@ describe('native asset registry', () => {
     for (const key of NOVEL_PROBE_WORDS) {
       expect([key, pictureAsset(key) !== undefined]).toEqual([key, true])
     }
-    expect(pictureAsset('ship')).toBeUndefined()
+    expect(pictureAsset('shell')).toBeUndefined()
   })
 
   // Content wave 1 (design/native/content-wave-1.md § 3.5, § 4.4, AC 8)
