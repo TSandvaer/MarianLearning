@@ -34,7 +34,7 @@ import {
   bigWordsCanonViolations,
 } from './bigWordsCanonCheck.ts'
 import { PENDING_CANON_NODES, activeCombos } from './generateSessionCanon.ts'
-import { storyCanonViolations } from './spliceContentWave3Canon.ts'
+import { storyCanonViolations, taughtWords } from './spliceContentWave3Canon.ts'
 import {
   WAVE_4_WORD_STEPS,
   WAVE_4_STORY_STEP,
@@ -167,26 +167,52 @@ describe('sheep stories: the rules (§ 6.2)', () => {
     expect(sheepStoryViolations()).toEqual([])
   })
 
-  it('an untaught word, a plural or "she" is caught', () => {
-    const doc = committed('sheep-stories')
-    for (const bad of [
+  /** The table with sheep-1's story swapped for `story`. */
+  const withSheep1 = (story: string) =>
+    storiesOf('sheep-stories').map((s, i) => (i === 0 ? { ...s, story } : s))
+
+  // The lines stay the table's, so each message is the rules' own.
+  it.each([
+    [
       'The sheep sat in the jeep. It has a pear.',
+      ['sheep-1: "pear" is not a taught word'],
+    ],
+    [
       'The sheep sat in the jeeps. It has a peach.',
-      'The sheep sat in the jeep. She has a peach.',
-    ]) {
-      const lines = doc.plan.utterances.map((u) =>
-        u.id === 'word.p1.hint' ? { ...u, text: bad } : u,
-      )
-      expect(
-        storyCanonViolations('sheep-stories', lines).length +
-          sheepStoryViolations(
-            storiesOf('sheep-stories').map((s, i) =>
-              i === 0 ? { ...s, story: bad } : s,
-            ),
-          ).length,
-        bad,
-      ).toBeGreaterThan(0)
-    }
+      [
+        'sheep-1: "jeeps" is not a taught word',
+        'sheep-1: a plural or -s ending',
+      ],
+    ],
+    [
+      'The sheep hopped in the jeep. It has a peach.',
+      ['sheep-1: "hopped" is not a taught word', 'sheep-1: an -ed ending'],
+    ],
+    ['The sheep sat in the jeep. It has a seed.', []],
+  ] as const)('the lint on "%s"', (story, expected) => {
+    const doc = committed('sheep-stories')
+    expect(
+      storyCanonViolations(
+        'sheep-stories',
+        doc.plan.utterances,
+        taughtWords(),
+        withSheep1(story),
+      ),
+    ).toEqual(expected)
+  })
+
+  it('"she" is caught by § 6.2, not the lint (she is a taught word)', () => {
+    const rows = withSheep1('The sheep sat in the jeep. She has a peach.')
+    const doc = committed('sheep-stories')
+    expect(
+      storyCanonViolations(
+        'sheep-stories',
+        doc.plan.utterances,
+        taughtWords(),
+        rows,
+      ),
+    ).toEqual([])
+    expect(sheepStoryViolations(rows)).toEqual(['sheep-1: "she"'])
   })
 
   it('"seed" passes the -ed check (its exemption, § 6.2)', () => {

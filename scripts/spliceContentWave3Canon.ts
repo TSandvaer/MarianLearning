@@ -53,6 +53,7 @@ import {
   storyGiveAnswerLine,
   storySentences,
   storyWordKey,
+  type LittleStory,
   type StoryNode,
 } from '@marian/core/wordSong/littleStories'
 import { renderElevenLabsText } from '../api/_tts_elevenlabs.js'
@@ -173,11 +174,16 @@ export function taughtWords(): Set<string> {
   return taught
 }
 
-/** Every way a step's lines depart from the table and § 4.7's rules. */
+/**
+ * Every way a step's lines depart from the table and § 4.7's rules. `rows`
+ * are the stories the rules read (the table's by default; a test passes
+ * its own bad rows).
+ */
 export function storyCanonViolations(
   step: StoryNode,
   utterances: readonly Line[],
   taught: ReadonlySet<string> = taughtWords(),
+  rows: readonly LittleStory[] = storiesOf(step),
 ): string[] {
   const out: string[] = []
   const problem = utterances
@@ -186,7 +192,7 @@ export function storyCanonViolations(
   const expected = expectedStoryLines(step)
   if (JSON.stringify(problem) !== JSON.stringify(expected))
     out.push(`${step}: the problem lines are not the table's`)
-  for (const s of storiesOf(step)) {
+  for (const s of rows) {
     for (const w of storySentences(s.story).flat().map(storyWordKey))
       if (!taught.has(w)) out.push(`${s.id}: "${w}" is not a taught word`)
     if (/s\b/.test(s.story.replace(/\b(is|has|bus)\b/g, '')))
