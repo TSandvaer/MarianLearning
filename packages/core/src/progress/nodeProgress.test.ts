@@ -64,7 +64,11 @@ describe('nodeProgress — basic fields', () => {
     expect(nodeProgress(p, 'mult-mix').unlocksNext).toBe('div-share')
     expect(nodeProgress(p, 'div-share').unlocksNext).toBe('hundreds')
     expect(nodeProgress(p, 'hundreds').unlocksNext).toBe('hundreds-addsub')
-    expect(nodeProgress(p, 'hundreds-addsub').unlocksNext).toBeNull()
+    expect(nodeProgress(p, 'hundreds-addsub').unlocksNext).toBe(
+      'hundreds-zeros',
+    )
+    expect(nodeProgress(p, 'hundreds-zeros').unlocksNext).toBe('add-two-digit')
+    expect(nodeProgress(p, 'add-two-digit').unlocksNext).toBeNull()
     expect(nodeProgress(p, 'crab-words').unlocksNext).toBe('tent-words')
     expect(nodeProgress(p, 'cake-words').unlocksNext).toBe('fox-stories')
     expect(nodeProgress(p, 'bug-stories').unlocksNext).toBe('bee-words')

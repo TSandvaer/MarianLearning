@@ -68,21 +68,23 @@ const PATH_IDS = [
 
 describe('hundreds in the Number Garden tree (§ 1, § 3.1)', () => {
   it('follows div-share in both tree lists; more and less follows it (content wave 4)', () => {
-    expect(MATH_TREE.slice(-3, -1)).toEqual(['div-share', HUNDREDS])
-    expect(MATH_NODES_IN_ORDER.slice(-3, -1)).toEqual(['div-share', HUNDREDS])
+    expect(MATH_TREE.slice(-5, -3)).toEqual(['div-share', HUNDREDS])
+    expect(MATH_NODES_IN_ORDER.slice(-5, -3)).toEqual(['div-share', HUNDREDS])
     expect(nextNode('math', 'div-share')).toBe(HUNDREDS)
     expect(nextNode('math', HUNDREDS)).toBe('hundreds-addsub')
   })
 
-  it('is land 5, Hundreds, of 5 Number Garden lands; LANDS flattened equals both trees (AC 7)', () => {
+  it('is land 5, Hundreds, of 6 Number Garden lands; LANDS flattened equals both trees (AC 7)', () => {
     const ng = LANDS.filter((l) => l.world === 'math')
-    expect(ng).toHaveLength(5)
-    // Content wave 4 adds more and less as its 2nd stop.
+    // Content wave 5 adds land 6, Bigger numbers.
+    expect(ng).toHaveLength(6)
+    // Content wave 4 adds more and less as its 2nd stop, content wave 5
+    // zeros as its 3rd.
     expect(ng[4]).toEqual({
       world: 'math',
       number: 5,
       name: 'Hundreds',
-      nodes: [HUNDREDS, 'hundreds-addsub'],
+      nodes: [HUNDREDS, 'hundreds-addsub', 'hundreds-zeros'],
     })
     // Content wave 4 adds Word Song land 8.
     expect(LANDS.filter((l) => l.world === 'word-song')).toHaveLength(8)

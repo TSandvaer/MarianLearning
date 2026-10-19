@@ -51,10 +51,27 @@ export interface PathLine {
   kind: PathLineKind
   world: MasteryTrack
   text: string
+  /**
+   * What the render sends to Lily when it is not `text` (as guidance
+   * lines' `input`): a `THEN_THIS_INPUT_STEPS` step's locked-next line goes
+   * as "<Name>! First, <previous>; then this!" (content wave 5 § 9.1; the
+   * ". Then this!" take came back scratchy twice, #599 and #607 take 3).
+   * The caption stays `text`. Undefined = `text`.
+   */
+  input?: string
   /** Bundled MP3 path relative to `public/`; `null` = not baked yet
    *  (a `DEFERRED_PATH_LINE_KINDS` line). */
   src: string | null
 }
+
+/**
+ * The steps whose locked-next line renders from "…; then this!" (content
+ * wave 5 § 9.1). Only steps whose line has no clip yet: a shipped line keeps
+ * no input, so nothing already rendered re-renders.
+ */
+export const THEN_THIS_INPUT_STEPS: ReadonlySet<SkillNode> = new Set<SkillNode>(
+  ['hundreds-zeros', 'add-two-digit'],
+)
 
 /**
  * Two-name forms, one bake per (stop, current step) pair: 111 `locked-later`
@@ -100,7 +117,16 @@ function buildLines(): PathLine[] {
     src: string | null = DEFERRED_PATH_LINE_KINDS.has(kind)
       ? null
       : pathLineSrc(id),
-  ) => lines.push({ id, kind, world, text, src })
+    input?: string,
+  ) =>
+    lines.push({
+      id,
+      kind,
+      world,
+      text,
+      ...(input === undefined ? {} : { input }),
+      src,
+    })
 
   for (const world of WORLDS) {
     const steps = pathStepsOf(world)
@@ -140,6 +166,10 @@ function buildLines(): PathLine[] {
         'locked-next',
         world,
         `${Name(n)}! First, ${name(steps[j - 1])}. Then this!`,
+        undefined,
+        THEN_THIS_INPUT_STEPS.has(n)
+          ? `${Name(n)}! First, ${name(steps[j - 1])}; then this!`
+          : undefined,
       )
       for (let i = 0; i <= j - 2; i++)
         add(
@@ -216,9 +246,21 @@ export const BAKED_PATH_LINES: readonly (PathLine & { src: string })[] =
  * tests expect exactly these to be missing. The render commit sets this
  * list to `[]`.
  *
- * Now: none.
+ * Now: content wave 5's Number Garden lines (§ 9.1): zeros' and adding big
+ * numbers' path lines, and land 6's.
  */
-export const PATH_LINES_AWAITING_RENDER: readonly string[] = []
+export const PATH_LINES_AWAITING_RENDER: readonly string[] = [
+  ...['hundreds-zeros', 'add-two-digit'].flatMap((n) => [
+    `path.open.${n}`,
+    `path.stop.${n}`,
+    `path.locked.next.${n}`,
+    `end.bud.${n}`,
+    `end.unlock.${n}`,
+  ]),
+  'path.land.math.6',
+  'end.land.math.6',
+  'end.land.math.6.no-number',
+]
 
 const BY_ID = new Map(PATH_LINES.map((l) => [l.id, l]))
 

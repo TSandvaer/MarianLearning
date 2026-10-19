@@ -37,10 +37,17 @@
  *    screen and no Leitner fact.
  *  - place-value: `"Two hundreds, three tens and four ones. What number is
  *    it?"` — the answer is the number the three places build (content wave
- *    3 § 3.6). Only in the hundreds step (`hundreds`).
+ *    3 § 3.6). In hundreds (`hundreds`) and zeros (`hundreds-zeros`, content
+ *    wave 5 § 2.6: "no tens", "One hundred"), whose name read `"Find one
+ *    hundred and ninety."` is a place-value problem too (`form: 'name'`).
  *  - more: `"Two hundred and forty-three. What is ten more?"` — the answer
- *    is the number plus ten or one hundred (§ 3.6). Also only in hundreds.
- *    Neither hundreds kind has a Leitner fact or an equation on screen.
+ *    is the number plus ten or one hundred (§ 3.6). In hundreds, more and
+ *    less and zeros. Neither hundreds kind has a Leitner fact or an
+ *    equation on screen.
+ *
+ *  Adding big numbers (`add-two-digit`, content wave 5 § 3.6) reads as
+ *  plain addition (`kind: 'arithmetic'`); its step draws the place-value
+ *  trays ({@link PLACE_VALUE_ARITHMETIC_NODES}).
  *
  * Answer chips
  * ------------
@@ -51,7 +58,7 @@
  * Pure types plus type guards: no I/O, no React.
  */
 
-import type { MathFact } from '../progress/types'
+import type { MathFact, SkillNode } from '../progress/types'
 import { GENTLE_RAMP_THROUGH } from './distractors'
 import type { MathProblem, MathProblemUtterances } from './sessionPlans'
 
@@ -191,7 +198,10 @@ export interface DivideProblem {
 }
 
 /** Hundreds' digits (content wave 3 § 3.6, D8): every place 2..9, so no
- *  zero and no "one hundred" until a deepening. */
+ *  zero and no "one hundred" in hundreds' canon (its lint). Zeros, the
+ *  deepening (content wave 5 § 2.6), reads a place as "no" (0) and the
+ *  hundreds as "One hundred": the parser takes hundreds 1..9 and tens and
+ *  ones 0..9. */
 export const PLACE_DIGIT_MIN = 2
 export const PLACE_DIGIT_MAX = 9
 
@@ -205,24 +215,43 @@ export const PLACE_PARTS: readonly PlacePart[] = ['hundreds', 'tens', 'ones']
  * A place-value problem (content wave 3 § 3, NG-D): Emma builds a number
  * from hundred-flats, ten-rods and one-cubes as she names each place; the
  * child taps the number. e.g. "Two hundreds, three tens and four ones. What
- * number is it?" → hundreds 2, tens 3, ones 4, correct 234. P5 names the
- * places in Danish order ("Three hundreds, six ones and two tens.").
+ * number is it?" → hundreds 2, tens 3, ones 4, correct 234. Hundreds' P5
+ * names the places out of order ("Three hundreds, six ones and two
+ * tens."): an expanded form (2.NBT.A.3) that can't be solved by copying the
+ * digits in the order heard. Zeros (content wave 5 § 2.6) names an empty
+ * place "no tens", and its name read "Find one hundred and ninety." asks
+ * for the number by name (`form: 'name'`).
  */
 export interface PlaceValueProblem {
   kind: 'place-value'
   /** 1-based position in the session (1..8). */
   index: number
-  /** Each place's digit ({@link PLACE_DIGIT_MIN}..{@link PLACE_DIGIT_MAX}). */
+  /** The hundreds digit, 1..9 (hundreds keeps 2..9 by its lint). */
   hundreds: number
+  /** The tens and ones digits, 0..9 (0: "no tens"). */
   tens: number
   ones: number
   /** The places in the order the read names them, e.g. `['hundreds',
-   *  'ones', 'tens']`. */
+   *  'ones', 'tens']`; the name form's are {@link PLACE_PARTS}. */
   spokenOrder: readonly PlacePart[]
+  /** `'places'`: the read names the places ("Three hundreds, no tens and
+   *  five ones."); `'name'`: "Find <number>." (content wave 5 § 2.6). */
+  form: PlaceValueForm
   /** `100 × hundreds + 10 × tens + ones`. */
   correct: number
   /** Pre-canned utterance lines, same slots as arithmetic problems. */
   utterances: MathProblemUtterances
+}
+
+/** How a place-value read gives its number (content wave 5 § 2.6). */
+export type PlaceValueForm = 'places' | 'name'
+
+/** The places a place-value problem leaves empty (zeros' "no tens"), in
+ *  place order; `[]` for hundreds' own problems. */
+export function zeroPlaces(
+  problem: Pick<PlaceValueProblem, PlacePart>,
+): PlacePart[] {
+  return PLACE_PARTS.filter((p) => problem[p] === 0)
 }
 
 /**
@@ -232,14 +261,16 @@ export interface PlaceValueProblem {
  * ten more?" → start 243, step 10, count 1, 'more', correct 253. More and
  * less (content wave 4 § 2.6) asks 2–4 of them, added or taken away: "Six
  * hundred and fifty-three. What is two hundred less?" → start 653, step
- * 100, count 2, 'less', correct 453. No zero digit in `start` or
- * `correct`, and no regrouping.
+ * 100, count 2, 'less', correct 453. No regrouping. Zeros (content wave 5
+ * § 2.6) lets a zero sit in `start` or `correct`, and the changed digit
+ * become 0 ("Four hundred and sixteen. What is ten less?" → 406); hundreds'
+ * and more and less's canon keep no zero by their lints.
  */
 export interface MoreProblem {
   kind: 'more'
   /** 1-based position in the session (1..8). */
   index: number
-  /** The number read, three digits with no zero. */
+  /** The number read, 100..999. */
   start: number
   /** The place that changes: the tens or the hundreds. */
   step: 10 | 100
@@ -369,6 +400,52 @@ export function moreBlocksMoveOnRead(problem: MoreProblem): boolean {
     (problem.direction === 'less' &&
       problem.index === MORE_AND_LESS_FIRST_LESS_INDEX)
   )
+}
+
+/**
+ * The steps whose arithmetic problems draw the place-value trays (content
+ * wave 5 § 3.6, K2): two trays, tens and ones, under today's equation, and
+ * the place-value frame and chips. A problem's step is its `problemNodes`
+ * entry, else the focus node. A later `sub-two-digit` joins the list.
+ */
+export const PLACE_VALUE_ARITHMETIC_NODES: readonly SkillNode[] = [
+  'add-two-digit',
+]
+
+/** Whether `problem` draws the place-value trays: an arithmetic problem of
+ *  a {@link PLACE_VALUE_ARITHMETIC_NODES} step. */
+export function isPlaceValueArithmetic(
+  problem: MathProblem | ExtendedMathProblem,
+  node: SkillNode | null | undefined,
+): problem is ArithmeticProblem {
+  return (
+    (!('kind' in problem) || problem.kind === 'arithmetic') &&
+    node !== null &&
+    node !== undefined &&
+    PLACE_VALUE_ARITHMETIC_NODES.includes(node)
+  )
+}
+
+/** What an adding-big-numbers problem moves on the read (content wave 5
+ *  § 3.4, § 3.6, D6). */
+export type AddTwoDigitReadMotion = 'drop-and-bundle' | 'drop' | 'none'
+
+/** The problems that drop the second number on the read and keep the
+ *  bundle for hint 2 (D6: backward fading, the bundle first). */
+const ADD_TWO_DIGIT_DROP_THROUGH = 5
+
+/**
+ * What moves on an adding-big-numbers read, by the problem's position (as
+ * {@link moreBlocksMoveOnRead}, so a review block keeps its slot's rule;
+ * content wave 5 § 3.6, D6): P1–P3 drop the second number's blocks and
+ * bundle a new ten (P3 is the session's one worked example; P1–P2 make
+ * none), P4–P5 drop them and keep the bundle for hint 2, P6–P8 move
+ * nothing.
+ */
+export function addTwoDigitReadMotion(index: number): AddTwoDigitReadMotion {
+  if (index <= GENTLE_RAMP_THROUGH) return 'drop-and-bundle'
+  if (index <= ADD_TWO_DIGIT_DROP_THROUGH) return 'drop'
+  return 'none'
 }
 
 export function isHundredsProblem(

@@ -41,7 +41,7 @@ import {
  */
 
 describe('activeCombos — coverage matches the curriculum', () => {
-  it('produces 38 combos: 15 math nodes × level 1 + 23 word-song nodes × level 1 (mult-mix spliced; duck-words + crab-words, content wave 1; div-share, tent-words + cake-words spliced, content wave 2; the three story steps and hundreds spliced, content wave 3; hundreds-addsub, bee-words, car-words and sheep-stories spliced, content wave 4)', () => {
+  it('produces 40 combos: 17 math nodes × level 1 + 23 word-song nodes × level 1 (mult-mix spliced; duck-words + crab-words, content wave 1; div-share, tent-words + cake-words spliced, content wave 2; the three story steps and hundreds spliced, content wave 3; hundreds-addsub, bee-words, car-words and sheep-stories spliced, content wave 4; hundreds-zeros and add-two-digit spliced, content wave 5)', () => {
     // Step 2 of the planner-parser contract added cvc-words alongside
     // blending-cv as a first-class word-song content mode. Ticket
     // 86c9m3ae3 added `cvc-words-short-o` as the next-vowel sibling
@@ -89,12 +89,15 @@ describe('activeCombos — coverage matches the curriculum', () => {
     // and less, land 5; design/native/content-wave-4.md § 2.7), written by
     // a splice, and `bee-words`, `car-words` and `sheep-stories` (land 8;
     // design/native/content-wave-4.md § 3, § 4, § 6), written by
-    // scripts/spliceContentWave4Canon.ts.
+    // scripts/spliceContentWave4Canon.ts. Content wave 5 added
+    // `hundreds-zeros` (zeros, land 5) and `add-two-digit` (adding big
+    // numbers, land 6; design/native/content-wave-5.md § 2.7, § 3.7),
+    // written by scripts/spliceContentWave5MathCanon.ts.
     const combos = activeCombos()
-    expect(combos).toHaveLength(38)
+    expect(combos).toHaveLength(40)
     const mathCount = combos.filter((c) => c.track === 'math').length
     const wordSongCount = combos.filter((c) => c.track === 'word-song').length
-    expect(mathCount).toBe(15)
+    expect(mathCount).toBe(17)
     expect(wordSongCount).toBe(23)
   })
 

@@ -133,8 +133,10 @@ import {
   bigWordsCanonViolations,
   isBigWordsStep,
 } from './bigWordsCanonCheck.ts'
+import { addTwoDigitCanonViolations } from './addTwoDigitCanonCheck.ts'
 import { hundredsAddsubCanonViolations } from './hundredsAddsubCanonCheck.ts'
 import { hundredsCanonViolations } from './hundredsCanonCheck.ts'
+import { hundredsZerosCanonViolations } from './hundredsZerosCanonCheck.ts'
 import { shareCanonViolations } from './shareCanonCheck.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -260,6 +262,11 @@ const MATH_FOCUS_NODES: readonly string[] = [
   // Content wave 4 § 2.7: written by scripts/spliceContentWave4MathCanon.ts,
   // held to the spec by `hundredsAddsubCanonCheck.ts` below.
   'hundreds-addsub',
+  // Content wave 5 § 2.7, § 3.7: written by
+  // scripts/spliceContentWave5MathCanon.ts, held to the spec by
+  // `hundredsZerosCanonCheck.ts` and `addTwoDigitCanonCheck.ts` below.
+  'hundreds-zeros',
+  'add-two-digit',
 ]
 
 // Word-song first-class content modes — must match the
@@ -387,6 +394,8 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
  *   rendered the same way.
  * - hundreds-addsub (content wave 4 § 2.7): the same, written by
  *   `scripts/spliceContentWave4MathCanon.ts`.
+ * - hundreds-zeros, add-two-digit (content wave 5 § 2.7, § 3.7): the same,
+ *   written by `scripts/spliceContentWave5MathCanon.ts`.
  * - duck-words, crab-words: a deliberate bake (Thomas OKs the credit use),
  *   held to the spec by `bigWordsCanonCheck.ts`, then the Lily render and
  *   the ear test. Their committed files are hand-checked.
@@ -411,6 +420,8 @@ export const PENDING_CANON_NODES: ReadonlySet<string> = new Set([
   'div-share',
   'hundreds',
   'hundreds-addsub',
+  'hundreds-zeros',
+  'add-two-digit',
   'duck-words',
   'crab-words',
   'tent-words',
@@ -806,6 +817,24 @@ export async function bakeOne(
       const message =
         `[more and less] hundreds-addsub: ${drift.length} line(s) off the ` +
         `spec:\n` +
+        drift.map((d) => `  - ${d}`).join('\n')
+      if (lintWarn)
+        console.warn(`\n${message}\n(writing anyway: --lint-warn)\n`)
+      else throw new Error(message)
+    }
+  }
+
+  // Zeros and adding big numbers (content wave 5 § 2.7, § 3.7, binding):
+  // as hundreds.
+  for (const [node, name, violations] of [
+    ['hundreds-zeros', 'zeros', hundredsZerosCanonViolations],
+    ['add-two-digit', 'adding big numbers', addTwoDigitCanonViolations],
+  ] as const) {
+    if (combo.track !== 'math' || combo.focusNode !== node) continue
+    const drift = violations(response.utterances)
+    if (drift.length > 0) {
+      const message =
+        `[${name}] ${node}: ${drift.length} line(s) off the spec:\n` +
         drift.map((d) => `  - ${d}`).join('\n')
       if (lintWarn)
         console.warn(`\n${message}\n(writing anyway: --lint-warn)\n`)

@@ -285,6 +285,11 @@ const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {
   // Number Garden land 5's 2nd stop (content wave 4 § 2.4, § 8.1; Thomas
   // approved T2). Its pill pulses on "More" only (D1).
   'hundreds-addsub': 'More and less!',
+  // Number Garden land 5's 3rd stop and land 6 (content wave 5 § 2.4,
+  // § 3.4, § 9.1; Thomas approved T2; Dave D2, D4): the empty tens tray
+  // pulses on each "tens"; the two trays pulse on "Tens" and "ones".
+  'hundreds-zeros': 'No tens? Zero tens!',
+  'add-two-digit': 'Tens and ones!',
   // Word Song land 6 (content wave 1 § 3.3, § 4.3).
   'duck-words': 'Two letters, one sound!',
   'crab-words': 'Read all the letters!',
@@ -329,9 +334,19 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: none.
+ * Now: content wave 5's Number Garden lines (§ 9.1): zeros' and adding big
+ * numbers' leads, peeks and replays.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
+  'hundreds-zeros',
+  'add-two-digit',
+].flatMap((n) => [
+  `guide.session.intro.${n}`,
+  `guide.session.peek-open.${n}`,
+  `guide.session.peek-close.${n}`,
+  `guide.session.replay-open.${n}`,
+  `guide.session.replay-close.${n}`,
+])
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 

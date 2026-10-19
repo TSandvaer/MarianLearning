@@ -53,6 +53,12 @@ export type NumberGardenNode =
   // Content wave 4 § 2 (more and less): 2–4 hundreds or tens added or
   // taken away. Served from canon; no fact.
   | 'hundreds-addsub'
+  // Content wave 5 § 2 (zeros): three-digit numbers with an empty place.
+  // Served from canon; no fact.
+  | 'hundreds-zeros'
+  // Content wave 5 § 3 (adding big numbers): two-digit + two-digit with a
+  // new ten. Served from canon; its sums are Leitner facts.
+  | 'add-two-digit'
 
 // cvc-words = short-a CVC. Subsequent vowels get sibling nodes
 // (cvc-words-short-o, cvc-words-short-u, cvc-words-short-i,
