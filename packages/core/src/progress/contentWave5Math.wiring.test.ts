@@ -237,9 +237,19 @@ describe('the lines (§ 9.1, AC 8)', () => {
     expect(pathLine('path.locked.next.hundreds-addsub')?.input).toBeUndefined()
     for (const l of PATH_LINES)
       if (l.input !== undefined) {
-        expect(l.kind).toBe('locked-next')
+        expect(
+          l.kind === 'locked-next' || l.id === 'path.stop.hundreds-zeros',
+        ).toBe(true)
         expect(l.input.length).toBe(l.text.length)
       }
+  })
+
+  it('the one-word stop line renders from "Zeros," (lesson 3); its caption stays "Zeros."', () => {
+    expect(pathLine('path.stop.hundreds-zeros')).toMatchObject({
+      text: 'Zeros.',
+      input: 'Zeros,',
+    })
+    expect(pathLine('path.stop.add-two-digit')?.input).toBeUndefined()
   })
 
   it('every new line awaits its Lily render; land 5 and more and less are not new', () => {

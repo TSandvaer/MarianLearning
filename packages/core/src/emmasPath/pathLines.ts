@@ -74,6 +74,15 @@ export const THEN_THIS_INPUT_STEPS: ReadonlySet<SkillNode> = new Set<SkillNode>(
 )
 
 /**
+ * One line's render input, by line id: a one-word clip goes to Lily as
+ * "Word," (one word alone reads as an abbreviation: "Sat." came back as
+ * "Saturday", #607; content wave 5 lesson 3). The caption stays `text`.
+ */
+const LINE_INPUTS: Readonly<Record<string, string>> = {
+  'path.stop.hundreds-zeros': 'Zeros,',
+}
+
+/**
  * Two-name forms, one bake per (stop, current step) pair: 111 `locked-later`
  * + 38 `gate-locked` lines. Deferred by Thomas 2026-10-05 until he has heard
  * the first batch (140 one-name lines); their text is final, their audio is
@@ -117,7 +126,7 @@ function buildLines(): PathLine[] {
     src: string | null = DEFERRED_PATH_LINE_KINDS.has(kind)
       ? null
       : pathLineSrc(id),
-    input?: string,
+    input: string | undefined = LINE_INPUTS[id],
   ) =>
     lines.push({
       id,

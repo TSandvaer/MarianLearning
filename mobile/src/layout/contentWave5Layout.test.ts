@@ -245,13 +245,25 @@ describe("adding big numbers' blocks and bundle (§ 3.2, § 3.5, AC 12)", () => 
 })
 
 describe("zeros' trays (§ 2.3)", () => {
+  // Measured 2026-10-19: P5's 9 rods (§ 2.3 counts 6) widen the tens tray,
+  // so P takes u = 9 (hundreds 10); L, TP and TL keep hundreds' u, TP with
+  // 2 pt to spare.
+  const U: Record<string, [number, number]> = {
+    'P 375×667': [9, 329],
+    'L 667×375 b21': [8, 352],
+    'TP 744×1133': [20, 710],
+    'TL 1133×744': [15, 605],
+  }
+
   it.each(FORMS)(
     '%s: three trays sized for 7 flats, 9 rods, 8 cubes; an empty tray keeps its width',
-    (_name, v) => {
+    (name, v) => {
       const layout = extendedMathLayout(v, 'place-value')
       const m = placeValueMetrics(layout, ZEROS)
       expect(m.places).toEqual(['hundreds', 'tens', 'ones'])
       expect([m.maxFlats, m.maxRods, m.maxCubes]).toEqual([7, 9, 8])
+      expect([m.u, Math.round(m.block.width)]).toEqual(U[name])
+      expect(m.fits(m.u + 1)).toBe(false)
       expect(m.block.width).toBeLessThanOrEqual(layout.problem.width)
       expect(m.block.height).toBeLessThanOrEqual(layout.problem.height)
       // P1 305: an empty tens tray, its tray full width, no rods.
