@@ -104,7 +104,11 @@ interface HostCrypto {
   randomUUID?: () => string
 }
 
-function generateUuid(): string {
+/**
+ * A fresh v4-shaped UUID (the generator behind `getOrCreateDeviceId`).
+ * Also learner profiles' learner ids (`learners/learners.ts`).
+ */
+export function generateUuid(): string {
   // crypto.randomUUID() is available on iOS Safari 15.4+ — Marian's iPad
   // supports this, no polyfill needed in the production target. The
   // fallback exists for non-target browsers (test runners, older iOS,

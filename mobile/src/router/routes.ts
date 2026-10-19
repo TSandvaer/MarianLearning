@@ -15,6 +15,12 @@ export { FIRST_ROUTE, type Route }
  * Where each route can go next. Mirrors the web's `App.tsx`:
  *
  * - splash → greet | hub          `handleSplashAdvance` (core `nextAfterSplash`)
+ * - splash → picker               native only: 2+ learners (learner profiles § 1.1)
+ * - picker → greet | hub          the tap: Greet if that learner never played
+ * - hub | greet | map | session-end | parent-settings → picker
+ *                                 native only, 2+ learners: the badge, the
+ *                                 return rule, Session End's handover and
+ *                                 Parent Settings' Done (§§ 1.1, 2.1–2.4)
  * - greet → math                  `handleGreetAdvance` (first-launch sequence)
  * - hub → math | literacy         `handleHubPickTree`
  * - hub → map                     `handleHubOpenMap`
@@ -38,15 +44,16 @@ export { FIRST_ROUTE, type Route }
  *                                 placeholder a way out
  */
 export const ROUTE_EXITS: Readonly<Record<Route, readonly Route[]>> = {
-  splash: ['greet', 'hub'],
-  greet: ['math'],
-  hub: ['math', 'literacy', 'map', 'parent-settings'],
+  splash: ['picker', 'greet', 'hub'],
+  picker: ['greet', 'hub'],
+  greet: ['math', 'picker'],
+  hub: ['math', 'literacy', 'map', 'parent-settings', 'picker'],
   math: ['session-end', 'hub', 'map'],
   literacy: ['session-end', 'hub', 'map'],
-  'session-end': ['hub', 'map', 'math', 'literacy'],
+  'session-end': ['hub', 'map', 'math', 'literacy', 'picker'],
   reward: ['hub'],
-  'parent-settings': ['hub'],
-  map: ['hub', 'peek', 'math', 'literacy'],
+  'parent-settings': ['hub', 'picker'],
+  map: ['hub', 'peek', 'math', 'literacy', 'picker'],
   peek: ['map'],
 }
 
@@ -65,6 +72,7 @@ export const ROUTE_LABELS: Readonly<Record<Route, string>> = {
   'parent-settings': 'Parent Settings',
   map: "Emma's Path",
   peek: 'Peek',
+  picker: 'Who is playing',
 }
 
 /**

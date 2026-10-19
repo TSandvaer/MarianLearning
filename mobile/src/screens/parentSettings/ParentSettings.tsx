@@ -27,11 +27,8 @@ import {
   pendingPromotionToConfirm,
   type ParentSettingsPatch,
 } from '@marian/core/parentSettings/parentSettingsModel'
-import {
-  defaultProgress,
-  getSettings,
-  type Progress,
-} from '@marian/core/progress'
+import { getSettings, type Progress } from '@marian/core/progress'
+import { startProgressForActive } from '@marian/core/learners'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BackHandler,
@@ -88,7 +85,7 @@ export function ParentSettings({
   const reducedMotion = useReducedMotion()
   // Read once; every control writes through and updates this copy.
   const [progress, setProgress] = useState<Progress>(
-    () => deps.load() ?? defaultProgress(),
+    () => deps.load() ?? startProgressForActive(),
   )
   const settings = useMemo(() => getSettings(progress), [progress])
   const lifetime = useLifetime()

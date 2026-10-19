@@ -283,6 +283,8 @@ export function restoreOutcomeMessage(outcome: ReconcileOutcome): string {
       return 'Both devices have the same progress.'
     case 'cloud-blob-rejected':
       return "That device's backup is in an unexpected format."
+    case 'cloud-learner-mismatch':
+      return "That backup holds another learner's progress."
     case 'cloud-error':
       return `Couldn't reach the server (${outcome.reason}).`
   }

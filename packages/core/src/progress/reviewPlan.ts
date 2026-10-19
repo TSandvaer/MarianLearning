@@ -34,7 +34,8 @@ import {
 import { CANON_MATH_FACTS } from './canonMathFacts.generated'
 import { isStoryNode } from '../wordSong/littleStories'
 import { localDateKey } from './clock'
-import { defaultProgress } from './defaults'
+import { startProgressForActive } from '../learners/startDoc'
+import { activeLearner } from '../learners/state'
 import {
   buildLeitnerSessionHint,
   dueLeitnerItems,
@@ -76,19 +77,28 @@ function treeOf(world: MasteryTrack): readonly SkillNode[] {
   return world === 'math' ? MATH_TREE : LITERACY_TREE
 }
 
-let baseline: ReadonlySet<SkillNode> | null = null
+/** Baselines by learner id and start ('' with no list: the web). */
+const baselines = new Map<string, ReadonlySet<SkillNode>>()
 
 /**
- * The steps that are `'mastered'` in `defaultProgress()` (D2): Marian's
- * diagnostic baseline, never reviewed and never a Word Song warm-up
- * source. Computed from the defaults, so a baseline change follows.
+ * The steps that are `'mastered'` in the playing learner's start doc
+ * (D2; learner profiles § 4.8, K7): steps a learner was placed past, never
+ * reviewed and never a Word Song warm-up source. For the migrated learner
+ * 1 (and the web) that is `defaultProgress()`, Marian's diagnostic
+ * baseline; a land-1 learner has none. Cached per learner and start, so a
+ * switch or a moved start follows.
  */
 export function reviewBaseline(): ReadonlySet<SkillNode> {
-  if (baseline === null) {
-    const levels = defaultProgress().skillLevels
+  const active = activeLearner()
+  const key =
+    active === null ? '' : `${active.id}|${JSON.stringify(active.start)}`
+  let baseline = baselines.get(key)
+  if (baseline === undefined) {
+    const levels = startProgressForActive().skillLevels
     baseline = new Set(
       [...MATH_TREE, ...LITERACY_TREE].filter((n) => levels[n] === 'mastered'),
     )
+    baselines.set(key, baseline)
   }
   return baseline
 }

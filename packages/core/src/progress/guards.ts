@@ -529,6 +529,17 @@ export function isProgressV1(v: unknown): v is Progress {
     if (!Array.isArray(v.unlocksCelebrated)) return false
     if (!v.unlocksCelebrated.every((n) => typeof n === 'string')) return false
   }
+  // learner is optional (learner profiles § 4.5, the doc carrier): an
+  // object whose three fields are strings when present. The values are not
+  // checked against a known set, as for step names: an older build or a
+  // newer avatar set must not reject the doc.
+  if ('learner' in v && v.learner !== undefined) {
+    if (!isObject(v.learner)) return false
+    for (const field of ['syncId', 'avatarId', 'language'] as const) {
+      const value = v.learner[field]
+      if (value !== undefined && typeof value !== 'string') return false
+    }
+  }
   return true
 }
 

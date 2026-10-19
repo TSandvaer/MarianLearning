@@ -3,10 +3,12 @@
  * core's platform seams (the web host is `src/platform/web.ts` at the
  * repo root).
  *
- *   - storage:    a synchronous `KeyValueStore` on expo-sqlite
+ *   - storage:    a synchronous `KeyValueStore` on expo-sqlite, scoped to
+ *     the learner playing (`ensureLearnerList`, learner profiles § 4.3)
  *   - API base:   `EXPO_PUBLIC_API_BASE`, default production
  *   - cloud sync: `EXPO_PUBLIC_PROGRESS_API_SECRET`, and each successful
- *     sync recorded as Parent Settings' "Last synced" (`recordLastSync`)
+ *     sync recorded as Parent Settings' "Last synced" for the learner whose
+ *     sync ID it was (`recordLastSyncForSyncId`)
  *   - day offset: the debug launch flag
  *
  * `bootNative()` installs them and then applies a debug step jump and a
@@ -23,7 +25,10 @@ import {
 } from '@marian/core'
 import { applyDebugSeed } from '@marian/core/debug/seeds'
 import { applyQaStep } from '@marian/core/debug/stepProgress'
-import { recordLastSync } from '@marian/core/progress'
+import {
+  ensureLearnerList,
+  recordLastSyncForSyncId,
+} from '@marian/core/learners'
 import type { BuildEnv } from './buildEnv'
 import { setLaunchFlags, type LaunchFlags } from './launchFlags'
 
@@ -39,6 +44,8 @@ export interface SyncKeyValueBackend {
   getItemSync(key: string): string | null
   setItemSync(key: string, value: string): void
   removeItemSync(key: string): unknown
+  /** Every key (expo-sqlite 57's `getAllKeysSync`): the learner list's rebuild. */
+  getAllKeysSync?(): string[]
 }
 
 /**
@@ -52,13 +59,17 @@ export interface SyncKeyValueBackend {
 export function sqliteKeyValueStore(
   backend: SyncKeyValueBackend,
 ): KeyValueStore {
-  return {
+  const store: KeyValueStore = {
     getItem: (key) => backend.getItemSync(key),
     setItem: (key, value) => backend.setItemSync(key, value),
     removeItem: (key) => {
       backend.removeItemSync(key)
     },
   }
+  if (typeof backend.getAllKeysSync === 'function') {
+    store.keys = () => backend.getAllKeysSync!()
+  }
+  return store
 }
 
 /** `EXPO_PUBLIC_API_BASE` when set (trailing slashes are fine), else production. */
@@ -73,16 +84,23 @@ export interface NativePlatformDeps {
   flags: LaunchFlags
 }
 
-/** Install the native implementations of every core seam. */
+/**
+ * Install the native implementations of every core seam. Right after the
+ * sqlite store, the learner list (learner profiles § 4.3): on the first
+ * run today's child becomes learner 1 with nothing moved, and the playing
+ * learner's scoped store replaces the raw one. It never throws; on any
+ * error the raw store stays installed, today's behaviour.
+ */
 export function installNativePlatform({
   backend,
   env,
   flags,
 }: NativePlatformDeps): void {
   setKeyValueStore(sqliteKeyValueStore(backend))
+  ensureLearnerList()
   setApiBase(resolveApiBase(env.apiBase))
   setCloudSyncAuthSecretSource(() => env.progressApiSecret)
-  setCloudSyncSuccessListener(() => recordLastSync())
+  setCloudSyncSuccessListener((syncId) => recordLastSyncForSyncId(syncId))
   // `flags.dayOffset` is already null unless debug is on.
   setDayOffsetSource(() => flags.dayOffset)
 }

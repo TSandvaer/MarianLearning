@@ -52,5 +52,13 @@ export type Route =
    * The web never routes here.
    */
   | 'peek'
+  /**
+   * Native only: "Who is playing?", the learner picker
+   * (`design/native/learner-profiles.md` § 1). Reached with 2 or more
+   * learners on the device: after Splash, from the Hub badge, Session
+   * End's handover, the return rule and Parent Settings' Done. A tap goes
+   * to Greet or the Hub. The web never routes here.
+   */
+  | 'picker'
 
 export const FIRST_ROUTE: Route = 'splash'

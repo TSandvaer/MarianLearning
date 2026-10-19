@@ -124,7 +124,7 @@ export function buildWordSongSessionPayload(
     return {
       track: 'word-song',
       level: 1,
-      childName: 'Marian',
+      childName: 'friend',
       ...(hints.focusNode !== undefined
         ? { progress: { focusNode: hints.focusNode } }
         : {}),
@@ -173,7 +173,7 @@ function forwardPayload(
   return {
     track: 'word-song',
     level: 1,
-    childName: 'Marian',
+    childName: 'friend',
     ...progressBlock,
   }
 }
