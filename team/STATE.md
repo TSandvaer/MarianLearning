@@ -1,6 +1,6 @@
 # STATE — Marian Tutor live coordination
 
-**Resume next-action:** _2026-10-17: Content wave 2 SHIPPED (build 10 on the iPad, production 2e2675f, smoke green). In flight: Map tap-to-play #592 (Kevin review, Lily render of 60 lines), then Thomas's ear test and iPad look; it has a server change, so `yarn release` BEFORE TestFlight build 11. Voice-QA baseline #590 merging._
+**Resume next-action:** _2026-10-19 12:10Z: Content wave 4 SHIPPED: #608 + #607 merged, production released (smoke green), TestFlight build 15 queued (EAS fe2159e8), baseline #611 merging. Next: Thomas installs build 15 on both devices; Orca workspace cleanup (devon-ng-more-and-less, kevin-ws-land-8, review/fix workspaces) + remote branch deletes; then wave 5 per Dave's roadmap (ai/ay, oa) when Thomas says go. Open: Dave's land-7 first-tap check (T5)._
 
 _Earlier headers and log-like sections (2026-08-02 to 2026-10-14) are archived verbatim in [`log/state-archive-2026-08-02-to-2026-10-14.md`](log/state-archive-2026-08-02-to-2026-10-14.md)._
 
