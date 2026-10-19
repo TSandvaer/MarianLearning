@@ -2,6 +2,8 @@
 
 **Date:** 2026-10-15. **For:** Matt, relayed to Thomas. **Status:** research only. Nothing gets built from this until Thomas says go.
 
+**2026-10-19:** the Danish premise below is withdrawn, and the app is planned for many learners, not one. See "Corrections (2026-10-19)" in the wave 5 addendum at the end.
+
 ## Question
 
 Both paths currently end here: Word Song at `simple-sentences` ("reading sentences") and Number Garden at `mult-6-9` ("big groups") (`packages/core/src/sessionEnd/friendlyNodeName.ts`, `STAGE_SPOKEN_NAMES`). Marian found her first sessions (2026-10-14) too easy in both worlds. In maths she was mostly right but counted on her fingers. With the fast track she may reach the ends sooner than planned. What should come next in each world, what does each step need, and should we extend the paths or deepen the existing steps first?
@@ -407,3 +409,305 @@ Steps 19 and 20 use `cvc-word` exactly as land 6 does:
 - R8 is a reference-work summary, not a study of children. _sheep / ship_ is a good trap for reading even if she hears the vowels the same.
 - Hypothesis: _seed_ and _peach_ are the weakest pictures, and the reserves exist for them.
 - M2's binding wording is still from search excerpts. Her school's year plan outranks it.
+
+---
+
+## Addendum, 2026-10-19: content wave 5
+
+**For:** Matt and the coordinator, relayed to Thomas; Kyle writes the spec. **Status:** research only. Thomas said go on 2026-10-19 (popup "Start wave 5 roadmap"). Step numbers continue the tables above: Number Garden 16–17, Word Song 22–24.
+
+**Who this plans for:** any learner of about 6 to 9 learning maths and English reading in the app (Thomas, 2026-10-19: the app is multi-user). Marian (8, Tagalog-first, some English, on the app since 2026-10-14) is one user. Her signals ("too easy", counting on fingers) are one user's data, and no step below depends on one child's school, language or history.
+
+### Corrections (2026-10-19)
+
+Thomas, 2026-10-19: Marian has no Danish and has never been to Danish school. The "Danish school since August 2026" premise (section "Application to Marian", from `CLAUDE.md:8`) was wrong, and every choice built on it loses that basis. One line each: does it still hold on other evidence?
+
+| Earlier choice (where)                                                                                             | Verdict                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Align maths with the Danish grade-3 goals (M2; "Application to Marian"; § 2 "Why this order"; wave 4 § 1)          | **Withdrawn.** The progression follows the US standards (M1, M8, M12). The shipped hundreds steps still hold on them: hundreds is 2.NBT.A.1 and A.3, more and less is 2.NBT.B.8 widened. Nothing shipped changes.                                                                                                                         |
+| Leave fractions out because Danish puts them after grade 6 (Bottom line)                                           | **Reason gone; this changes.** CCSS has equal shares with halves, thirds and fourths in grade 2 (2.G.A.3) and unit fractions in grade 3 (3.NF.A.1, M12), and M7 backs them. Fractions become a candidate for a later wave, starting from sharing's equal shares.                                                                          |
+| Leave clock time out because Danish "halv tre" clashes with "half past two" (Bottom line; "Application to Marian") | **Reason gone; this changes.** Clock time is grade 1–2 (1.MD.B.3 hours and half-hours, 2.MD.C.7 five minutes, M12). It becomes a candidate for a later wave. It needs a new clock picture and a few new words, so it is not cheap.                                                                                                        |
+| Digits on screen for every maths problem, because maths class is in Danish (M5; wave 4 rule 7)                     | **Holds, new reason.** Digits are language-free for any learner who meets maths in more than one language, and M5 found exact facts tied to the training language (adults, small sample). It costs nothing. Keep.                                                                                                                         |
+| The digit-swap chip as "the slip a Danish inner voice predicts" (M6, M9; wave 4 § 1; `content-wave-4.md:176`)      | **Holds only as a weaker trap.** English-speaking children make very few inversion errors (M13), so the swap is not a predicted slip for English learners. It still makes the learner read both digits in their places, and it is the "zero in the wrong place" error in step 16. Shipped chips stay; new steps prefer evidenced classes. |
+| Hundreds P5 names the places "in Danish order" (`content-wave-3.md:144`, `:219`; `extendedProblems.ts:209`)        | **Holds, new reason (my judgment).** Places named out of order are an expanded form (2.NBT.A.3) that a child can't solve by copying digits in the order they are heard. Keep; the code comment's "Danish" can go when that file is next touched.                                                                                          |
+| Division sign "may be the Danish ':'" (`content-wave-2.md:586`)                                                    | **Withdrawn.** CCSS writes ÷ (3.OA.A.4, M12). Use ÷ when sharing gets a sign.                                                                                                                                                                                                                                                             |
+| English is a school subject in her Danish school ("Application to Marian")                                         | **Withdrawn.** Word Song's case rests on R1 and R2 (vocabulary limits L2 readers) without it.                                                                                                                                                                                                                                             |
+| R2 used "for an L2 child in a Scandinavian school"                                                                 | **Holds, wider.** Its finding (L2 vocabulary limits comprehension) applies to any L2 English reader.                                                                                                                                                                                                                                      |
+| "Her school's year plan outranks both curricula" (Risks, both earlier sections)                                    | **Withdrawn.** No learner's school is assumed.                                                                                                                                                                                                                                                                                            |
+
+`CLAUDE.md:8` still says "Starting Danish school August 2026"; changing it is the coordinator's call, not part of this roadmap PR.
+
+### State check (read in code, 2026-10-19)
+
+- **Wave 4 shipped** (#607, #608): `hundreds-addsub` (`packages/core/src/progress/types.ts:55`), spoken "more and less" (`packages/core/src/sessionEnd/friendlyNodeName.ts:167`), the 2nd stop of land 5 (`packages/core/src/progress/lands.ts:53`); `bee-words`, `car-words`, `sheep-stories` (`types.ts:112-114`) in land 8 "Words and stories" (`lands.ts:106-111`). Both paths end there: Number Garden at land 5 of 5, Word Song at land 8 of 8.
+- **Zeros and "one" are parser-blocked today.** Place-value digits are 2–9 (`packages/core/src/math/extendedProblems.ts:195-196`), and a more-or-less read is refused if the start or the answer has a zero (`packages/core/src/math/planFromServer.ts:910`).
+- **Two-digit + two-digit is nowhere on the path.** Both two-digit steps add or take away a one-digit number ("Twenty-seven plus six. How many?", `public/canon/math/level-1/two-digit-addsub.json` and `two-digit-addsub-with-regroup.json`). Past 9 they draw no counters (`MAX_COUNTED_ADDEND = 9`, `mobile/src/layout/mathLayout.ts:509`, `:526-528`), so the equation is the only picture.
+- **Regroup chip classes exist:** `'forgotten-carry'` and `'smaller-from-larger'` (`packages/core/src/math/distractors.ts:223-224`), from `design/research/wave-5-borrow-carry-error-patterns.md` (an earlier "wave 5" of the web build, not this one).
+- **Words:** 106 pack pictures (`ls mobile/assets/pictures | wc -l`). None of the 16 new target words below is in `wordPack.ts`, `bigWordsSteps.ts` or any canon line (`grep`, 2026-10-19). Every land-6-format word takes "Yes! That's a <word>." (`packages/core/src/wordSong/bigWordsSteps.ts:22`), so mass nouns (_rain_, _soap_, _paint_) and vowel-first words stay out.
+- **The lead cue** lights a word's last two cells (`'ending-pair'`, `mobile/src/screens/wordSong/introSpotlight.ts:83-84`).
+
+### Bottom line
+
+- **Number Garden: two steps.**
+  - **16 zeros:** three-digit numbers with an empty place (305, 460, 700) and "one hundred" as a start. It joins land 5.
+  - **17 adding big numbers:** two-digit + two-digit, mostly with a new ten (28 + 35). It opens a new land 6.
+  - Both reuse `PlaceValueStage`. No new core word.
+- **Word Song: three steps in a new land 9.**
+  - **22 snail words:** ai/ay and oa together, 8 words.
+  - **23 moon words:** long oo, 8 words.
+  - **24 goat stories:** sheep stories' format with the 16 new words.
+- **ai/ay and oa: one combined step, not one each.** Each team has only about 6 words that pass the picture bar. Together they give 8 strong words, and the 2nd word step goes to oo, which has 8 of its own.
+- **Order:** NG 16 → 17 on one track, WS 22 + 23 together, then 24. NG and WS run in parallel.
+
+### New evidence
+
+**Maths**
+
+- **M12. Common Core, fetched 2026-10-19** (standards, not evidence of effect):
+  - 2.NBT.A.1: three digits are hundreds, tens and ones; "100 can be thought of as a bundle of ten tens"; "The numbers 100, 200, … 900 refer to one, two, … nine hundreds (and 0 tens and 0 ones)." https://www.thecorestandards.org/Math/Content/2/NBT/
+  - 2.NBT.A.3: "Read and write numbers to 1000 using base-ten numerals, number names, and expanded form."
+  - 2.NBT.B.5: "Fluently add and subtract within 100 using strategies based on place value …". 2.NBT.B.7: within 1000 with models, "sometimes it is necessary to compose or decompose tens or hundreds". 3.NBT.A.2: fluently within 1000 (https://www.thecorestandards.org/Math/Content/3/NBT/).
+  - Also used in the corrections: 1.MD.B.3, 2.MD.C.7, 2.G.A.3, 3.NF.A.1, 3.OA.A.4 (the ÷ sign), each fetched from thecorestandards.org on 2026-10-19.
+- **M13. Steiner, Finke, Clayton, Banfi, Kemény, Göbel & Landerl (2021)**, "Language effects in early development of number writing and reading", _Journal of Numerical Cognition_ 7(3), e6929, doi:10.5964/jnc.6929. https://jnc.psychopen.eu/index.php/jnc/article/view/6929
+  - 264 English-speaking and 170 German-speaking children, followed through grades 1 and 2.
+  - "For English, the percentage of inversion-related errors was very low."
+  - Three-digit numbers with "syntactic" zeros (109) were transcoded more accurately than those with "lexical" zeros (190).
+  - Moderate (one longitudinal study; I read the abstract only). _Use:_ zeros are hard for English-speaking children too, and the digit swap is not their typical slip.
+- **M14. Byrge, Smith & Mix (2014)**, "Beginnings of place value: how preschoolers write three-digit numbers", _Child Development_ 85(2):437–443. https://cogdev.lab.indiana.edu/research/byrge_smith_mix.pdf
+  - 172 children aged 4–6 often wrote "expanded" numbers with extra zeros (600402 for 642).
+  - Moderate; I saw a search summary only. _Use:_ zeros are where number writing breaks. A chip like 30005 can't be offered (chips stay at three digits or fewer), so step 16 uses the zero left out and the zero moved instead (my judgment).
+- **M15. Watson, Lopes, Oliveira & Judge (2018)**, "Error patterns in Portuguese students' addition and subtraction calculation tasks: implications for teaching", _Journal for Multicultural Education_ 12(1):67–82, doi:10.1108/JME-01-2017-0002. https://research.ulusofona.pt/en/publications/error-patterns-in-portuguese-students-addition-and-subtraction-ca-9/
+  - 697 elementary students. In addition, miscalculation was the most common error (38.6%) and failure to regroup the second (17.5%).
+  - Weak to moderate (a convenience sample; abstract only). _Use:_ step 17's two traps are exactly these two: the lost new ten and the off-by-one slip.
+- **M16. Fuson, Wearne, Hiebert, Murray, Human, Olivier, Carpenter & Fennema (1997)**, "Children's conceptual structures for multidigit numbers and methods of multidigit addition and subtraction", _JRME_ 28(2):130–162. https://nctm.org/Publications/journal-for-research-in-mathematics-education/1997/Vol28/Issue2/Children_s-Conceptual-Structures-for-Multidigit-Numbers-and-Methods-of-Multidigit-Addition-and-Subtraction
+  - The four projects stress relating ten-structured quantities to number words and written numerals, then using them to add and take away.
+  - Moderate (a synthesis); abstract only. _Use:_ blocks, the spoken read and the digit chips together, as `PlaceValueStage` already does.
+- **Earlier note reused:** `design/research/wave-5-borrow-carry-error-patterns.md` (Brown & VanLehn 1980; Geary 2004) for `'forgotten-carry'` and `'off-by-one'`.
+
+**Reading**
+
+- **R10. UFLI Foundations Toolbox, fetched 2026-10-19.**
+  - Lesson 84 "ai /ā/, ay /ā/"; 86 "oa /ō/, ow /ō/, oe /ō/". https://ufli.education.ufl.edu/foundations/toolbox/84-88/
+  - Lesson 89 "u /oo/, oo /oo/" (the _book_ sound); 90 "oo /ū/" (the _moon_ sound); 91 "ew, ui, ue". https://ufli.education.ufl.edu/foundations/toolbox/89-94/
+  - _Use:_ ai/ay and oa are the UFLI lessons on either side of ee/ea (84, 86). UFLI teaches _book_'s oo before _moon_'s; I put _moon_ first (§ 3, step 23, says why).
+
+### 1. Number Garden step 16: zeros
+
+**What it is:** three-digit numbers with an empty place, plus "one hundred" as a start. 2.NBT.A.1b names the zeros outright, and 2.NBT.A.3 asks for number names and expanded form (M12). Zeros are where children's number writing breaks (M13, M14). It is the 3rd stop of land 5, after more and less; the working name is "zeros", and the spoken name is Kyle's.
+
+**The picture:** hundreds' `PlaceValueStage`, with one new look: an **empty tray**. Its tag shows 0 at the answer. No new motion.
+
+**Shapes:**
+
+- **P1–P3, build:** Emma names all three places, the empty ones too ("no tens"), and the blocks build on the read, as hundreds' P1–P5.
+- **P4, build from "one hundred":** the first 1 in a place (today's digits are 2–9).
+- **P5, number name to digits:** "Find one hundred and ninety." Nothing is built on the read; the blocks build at hint 2. This is M13's harder kind of zero.
+- **P6–P8, ten or one hundred more or less on a number with a zero:** the zero gets filled (P6), stays (P7) or is made (P8). One place, no regrouping, as in more and less.
+
+**Suggested canon** (the numbers may change; the rules below are binding):
+
+| P   | Read (characters)                                                | Answer | Blocks move | Wrong chips (class)              |
+| --- | ---------------------------------------------------------------- | ------ | ----------- | -------------------------------- |
+| 1   | "Three hundreds, no tens and five ones. What number is it?" (57) | 305    | on the read | 505, 705 (gentle)                |
+| 2   | "Four hundreds, six tens and no ones. What number is it?" (55)   | 460    | on the read | 660, 860 (gentle)                |
+| 3   | "Seven hundreds, no tens and no ones. What number is it?" (55)   | 700    | on the read | 500, 300 (gentle)                |
+| 4   | "One hundred, no tens and eight ones. What number is it?" (55)   | 108    | on the read | 18 (zero-drop), 180 (digit-swap) |
+| 5   | "Find one hundred and ninety." (28)                              | 190    | at hint 2   | 19 (zero-drop), 109 (digit-swap) |
+| 6   | "Three hundred and five. What is ten more?" (41)                 | 315    | at hint 2   | 306, 405 (wrong-place)           |
+| 7   | "Six hundred and forty. What is one hundred more?" (48)          | 740    | at hint 2   | 650, 641 (wrong-place)           |
+| 8   | "Four hundred and sixteen. What is ten less?" (43)               | 406    | at hint 2   | 415, 316 (wrong-place)           |
+
+**Rules:**
+
+- **Numbers:** at least one zero in every start or answer; no regrouping; answers in 100–999. Digits run 0–9. In the build reads (P1–P4) a 1 appears only in the hundreds, because "one ten" is awkward English; the number-name reads (P5–P8) take any digit (315, 416).
+- **Blocks:** at most 7 flats, 6 rods and 8 cubes, hundreds' measured maxima (the canon above peaks at 7, 6, 8).
+- **Wrong-chip classes:**
+  - `'gentle'` (P1–P3): hundreds' rule, the hundreds digit + 2 and + 4 (− 2 and − 4 above 5).
+  - `'zero-drop'` (new, P4–P5): the number with its zero left out (108 → 18). My judgment, from M13 and M14; I found no study that counts this exact slip.
+  - `'digit-swap'` (P4–P5): here it moves the zero (108 → 180), the lexical/syntactic contrast of M13.
+  - `'wrong-place'` (P6–P8): hundreds' own count-1 rule, the other two of ± 1, ± 10, ± 100.
+- **Chip range:** the zero-drop chip has two digits, so this step's chips run 10–999, not 100–999. Kevin widens the check for this file only.
+
+**Hints:** 1 "Look at the tens." / "Look at the ones." (reused); 2 "Zero tens." / "Zero ones.", with the empty tray pulsing; 3 the read's question. Correct "Yes! Three hundred and five!".
+
+**Words:** none new. _no_, _zero_ ("Yes! Zero!") and _find_ ("Find the word: a.") are already spoken (word scan of canon, guidance and path lines, 2026-10-19).
+
+**Build cost:** parser widening (digits 0–9 and 1 in the place-value read; zeros in the more-or-less read; a new "Find <number>." template; count-1 "less"), the empty-tray look, the zero-drop class. No pictures.
+
+### 2. Number Garden step 17: adding big numbers
+
+**What it is:** two-digit + two-digit within 100, mostly with a new ten. 2.NBT.B.5 asks for this fluently, before three-digit regrouping (2.NBT.B.7) and grade 3's fluency within 1000 (3.NBT.A.2, M12). It is the first stop of a new land 6; the working name is "adding big numbers", and the spoken name is Kyle's ("big numbers" is taken by `two-digit-addsub-no-regroup`).
+
+**Why it serves fluency, not just bigger numbers:**
+
+- Every regroup problem hides a fact within 20 (8 + 5, 7 + 6), the fluency that M1 calls the entry ticket to grade 3 and that finger-counters still count.
+- Counting all of 28 + 35 by ones is impractical, so the efficient route is tens with tens and ones with ones (M16). Counting the ones on fingers stays fine.
+
+**The picture:** `PlaceValueStage` with the tens and ones trays only, under today's equation.
+
+- **The one new motion:** when the ones tray holds ten or more, ten cubes slide together into a rod, and the rod moves to the tens tray. That is 2.NBT.A.1a's "bundle of ten tens", one place down.
+- **Fading (M10):** P1–P3 move their blocks on the read; P4–P8 move them at hint 2 (wave 4's rule).
+- **Layout risk for Kyle:** up to 14 cubes before the bundle (P6) and 9 rods (P8), above hundreds' 8 and 6.
+
+**Suggested canon** (the existing addition template, `planFromServer.ts:580`):
+
+| P   | Read (characters)                               | Answer | New ten | Wrong chips (class)                   |
+| --- | ----------------------------------------------- | ------ | ------- | ------------------------------------- |
+| 1   | "Thirty-four plus twenty-five. How many?" (39)  | 59     | no      | 39, 79 (gentle)                       |
+| 2   | "Forty-two plus thirty-six. How many?" (36)     | 78     | no      | 58, 98 (gentle)                       |
+| 3   | "Twenty-eight plus thirty-five. How many?" (40) | 63     | yes     | 43, 83 (gentle)                       |
+| 4   | "Forty-seven plus twenty-six. How many?" (38)   | 73     | yes     | 63 (forgotten-carry), 74 (off-by-one) |
+| 5   | "Thirty-nine plus forty-four. How many?" (38)   | 83     | yes     | 73, 82                                |
+| 6   | "Fifty-six plus twenty-eight. How many?" (38)   | 84     | yes     | 74, 85                                |
+| 7   | "Twenty-nine plus thirty-three. How many?" (40) | 62     | yes     | 52, 61                                |
+| 8   | "Sixty-five plus twenty-seven. How many?" (39)  | 92     | yes     | 82, 93                                |
+
+**Rules:**
+
+- **Numbers:** both addends 11–89 with no zero digit; answers 21–99 with no zero digit. P1–P2 without a new ten (tens with tens is the new idea), P3–P8 with one. The ones sums cover 12, 13 and 14, and the off-by-one direction alternates.
+- **Wrong-chip classes:** `'gentle'` (P1–P3: the tens digit ± 2); P4–P8 `'forgotten-carry'` (the answer − 10, the lost new ten) and `'off-by-one'` (the answer ± 1, a counting slip). Both classes exist in `distractors.ts`, and they are M15's two most frequent addition errors.
+
+**Hints:** 1 "Look at the ones." (reused); 2 "Ten ones make a ten." (the bundle plays); 3 "How many?". **Lead** (forward sessions until mastered): "Make a ten!". Both lines use only words in use.
+
+**Not in it:** taking away with regrouping (its `'smaller-from-larger'` class is ready; a later step), three-digit regrouping, numbers with zeros, a Leitner fact (Kevin checks what the two-digit steps record today and matches it).
+
+### 3. Word Song steps 22–24
+
+Steps 22 and 23 use `cvc-word` exactly as land 6 and bee words do:
+
+- "Read the <word>." with the word card, 3 picture chips, the 1500 ms silent beat, the hint "Let's look. <Word>." and the given answer.
+- 8 words from canon in order, gentle chips on P1–P3 and trap chips on P4–P8. Every row carries both pairs, because a review moves blocks.
+- Every word takes "Yes! That's a <word>.".
+- **Lead:** "Two letters, one sound!" again; it is literally true for ay, ai, oa and oo.
+
+**The chip rule for both steps:**
+
+- **Gentle (P1–P3):** another category, another first sound, and no letter of the target's team. Kyle picks them (wave 4's D5).
+- **Trap 1 (P4–P8):** the same start with a short vowel or with another team, so the learner must read the team. _coat/cot_ and _boat/bat_ are the word without one team letter (the _cart/cat_ logic); _loaf/leaf_ and _tray/tree_ swap the team for one the learner knows.
+- **Trap 2:** a rhyme or another word with the same team, so the learner must read the start or the end.
+- **New this wave:** the bee- and car-words pictures make team-against-team traps possible for the first time.
+
+**Step 22: snail words (ai/ay and oa).** One idea the learner already has from bee words: two letters, one sound, the first letter's name. Cake words taught four spellings in one step under one idea, and bee words two; this step teaches three under the same idea.
+
+| P   | Word  | Team | Trap 1                       | Trap 2                      |
+| --- | ----- | ---- | ---------------------------- | --------------------------- |
+| 1   | tray  | ay   | tree (ay vs ee)              | train (same start, read on) |
+| 2   | boat  | oa   | bat (boat without the o)     | bone (o_e, the same sound)  |
+| 3   | snail | ai   | seal (s…l, ai vs ea)         | sack (s, short a)           |
+| 4   | coat  | oa   | **cot (coat without the a)** | goat (rhyme)                |
+| 5   | train | ai   | chain (rhyme)                | tray (same start)           |
+| 6   | loaf  | oa   | **leaf (oa vs ea)**          | log (l, short o)            |
+| 7   | goat  | oa   | gum (g, short u)             | coat (rhyme)                |
+| 8   | chain | ai   | can (ch as c, ai as short a) | train (rhyme)               |
+
+- **P1 must be _tray_:** it is the only word that ends in its team, so duck words' last-two-cells cue lights _ay_ with no code change.
+- **The teams alternate** (a, o, a, o …) so neither is a blocked run.
+- **Kept out:** _tail_ and _sail_ (a tail alone or a sail alone doesn't read at 96 pt, and a sail is the _ship_ picture); _rain_, _paint_, _hay_, _soap_, _toast_ (mass nouns); _oak_, _oar_ (vowel-first); _pail_ (British says bucket); _plait_ (British /plæt/); _cloak_ (it is the _cape_ picture); _hair_, _chair_ (British /eə/, not the ai sound).
+- **Reserves:** _nail_, _brain_ (ai); _toad_, _goal_ (oa). _toad_ needs `toad–frog`; _goal_ needs `goal–net`.
+
+**Step 23: moon words (long oo).** oo says /uː/, a new sound like ar's (UFLI lesson 90, R10).
+
+| P   | Word  | Trap 1              | Trap 2            |
+| --- | ----- | ------------------- | ----------------- |
+| 1   | moon  | mop (m, short o)    | spoon (rhyme)     |
+| 2   | spoon | sock (s, short o)   | moon (rhyme)      |
+| 3   | boot  | box (b, short o)    | bone (o_e)        |
+| 4   | broom | brick (br, short i) | boot (same team)  |
+| 5   | tooth | top (t, short o)    | boot (same team)  |
+| 6   | stool | star (st, ar vs oo) | spoon (same team) |
+| 7   | hoop  | hot (h, short o)    | roof (same team)  |
+| 8   | roof  | rock (r, short o)   | rope (o_e)        |
+
+- **Why _moon_ before _book_:** long oo has 8 strong picture words; short oo has about 4 (_book_, _hook_, _foot_, _hood_). UFLI orders them the other way; the cost of being wrong is low, because both are content in a shipped format.
+- **_tooth_** uses th, which `digraphs-th-voiceless` taught.
+- **Kept out:** _goose_ (a final e that isn't magic e, straight after cake words); _food_, _zoo_ (no "a"); _balloon_ (two syllables).
+- **Weakest:** _roof_ and _hoop_ (hypothesis). _pool_ is the only reserve, and it is weak too. A failing word goes back through me.
+- **Needs a small code change:** no picturable oo word ends in oo, so the lead's cue must light the team's cells wherever they are (a new `PATTERNS` entry in `introSpotlight.ts`).
+
+**New `FORBIDDEN_PAIRS` candidates** (Thomas's picture review may add more):
+
+| Pair                                                | Why                                |
+| --------------------------------------------------- | ---------------------------------- |
+| tray – mat                                          | flat rectangles                    |
+| train – bus, train – van, train – car, train – jeep | vehicles in side view              |
+| chain – rope                                        | long links or strands              |
+| boat – ship, boat – tub                             | things that float                  |
+| goat – sheep, goat – dog, goat – pig, goat – cat    | four-legged animals (the pig rule) |
+| loaf – bun                                          | bread                              |
+| snail – bug                                         | small creatures                    |
+| broom – mop                                         | long-handled cleaning tools        |
+| boot – sock                                         | footwear                           |
+| stool – desk                                        | furniture on legs                  |
+| hoop – ring                                         | rings                              |
+| roof – tent, roof – barn                            | pointed roofs                      |
+
+No trio above holds a pair, old or new, and every trap word already has a picture (my check against `FORBIDDEN_PAIRS`, `wordPack.ts:1676`, and the 106 pictures, 2026-10-19).
+
+**New pictures: 16**, the targets only. Picture notes for Kyle: a crescent _moon_ (a full disc reads as the _sun_), a rowing _boat_ with no sail (the _ship_ has sails), a _goat_ with horns and a beard (the _sheep_ picture avoids both), a _tray_ with a rim and handles.
+
+**Step 24: goat stories (little stories, round 3).**
+
+- **Format:** sheep stories' exactly: 8 stories, 2 sentences of 10–14 words, the question word mixed after P3, the scene only after the answer.
+- **Nothing else new.** The open land-7 question (do children answer story questions on the first tap?) argues against adding difficulty here. If first-tap answers prove low, the splice regroups the canon into one question word per stretch, wave 4's T5, with no build change.
+- **Words:** the taught-word rule, plus the 16 new words. Each story uses at least 2 of them, each of the 16 appears at least once, and the goat is in every story but not always the answer.
+- **Examples** (not binding; story words checked against the shipped story and sentence canon):
+  - "The goat sat in the boat. It has a loaf." (10 words) → "Who sat in the boat?" → **goat** / boat, loaf.
+  - "The goat has a coat. A spoon is on the stool." (11) → "What is on the stool?" → **spoon** / coat, stool.
+  - "The goat sat in the train. The snail ran to the roof." (12) → "Where is the goat?" → **train** (In) / snail, roof.
+- **Questions:** 23 characters at most. "What does the goat have?" is 24, so What questions use "What is in/on the …?".
+- **Lead:** "Read the story. Who, what or where?" (reused).
+- **Why a third story round, not a third phonics step:** connected text is where the language limit (R1, R2) gets trained, and UFLI pairs each pattern lesson with decodable text (R6, R9). The 16 words need a place to be read in sentences.
+
+**Words (the ~200 cap):** no new core word in the five steps. The leads, hints and reads above use only words already spoken. The step names are target words. Land names are Kyle's and may add one or two. The count stays about 177.
+
+### 4. Order, lands and what must hold
+
+**Tracks:**
+
+- **NG:** step 16, then step 17, on one track. Both change `PlaceValueStage` and `planFromServer.ts`, so running them in parallel buys only a rebase.
+  - Core: zeros in the parser, "Find <number>.", the zero-drop class; then two-tray place value for addition and the class reuse.
+  - Stage: the empty tray; then the bundle.
+  - No pictures.
+- **WS words:** snail words and moon words together, in the land-6 format: rows, 16 pictures, the moon-words cue, render, voice QA.
+- **WS stories:** goat stories once the 16 pictures are approved, because the scenes use them as references (wave 4's order).
+- **NG and WS in parallel.**
+
+**Why this order:**
+
+- **NG 16 before 17:** CCSS order (2.NBT.A before 2.NBT.B). Zeros finish land 5's idea with no new motion.
+- **WS 22 before 23:** ai/ay and oa reuse bee words' idea (the team says the first letter's name). oo brings a new sound, as car words did after bee words.
+
+**Lands:**
+
+- Step 16 joins Number Garden land 5 as its 3rd stop.
+- **Step 17 opens Number Garden land 6.** It is not hundreds, and land 6 can later hold taking away with a new ten, three-digit regrouping and three-digit + three-digit. 6 lands still fit portrait (`PORTRAIT_FIT_LANDS = 6`, `packages/core/src/map/mapLayout.ts:323`).
+- **Steps 22–24 make Word Song land 9.** Land 8 is a full trio, as land 7 was. Word Song already scrolls on portrait, so a 9th band uses the same scroll path; Kyle re-runs wave 4's map check (T6) for it. Land names are Kyle's.
+
+**Later candidates (not this wave):** taking away two-digit numbers with a new ten; clock time (1.MD.B.3); equal parts (2.G.A.3); igh/ie and ow, which are short of picture words.
+
+**What must hold true:**
+
+1. **Never tie fingers to "not yet".** The blocks invite counting, and counting the ones is fine (M3).
+2. **No speed signal.** No timer or "fast"; latency is recorded and never shown.
+3. **Never a red X.** Poof, shake, `puzzled-tilt`, "Hmm... try again?"; hints at the 2nd wrong, the given answer at the 3rd.
+4. **Decode first.** No picture before the chips, and Emma never says the target before the 2nd wrong's hint; in stories, no scene until the answer.
+5. **Taught words only in stories.**
+6. **Every chip reads at 96 pt,** with no forbidden pair in a trio, British-valid words, and "Yes! That's a <word>." working.
+7. **Digits on screen for every maths problem** (the new reason in the corrections).
+8. **One new idea per step.**
+9. **About 177 core words** of the ~200 cap.
+10. **No mechanics added:** no currency, streak, loss or timer.
+11. **No step depends on one learner's school, language or history.**
+
+### Thomas decides
+
+- **Picture spend:** 16 word pictures and 8 scenes. At wave 4's ledger rates (`content-wave-4.md:360-361`) that is about 16 × $0.078 + 8 × $0.13–0.14 ≈ $2.30, or about $2.90 with retakes; `--dry-run` prints the real figure. Recommendation: approve.
+- **One question only Thomas can answer:** with many learners, does the app keep British English as its reading and voice standard? Lily is British, and every word list here is checked against British usage (_boot_, _loaf_, no _pail_). Recommendation: keep British.
+
+### Risks / counter-evidence
+
+- **Combining ai/ay with oa** puts two new teams in one step. Cake words did four spellings under one idea, and there was no way to reach 8 strong words for either team alone. If children mix the teams up, split the step in a later wave using the reserves.
+- **M13–M16 were read as abstracts or summaries.** The zero-drop class is my judgment, and M15 is one convenience sample.
+- **Step 17 grows the stage** to 14 cubes and 9 rods, past hundreds' measured sizes. Kyle's layout pass decides whether that fits, or whether the canon trims to 13 cubes and 8 rods.
+- **_moon_ before _book_** goes against UFLI's order (R10), chosen only for picture supply.
+- **Marian's "too easy" and fingers** are one user's signals from one week. The plan doesn't rest on them; they only argue that fluency, not more content, is the maths limit, as before.
