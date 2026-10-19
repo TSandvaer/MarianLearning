@@ -51,10 +51,28 @@ export interface PathLine {
   kind: PathLineKind
   world: MasteryTrack
   text: string
+  /**
+   * What the render sends to Lily when it is not `text`, as guidance lines
+   * have it: a `THEN_THIS_INPUT_STEPS` step's locked-next line goes as
+   * "<Name>! First, <previous>; then this!" (content wave 5 § 9.1). The
+   * caption stays `text`. Undefined = `text`.
+   */
+  input?: string
   /** Bundled MP3 path relative to `public/`; `null` = not baked yet
    *  (a `DEFERRED_PATH_LINE_KINDS` line). */
   src: string | null
 }
+
+/**
+ * The steps whose locked-next line goes to Lily as "…; then this!" with its
+ * caption unchanged (content wave 5 § 9.1). Two waves needed that take by
+ * ear (hen and bug stories in #599, car words in #607; `team/DECISIONS.md`),
+ * so it is the first take for a new step. Shipped lines are not listed:
+ * their committed MP3s stay as they are.
+ */
+export const THEN_THIS_INPUT_STEPS: ReadonlySet<SkillNode> = new Set<SkillNode>(
+  ['snail-words', 'moon-words', 'goat-stories'],
+)
 
 /**
  * Two-name forms, one bake per (stop, current step) pair: 111 `locked-later`
@@ -100,7 +118,16 @@ function buildLines(): PathLine[] {
     src: string | null = DEFERRED_PATH_LINE_KINDS.has(kind)
       ? null
       : pathLineSrc(id),
-  ) => lines.push({ id, kind, world, text, src })
+    input?: string,
+  ) =>
+    lines.push({
+      id,
+      kind,
+      world,
+      text,
+      ...(input === undefined ? {} : { input }),
+      src,
+    })
 
   for (const world of WORLDS) {
     const steps = pathStepsOf(world)
@@ -140,6 +167,10 @@ function buildLines(): PathLine[] {
         'locked-next',
         world,
         `${Name(n)}! First, ${name(steps[j - 1])}. Then this!`,
+        undefined,
+        THEN_THIS_INPUT_STEPS.has(n)
+          ? `${Name(n)}! First, ${name(steps[j - 1])}; then this!`
+          : undefined,
       )
       for (let i = 0; i <= j - 2; i++)
         add(
@@ -216,9 +247,15 @@ export const BAKED_PATH_LINES: readonly (PathLine & { src: string })[] =
  * tests expect exactly these to be missing. The render commit sets this
  * list to `[]`.
  *
- * Now: none.
+ * Now: content wave 5's Word Song lines (§ 9.1): land 9 and its three
+ * steps, 18 lines.
  */
-export const PATH_LINES_AWAITING_RENDER: readonly string[] = []
+export const PATH_LINES_AWAITING_RENDER: readonly string[] =
+  BAKED_PATH_LINES.filter(
+    (l) =>
+      /\.word-song\.9(\.|$)/.test(l.id) ||
+      /\.(snail-words|moon-words|goat-stories)$/.test(l.id),
+  ).map((l) => l.id)
 
 const BY_ID = new Map(PATH_LINES.map((l) => [l.id, l]))
 

@@ -182,7 +182,7 @@ describe('land 9: snail and moon words deal their rows (content wave 5 § 6, AC 
       trap: ['gum', 'coat'],
     })
     expect(chips(review.problems[3]!)).toEqual(['coat', 'goat', 'gum'])
-    expect(chips(review.problems[1]!)).toEqual(['bug', 'jet', 'moon'])
+    expect(chips(review.problems[1]!)).toEqual(['cup', 'hen', 'moon'])
   })
 })
 

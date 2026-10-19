@@ -364,6 +364,11 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'bee-words',
   'car-words',
   'sheep-stories',
+  // Content wave 5 (design/native/content-wave-5.md § 4, § 5, § 7): land 9.
+  // Written by scripts/spliceContentWave5Canon.ts.
+  'snail-words',
+  'moon-words',
+  'goat-stories',
 ]
 
 /**
@@ -400,6 +405,9 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
  * - bee-words, car-words, sheep-stories (content wave 4 § 8.1): written by
  *   `scripts/spliceContentWave4Canon.ts`, never Haiku-baked; rendered the
  *   same way.
+ * - snail-words, moon-words, goat-stories (content wave 5 § 9.1): written
+ *   by `scripts/spliceContentWave5Canon.ts`, never Haiku-baked; rendered
+ *   the same way.
  *
  * The deliberate render runs `npx tsx scripts/generateSessionCanon.ts
  * --include-pending`; an existing file is still skipped without `--force`.
@@ -421,6 +429,9 @@ export const PENDING_CANON_NODES: ReadonlySet<string> = new Set([
   'bee-words',
   'car-words',
   'sheep-stories',
+  'snail-words',
+  'moon-words',
+  'goat-stories',
 ])
 
 /** The combos a run bakes: missing (or all, with `--force`), minus pending. */

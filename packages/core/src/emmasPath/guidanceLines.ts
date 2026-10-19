@@ -25,6 +25,7 @@ import {
   capitalizeSpokenName,
 } from '../sessionEnd/friendlyNodeName'
 import {
+  LITTLE_STORIES,
   STORY_WORDS,
   storiesOf,
   storySentences,
@@ -246,8 +247,8 @@ function buildLines(): GuidanceLine[] {
   // Little stories (content wave 3 § 4.4, § 5.1): "Read the story." on a
   // story card, and one clip per distinct story word that a word tap plays
   // ("Fox."). The word list comes from `LITTLE_STORIES`. The words sheep
-  // stories bring are rendered from "Word," (content wave 4 § 8.1); wave
-  // 3's 54 keep their committed MP3s and take picks.
+  // and goat stories bring are rendered from "Word," (content wave 4 § 8.1,
+  // wave 5 § 9.1); wave 3's 54 keep their committed MP3s and take picks.
   add(STORY_READ_ID, 'story-read', 'Read the story.', 'word-song')
   for (const word of STORY_WORDS) {
     const cap = `${word.charAt(0).toUpperCase()}${word.slice(1)}`
@@ -261,6 +262,18 @@ function buildLines(): GuidanceLine[] {
   }
   return lines
 }
+
+/** The story words goat stories bring (content wave 5 § 7.2): the 16. */
+const WAVE_5_STORY_WORDS: ReadonlySet<string> = new Set(
+  STORY_WORDS.filter(
+    (w) =>
+      !LITTLE_STORIES.some(
+        (s) =>
+          s.node !== 'goat-stories' &&
+          storySentences(s.story).flat().map(storyWordKey).includes(w),
+      ),
+  ),
+)
 
 /** The story words wave 3 rendered from "Word." (fox, hen and bug stories). */
 const WAVE_3_STORY_WORDS: ReadonlySet<string> = new Set(
@@ -302,6 +315,13 @@ const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {
   'bee-words': 'Two letters, one sound!',
   'car-words': 'Two letters, one sound!',
   'sheep-stories': 'Read the story. Who, what or where?',
+  // Word Song land 9 (content wave 5 § 4.3, § 5.3, § 7.1; Thomas approved
+  // T1–T7): snail and moon words reuse duck words' line, goat stories sheep
+  // stories'. Snail words keep duck words' cue; moon words light the first
+  // "oo" (the native `introSpotlight`'s 'team-pair').
+  'snail-words': 'Two letters, one sound!',
+  'moon-words': 'Two letters, one sound!',
+  'goat-stories': 'Read the story. Who, what or where?',
 }
 
 const sessionIntroId = (n: SkillNode) => `guide.session.intro.${n}`
@@ -329,9 +349,21 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: none.
+ * Now: content wave 5's Word Song lines (§ 9.1): land 9's peeks and
+ * replays and the 16 story words goat stories bring. The three leads are
+ * shipped texts (duck words' and sheep stories'), so their files are
+ * copies of those clips (the bytes the render writes for that text).
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] =
+  GUIDANCE_LINES.filter(
+    (l) =>
+      (l.kind === 'story-word' &&
+        WAVE_5_STORY_WORDS.has(l.id.slice(storyWordId('').length))) ||
+      (['snail-words', 'moon-words', 'goat-stories'].some((n) =>
+        l.id.endsWith(`.${n}`),
+      ) &&
+        l.kind !== 'session-intro'),
+  ).map((l) => l.id)
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 

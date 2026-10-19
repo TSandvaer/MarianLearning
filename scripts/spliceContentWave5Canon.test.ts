@@ -161,25 +161,21 @@ describe('the lead-cue words at P1 (§ 5.3 lint)', () => {
   })
 
   it('names a P1 that breaks the rule', () => {
+    // Another ay-final or oo-holding word at P1 passes.
     expect(
       leadCueViolations({
-        'snail-words': ['boat', 'tray'],
+        'snail-words': ['tray', 'boat'],
         'moon-words': ['boot', 'moon'],
       }),
     ).toEqual([])
+    // Only P1 is read: a later word does not rescue it.
     expect(
       leadCueViolations({
-        'snail-words': ['train', 'tray'],
-        'moon-words': ['stool', 'moon'],
-      }),
-    ).toEqual([])
-    expect(
-      leadCueViolations({
-        'snail-words': ['snail', 'tray'],
+        'snail-words': ['boat', 'tray'],
         'moon-words': ['chain', 'moon'],
       }),
     ).toEqual([
-      'snail-words P1 "snail" does not end in ai, ay or oa',
+      'snail-words P1 "boat" does not end in ai, ay or oa',
       'moon-words P1 "chain" holds no "oo"',
     ])
   })

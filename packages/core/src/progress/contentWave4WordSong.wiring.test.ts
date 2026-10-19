@@ -62,8 +62,14 @@ const NEW = [BEE, CAR, SHEEP] as const
 
 describe('the three steps in the Word Song tree (§ 1, § 3.1, § 4.1, § 6.1)', () => {
   it('follow bug stories, in both tree lists', () => {
-    expect(LITERACY_TREE.slice(-4)).toEqual(['bug-stories', BEE, CAR, SHEEP])
-    expect(WORD_SONG_NODES_IN_ORDER.slice(-4)).toEqual([
+    const at = LITERACY_TREE.indexOf('bug-stories')
+    expect(LITERACY_TREE.slice(at, at + 4)).toEqual([
+      'bug-stories',
+      BEE,
+      CAR,
+      SHEEP,
+    ])
+    expect(WORD_SONG_NODES_IN_ORDER.slice(at, at + 4)).toEqual([
       'bug-stories',
       BEE,
       CAR,
@@ -72,12 +78,14 @@ describe('the three steps in the Word Song tree (§ 1, § 3.1, § 4.1, § 6.1)',
     expect(nextNode('word-song', 'bug-stories')).toBe(BEE)
     expect(nextNode('word-song', BEE)).toBe(CAR)
     expect(nextNode('word-song', CAR)).toBe(SHEEP)
-    expect(nextNode('word-song', SHEEP)).toBeNull()
+    // Content wave 5's land 9 follows.
+    expect(nextNode('word-song', SHEEP)).toBe('snail-words')
   })
 
-  it('are land 8, Words and stories, of 8 Word Song lands; LANDS flattened equals both trees (K6, AC 8)', () => {
+  it('are land 8, Words and stories, of the Word Song lands; LANDS flattened equals both trees (K6, AC 8)', () => {
     const ws = LANDS.filter((l) => l.world === 'word-song')
-    expect(ws).toHaveLength(8)
+    // Content wave 5 adds land 9.
+    expect(ws).toHaveLength(9)
     expect(ws[7]).toEqual({
       world: 'word-song',
       number: 8,
@@ -177,8 +185,9 @@ describe('the lines (§ 8.1, AC 8)', () => {
       'scarf',
       'star',
     ]
-    expect(STORY_WORDS).toHaveLength(71)
-    expect(STORY_WORDS.slice(54)).toEqual(fresh)
+    // Content wave 5's goat stories add 16 more after these.
+    expect(STORY_WORDS).toHaveLength(87)
+    expect(STORY_WORDS.slice(54, 71)).toEqual(fresh)
     const lines = fresh.map((w) => storyWordLine(w)!)
     expect(lines.reduce((n, l) => n + l.text.length, 0)).toBe(87)
     expect(storyWordLine('sheep')).toMatchObject({
@@ -194,10 +203,12 @@ describe('the lines (§ 8.1, AC 8)', () => {
   })
 
   it('32 guidance lines (30 new texts, 477 characters) and 18 path lines (628 characters) of this half, rendered in Lily', () => {
+    const sheepWords = new Set(STORY_WORDS.slice(54, 71))
     const g = GUIDANCE_LINES.filter(
       (l) =>
         NEW.some((n) => l.id.endsWith(`.${n}`)) ||
-        (l.kind === 'story-word' && l.input !== undefined),
+        (l.kind === 'story-word' &&
+          sheepWords.has(l.id.replace('guide.story.word.', ''))),
     )
     expect(g).toHaveLength(32)
     // § 8.1: peeks 6 + replays 6 + 3 leads + 17 clips. The bee and car
@@ -474,6 +485,9 @@ describe('the warm-up never serves a sheep-story block (AC 7, K8)', () => {
     const levels = { ...seed.skillLevels } as SkillLevels
     for (const n of LITERACY_TREE) levels[n] = 'mastered'
     levels[SHEEP] = 'mastered'
+    // Land 9 (content wave 5) not reached yet.
+    for (const n of ['snail-words', 'moon-words', 'goat-stories'] as const)
+      levels[n] = 'locked'
     // A world not yet complete: one earlier step is still practicing, so
     // the review pool is open and sheep stories is its newest step.
     levels['cvc-words-short-e'] = 'practicing'
