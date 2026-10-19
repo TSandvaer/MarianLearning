@@ -4,7 +4,9 @@
  *
  * "Successful" is cloudSync's sync-success listener: this device and its
  * cloud copy agreed after a cloud call (`setCloudSyncSuccessListener`).
- * The native host installs `() => recordLastSync()` as that listener.
+ * The native host installs `recordLastSyncForSyncId` as that listener
+ * (`learners/learners.ts`): with learner profiles the key is per learner,
+ * and the time is recorded for the learner whose sync ID was synced.
  *
  * Device-local on purpose. The time lives under its own key, never inside
  * the Progress blob, so it is never pushed to the cloud and a Restore

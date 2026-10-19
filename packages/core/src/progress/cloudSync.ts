@@ -147,8 +147,10 @@ function authHeaders(): Record<string, string> {
  * Called synchronously before the helper resolves, so a caller awaiting
  * the push or reconcile sees the listener's write afterwards.
  *
- * The native host installs one to record "Last synced"
- * (`./lastSync.ts`). The web installs none: its row shows
+ * The listener gets the ID it synced: with learner profiles each learner
+ * has their own record, and native records "Last synced" for the learner
+ * whose sync ID it is (`learners/learners.ts` `recordLastSyncForSyncId`,
+ * `./lastSync.ts`). The web installs none: its row shows
  * `profile.lastPlayedISO` (frozen).
  */
 export type CloudSyncSuccessListener = (syncId: string) => void
@@ -170,6 +172,65 @@ function notifySynced(syncId: string): void {
     const message = err instanceof Error ? err.message : String(err)
     console.warn(`[cloudSync] sync listener threw — ${message}`)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Push stamp
+// ---------------------------------------------------------------------------
+
+/**
+ * Stamps the doc a push sends with the record it is sent to (learner
+ * profiles § 4.5, X3): `learner.syncId` is the ID being pushed to, so a
+ * record never carries another record's ID. Native's learners module
+ * installs it (`ensureLearnerList`); the web and older builds install
+ * none and send the doc as it is.
+ */
+export type CloudPushStamp = (syncId: string, progress: Progress) => Progress
+
+let pushStamp: CloudPushStamp | null = null
+
+/** Install the push stamp. `null` uninstalls it (tests, a failed boot). */
+export function setCloudPushStamp(stamp: CloudPushStamp | null): void {
+  pushStamp = stamp
+}
+
+function stampForPush(syncId: string, progress: Progress): Progress {
+  if (pushStamp === null) return progress
+  try {
+    return pushStamp(syncId, progress)
+  } catch (err) {
+    // The helpers never throw; a stamp that does sends the doc unstamped.
+    const message = err instanceof Error ? err.message : String(err)
+    console.warn(`[cloudSync] push stamp threw — ${message}`)
+    return progress
+  }
+}
+
+/**
+ * The cloud record a doc says it belongs to (`learner.syncId`), or null
+ * when it carries none: no carrier, or a doc from before profiles.
+ */
+export function carrierSyncId(blob: unknown): string | null {
+  if (typeof blob !== 'object' || blob === null) return null
+  const learner = (blob as { learner?: unknown }).learner
+  if (typeof learner !== 'object' || learner === null) return null
+  const syncId = (learner as { syncId?: unknown }).syncId
+  return typeof syncId === 'string' ? syncId : null
+}
+
+/**
+ * Does `blob`, read from record `recordId`, hold another learner's doc?
+ * True when its carrier names another record, or (with `requireCarrier`,
+ * every learner but the legacy one) when it carries none (§ 4.5).
+ */
+export function isOtherLearnersRecord(
+  blob: unknown,
+  recordId: string,
+  requireCarrier: boolean,
+): boolean {
+  const syncId = carrierSyncId(blob)
+  if (syncId === null) return requireCarrier
+  return syncId.toLowerCase() !== recordId.toLowerCase()
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +296,7 @@ export async function pushProgressToCloud(
 
   const body = {
     deviceId,
-    blob: progress,
+    blob: stampForPush(deviceId, progress),
     lastModifiedISO,
   }
 
@@ -398,6 +459,11 @@ export interface ReconcileOptions {
   /** Override the install path (defaults to `saveProgress` from
    *  `./storage`). Tests inject a stub to avoid touching localStorage. */
   installLocally?: (p: Progress) => void
+  /** Refuse a record whose doc carries no carrier, as well as one whose
+   *  carrier names another record (learner profiles § 4.5): true for every
+   *  learner but the legacy one. Default false (the legacy learner, the
+   *  web). */
+  requireCarrier?: boolean
   /** Override the push path (test seam — defaults to
    *  `pushProgressToCloud`). */
   pushImpl?: (
@@ -421,6 +487,12 @@ export interface ReconcileOptions {
  * 4. on cloud-wins: run blob through `withDefaultedSkillLevels` then
  *    `isProgressV1`. If valid, install via `saveProgress`. If invalid,
  *    return `cloud-blob-rejected` and keep local.
+ *
+ * Before step 3, a record that holds another learner's doc is refused
+ * (learner profiles § 4.5, X3): its carrier names another record, or
+ * (`requireCarrier`) it carries none. Nothing is installed, written or
+ * pushed, and the result is `cloud-learner-mismatch`; this learner's next
+ * session-end push writes their own doc back over the record.
  */
 export async function reconcileWithCloud(
   deviceId: string,
@@ -456,7 +528,17 @@ export async function reconcileWithCloud(
     return { kind: 'pushed-to-cloud' }
   }
 
-  // Cloud has a record. Decide which side wins.
+  // Cloud has a record. It must be this learner's (X3).
+  if (
+    isOtherLearnersRecord(fetched.blob, deviceId, opts.requireCarrier === true)
+  ) {
+    console.warn(
+      "[cloudSync] reconcile refused — the record holds another learner's progress",
+    )
+    return { kind: 'cloud-learner-mismatch' }
+  }
+
+  // Decide which side wins.
   const cloudTimeMs = Date.parse(fetched.lastModifiedISO)
   const localTimeMs = currentLocal?.profile.lastPlayedISO
     ? Date.parse(currentLocal.profile.lastPlayedISO)
@@ -525,6 +607,9 @@ export async function reconcileWithCloud(
  * installed with that level dropped while a local load kept it. The
  * `withDefaultedSkillLevels parity` tests in `cloudSync.test.ts` pin the
  * two paths equal.
+ *
+ * Exported for learner profiles' Add from a code, which installs a record
+ * with no local merge (`learners/learners.ts` `addLearnerFromBackup`).
  */
 export function installCloudBlob(
   blob: unknown,

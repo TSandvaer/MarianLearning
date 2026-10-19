@@ -71,7 +71,7 @@ export function buildPeekPayload(
   return {
     track: world,
     level: 1,
-    childName: 'Marian',
+    childName: 'friend',
     peek: { blocks: pickPeekBlocks(node).map(wireRef) },
   }
 }
@@ -81,7 +81,7 @@ export function buildReplayPayload(
   world: MasteryTrack,
   node: SkillNode,
 ): SessionStartPayload {
-  return { track: world, level: 1, childName: 'Marian', replay: { node } }
+  return { track: world, level: 1, childName: 'friend', replay: { node } }
 }
 
 function hasPlanId(plan: unknown, prefix: string): boolean {

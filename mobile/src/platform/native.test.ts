@@ -3,7 +3,14 @@ import { DEBUG_SEED_NAMES } from '@marian/core/debug/seeds'
 import { QA_STEPS } from '@marian/core/debug/stepProgress'
 import { currentStepOf } from '@marian/core/hub/hubCardModel'
 import {
+  LEARNERS_STORAGE_KEY,
+  activeLearner,
+  resetLearnersForTests,
+} from '@marian/core/learners'
+import {
   LAST_SYNC_STORAGE_KEY,
+  STORAGE_KEY,
+  getOrCreateDeviceId,
   loadProgress,
   readLastSyncISO,
   reconcileAtLaunch,
@@ -17,6 +24,7 @@ import { nextAfterSplash } from '@marian/core/router/nextAfterSplash'
 import { recordProgressOnSessionEnd } from '@marian/core/sessionEnd/progressHistory'
 import {
   SESSION_HISTORY_KEY,
+  emptySessionHistory,
   readSessionHistory,
 } from '@marian/core/sessionEnd/sessionHistory'
 import type { BuildEnv } from './buildEnv'
@@ -54,8 +62,15 @@ function memoryBackend(): SyncKeyValueBackend & { map: Map<string, string> } {
       map.set(key, value)
     },
     removeItemSync: (key) => map.delete(key),
+    getAllKeysSync: () => [...map.keys()],
   }
 }
+
+/**
+ * What a fresh install's boot writes (learner profiles § 4.3, T7): the
+ * learner list and learner 1's floor start doc, nothing else.
+ */
+const FRESH_INSTALL_KEYS = [LEARNERS_STORAGE_KEY, STORAGE_KEY].sort()
 
 const EMPTY_ENV: BuildEnv = {
   apiBase: undefined,
@@ -79,6 +94,7 @@ const DEBUG_FLAGS: LaunchFlags = {
 
 afterEach(() => {
   setApiBase('')
+  resetLearnersForTests()
   jest.restoreAllMocks()
 })
 
@@ -91,6 +107,16 @@ describe('sqliteKeyValueStore', () => {
     expect(store.getItem('k')).toBe('v')
     store.removeItem('k')
     expect(store.getItem('k')).toBeNull()
+  })
+
+  it('lists keys through getAllKeysSync when the backend has it', () => {
+    const backend = memoryBackend()
+    const store = sqliteKeyValueStore(backend)
+    store.setItem('a', '1')
+    expect(store.keys?.()).toEqual(['a'])
+    const noKeys: SyncKeyValueBackend = { ...memoryBackend() }
+    delete noKeys.getAllKeysSync
+    expect(sqliteKeyValueStore(noKeys).keys).toBeUndefined()
   })
 
   it('lets backend errors reach core (whose readers catch them)', () => {
@@ -233,14 +259,26 @@ describe('installNativePlatform', () => {
         .spyOn(globalThis, 'fetch')
         .mockResolvedValue(new Response('{"ok":true}', { status: 200 }))
       const backend = install()
+      // The playing learner's own sync ID (learner 1: today's device ID).
+      await expect(
+        pushProgressToCloud(getOrCreateDeviceId(), defaultProgress()),
+      ).resolves.toBe('sent')
+      expect(backend.map.get(LAST_SYNC_STORAGE_KEY)).toBe(SYNC_AT)
+      expect(readLastSyncISO()).toBe(SYNC_AT)
+    })
+
+    it('a push to an ID no learner here holds records nothing (K3)', async () => {
+      jest
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response('{"ok":true}', { status: 200 }))
+      const backend = install()
       await expect(
         pushProgressToCloud(
           '11111111-2222-4333-8444-555555555555',
           defaultProgress(),
         ),
       ).resolves.toBe('sent')
-      expect(backend.map.get(LAST_SYNC_STORAGE_KEY)).toBe(SYNC_AT)
-      expect(readLastSyncISO()).toBe(SYNC_AT)
+      expect(backend.map.has(LAST_SYNC_STORAGE_KEY)).toBe(false)
     })
 
     it("the session-end write's own push", async () => {
@@ -311,11 +349,43 @@ describe('installNativePlatform', () => {
 })
 
 describe('bootNative', () => {
-  it('fresh install, no debug: Splash goes to Greet', () => {
+  it('fresh install, no debug: Splash goes to Greet, at land 1 in both worlds (T7)', () => {
     const backend = memoryBackend()
     bootNative({ backend, env: EMPTY_ENV, flags: NO_LAUNCH_FLAGS })
     expect(nextAfterSplash()).toBe('greet')
-    expect(backend.map.size).toBe(0)
+    expect([...backend.map.keys()].sort()).toEqual(FRESH_INSTALL_KEYS)
+    expect(currentStepOf(loadProgress()!, 'math')).toBe('number-recog')
+    expect(currentStepOf(loadProgress()!, 'word-song')).toBe('letter-names')
+    expect(activeLearner()).toMatchObject({ legacySlot: true, name: '' })
+  })
+
+  it("an upgrade keeps today's keys byte-equal and adds only the list (P3)", () => {
+    const backend = memoryBackend()
+    const played: Progress = {
+      ...defaultProgress(),
+      profile: {
+        ...defaultProgress().profile,
+        lastPlayedISO: '2026-10-18T17:00:00.000Z',
+      },
+    }
+    backend.map.set(STORAGE_KEY, JSON.stringify(played))
+    backend.map.set(
+      SESSION_HISTORY_KEY,
+      JSON.stringify({ ...emptySessionHistory(), sessionCount: 40 }),
+    )
+    backend.map.set(
+      'marian-tutor:device-id',
+      '11111111-2222-4333-8444-555555555555',
+    )
+    const before = new Map(backend.map)
+    bootNative({ backend, env: EMPTY_ENV, flags: NO_LAUNCH_FLAGS })
+    for (const [key, value] of before) expect(backend.map.get(key)).toBe(value)
+    expect([...backend.map.keys()].filter((k) => !before.has(k))).toEqual([
+      LEARNERS_STORAGE_KEY,
+    ])
+    expect(nextAfterSplash()).toBe('hub')
+    expect(loadProgress()?.skillLevels['add-to-10']).toBe('practicing')
+    expect(activeLearner()).toMatchObject({ legacySlot: true, name: 'Marian' })
   })
 
   it('applies a debug seed through the sqlite store before any read', () => {
@@ -342,7 +412,7 @@ describe('bootNative', () => {
     })
     expect(warn).toHaveBeenCalledTimes(1)
     expect(warn.mock.calls[0]![0]).toContain('Unknown seed value: "banana"')
-    expect(backend.map.size).toBe(0)
+    expect([...backend.map.keys()].sort()).toEqual(FRESH_INSTALL_KEYS)
     expect(nextAfterSplash()).toBe('greet')
   })
 
@@ -365,7 +435,8 @@ describe('bootNative', () => {
       flags: { ...DEBUG_FLAGS, qaStep: 'mult-6-9' },
     })
     expect(currentStepOf(loadProgress()!, 'math')).toBe('mult-6-9')
-    expect(currentStepOf(loadProgress()!, 'word-song')).toBe('letter-sounds')
+    // The other world keeps the learner's start: a fresh install's land 1.
+    expect(currentStepOf(loadProgress()!, 'word-song')).toBe('letter-names')
     expect(readSessionHistory().sessionCount).toBe(1)
     expect(nextAfterSplash()).toBe('hub')
     expect(log).toHaveBeenCalledWith('[qaStep] jumped to "mult-6-9"')
@@ -381,7 +452,7 @@ describe('bootNative', () => {
     })
     expect(warn).toHaveBeenCalledTimes(1)
     expect(warn.mock.calls[0]![0]).toContain('Unknown step: "digraphs"')
-    expect(backend.map.size).toBe(0)
+    expect([...backend.map.keys()].sort()).toEqual(FRESH_INSTALL_KEYS)
     expect(nextAfterSplash()).toBe('greet')
   })
 
@@ -445,7 +516,7 @@ describe('bootNative', () => {
     ])
     bootNative({ backend, env: EMPTY_ENV, flags })
     expect(flags.qaStep).toBeNull()
-    expect(backend.map.size).toBe(0)
+    expect([...backend.map.keys()].sort()).toEqual(FRESH_INSTALL_KEYS)
     expect(nextAfterSplash()).toBe('greet')
   })
 })

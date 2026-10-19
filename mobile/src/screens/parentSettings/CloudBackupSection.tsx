@@ -43,8 +43,14 @@ import type { ParentSettingsDeps } from './parentSettingsDeps'
 import { BODY_FONT_MAX, type } from './psTheme'
 import { useTransientStatus } from './useTransientStatus'
 
-/** Core's restore statuses plus native's own-ID catch. */
-export type NativeRestoreStatus = RestoreStatus | { kind: 'own-id' }
+/**
+ * Core's restore statuses plus native's own-ID catch, and a code another
+ * learner on this device holds (learner profiles § 3.4).
+ */
+export type NativeRestoreStatus =
+  | RestoreStatus
+  | { kind: 'own-id' }
+  | { kind: 'code-held'; name: string }
 
 const PUSH_LINES: Record<'sent' | 'failed' | 'skipped', StatusLine> = {
   sent: { tone: 'ok', text: PUSH_STATUS_COPY.sent },
@@ -68,6 +74,8 @@ function restoreLine(s: NativeRestoreStatus): StatusLine | null {
       return { tone: 'error', text: CLOUD_BACKUP_COPY.invalidFormat }
     case 'own-id':
       return { tone: 'error', text: NATIVE_COPY.ownDeviceId }
+    case 'code-held':
+      return { tone: 'error', text: NATIVE_COPY.codeHeld(s.name) }
     case 'restored':
       return { tone: 'ok', text: restoreOutcomeMessage(s.outcome) }
     case 'restore-failed':
@@ -152,6 +160,9 @@ export function CloudBackupSection({
     deps.restoreFromDeviceId(uuid, signal).then(
       (outcome) => {
         if (signal.aborted) return
+        if (outcome.kind === 'code-held') {
+          return showRestore({ kind: 'code-held', name: outcome.learner.name })
+        }
         showRestore({ kind: 'restored', outcome })
         refreshLastSync()
         // What storage now holds: the adopted ID, or this device's own
@@ -174,7 +185,9 @@ export function CloudBackupSection({
   const status = restore.status
   const canSubmit = canSubmitRestore(
     input,
-    status.kind === 'own-id' ? { kind: 'idle' } : status,
+    status.kind === 'own-id' || status.kind === 'code-held'
+      ? { kind: 'idle' }
+      : status,
   )
 
   const submitRestore = () => {

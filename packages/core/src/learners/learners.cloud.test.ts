@@ -137,10 +137,11 @@ let store: MapStore
 let synced: string[]
 
 function setup(): { one: LearnerEntry; b: LearnerEntry } {
+  // An upgrade: Marian's doc is there before the migration names her.
   store = new MapStore()
+  store.data.set(STORAGE_KEY, JSON.stringify(played(T0)))
   setKeyValueStore(store)
   ensureLearnerList()
-  saveProgress(played(T0))
   const one = activeLearner()!
   const b = addLearner({
     name: 'Sam',
@@ -319,9 +320,10 @@ describe('sync-ID uniqueness (AC 12, K8)', () => {
 
   it('Add from a code with a code a learner here holds → refused, nothing written, no fetch', async () => {
     const { one } = setup()
+    const oneSync = syncIdOf(one)
     const before = new Map(store.data)
     cloud.fetch.mockClear()
-    const outcome = await addLearnerFromBackup(syncIdOf(one))
+    const outcome = await addLearnerFromBackup(oneSync)
     expect(outcome).toEqual({
       kind: 'already-here',
       learner: expect.objectContaining({ id: one.id }),

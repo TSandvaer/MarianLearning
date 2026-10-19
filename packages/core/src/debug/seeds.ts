@@ -195,7 +195,6 @@
  */
 
 import {
-  defaultProgress,
   loadProgress,
   saveProgress,
   type Progress,
@@ -204,6 +203,7 @@ import {
   type SkillLevels,
   type SkillNode,
 } from '../progress'
+import { startProgressForActive } from '../learners/startDoc'
 import {
   emptySessionHistory,
   readSessionHistory,
@@ -704,7 +704,7 @@ export function applyDebugSeed(value: string): boolean {
  */
 function applyHistorySeed(entries: SessionHistoryEntry[]): void {
   if (entries.length === 0) return
-  const existing = loadProgress() ?? defaultProgress()
+  const existing = loadProgress() ?? startProgressForActive()
   saveProgress({
     ...existing,
     history: [...existing.history, ...entries],
@@ -727,7 +727,7 @@ function applySkillLevelsPatch(
   patch: Readonly<Partial<Record<SkillNode, SkillLevel>>>,
 ): void {
   const stored = loadProgress()
-  const existing: Progress = stored ?? defaultProgress()
+  const existing: Progress = stored ?? startProgressForActive()
   const nextSkillLevels: SkillLevels = { ...existing.skillLevels }
   let changed = false
   for (const [key, value] of Object.entries(patch) as Array<

@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { recordProgressOnSessionEnd } from '../sessionEnd/progressHistory'
 import { recordSessionEnd } from '../sessionEnd/sessionHistory'
 import { markNudgeSaid } from '../sessionEnd/notYetNudge'
+import { writeStardust } from '../shared/stardust'
 import { writeFlowerWake } from '../hub/hubGuidance'
 import {
   getKeyValueStore,
@@ -70,6 +71,7 @@ function storeWithTodaysKeys(): MapStore {
     focusNode: 'add-to-10',
   })
   recordSessionEnd(3, store, () => new Date(PLAYED_AT), 4)
+  writeStardust(12, store)
   markNudgeSaid('math', '2026-10-18', store)
   writeFlowerWake({ math: '2026-10-18' }, store)
   getOrCreateDeviceId()

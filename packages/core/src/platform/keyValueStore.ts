@@ -21,6 +21,12 @@ export interface KeyValueStore {
   getItem(key: string): string | null
   setItem(key: string, value: string): void
   removeItem(key: string): void
+  /**
+   * Every stored key. Optional: native's sqlite store has it
+   * (`getAllKeysSync`), the web's `localStorage` adapter needs none. Only
+   * the learner list's rebuild reads it (`learners/learners.ts`).
+   */
+  keys?(): string[]
 }
 
 let installed: KeyValueStore | null = null
@@ -33,4 +39,24 @@ export function setKeyValueStore(store: KeyValueStore | null): void {
 /** The installed store, or `null` when the host has none. */
 export function getKeyValueStore(): KeyValueStore | null {
   return installed
+}
+
+/**
+ * Run `fn` with `store` installed, then put the previous store back.
+ * Synchronous only: nothing else runs in between, so every core reader
+ * and writer `fn` calls sees `store`. Learner profiles use it to read and
+ * write one learner's keys whoever is playing (`learners/learners.ts`
+ * `boundLearner`).
+ */
+export function withKeyValueStore<T>(
+  store: KeyValueStore | null,
+  fn: () => T,
+): T {
+  const previous = installed
+  installed = store
+  try {
+    return fn()
+  } finally {
+    installed = previous
+  }
 }

@@ -25,7 +25,7 @@ import {
   readSessionHistory,
   recordSessionEnd,
 } from '../sessionEnd/sessionHistory'
-import { STARDUST_STORAGE_KEY } from '../shared/stardust'
+import { STARDUST_STORAGE_KEY, writeStardust } from '../shared/stardust'
 import {
   LEARNERS_STORAGE_KEY,
   LEARNER_KEYS,
@@ -360,6 +360,7 @@ describe('no list installed: the web (AC 25)', () => {
     const store = new MapStore()
     setKeyValueStore(store)
     recordSessionEnd(1, undefined, () => new Date(PLAYED_AT), 1)
+    writeStardust(3)
     recordProgressOnSessionEnd({
       surface: 'math',
       totalCorrect: 8,

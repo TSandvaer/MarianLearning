@@ -7,6 +7,11 @@
  * The two network calls take the screen's lifetime signal: a push or a
  * restore still in flight is aborted when the screen unmounts.
  */
+import {
+  activeLearner,
+  restoreLearnerFromCode,
+  type LearnerRestoreOutcome,
+} from '@marian/core/learners'
 import { adoptDeviceIdAfterRead } from '@marian/core/parentSettings/cloudBackup'
 import {
   getOrCreateDeviceId,
@@ -18,7 +23,6 @@ import {
   writeStoredDeviceId,
   type Progress,
   type PushResult,
-  type ReconcileOutcome,
 } from '@marian/core/progress'
 import {
   readSessionHistory,
@@ -53,12 +57,15 @@ export interface ParentSettingsDeps {
   /**
    * Reconcile against `uuid`, then adopt it as this device's ID (unless
    * the read failed or that device's copy was rejected):
-   * `adoptDeviceIdAfterRead`.
+   * `adoptDeviceIdAfterRead`, bound to the learner playing
+   * (`restoreLearnerFromCode`, learner profiles § 3.4), which also
+   * refuses a code another learner here holds (`code-held`) and a record
+   * that holds another learner's doc (`cloud-learner-mismatch`).
    */
   restoreFromDeviceId: (
     uuid: string,
     signal: AbortSignal,
-  ) => Promise<ReconcileOutcome>
+  ) => Promise<LearnerRestoreOutcome>
 }
 
 async function writeClipboard(text: string): Promise<void> {
@@ -85,13 +92,17 @@ export const DEFAULT_PARENT_SETTINGS_DEPS: ParentSettingsDeps = {
     pushProgressToCloud(getOrCreateDeviceId(), progress, {
       fetchImpl: abortableFetch(globalThis.fetch, signal),
     }),
-  restoreFromDeviceId: (uuid, signal) =>
-    adoptDeviceIdAfterRead(uuid, {
+  restoreFromDeviceId: (uuid, signal) => {
+    const fetchImpl = abortableFetch(globalThis.fetch, signal)
+    const learner = activeLearner()
+    if (learner !== null) {
+      return restoreLearnerFromCode(learner, uuid, { fetchImpl })
+    }
+    // No learner list (a boot whose migration failed): today's restore.
+    return adoptDeviceIdAfterRead(uuid, {
       writeDeviceId: writeStoredDeviceId,
       loadLocal: loadProgress,
-      reconcile: (id, local) =>
-        reconcileWithCloud(id, local, {
-          fetchImpl: abortableFetch(globalThis.fetch, signal),
-        }),
-    }),
+      reconcile: (id, local) => reconcileWithCloud(id, local, { fetchImpl }),
+    })
+  },
 }

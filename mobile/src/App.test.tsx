@@ -272,7 +272,7 @@ it('Greet → heart → Math (offline: the static plan, silent captions) → 8 p
   expect(sessionStarts()).toEqual([
     {
       kind: 'session-start',
-      payload: { track: 'math', level: 1, childName: 'Marian' },
+      payload: { track: 'math', level: 1, childName: 'friend' },
     },
   ])
   expect(screen.getByTestId('math')).toBeOnTheScreen()
@@ -335,7 +335,7 @@ it('Session End writes once per session: Math → Session End → Hub → Word S
   await flushAll()
   expect(screen.getByTestId('word-song')).toBeOnTheScreen()
   expect(sessionStarts().at(-1)).toMatchObject({
-    payload: { track: 'word-song', level: 1, childName: 'Marian' },
+    payload: { track: 'word-song', level: 1, childName: 'friend' },
   })
   for (let i = 0; i < 8; i++) await answerWordRight()
 

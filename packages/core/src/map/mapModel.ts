@@ -10,12 +10,12 @@
  */
 
 import {
-  defaultProgress,
   getSettings,
   type MasteryTrack,
   type Progress,
   type SkillNode,
 } from '../progress'
+import { startProgressForActive } from '../learners/startDoc'
 import { landsOf } from '../progress/lands'
 import { nodeProgress } from '../progress/nodeProgress'
 import { currentStepOf } from '../hub/hubCardModel'
@@ -60,7 +60,7 @@ export function buildMapModel(
   progress: Progress | null,
   world: MasteryTrack,
 ): MapModel {
-  const p = progress ?? defaultProgress()
+  const p = progress ?? startProgressForActive()
   const current = currentStepOf(p, world)
   const worldLands = landsOf(world)
   const complete = worldLands.every((land) =>

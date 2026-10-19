@@ -1,3 +1,5 @@
+import { nextAfterPick } from '../learners/learners'
+import { activeLearner, installedLearnerList } from '../learners/state'
 import { readSessionHistory } from '../sessionEnd/sessionHistory'
 import type { Route } from './route'
 
@@ -16,9 +18,19 @@ import type { Route } from './route'
  * `KeyValueStore` — a missing / malformed key, or no store at all,
  * reads as `sessionCount === 0`, so the first-ever path is the safe
  * default if storage is unavailable.
+ *
+ * With learner profiles (native, `design/native/learner-profiles.md`
+ * § 6.1, K6): 2 or more learners → the picker ("Who is playing?"); one
+ * learner → `nextAfterPick`, which also sends a learner added from a code
+ * (doc history, no session history yet) to the Hub. The web installs no
+ * list and keeps the rule above.
  */
-export function nextAfterSplash(): Extract<Route, 'greet' | 'hub'> {
+export function nextAfterSplash(): Extract<Route, 'picker' | 'greet' | 'hub'> {
   try {
+    const list = installedLearnerList()
+    if (list !== null && list.learners.length >= 2) return 'picker'
+    const active = activeLearner()
+    if (list !== null && active !== null) return nextAfterPick(active)
     const history = readSessionHistory()
     return history.sessionCount === 0 ? 'greet' : 'hub'
   } catch {

@@ -23,6 +23,9 @@ export const NATIVE_COPY = {
   /** Share sheet title (Android) and mail subject (iOS). */
   shareTitle: "Emma's Path backup",
   ownDeviceId: "That's this device's own ID.",
+  /** Restore with another learner's code (learner profiles § 3.4, K8). */
+  codeHeld: (name: string) =>
+    `That code is ${name === '' ? 'this child' : name}'s.`,
   restoreAlertTitle: 'Restore from that device?',
   restoreAlertMessage:
     'This device will use that ID from now on. The newer progress of the two devices is kept, and the older one is replaced.',

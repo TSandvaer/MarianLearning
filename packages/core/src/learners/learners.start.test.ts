@@ -282,8 +282,8 @@ describe('fallbacks (AC 18, K7)', () => {
         if (!/\.(ts|tsx)$/.test(name) || /\.test\.tsx?$/.test(name)) continue
         const lines = readFileSync(path, 'utf8').split('\n')
         lines.forEach((line, i) => {
-          const code = line.replace(/\/\/.*$/, '')
-          if (/^\s*\*/.test(code)) return
+          const code = line.replace(/\/\*.*?\*\//g, '').replace(/\/\/.*$/, '')
+          if (/^\s*(\*|\/\*)/.test(code)) return
           if (
             /\bdefaultProgress\(/.test(code) &&
             !/function defaultProgress/.test(code)
