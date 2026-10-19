@@ -25,6 +25,7 @@ import {
   WARMUP_PROBLEMS,
   type CanonBlockRef,
 } from './reviewPlan'
+import { withDefaultedSkillLevels } from './storage'
 import type {
   LeitnerBoxIndex,
   LeitnerItem,
@@ -110,12 +111,63 @@ describe('reviewBaseline / reviewPool (D2)', () => {
       'add-to-10',
       'add-to-20',
     ])
+    // A jump has no good days: sounding out is unplayed, so left out.
     expect(
       reviewPool(progressAtStep('cvc-words-short-o'), 'word-song'),
-    ).toEqual(['letter-sounds', 'blending-cv', 'sounding-out', 'cvc-words'])
+    ).toEqual(['letter-sounds', 'blending-cv', 'cvc-words'])
     const done = progressAtStep('hundreds-addsub')
     done.skillLevels['hundreds-addsub'] = 'mastered'
     expect(reviewPool(done, 'math')).toEqual([])
+  })
+})
+
+describe('sounding out is reviewed only once played (real blending T4)', () => {
+  /**
+   * A doc from before real blending at cat words: no sounding-out key, so
+   * the T4 migration fills it 'mastered' though she never played it.
+   */
+  const migrated = (): Progress => {
+    const p = progressAtStep('cvc-words')
+    const levels: Record<string, unknown> = { ...p.skillLevels }
+    delete levels['sounding-out']
+    return withDefaultedSkillLevels({ ...p, skillLevels: levels }) as Progress
+  }
+  const MON_KEY = localDateKey(at(MON, 18))
+
+  it('a migrated doc: sounding out is not in the pool, the review or either warm-up heart', () => {
+    const p = migrated()
+    expect(p.skillLevels['sounding-out']).toBe('mastered')
+    expect(reviewPool(p, 'word-song')).toEqual(['letter-sounds', 'blending-cv'])
+    const review = pickReviewBlocks(p, 'word-song', NOW_MS, 0)
+    expect(review).toHaveLength(8)
+    expect(review.map((r) => r.node)).not.toContain('sounding-out')
+    for (const seed of [0, 1, 5, 7, 12]) {
+      const refs = pickWarmupBlocks(p, 'word-song', NOW_MS, TODAY, seed)
+      expect(refs).toHaveLength(2)
+      expect(refs.every((r) => r.node === 'blending-cv')).toBe(true)
+    }
+  })
+
+  it('a played sounding out (a good day or a secure day) is in the pool and serves the warm-up', () => {
+    const good: Progress = {
+      ...migrated(),
+      goodDays: { 'sounding-out': [MON_KEY] },
+    }
+    expect(reviewPool(good, 'word-song')).toEqual([
+      'letter-sounds',
+      'blending-cv',
+      'sounding-out',
+    ])
+    const refs = pickWarmupBlocks(good, 'word-song', NOW_MS, TODAY, 5)
+    expect(refs).toEqual([
+      { node: 'sounding-out', problem: 6 },
+      { node: 'sounding-out', problem: 7 },
+    ])
+    const secure: Progress = {
+      ...migrated(),
+      secureDays: { 'sounding-out': [MON_KEY] },
+    }
+    expect(reviewPool(secure, 'word-song')).toContain('sounding-out')
   })
 })
 
@@ -209,7 +261,7 @@ describe('pickReviewBlocks (§ 7.2)', () => {
     expect(pickReviewBlocks(defaultProgress(), 'math', NOW_MS, 0)).toEqual([])
   })
 
-  it('Word Song mixes the four review steps, newest first', () => {
+  it('Word Song mixes the three review steps, newest first', () => {
     const refs = pickReviewBlocks(
       progressAtStep('cvc-words-short-o'),
       'word-song',
@@ -217,9 +269,8 @@ describe('pickReviewBlocks (§ 7.2)', () => {
       0,
     )
     expect(refs).toHaveLength(8)
-    expect(refs.slice(0, 4).map((r) => r.node)).toEqual([
+    expect(refs.slice(0, 3).map((r) => r.node)).toEqual([
       'cvc-words',
-      'sounding-out',
       'blending-cv',
       'letter-sounds',
     ])

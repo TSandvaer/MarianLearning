@@ -55,6 +55,9 @@ export type WordSongStageId =
   | 'bee-words'
   | 'car-words'
   | 'sheep-stories'
+  | 'snail-words'
+  | 'moon-words'
+  | 'goat-stories'
 
 export type StageId = NumberGardenStageId | WordSongStageId
 
@@ -103,6 +106,9 @@ export const WORD_SONG_STAGES: WordSongStageId[] = [
   'bee-words',
   'car-words',
   'sheep-stories',
+  'snail-words',
+  'moon-words',
+  'goat-stories',
 ]
 
 /**

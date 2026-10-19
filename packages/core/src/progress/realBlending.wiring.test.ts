@@ -443,10 +443,10 @@ describe('the lines (§ 11, AC 7)', () => {
     )
   })
 
-  it('counts: guidance 258 → 264 ids, path lines 646 → 679, baked 223 → 228 (on a01b5f5)', () => {
-    expect(GUIDANCE_LINES).toHaveLength(264)
-    expect(PATH_LINES).toHaveLength(679)
-    expect(BAKED_PATH_LINES).toHaveLength(228)
+  it('counts: guidance 289 → 295 ids, path lines 756 → 793, baked 241 → 246 (on main after content wave 5, #617)', () => {
+    expect(GUIDANCE_LINES).toHaveLength(295)
+    expect(PATH_LINES).toHaveLength(793)
+    expect(BAKED_PATH_LINES).toHaveLength(246)
   })
 
   const NEW_GUIDANCE_IDS = [
