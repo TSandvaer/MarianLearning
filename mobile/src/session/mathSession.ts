@@ -6,8 +6,9 @@
  * Contract, same as the web:
  * - **Kick once** (`kick()`, latched): App kicks on Greet so Greet's intro
  *   hides the request, or on Math for a returning child. The payload is the
- *   web's: `{ track: 'math', level: 1, childName: 'Marian', progress? }`
- *   with the focus node, recent success rate, Leitner and slow-fact hints
+ *   web's shape, `{ track: 'math', level: 1, childName, progress? }`, with
+ *   `childName: 'friend'` for every learner (learner profiles P7, T8: no
+ *   child's name goes in a session request) and the focus node, recent success rate, Leitner and slow-fact hints
  *   and the lifetime first encounters from the persisted progress.
  * - **Visible-wait fallback** (`startWaitTimer()`, Emma's Path 1/10): once
  *   Math is on screen and still waiting, a hinted request (Leitner /
@@ -191,7 +192,7 @@ export function buildMathSessionPayload(
     return {
       track: 'math',
       level: 1,
-      childName: 'Marian',
+      childName: 'friend',
       ...(hints.focusNode !== undefined
         ? { progress: { focusNode: hints.focusNode } }
         : {}),
@@ -235,7 +236,7 @@ function forwardPayload(
           },
         }
       : {}
-  return { track: 'math', level: 1, childName: 'Marian', ...progressBlock }
+  return { track: 'math', level: 1, childName: 'friend', ...progressBlock }
 }
 
 /**

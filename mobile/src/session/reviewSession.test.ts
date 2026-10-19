@@ -201,7 +201,7 @@ describe('review request', () => {
     expect(payload).toEqual({
       track: 'math',
       level: 1,
-      childName: 'Marian',
+      childName: 'friend',
       progress: { focusNode: 'sub-to-10' },
       review: {
         blocks: hints.planKind.kind === 'review' ? hints.planKind.blocks : [],

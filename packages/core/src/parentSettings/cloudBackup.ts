@@ -142,6 +142,9 @@ export async function adoptDeviceId(
  *     installed (failed validation), so local progress is unchanged.
  *   - the reconcile threw: the promise rejects before the ID write.
  *
+ *   - `cloud-learner-mismatch`: the record holds another learner's doc
+ *     (learner profiles § 4.5); nothing was installed.
+ *
  * In each case this device keeps its own ID. Adopting it would leave this
  * device on the other device's ID with its own progress, and its next
  * session-end push would overwrite that device's cloud record.
@@ -161,7 +164,8 @@ export async function adoptDeviceIdAfterRead(
   const outcome = await deps.reconcile(uuid, deps.loadLocal())
   if (
     outcome.kind !== 'cloud-error' &&
-    outcome.kind !== 'cloud-blob-rejected'
+    outcome.kind !== 'cloud-blob-rejected' &&
+    outcome.kind !== 'cloud-learner-mismatch'
   ) {
     deps.writeDeviceId(uuid)
   }

@@ -117,7 +117,7 @@ it('sends the web payload: no progress → the bare request', () => {
   expect(buildWordSongSessionPayload(NO_HINTS, true)).toEqual({
     track: 'word-song',
     level: 1,
-    childName: 'Marian',
+    childName: 'friend',
   })
 })
 
@@ -126,7 +126,7 @@ it('sends the hints, and strips the canon-bypassing ones for the fallback', () =
   expect(full).toEqual({
     track: 'word-song',
     level: 1,
-    childName: 'Marian',
+    childName: 'friend',
     progress: {
       focusNode: 'cvc-words',
       recentSuccessRate: 0.9,
@@ -137,7 +137,7 @@ it('sends the hints, and strips the canon-bypassing ones for the fallback', () =
   expect(buildWordSongSessionPayload(GRADUATION, false)).toEqual({
     track: 'word-song',
     level: 1,
-    childName: 'Marian',
+    childName: 'friend',
     progress: {
       focusNode: 'cvc-words',
       recentSuccessRate: 0.9,

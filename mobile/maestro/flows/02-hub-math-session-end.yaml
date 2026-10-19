@@ -6,8 +6,9 @@ tags:
   - critical-path
 ---
 # Any skip-Greet seed makes a returning child (sessionCount 1). The
-# `cvc-words` seed only touches Word Song, so Math stays on the diagnostic
-# baseline, the same step as a first launch.
+# `cvc-words` seed only touches Word Song, so Math stays on a fresh
+# install's start, the same step as a first launch: land 1, number-recog
+# (learner profiles T7; before profiles it was Marian's diagnostic).
 - launchApp:
     stopApp: true
     arguments:
