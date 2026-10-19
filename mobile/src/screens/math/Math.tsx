@@ -99,6 +99,7 @@ import {
 } from '@marian/core/math/dotCard'
 import {
   isHundredsProblem,
+  isPlaceValueArithmetic,
   type ExtendedMathProblem,
   type ExtendedMathSessionPlan,
 } from '@marian/core/math/extendedProblems'
@@ -168,6 +169,7 @@ import {
 import { CaptionRibbon } from '../../components/CaptionRibbon'
 import {
   chipNumeralFont,
+  mathLayoutKind,
   countingMetrics,
   groupsAreDrawn,
   groupsMetrics,
@@ -200,6 +202,7 @@ import type {
 } from './mathTypes'
 import { NumberStrip } from './NumberStrip'
 import { PlaceValueStage } from './PlaceValueStage'
+import { placeValueHintBuildMs } from './placeValueTiming'
 import { ScaffoldFlash } from './ScaffoldFlash'
 import { ShareStage } from './ShareStage'
 import { AUTO_DEAL_DELAY_MS, FILL_HOLD_MS } from './shareDeal'
@@ -575,6 +578,8 @@ export function MathScreen({
    *  wrong's re-prompt) must not unlight them (spec § 3: after hint 2 the
    *  tags stay). */
   const [hint2Lit, setHint2Lit] = useState(0)
+  // Adding big numbers: hint 2's word ticks (the bundle plays on "make").
+  const [hint2Revealed, setHint2Revealed] = useState(0)
   /** A missing number's hidden part: shown from hint 3 (content wave 1
    *  § 1.5); stays until the problem ends. The guided answer shows it too. */
   const [budReveal, setBudReveal] = useState<BudReveal>('hidden')
@@ -598,9 +603,29 @@ export function MathScreen({
   // The chips follow each problem's own step (review spec § 7.4); see
   // `problemChips.ts`.
   const chipOrderWithClass = useMemo<ProblemChips>(
-    () => problemChips(plan.problems, problemIndex, focusNode, problemNodes),
-    [plan, problemIndex, problemNodes, focusNode],
+    () =>
+      problemChips(
+        plan.problems,
+        problemIndex,
+        focusNode,
+        problemNodes,
+        planFocusNode,
+      ),
+    [plan, problemIndex, problemNodes, focusNode, planFocusNode],
   )
+  // Adding big numbers (content wave 5 § 3.6): an arithmetic problem whose
+  // step (its `problemNodes` entry, else the session's focus) is in
+  // `PLACE_VALUE_ARITHMETIC_NODES` draws the place-value trays, takes the
+  // place-value frame and its own chips. Derived from the props on every
+  // render (never frozen), so a screen that mounts before its session is
+  // ready follows it (wave 3 lesson 2).
+  const sumTraysAt = (i: number): boolean => {
+    const p = plan.problems[i]
+    return (
+      p !== undefined &&
+      isPlaceValueArithmetic(p, problemNodes?.[i] ?? planFocusNode)
+    )
+  }
   useEffect(() => {
     perProblemDistractorClassRef.current[problemIndex] =
       chipOrderWithClass.offeredClass
@@ -614,6 +639,9 @@ export function MathScreen({
   )
   const shakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Zeros' name read: hint 1's line waits for the build (content wave 5
+   *  § 2.4, D3). */
+  const hintBuildTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const poseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const streakFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const chimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -651,6 +679,7 @@ export function MathScreen({
       advanceCeilingTimerRef,
       shakeTimerRef,
       hintTimerRef,
+      hintBuildTimerRef,
       poseTimerRef,
       streakFadeTimerRef,
       chimeTimerRef,
@@ -813,10 +842,12 @@ export function MathScreen({
       void (async () => {
         if (lead !== null) {
           if (lead === opener) openerStartedRef.current = true
-          // Hundreds' lead pulses the trays on its word ticks (§ 3.4).
+          // Hundreds' and adding big numbers' leads pulse the trays on
+          // their word ticks (wave 3 § 3.4, wave 5 § 3.4).
           await speakGuide(
             lead,
-            lead === sessionIntro && isHundredsProblem(problem)
+            lead === sessionIntro &&
+              (isHundredsProblem(problem) || sumTraysAt(myProblemIndex))
               ? setLeadRevealed
               : undefined,
           )
@@ -840,9 +871,10 @@ export function MathScreen({
           }, CHIP_GATE_FALLBACK_MS)
         }
         // Sharing's and hundreds' reads drive their stages (the total tag
-        // and the plates; the trays' build, the number tag and its pill).
-        const drivesStage =
-          problem.kind === 'divide' || isHundredsProblem(problem)
+        // and the plates; the trays' build, the number tag and its pill),
+        // and adding big numbers' its second number's drop.
+        const trays = isHundredsProblem(problem) || sumTraysAt(myProblemIndex)
+        const drivesStage = problem.kind === 'divide' || trays
         await speak(
           problem.utterances.read,
           true,
@@ -850,7 +882,7 @@ export function MathScreen({
         )
         if (!live()) return
         // A read that ended without its ticks still builds the trays.
-        if (isHundredsProblem(problem)) {
+        if (trays) {
           const words = problem.utterances.read.split(/\s+/).filter(Boolean)
           setReadRevealed((r) => Math.max(r, words.length))
         }
@@ -862,8 +894,12 @@ export function MathScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- web parity: re-run on problem / readiness only
   }, [problemIndex, audioReady])
 
-  // The current problem's kind, for App's frame (review spec § 3.4).
-  const currentKind = plan.problems[problemIndex].kind
+  // The current problem's kind, for App's frame (review spec § 3.4); a sum
+  // with trays reports 'place-value' (content wave 5 § 3.3).
+  const currentKind = mathLayoutKind(
+    plan.problems[problemIndex],
+    problemNodes?.[problemIndex] ?? planFocusNode,
+  )
   useEffect(() => {
     onProblemKindChangeRef.current?.(currentKind)
   }, [currentKind])
@@ -962,6 +998,7 @@ export function MathScreen({
       setHintStep(null)
       setHint2Done(false)
       setHint2Lit(0)
+      setHint2Revealed(0)
       setBudReveal('hidden')
       setReadRevealed(0)
       setLeadRevealed(0)
@@ -981,6 +1018,10 @@ export function MathScreen({
       if (hintTimerRef.current !== null) {
         clearTimeout(hintTimerRef.current)
         hintTimerRef.current = null
+      }
+      if (hintBuildTimerRef.current !== null) {
+        clearTimeout(hintBuildTimerRef.current)
+        hintBuildTimerRef.current = null
       }
       resolvedRef.current = false
       wrongCountRef.current = 0
@@ -1138,7 +1179,12 @@ export function MathScreen({
       // groups follow `hintBeat` (web W12-02), and so do a missing number's
       // (group A ripples on hints 1–2; hint 3 shows the buds).
       const missing = problem.kind === 'missing-addend'
-      const extended = problem.kind !== 'arithmetic' && !missing
+      // Adding big numbers sets `hintStep`, as the extended kinds do (§ 3.4).
+      const sums = isPlaceValueArithmetic(
+        problem,
+        problemNodes?.[myIndex] ?? planFocusNode,
+      )
+      const extended = (problem.kind !== 'arithmetic' && !missing) || sums
       const triple = resolveHintTriple(problem.utterances)
       if (triple === null) {
         const legacy = problem.utterances.hint
@@ -1149,6 +1195,18 @@ export function MathScreen({
       }
       if (extended) setHintStep(1)
       else setHintBeat('group-a')
+      // Zeros' name read builds its number at hint 1 first (content wave 5
+      // § 2.4, D3); "Look at the ones." waits for it to land.
+      const buildMs = placeValueHintBuildMs(problem, reducedMotion)
+      if (buildMs > 0) {
+        await new Promise<void>((resolve) => {
+          hintBuildTimerRef.current = setTimeout(() => {
+            hintBuildTimerRef.current = null
+            resolve()
+          }, buildMs)
+        })
+        if (!stillLive()) return
+      }
       await speak(triple.hint1)
       if (!stillLive()) return
       if (extended) setHintStep(2)
@@ -1169,7 +1227,10 @@ export function MathScreen({
                   ),
                 ),
               )
-          : undefined
+          : sums
+            ? (revealed: number) =>
+                setHint2Revealed((r) => Math.max(r, revealed))
+            : undefined
       await speak(triple.hint2, false, lightPlates)
       if (!stillLive()) return
       if (extended) {
@@ -1184,7 +1245,7 @@ export function MathScreen({
       await speak(triple.hint3)
       returnToIdle()
     },
-    [speak, problemIndex],
+    [speak, problemIndex, problemNodes, planFocusNode, reducedMotion],
   )
 
   // ── Taps ─────────────────────────────────────────────────────────────
@@ -1483,9 +1544,18 @@ export function MathScreen({
   // ── Scaffolds (core's gates, as on the web) ──────────────────────────
 
   const currentProblem = plan.problems[problemIndex]
+  // Adding big numbers' sum on screen (content wave 5 § 3.2): today's
+  // equation over the place-value trays, never a counting row or a scaffold.
+  const sumProblem =
+    currentProblem.kind === 'arithmetic' && sumTraysAt(problemIndex)
+      ? currentProblem
+      : null
   // The arithmetic problem on screen; `null` for the extended kinds, which
   // never run the subitising scaffolds (spec § 1).
-  const arith = currentProblem.kind === 'arithmetic' ? currentProblem : null
+  const arith =
+    currentProblem.kind === 'arithmetic' && sumProblem === null
+      ? currentProblem
+      : null
   // A missing number (content wave 1 § 1): `A + ? = T` over group A and the
   // hidden part; never a dot card (it would show both parts).
   const missing =
@@ -1594,6 +1664,23 @@ export function MathScreen({
     () => placeValueMetrics(layout, plan.problems.filter(isHundredsProblem)),
     [layout, plan],
   )
+  // Adding big numbers' two trays, sized for the plan's sums (§ 3.3).
+  const sumTrays = useMemo(
+    () =>
+      placeValueMetrics(
+        layout,
+        plan.problems.flatMap((p, i) =>
+          p.kind === 'arithmetic' &&
+          isPlaceValueArithmetic(p, problemNodes?.[i] ?? planFocusNode)
+            ? [p]
+            : [],
+        ),
+      ),
+    [layout, plan, problemNodes, planFocusNode],
+  )
+  // The step lead's text: its words naming a place pulse that tray.
+  const leadText =
+    sessionIntro === null ? undefined : sessionGuideLine(sessionIntro).text
   // A 3-digit numeral steps the chips' font down to fit (§ 3.3).
   const chipFont = useMemo(
     () => chipNumeralFont(chipOrderWithClass.values, chips.size, chips.font),
@@ -1624,11 +1711,11 @@ export function MathScreen({
           '=',
           '?',
         ]
-      : arith !== null
+      : (arith ?? sumProblem) !== null
         ? [
-            String(arith.addendA),
-            arith.op === '-' ? '−' : '+',
-            String(arith.addendB),
+            String((arith ?? sumProblem)!.addendA),
+            (arith ?? sumProblem)!.op === '-' ? '−' : '+',
+            String((arith ?? sumProblem)!.addendB),
             '=',
             '?',
           ]
@@ -1759,6 +1846,7 @@ export function MathScreen({
                   width={area.width}
                   readRevealed={readRevealed}
                   leadRevealed={leadRevealed}
+                  leadText={leadText}
                   hintStep={hintStep}
                   guided={guidedActive}
                   answered={problemState.resolved}
@@ -1798,6 +1886,22 @@ export function MathScreen({
                     ),
                   )}
                 </View>
+              )}
+
+              {sumProblem !== null && (
+                <PlaceValueStage
+                  key={`sum-${problemIndex}`}
+                  problem={sumProblem}
+                  metrics={sumTrays}
+                  width={area.width}
+                  readRevealed={readRevealed}
+                  leadRevealed={leadRevealed}
+                  leadText={leadText}
+                  hintStep={hintStep}
+                  hint2Revealed={hint2Revealed}
+                  guided={guidedActive}
+                  answered={problemState.resolved}
+                />
               )}
 
               {multiply !== null && groups.slot > 0 && (

@@ -413,11 +413,12 @@ export const PLACE_VALUE_ARITHMETIC_NODES: readonly SkillNode[] = [
 ]
 
 /** Whether `problem` draws the place-value trays: an arithmetic problem of
- *  a {@link PLACE_VALUE_ARITHMETIC_NODES} step. */
+ *  a {@link PLACE_VALUE_ARITHMETIC_NODES} step. (Not a type guard: `false`
+ *  says nothing of the kind, since it also depends on `node`.) */
 export function isPlaceValueArithmetic(
   problem: MathProblem | ExtendedMathProblem,
   node: SkillNode | null | undefined,
-): problem is ArithmeticProblem {
+): boolean {
   return (
     (!('kind' in problem) || problem.kind === 'arithmetic') &&
     node !== null &&
