@@ -65,7 +65,6 @@ import { CaptionRibbon } from '../../components/CaptionRibbon'
 import type { MathLayout } from '../../layout/mathLayout'
 import {
   appVisibility,
-  useIsAppHidden,
   type AppVisibility,
 } from '../../lifecycle/appVisibility'
 import { colors, FILL } from '../../theme'
@@ -187,7 +186,6 @@ export function GameScreen({
   visibility = appVisibility,
 }: GameScreenProps) {
   const reducedMotion = useReducedMotion()
-  const appHidden = useIsAppHidden(visibility)
 
   // Fixed at mount: the round, the line player, the effects.
   const [round] = useState<readonly FlowerBedBed[]>(
@@ -350,13 +348,16 @@ export function GameScreen({
   }, [])
 
   // Back from the background: the advance that fell due runs.
-  useEffect(() => {
-    if (appHidden) return
-    const fn = pendingRef.current
-    if (fn === null) return
-    pendingRef.current = null
-    if (!exitedRef.current) fn()
-  }, [appHidden])
+  useEffect(
+    () =>
+      visibility.subscribe(() => {
+        const fn = pendingRef.current
+        if (fn === null || visibility.getIsHidden()) return
+        pendingRef.current = null
+        if (!exitedRef.current) fn()
+      }),
+    [visibility],
+  )
 
   // A new layout (rotation): a hop in flight ends at once (§ 1.6).
   const { problem, chips } = layout
