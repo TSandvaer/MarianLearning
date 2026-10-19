@@ -9,6 +9,7 @@ import {
   GUIDANCE_LINES_AWAITING_RENDER,
   guidanceLine,
   peekLines,
+  pickerWhoLine,
   replayLines,
   sessionIntroLine,
 } from './guidanceLines'
@@ -52,13 +53,15 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       // content wave 4 § 8.1: 17 more.
       'story-read': 1,
       'story-word': 71,
+      // Learner profiles § 1.3 (T5): the picker's "Who is playing?".
+      'picker-who': 1,
     })
-    expect(GUIDANCE_LINES).toHaveLength(258)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(258)
+    expect(GUIDANCE_LINES).toHaveLength(259)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(259)
     // Bee and car words' leads are duck words' text (content wave 4 § 11):
     // three ids, one text, three files.
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(256)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(258)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(257)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(259)
   })
 
   it('AC8: both replay sets, one line per STAGE_SPOKEN_NAMES step, with the exact texts (map-tap-to-play § 6, T1 approved 2026-10-17)', () => {
@@ -257,6 +260,19 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       )
   })
 
+  it('has the picker line (learner profiles § 1.3, T5), awaiting its Lily render', () => {
+    expect(pickerWhoLine()).toEqual({
+      id: 'guide.picker.who',
+      kind: 'picker-who',
+      world: null,
+      text: 'Who is playing?',
+      src: '/assets/audio/path/guide-picker-who.mp3',
+    })
+    // 15 characters of Lily (T5).
+    expect(pickerWhoLine().text).toHaveLength(15)
+    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual(['guide.picker.who'])
+  })
+
   it('names the step in the peek opener and closer (Thomas 2026-10-15), with the path lines’ spoken names and their verb', () => {
     expect(peekLines('sub-to-10')).toMatchObject({
       open: {
@@ -362,7 +378,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(258)
+    ).toHaveLength(259)
   })
 
   it('repeats no Emma’s Path line', () => {

@@ -11,7 +11,7 @@ export {
   learnerStartProgress,
   startProgressForActive,
 } from './startDoc'
-export { activeLearner } from './state'
+export { activeLearner, installedLearnerList } from './state'
 export {
   activateLearner,
   addLearner,

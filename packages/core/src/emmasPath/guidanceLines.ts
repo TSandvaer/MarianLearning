@@ -62,6 +62,7 @@ export type GuidanceLineKind =
   | 'session-replay-close'
   | 'story-read'
   | 'story-word'
+  | 'picker-who'
 
 export interface GuidanceLine {
   /** Dotted id, e.g. `guide.hub.suggest.math`. */
@@ -259,6 +260,10 @@ function buildLines(): GuidanceLine[] {
       WAVE_3_STORY_WORDS.has(word) ? undefined : `${cap},`,
     )
   }
+  // Learner profiles § 1.3 (T5, approved by Thomas 2026-10-19): the
+  // picker's question, on a device with 2 or more learners. No name in it
+  // (P7).
+  add(PICKER_WHO_ID, 'picker-who', 'Who is playing?')
   return lines
 }
 
@@ -317,6 +322,7 @@ const peekCloseId = (n: SkillNode) => `guide.session.peek-close.${n}`
 const replayOpenId = (n: SkillNode) => `guide.session.replay-open.${n}`
 const replayCloseId = (n: SkillNode) => `guide.session.replay-close.${n}`
 const STORY_READ_ID = 'guide.story.read'
+const PICKER_WHO_ID = 'guide.picker.who'
 const storyWordId = (word: string) => `guide.story.word.${word}`
 
 /** Every guidance line: Hub, then session end, then in session. */
@@ -329,9 +335,9 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: none.
+ * Now: the picker's "Who is playing?" (learner profiles § 1.3).
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [PICKER_WHO_ID]
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 
@@ -353,6 +359,11 @@ export function storyReadLine(): GuidanceLine {
 /** A story word's own clip ("Fox."), or undefined for a word without one. */
 export function storyWordLine(word: string): GuidanceLine | undefined {
   return BY_ID.get(storyWordId(word))
+}
+
+/** "Who is playing?" (learner profiles § 1.3): the picker's line. */
+export function pickerWhoLine(): GuidanceLine {
+  return BY_ID.get(PICKER_WHO_ID)!
 }
 
 /** "Some flowers are hiding!" (§ 6.1): before a round's first missing number. */
