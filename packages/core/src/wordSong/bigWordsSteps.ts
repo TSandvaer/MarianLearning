@@ -5,7 +5,9 @@
  * (end blends) and cake words (magic e) from content wave 2
  * (`design/native/content-wave-2.md` § 3.2 and § 4.2). Land 8, "Words and
  * stories": bee words (ee / ea) and car words (ar) from content wave 4
- * (`design/native/content-wave-4.md` § 3.2 and § 4.2).
+ * (`design/native/content-wave-4.md` § 3.2 and § 4.2). Land 9, "More words
+ * and stories": snail words (ai / ay and oa) and moon words (long oo) from
+ * content wave 5 (`design/native/content-wave-5.md` § 4.2 and § 5.2).
  *
  * THE one place their words and traps live. `wordPack.ts` builds the
  * picture-pack entries and the distractor rows from it, and the server's
@@ -31,6 +33,8 @@ export type BigWordsStep =
   | 'cake-words'
   | 'bee-words'
   | 'car-words'
+  | 'snail-words'
+  | 'moon-words'
 
 /** The `WordCategory` values these words use (a subset; `wordPack.ts`
  *  assigns them to `WordEntry.category`, so tsc checks the subset). */
@@ -48,6 +52,8 @@ export type BigWordCategory =
   | 'vehicle'
   // Content wave 4: star (§ 4.2; the pack's sun is celestial already).
   | 'celestial'
+  // Content wave 5: spoon (§ 5.2; the pack's pan and pot are kitchen).
+  | 'kitchen'
 
 export interface BigWordRow {
   word: string
@@ -57,6 +63,8 @@ export interface BigWordRow {
    * that says its name (content wave 2 § 4.2); nothing on the land-6 path
    * reads it as a short sound. Bee words: 'e', the team's first letter,
    * which says its name; car words: 'a' (content wave 4 § 3.2, § 4.2).
+   * Snail words: 'a' for ai / ay, 'o' for oa, the team's first letter,
+   * which says its name; moon words: 'o' (content wave 5 § 4.2, § 5.2).
    */
   vowel: 'a' | 'e' | 'i' | 'o' | 'u'
   category: BigWordCategory
@@ -74,6 +82,8 @@ export const BIG_WORDS_STEP_IDS: readonly BigWordsStep[] = [
   'cake-words',
   'bee-words',
   'car-words',
+  'snail-words',
+  'moon-words',
 ]
 
 export const BIG_WORDS_STEPS: Readonly<
@@ -452,6 +462,131 @@ export const BIG_WORDS_STEPS: Readonly<
       category: 'object',
       gentle: ['fox', 'bus'],
       trap: ['hat', 'barn'], // the short word; the same ar
+    },
+  ],
+  // Content wave 5 § 4.2 (Dave's words and traps, D5's gentle pairs): ai /
+  // ay and oa say the first letter's name, the teams alternating a, o, a,
+  // o … Gentle pairs: another category and first sound, and no letter of
+  // the target's team (every one has e or u as its vowel). P1 is tray, the
+  // only word ending in its team, so the lead's ending-pair cue lights a y.
+  'snail-words': [
+    {
+      word: 'tray',
+      vowel: 'a',
+      category: 'household',
+      gentle: ['hen', 'cup'],
+      trap: ['tree', 'train'], // ay against ee; read on
+    },
+    {
+      word: 'boat',
+      vowel: 'o',
+      category: 'vehicle',
+      gentle: ['sun', 'jug'],
+      trap: ['bat', 'bone'], // boat without the o; o_e
+    },
+    {
+      word: 'snail',
+      vowel: 'a',
+      category: 'animal',
+      gentle: ['cup', 'bed'],
+      trap: ['seal', 'sack'], // s…l, ai against ea; short a
+    },
+    {
+      word: 'coat',
+      vowel: 'o',
+      category: 'clothing',
+      gentle: ['hen', 'bus'],
+      trap: ['cot', 'goat'], // coat without the a; rhyme
+    },
+    {
+      word: 'train',
+      vowel: 'a',
+      category: 'vehicle',
+      gentle: ['nut', 'pen'],
+      trap: ['chain', 'tray'], // rhyme; the same start
+    },
+    {
+      word: 'loaf',
+      vowel: 'o',
+      category: 'food',
+      gentle: ['sun', 'bed'],
+      trap: ['leaf', 'log'], // oa against ea; l, short o
+    },
+    {
+      word: 'goat',
+      vowel: 'o',
+      category: 'animal',
+      gentle: ['cup', 'net'],
+      trap: ['gum', 'coat'], // g, short u; rhyme
+    },
+    {
+      word: 'chain',
+      vowel: 'a',
+      category: 'object',
+      gentle: ['bug', 'sun'],
+      trap: ['can', 'train'], // ch as c, ai as short a; rhyme
+    },
+  ],
+  // Content wave 5 § 5.2: oo says /uː/ (Lily is British: roof is /ruːf/,
+  // never /rʊf/). Gentle pairs as snail words', with no o. P1 is moon; no
+  // picturable oo word ends in oo, so its lead lights the team where it is
+  // ('team-pair').
+  'moon-words': [
+    {
+      word: 'moon',
+      vowel: 'o',
+      category: 'celestial',
+      gentle: ['hen', 'cup'],
+      trap: ['mop', 'spoon'], // m, short o; rhyme
+    },
+    {
+      word: 'spoon',
+      vowel: 'o',
+      category: 'kitchen',
+      gentle: ['bug', 'jet'],
+      trap: ['sock', 'moon'], // s, short o; rhyme
+    },
+    {
+      word: 'boot',
+      vowel: 'o',
+      category: 'clothing',
+      gentle: ['fan', 'pig'],
+      trap: ['box', 'bone'], // b, short o; o_e
+    },
+    {
+      word: 'broom',
+      vowel: 'o',
+      category: 'household',
+      gentle: ['hen', 'sun'],
+      trap: ['brick', 'boot'], // br, short i; the team
+    },
+    {
+      word: 'tooth',
+      vowel: 'o',
+      category: 'body-part',
+      gentle: ['cup', 'pig'],
+      trap: ['top', 'boot'], // t, short o; the team
+    },
+    {
+      word: 'stool',
+      vowel: 'o',
+      category: 'household',
+      gentle: ['jet', 'hen'],
+      trap: ['star', 'spoon'], // st, ar against oo; the team
+    },
+    {
+      word: 'hoop',
+      vowel: 'o',
+      category: 'object',
+      gentle: ['bus', 'cup'],
+      trap: ['hot', 'roof'], // h, short o; the team
+    },
+    {
+      word: 'roof',
+      vowel: 'o',
+      category: 'structure',
+      gentle: ['bed', 'fan'],
+      trap: ['rock', 'rope'], // r, short o; o_e
     },
   ],
 }

@@ -134,6 +134,58 @@ describe('a big-words problem deals its own step’s row (§ 5, AC 5)', () => {
   })
 })
 
+describe('land 9: snail and moon words deal their rows (content wave 5 § 6, AC 5)', () => {
+  const SNAIL = BIG_WORDS_STEPS['snail-words'].map((r) => r.word)
+  const MOON = BIG_WORDS_STEPS['moon-words'].map((r) => r.word)
+
+  it('a snail-words P4 deals coat, cot, goat; a moon-words P1 deals moon, hen, cup', () => {
+    const snail = wordSongSessionPlanFromServer(planOf(SNAIL), {
+      step: 'snail-words',
+    })
+    expect(snail.problems[3]!.target.word).toBe('coat')
+    expect(chips(snail.problems[3]!)).toEqual(['coat', 'cot', 'goat'])
+    const moon = wordSongSessionPlanFromServer(planOf(MOON), {
+      step: 'moon-words',
+    })
+    expect(moon.problems[0]!.target.word).toBe('moon')
+    expect(chips(moon.problems[0]!)).toEqual(['cup', 'hen', 'moon'])
+  })
+
+  it('every problem deals § 4.2 / § 5.2, with the step row on the problem or without it (no word collides, K4)', () => {
+    for (const step of ['snail-words', 'moon-words'] as const) {
+      const rows = BIG_WORDS_STEPS[step]
+      for (const options of [{ step }, undefined]) {
+        const plan = wordSongSessionPlanFromServer(
+          planOf(rows.map((r) => r.word)),
+          options,
+        )
+        plan.problems.forEach((p, i) => {
+          const row = rows[i]!
+          expect(chips(p), row.word).toEqual(
+            [row.word, ...(i < 3 ? row.gentle : row.trap)].sort(),
+          )
+        })
+      }
+    }
+  })
+
+  it('a review block keeps its step’s row: a snail-words goat at review P4', () => {
+    const review = wordSongSessionPlanFromServer(
+      planOf(['tray', 'moon', 'chain', 'goat'], 'review-x'),
+      {
+        step: ['snail-words', 'moon-words', 'snail-words', 'snail-words'],
+        problemCount: 4,
+      },
+    )
+    expect(review.problems[3]!.chipRow).toEqual({
+      gentle: ['cup', 'net'],
+      trap: ['gum', 'coat'],
+    })
+    expect(chips(review.problems[3]!)).toEqual(['coat', 'goat', 'gum'])
+    expect(chips(review.problems[1]!)).toEqual(['cup', 'hen', 'moon'])
+  })
+})
+
 describe('pickDistractors with a supplied row (§ 5: every check unchanged)', () => {
   it('uses the row instead of the matrix', () => {
     const sheep = getWordEntry('sheep')

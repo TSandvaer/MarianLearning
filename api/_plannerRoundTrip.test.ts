@@ -40,6 +40,8 @@ import {
   WORD_SONG_TARGET_WORDS_BEE,
   WORD_SONG_TARGET_WORDS_CAKE,
   WORD_SONG_TARGET_WORDS_CAR,
+  WORD_SONG_TARGET_WORDS_SNAIL,
+  WORD_SONG_TARGET_WORDS_MOON,
   WORD_SONG_TARGET_WORDS_CRAB,
   WORD_SONG_TARGET_WORDS_DUCK,
   WORD_SONG_TARGET_WORDS_TENT,
@@ -1440,7 +1442,7 @@ describe('simple-sentences tier — canonical pool ↔ browser-mirror alignment 
 // names the words in canon order from `bigWordsSteps.ts`, the planner keeps
 // that order (no continuant-onset reorder), and the parser reads every
 // problem as a picture-chip `cvc-word` with a real distractor trio.
-describe('planner → parser round-trip — land 6: duck, crab (content wave 1), tent and cake words (content wave 2); land 8: bee and car words (content wave 4)', () => {
+describe('planner → parser round-trip — land 6: duck, crab (content wave 1), tent and cake words (content wave 2); land 8: bee and car words (content wave 4); land 9: snail and moon words (content wave 5)', () => {
   const STEPS = [
     'duck-words',
     'crab-words',
@@ -1448,6 +1450,8 @@ describe('planner → parser round-trip — land 6: duck, crab (content wave 1),
     'cake-words',
     'bee-words',
     'car-words',
+    'snail-words',
+    'moon-words',
   ] as const
   const SERVER_LIST = {
     'duck-words': WORD_SONG_TARGET_WORDS_DUCK,
@@ -1456,6 +1460,8 @@ describe('planner → parser round-trip — land 6: duck, crab (content wave 1),
     'cake-words': WORD_SONG_TARGET_WORDS_CAKE,
     'bee-words': WORD_SONG_TARGET_WORDS_BEE,
     'car-words': WORD_SONG_TARGET_WORDS_CAR,
+    'snail-words': WORD_SONG_TARGET_WORDS_SNAIL,
+    'moon-words': WORD_SONG_TARGET_WORDS_MOON,
   } as const
 
   function wirePlan(words: readonly string[]): string {

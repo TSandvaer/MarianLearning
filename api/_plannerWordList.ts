@@ -443,6 +443,21 @@ export const WORD_SONG_TARGET_WORDS_BEE = bigWordsOf('bee-words').join(', ')
  */
 export const WORD_SONG_TARGET_WORDS_CAR = bigWordsOf('car-words').join(', ')
 
+/**
+ * Snail words (`snail-words`, land 9, content wave 5 —
+ * `design/native/content-wave-5.md` § 4): the vowel teams ai / ay and oa,
+ * which say the first letter's name. Exactly 8 words, IN CANON ORDER. Same
+ * source as duck words.
+ */
+export const WORD_SONG_TARGET_WORDS_SNAIL = bigWordsOf('snail-words').join(', ')
+
+/**
+ * Moon words (`moon-words`, land 9, content wave 5 — § 5): oo, /uː/ in
+ * British English. Exactly 8 words, IN CANON ORDER. Same source as duck
+ * words.
+ */
+export const WORD_SONG_TARGET_WORDS_MOON = bigWordsOf('moon-words').join(', ')
+
 /** Hint shown to the model so it knows the broader pack — even though it
  *  isn't authoring distractors, knowing the rhyme families helps it order
  *  the gentle-vs-trap window correctly (per Kyle's distractor spec).

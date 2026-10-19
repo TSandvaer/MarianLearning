@@ -132,6 +132,9 @@ const SCHEMA_FLOOR_NODES: readonly SkillNode[] = [
   'bee-words',
   'car-words',
   'sheep-stories',
+  'snail-words',
+  'moon-words',
+  'goat-stories',
 ] as const
 
 /**
@@ -259,6 +262,10 @@ const DEFAULT_SKILL_LEVELS: SkillLevels = {
   'bee-words': 'locked',
   'car-words': 'locked',
   'sheep-stories': 'locked',
+  // Content wave 5 (design/native/content-wave-5.md § 4.1, § 5.1, § 7.1).
+  'snail-words': 'locked',
+  'moon-words': 'locked',
+  'goat-stories': 'locked',
 }
 
 export function defaultProgress(childName = 'Marian'): Progress {

@@ -65,13 +65,19 @@ describe('the three story steps in the Word Song tree (§ 1, § 4.1)', () => {
     expect(nextNode('word-song', FOX)).toBe(HEN)
     expect(nextNode('word-song', HEN)).toBe(BUG)
     expect(nextNode('word-song', BUG)).toBe('bee-words')
-    expect(STORY_NODES).toEqual([FOX, HEN, BUG, 'sheep-stories'])
+    expect(STORY_NODES).toEqual([
+      FOX,
+      HEN,
+      BUG,
+      'sheep-stories',
+      'goat-stories',
+    ])
   })
 
   it('are land 7, Stories, of the Word Song lands; LANDS flattened equals both trees (AC 7)', () => {
     const ws = LANDS.filter((l) => l.world === 'word-song')
-    // Content wave 4 adds land 8.
-    expect(ws).toHaveLength(8)
+    // Content wave 4 adds land 8, content wave 5 land 9.
+    expect(ws).toHaveLength(9)
     expect(ws[6]).toEqual({
       world: 'word-song',
       number: 7,

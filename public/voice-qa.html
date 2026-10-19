@@ -622,7 +622,7 @@
         'other',
       ]
 
-      // Canon files — 15 math + 24 word-song. Iterated in alphabetical
+      // Canon files — 15 math + 27 word-song. Iterated in alphabetical
       // (group, file-stem) order so the dedup canonical-member choice is
       // deterministic across runs. A stem whose file is not baked yet
       // (404) is skipped with a console note, so a new step can be listed
@@ -637,10 +637,11 @@
       // cake-words add 64 with theirs (#589), content wave 3's three story
       // files add 85 with theirs (#599), hundreds adds 32 with its (#603),
       // and content wave 4's hundreds-addsub (more and less) adds 39 with
-      // its (#608) and bee-words + car-words + sheep-stories add 88 with
-      // theirs (#607). A line awaiting its render (empty audio) is not
-      // counted.
-      const EXPECTED_CANON_UNIQUE = 1181
+      // its (#608), bee-words + car-words + sheep-stories add 88 with
+      // theirs (#607), and content wave 5's snail-words + moon-words +
+      // goat-stories add 94 with theirs (#617). A line awaiting its render
+      // (empty audio) is not counted.
+      const EXPECTED_CANON_UNIQUE = 1275
       const CANON_FILES = [
         // math/level-1
         ['math', 'add-to-10'],
@@ -675,13 +676,16 @@
         ['word-song', 'digraphs-th-voiceless'],
         ['word-song', 'duck-words'],
         ['word-song', 'fox-stories'],
+        ['word-song', 'goat-stories'],
         ['word-song', 'hen-stories'],
         ['word-song', 'letter-names'],
         ['word-song', 'letter-sounds'],
         ['word-song', 'letter-sounds-audit'],
+        ['word-song', 'moon-words'],
         ['word-song', 'sheep-stories'],
         ['word-song', 'sight-words'],
         ['word-song', 'simple-sentences'],
+        ['word-song', 'snail-words'],
         ['word-song', 'tent-words'],
       ]
 
@@ -891,6 +895,18 @@
               'path-open-sheep-stories.mp3',
               'Here is your path! You are on sheep stories.',
             ],
+            [
+              'path-open-snail-words.mp3',
+              'Here is your path! You are on snail words.',
+            ],
+            [
+              'path-open-moon-words.mp3',
+              'Here is your path! You are on moon words.',
+            ],
+            [
+              'path-open-goat-stories.mp3',
+              'Here is your path! You are on goat stories.',
+            ],
           ],
         ],
         [
@@ -934,6 +950,9 @@
             ['path-stop-bee-words.mp3', 'Bee words.'],
             ['path-stop-car-words.mp3', 'Car words.'],
             ['path-stop-sheep-stories.mp3', 'Sheep stories.'],
+            ['path-stop-snail-words.mp3', 'Snail words.'],
+            ['path-stop-moon-words.mp3', 'Moon words.'],
+            ['path-stop-goat-stories.mp3', 'Goat stories.'],
           ],
         ],
         [
@@ -952,6 +971,7 @@
             ['path-land-word-song-6.mp3', 'Land 6: Big words.'],
             ['path-land-word-song-7.mp3', 'Land 7: Stories.'],
             ['path-land-word-song-8.mp3', 'Land 8: Words and stories.'],
+            ['path-land-word-song-9.mp3', 'Land 9: More words and stories.'],
           ],
         ],
         [
@@ -1101,6 +1121,18 @@
               'path-locked-next-sheep-stories.mp3',
               'Sheep stories! First, car words. Then this!',
             ],
+            [
+              'path-locked-next-snail-words.mp3',
+              'Snail words! First, sheep stories. Then this!',
+            ],
+            [
+              'path-locked-next-moon-words.mp3',
+              'Moon words! First, snail words. Then this!',
+            ],
+            [
+              'path-locked-next-goat-stories.mp3',
+              'Goat stories! First, moon words. Then this!',
+            ],
           ],
         ],
         [
@@ -1200,6 +1232,12 @@
             [
               'end-bud-sheep-stories.mp3',
               'Look! A new flower for sheep stories!',
+            ],
+            ['end-bud-snail-words.mp3', 'Look! A new flower for snail words!'],
+            ['end-bud-moon-words.mp3', 'Look! A new flower for moon words!'],
+            [
+              'end-bud-goat-stories.mp3',
+              'Look! A new flower for goat stories!',
             ],
           ],
         ],
@@ -1350,6 +1388,18 @@
               'end-unlock-sheep-stories.mp3',
               'You learned car words! Now you can do sheep stories!',
             ],
+            [
+              'end-unlock-snail-words.mp3',
+              'You learned sheep stories! Now you can do snail words!',
+            ],
+            [
+              'end-unlock-moon-words.mp3',
+              'You learned snail words! Now you can do moon words!',
+            ],
+            [
+              'end-unlock-goat-stories.mp3',
+              'You learned moon words! Now you can do goat stories!',
+            ],
           ],
         ],
         [
@@ -1372,6 +1422,10 @@
               'end-land-word-song-8.mp3',
               'A new land! Land 8: Words and stories!',
             ],
+            [
+              'end-land-word-song-9.mp3',
+              'A new land! Land 9: More words and stories!',
+            ],
           ],
         ],
         [
@@ -1393,6 +1447,10 @@
             [
               'end-land-word-song-8-no-number.mp3',
               'A new land: Words and stories!',
+            ],
+            [
+              'end-land-word-song-9-no-number.mp3',
+              'A new land: More words and stories!',
             ],
           ],
         ],
@@ -1562,6 +1620,15 @@
           "Let's look at sheep stories!",
         ],
         [
+          'guide-session-peek-open-snail-words.mp3',
+          "Let's look at snail words!",
+        ],
+        ['guide-session-peek-open-moon-words.mp3', "Let's look at moon words!"],
+        [
+          'guide-session-peek-open-goat-stories.mp3',
+          "Let's look at goat stories!",
+        ],
+        [
           'guide-session-peek-close-add-to-10.mp3',
           'Adding to ten is for later. You will learn it!',
         ],
@@ -1705,6 +1772,18 @@
           'guide-session-peek-close-sheep-stories.mp3',
           'Sheep stories are for later. You will learn it!',
         ],
+        [
+          'guide-session-peek-close-snail-words.mp3',
+          'Snail words are for later. You will learn it!',
+        ],
+        [
+          'guide-session-peek-close-moon-words.mp3',
+          'Moon words are for later. You will learn it!',
+        ],
+        [
+          'guide-session-peek-close-goat-stories.mp3',
+          'Goat stories are for later. You will learn it!',
+        ],
         ['guide-session-intro-duck-words.mp3', 'Two letters, one sound!'],
         ['guide-session-intro-crab-words.mp3', 'Read all the letters!'],
         ['guide-session-intro-tent-words.mp3', 'Read to the end!'],
@@ -1719,6 +1798,12 @@
         ['guide-session-intro-car-words.mp3', 'Two letters, one sound!'],
         [
           'guide-session-intro-sheep-stories.mp3',
+          'Read the story. Who, what or where?',
+        ],
+        ['guide-session-intro-snail-words.mp3', 'Two letters, one sound!'],
+        ['guide-session-intro-moon-words.mp3', 'Two letters, one sound!'],
+        [
+          'guide-session-intro-goat-stories.mp3',
           'Read the story. Who, what or where?',
         ],
         ['guide-session-intro-mult-mix.mp3', "Let's play all the groups!"],
@@ -1878,6 +1963,18 @@
           'guide-session-replay-open-sheep-stories.mp3',
           "Let's play sheep stories again!",
         ],
+        [
+          'guide-session-replay-open-snail-words.mp3',
+          "Let's play snail words again!",
+        ],
+        [
+          'guide-session-replay-open-moon-words.mp3',
+          "Let's play moon words again!",
+        ],
+        [
+          'guide-session-replay-open-goat-stories.mp3',
+          "Let's play goat stories again!",
+        ],
         ['guide-session-replay-close-number-recog.mp3', 'You know numbers!'],
         ['guide-session-replay-close-add-to-10.mp3', 'You know adding to ten!'],
         [
@@ -1973,6 +2070,12 @@
           'guide-session-replay-close-sheep-stories.mp3',
           'You know sheep stories!',
         ],
+        ['guide-session-replay-close-snail-words.mp3', 'You know snail words!'],
+        ['guide-session-replay-close-moon-words.mp3', 'You know moon words!'],
+        [
+          'guide-session-replay-close-goat-stories.mp3',
+          'You know goat stories!',
+        ],
         ['guide-story-read.mp3', 'Read the story.'],
         ['guide-story-word-the.mp3', 'The.'],
         ['guide-story-word-fox.mp3', 'Fox.'],
@@ -2045,6 +2148,22 @@
         ['guide-story-word-ship.mp3', 'Ship.'],
         ['guide-story-word-scarf.mp3', 'Scarf.'],
         ['guide-story-word-star.mp3', 'Star.'],
+        ['guide-story-word-goat.mp3', 'Goat.'],
+        ['guide-story-word-boat.mp3', 'Boat.'],
+        ['guide-story-word-loaf.mp3', 'Loaf.'],
+        ['guide-story-word-roof.mp3', 'Roof.'],
+        ['guide-story-word-broom.mp3', 'Broom.'],
+        ['guide-story-word-train.mp3', 'Train.'],
+        ['guide-story-word-stool.mp3', 'Stool.'],
+        ['guide-story-word-hoop.mp3', 'Hoop.'],
+        ['guide-story-word-coat.mp3', 'Coat.'],
+        ['guide-story-word-spoon.mp3', 'Spoon.'],
+        ['guide-story-word-tray.mp3', 'Tray.'],
+        ['guide-story-word-snail.mp3', 'Snail.'],
+        ['guide-story-word-moon.mp3', 'Moon.'],
+        ['guide-story-word-boot.mp3', 'Boot.'],
+        ['guide-story-word-tooth.mp3', 'Tooth.'],
+        ['guide-story-word-chain.mp3', 'Chain.'],
       ]
 
       // ── State ────────────────────────────────────────────────────────────

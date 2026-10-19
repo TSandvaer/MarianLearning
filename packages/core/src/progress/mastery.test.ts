@@ -168,7 +168,10 @@ describe('nextNode', () => {
     expect(nextNode('word-song', 'bug-stories')).toBe('bee-words')
     expect(nextNode('word-song', 'bee-words')).toBe('car-words')
     expect(nextNode('word-song', 'car-words')).toBe('sheep-stories')
-    expect(nextNode('word-song', 'sheep-stories')).toBeNull()
+    expect(nextNode('word-song', 'sheep-stories')).toBe('snail-words')
+    expect(nextNode('word-song', 'snail-words')).toBe('moon-words')
+    expect(nextNode('word-song', 'moon-words')).toBe('goat-stories')
+    expect(nextNode('word-song', 'goat-stories')).toBeNull()
   })
 
   it('returns null when the node does not appear in the track', () => {
