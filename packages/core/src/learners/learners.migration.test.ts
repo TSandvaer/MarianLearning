@@ -6,7 +6,7 @@
  * raw progress key (X1), and nothing here ever writes a progress key that
  * holds anything.
  */
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { recordProgressOnSessionEnd } from '../sessionEnd/progressHistory'
 import { recordSessionEnd } from '../sessionEnd/sessionHistory'
 import { markNudgeSaid } from '../sessionEnd/notYetNudge'
@@ -243,6 +243,13 @@ describe('ensureLearnerList: fresh install (AC 4, T7)', () => {
 })
 
 describe('ensureLearnerList: never throws (AC 5, K12)', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('a raw store whose getItem throws → returns, and the raw store is installed', () => {
     const raw = new MapStore()
     raw.getItem = () => {

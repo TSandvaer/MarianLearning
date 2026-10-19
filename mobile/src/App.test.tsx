@@ -8,6 +8,10 @@
  */
 import { LINE_GAP_MS } from '@marian/core/greet/greetSequence'
 import {
+  LEARNERS_STORAGE_KEY,
+  resetLearnersForTests,
+} from '@marian/core/learners'
+import {
   DEVICE_ID_STORAGE_KEY,
   defaultProgress,
   loadProgress,
@@ -18,7 +22,7 @@ import {
   type SessionHistoryEntry,
 } from '@marian/core/progress'
 import { seedUnlocksCelebrated } from '@marian/core/progress/pathBeats'
-import { now as progressNow } from '@marian/core/progress/clock'
+import { localDateKey, now as progressNow } from '@marian/core/progress/clock'
 import {
   isoDate,
   readSessionHistory,
@@ -66,11 +70,43 @@ let progressWrites = 0
 /** Writes per storage key since the last `boot()`. */
 const keyWrites = new Map<string, number>()
 
+/**
+ * Today's single-learner device on the profiles build (learner profiles
+ * PR A, `design/native/learner-profiles.md` § 4.3): the list holds one
+ * learner in the legacy slot with Marian's start, and nothing else is
+ * stored yet, so every reader falls back to her defaults exactly as before
+ * profiles. With it in place the migration writes nothing at boot. The
+ * learner is unnamed (as the migration leaves one whose name it can't
+ * read), so a saved doc keeps its own `childName`, as before profiles.
+ */
+const SINGLE_LEARNER_LIST = JSON.stringify({
+  schemaVersion: 1,
+  learners: [
+    {
+      id: '5f3c2a10-8b1e-4c2d-9a7f-1e2d3c4b5a69',
+      name: '',
+      avatarId: 'fox',
+      language: 'en',
+      legacySlot: true,
+      start: 'legacy-default',
+      createdAtISO: '2026-10-19T00:00:00.000Z',
+    },
+  ],
+  activeLearnerId: '5f3c2a10-8b1e-4c2d-9a7f-1e2d3c4b5a69',
+})
+
+/**
+ * Boot the app on an in-memory store: today's single-learner device, or
+ * with `freshInstall` an empty store (a new install: the migration writes
+ * the list and a land-1 start doc, T7).
+ */
 function boot(
   flags: LaunchFlags = NO_LAUNCH_FLAGS,
   progressApiSecret?: string,
+  { freshInstall = false }: { freshInstall?: boolean } = {},
 ): void {
   const map = new Map<string, string>()
+  if (!freshInstall) map.set(LEARNERS_STORAGE_KEY, SINGLE_LEARNER_LIST)
   progressWrites = 0
   keyWrites.clear()
   const backend: SyncKeyValueBackend = {
@@ -147,6 +183,7 @@ const voiceLine = () => audioEngine.voice.activeLabel
 beforeEach(() => {
   // Module state that outlives a render: the Hub's line player and 30 s
   // remount clock, and the app's session prefetch.
+  resetLearnersForTests()
   resetHubAudioForTests()
   sessionPrefetcher.discard()
   // A render is a new launch: the cloud reconcile may run again.
@@ -246,6 +283,21 @@ it('first launch (sessionCount 0): Splash → Greet, and Splash is silent', asyn
   expect(screen.getByTestId('greet')).toBeOnTheScreen()
   expect(screen.getByTestId('greet-wake-tap-target')).toBeOnTheScreen()
   expect(readSessionHistory().sessionCount).toBe(0)
+})
+
+it('fresh install (learner profiles T7): the boot writes the list and a land-1 start; Splash → Greet → Math asks for number-recog', async () => {
+  boot(NO_LAUNCH_FLAGS, undefined, { freshInstall: true })
+  expect([...keyWrites.keys()].sort()).toEqual(
+    [LEARNERS_STORAGE_KEY, STORAGE_KEY].sort(),
+  )
+  expect(progressWrites).toBe(1)
+  await greetToMath()
+  const [start] = sessionStarts() as Array<{
+    payload: { childName: string; progress?: { focusNode?: string } }
+  }>
+  expect(start!.payload.childName).toBe('friend')
+  expect(start!.payload.progress?.focusNode).toBe('number-recog')
+  expect(loadProgress()?.skillLevels['add-to-10']).toBe('locked')
 })
 
 it('returning (sessionCount ≥ 1, via a debug seed): Splash → Hub, and Emma speaks with no tap', async () => {
@@ -453,12 +505,13 @@ it('QA route session-end without a session: the placeholder, and nothing is writ
 it('3rd good day: All done opens the map, which plays the unlock once; Home → Hub → map again plays no beat and writes nothing', async () => {
   const day = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString()
   boot()
+  // Two earlier good days on add-to-10, banked in the counter: a doc whose
+  // history holds sessions sends Splash to the Hub (learner profiles K6).
   saveProgress({
     ...defaultProgress(),
-    history: [
-      { dateISO: day(2), skillFocus: ['add-to-10'], successRate: 1 },
-      { dateISO: day(1), skillFocus: ['add-to-10'], successRate: 1 },
-    ],
+    goodDays: {
+      'add-to-10': [day(2), day(1)].map((d) => localDateKey(new Date(d))),
+    },
   })
   await greetToMath()
   for (let i = 0; i < 8; i++) await answerRight()

@@ -32,6 +32,7 @@ import {
 } from '../progress/cloudSync'
 import { now as progressNow } from '../progress/clock'
 import {
+  generateUuid,
   getOrCreateDeviceId,
   isValidUuid,
   writeStoredDeviceId,
@@ -56,7 +57,12 @@ import {
   stampDoc,
   storedSyncId,
 } from './keys'
-import { landAt, learnerStartProgress, placeAtStep } from './startDoc'
+import {
+  currentLand,
+  landAt,
+  learnerStartProgress,
+  placeAtStep,
+} from './startDoc'
 import {
   activeLearner,
   getLearnersState,
@@ -116,22 +122,6 @@ function pictureFor(
   return free[0] ?? 'fox'
 }
 
-function newUuid(): string {
-  // getOrCreateDeviceId's generator, through a throwaway store.
-  let id = ''
-  withKeyValueStore(
-    {
-      getItem: () => null,
-      setItem: (_, v) => {
-        id = v
-      },
-      removeItem: () => {},
-    },
-    getOrCreateDeviceId,
-  )
-  return id
-}
-
 // ── State helpers ───────────────────────────────────────────────────────
 
 function requireState() {
@@ -140,11 +130,21 @@ function requireState() {
   return s
 }
 
-/** Use `next` as the list; written back unless it came from a newer build. */
+/**
+ * Use `next` as the list; written back unless it came from a newer build.
+ * A failed write keeps the change for this launch (storage errors never
+ * block play, as everywhere in core) and is logged.
+ */
 function commit(next: LearnerList): void {
   const s = requireState()
-  if (s.writable) s.raw.setItem(LEARNERS_STORAGE_KEY, JSON.stringify(next))
   setLearnersState({ ...s, list: next })
+  if (!s.writable) return
+  try {
+    s.raw.setItem(LEARNERS_STORAGE_KEY, JSON.stringify(next))
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.warn(`[learners] could not save the learner list — ${message}`)
+  }
 }
 
 function installActive(): void {
@@ -195,7 +195,7 @@ function loadDocAt(raw: KeyValueStore, entry: LearnerEntry): Progress | null {
 
 function legacyEntry(name: string, fresh: boolean, at: string): LearnerEntry {
   return {
-    id: newUuid(),
+    id: generateUuid(),
     name,
     avatarId: 'fox', // T3: Marian picks hers in Parent Settings later
     language: 'en',
@@ -359,7 +359,7 @@ export function addLearner(input: {
     throw new Error('learners: no such land')
   }
   const entry: LearnerEntry = {
-    id: newUuid(),
+    id: generateUuid(),
     name: input.name.trim(),
     avatarId: input.avatarId,
     language: 'en',
@@ -456,7 +456,7 @@ export function setLearnerStart(
   }
   const start =
     entry.start === 'legacy-default'
-      ? legacyStartAfterMove(world, land)
+      ? legacyStartAfterMove(entry, world, land)
       : { ...entry.start, [world === 'math' ? 'math' : 'wordSong']: land }
   io.save(moved)
   replaceEntry(id, { start })
@@ -465,33 +465,18 @@ export function setLearnerStart(
 
 /**
  * A migrated learner's start after one world moves: that world's land,
- * and the other world's land in Marian's diagnostic (the land of its
- * first step that isn't mastered there: Number Garden 2, Word Song 1).
+ * and the other world's current land in Marian's diagnostic (Number
+ * Garden 2, Word Song 1), so a lost doc rebuilds near where she began.
  */
 function legacyStartAfterMove(
+  entry: LearnerEntry,
   world: MasteryTrack,
   land: number,
 ): { math: number; wordSong: number } {
-  const diagnostic = learnerStartProgress({
-    id: '',
-    name: '',
-    avatarId: 'fox',
-    language: 'en',
-    legacySlot: true,
-    start: 'legacy-default',
-    createdAtISO: '',
-  })
-  const landOfFirstOpen = (w: MasteryTrack) => {
-    const tree = w === 'math' ? MATH_TREE : LITERACY_TREE
-    const open = tree.find((n) => diagnostic.skillLevels[n] !== 'mastered')
-    const lands = landsOf(w)
-    return open === undefined
-      ? lands.length
-      : lands.findIndex((l) => l.nodes.includes(open)) + 1
-  }
+  const diagnostic = learnerStartProgress(entry)
   return world === 'math'
-    ? { math: land, wordSong: landOfFirstOpen('word-song') }
-    : { math: landOfFirstOpen('math'), wordSong: land }
+    ? { math: land, wordSong: currentLand(diagnostic, 'word-song').number }
+    : { math: currentLand(diagnostic, 'math').number, wordSong: land }
 }
 
 /**
@@ -696,7 +681,7 @@ export async function addLearnerFromBackup(
   if (after !== null) return after
   const s = requireState()
   const entry: LearnerEntry = {
-    id: newUuid(),
+    id: generateUuid(),
     name: listName(doc.profile.childName),
     avatarId: pictureFor(doc, s.list.learners),
     language: 'en',
