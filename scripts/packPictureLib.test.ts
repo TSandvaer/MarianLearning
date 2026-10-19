@@ -670,15 +670,17 @@ describe('the scene manifest', () => {
     readRepoJson('design/word-song/picture-manifest.json'),
   )
 
-  it('holds the 32 stories: fox, hen, bug, sheep 1-8 in batches 1-4', () => {
-    const ids = ['fox', 'hen', 'bug', 'sheep'].flatMap((a) =>
+  it('holds the 40 stories: fox, hen, bug, sheep, goat 1-8 in batches 1-5', () => {
+    const ids = ['fox', 'hen', 'bug', 'sheep', 'goat'].flatMap((a) =>
       Array.from({ length: 8 }, (_, i) => `${a}-${i + 1}`),
     )
     expect(scenes.map((e) => e.scene)).toEqual(ids)
     for (const e of scenes) {
       const animal = e.scene.split('-')[0]
       expect(e.tier).toBe(`${animal}-stories`)
-      expect(e.batch).toBe({ fox: 1, hen: 2, bug: 3, sheep: 4 }[animal])
+      expect(e.batch).toBe(
+        { fox: 1, hen: 2, bug: 3, sheep: 4, goat: 5 }[animal],
+      )
       expect(e.avoid.length).toBeGreaterThan(0)
     }
   })
