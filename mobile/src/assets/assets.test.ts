@@ -123,10 +123,9 @@ describe('native asset registry', () => {
     expect(keys.filter((key) => pictureAsset(key) === undefined)).toEqual([])
   })
 
-  // Content wave 4 § 9.2: the 8 sheep-story scenes come after the pack
-  // picks; until then a sheep story reveals the answer's picture. Enable
-  // when the scenes are registered.
-  it.skip("has each sheep story's own scene (content wave 4 § 9.2)", () => {
+  // Content wave 4 § 9.2: the 8 sheep-story scenes (Thomas's picks; a
+  // missing one would reveal the answer's picture, the shipped fallback).
+  it("has each sheep story's own scene (content wave 4 § 9.2)", () => {
     const sheep = LITTLE_STORIES.filter((s) => s.node === 'sheep-stories')
     expect(sheep).toHaveLength(8)
     for (const { id } of sheep)

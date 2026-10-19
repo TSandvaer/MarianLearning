@@ -4,9 +4,9 @@
  * exactly, with the question word changing from story to story. The lead
  * "Read the story. Who, what or where?" plays once, before problem 1 (no
  * "Read the story." right after it); every later card opens with "Read the
- * story."; the Where rows answer "Yes! In / On the …!". A story without
- * its scene reveals the answer's picture. Fakes for Emma's voice, the
- * session guide and the story players.
+ * story."; the Where rows answer "Yes! In / On the …!". Each story
+ * reveals its own scene (§ 9.2). Fakes for Emma's voice, the session
+ * guide and the story players.
  */
 import {
   storiesOf,
@@ -161,10 +161,11 @@ describe('sheep stories (AC 13)', () => {
       await advance(
         STORY_REVEAL_DELAY_MS + STORY_SCENE_LAND_MS + STORY_REVEAL_READ_GAP_MS,
       )
-      // No scene for the sheep stories yet: the answer's picture (§ 10).
+      // Sheep 1's own scene (§ 9.2), not the answer's pack picture.
       if (i === 0) {
-        expect(screen.getByTestId('word-story-scene-picture')).toBeTruthy()
-        expect(screen.queryByTestId('word-story-scene-art')).toBeNull()
+        const art = screen.getByTestId('word-story-scene-art')
+        expect(art.props.accessibilityLabel).toBe('sheep')
+        expect(screen.queryByTestId('word-story-scene-picture')).toBeNull()
       }
       const story = h.voice.lines.at(-1)!
       expect(story.text).toBe(s.story)
