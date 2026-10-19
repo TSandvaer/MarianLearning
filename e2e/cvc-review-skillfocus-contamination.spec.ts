@@ -125,8 +125,8 @@ const EXPECTED_REVIEW_TIER = 'cvc-words-short-u'
 /** The wrong node the BUG records on base (forward fallback, last node). */
 // The LAST word-song node (content wave 1 moved it from simple-sentences;
 // content wave 2 from crab-words; content wave 3 from cake-words; content
-// wave 4 from bug-stories).
-const FORWARD_FALLBACK_NODE = 'sheep-stories'
+// wave 4 from bug-stories; content wave 5 from sheep-stories).
+const FORWARD_FALLBACK_NODE = 'goat-stories'
 
 const CVC_WORDS_SHORT_U_CANON_PATH = resolve(
   process.cwd(),
@@ -224,7 +224,7 @@ interface ReadbackProgress {
 }
 
 test.describe('periodic CVC-review must not contaminate forward-node mastery (ticket 86ca9atqh) — FAILING-FIRST, RED on main until Kevin threads sessionCount into the session-end pick', () => {
-  test('1. a high-scoring periodic CVC-review session records skillFocus on the REVIEW tier (cvc-words-short-u), NOT the forward fallback (sheep-stories)', async ({
+  test('1. a high-scoring periodic CVC-review session records skillFocus on the REVIEW tier (cvc-words-short-u), NOT the forward fallback (goat-stories)', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
@@ -259,7 +259,7 @@ test.describe('periodic CVC-review must not contaminate forward-node mastery (ti
         'digraphs-th-voiceless': 'mastered',
         'sight-words': 'mastered',
         'simple-sentences': 'mastered',
-        // Content waves 1-4 (lands 6-8): the tree's last ten steps.
+        // Content waves 1-5 (lands 6-9): the tree's last thirteen steps.
         'duck-words': 'mastered',
         'crab-words': 'mastered',
         'tent-words': 'mastered',
@@ -270,6 +270,9 @@ test.describe('periodic CVC-review must not contaminate forward-node mastery (ti
         'bee-words': 'mastered',
         'car-words': 'mastered',
         'sheep-stories': 'mastered',
+        'snail-words': 'mastered',
+        'moon-words': 'mastered',
+        'goat-stories': 'mastered',
       },
       // Post-graduation Marian — the one-shot graduation review has
       // already fired, so the PERIODIC round-robin is the branch under
