@@ -44,6 +44,11 @@ export interface PlayWordSongUtteranceOptions {
   onWordTick?: (wordIndex: number) => void
   /** The clip's clock in ms (real audio only; the marks-driven blend). */
   onTime?: (ms: number) => void
+  /**
+   * End the line this far into the clip, as at a natural end (real
+   * blending's sounds, cut before the word). Real audio only.
+   */
+  endAtMs?: number
 }
 
 /** A session line's MP3 on disk and its byte length (`fileFor`). */
