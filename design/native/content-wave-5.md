@@ -1,12 +1,12 @@
 # Content wave 5: zeros, adding big numbers, snail words, moon words, goat stories (native)
 
-**Status:** spec only. Thomas said go on 2026-10-19 (popup "Start wave 5 roadmap", quoted in the roadmap addendum's status line). Dave's check (§ 16) and Thomas's T-items (§ 15) are open.
+**Status:** spec only. Thomas said go on 2026-10-19 (popup "Start wave 5 roadmap", quoted in the roadmap addendum's status line). Dave checked D1–D9 on 2026-10-19: 6 confirmed, 3 changed (D3, D6, D8), all applied (§ 16). Thomas approved T1–T7 by popup on 2026-10-19 (§ 15). The Lily recount after Dave's changes is 5,436 characters (§ 9.1).
 
 **Scope:** `@marian/core`, the native app, canon, the pack manifest and the scene manifest. The web is frozen: a new read throws there and the web plays its silent static plan (`content-wave-1.md` § 1.9). Rules follow `content-wave-4.md` (#606) unless stated.
 
-**Source:** Dave's addendum "content wave 5" in `design/research/content-roadmap-after-path-ends.md` (PR #614, open while this was written), read from `origin/dave/roadmap-wave-5`. His "Corrections (2026-10-19)" section applies throughout: no step rests on a Danish-school premise, the digit swap is a weaker trap, and the progression follows the US standards. Number Garden steps 16–17 (§ 2–§ 3 here), Word Song steps 22–24 (§ 4–§ 7).
+**Source:** Dave's addendum "content wave 5" in `design/research/content-roadmap-after-path-ends.md` (PR #614, merged as 144ad7d), first read from `origin/dave/roadmap-wave-5`. Where Dave's § 16 verdicts differ from the addendum (D6's fading), the verdicts win. His "Corrections (2026-10-19)" section applies throughout: no step rests on a Danish-school premise, the digit swap is a weaker trap, and the progression follows the US standards. Number Garden steps 16–17 (§ 2–§ 3 here), Word Song steps 22–24 (§ 4–§ 7).
 
-**Who it is for:** any learner of about 6 to 9 (Thomas, 2026-10-19: the app is multi-user; `CLAUDE.md` "Users" line on PR #613). Marian is one user. No step depends on one learner's school, language or history.
+**Who it is for:** any learner of about 6 to 9 (Thomas, 2026-10-19: the app is multi-user; `CLAUDE.md` "Users" line, PR #613, merged as 4783427). Marian is one user. No step depends on one learner's school, language or history.
 
 **Out of scope:** code, renders, generation and test runs. Also out: taking away with a new ten, three-digit regrouping, clock time, equal parts, igh/ie and ow (Dave: later candidates), and learner profiles (specced separately).
 
@@ -102,7 +102,7 @@ P1, phone portrait (375×667), after the read has built the number:
 ```
 
 - **The empty tray** is hundreds' cream tray at its plan width, with nothing in it: no dashed outline, no "0" drawn inside. Empty means nothing there. Its tag reads "?" until a hint, the given answer or a right tap fills it with "0".
-- **P5** ("Find one hundred and ninety.") opens with all three trays empty and "?" tags; nothing is built on the read (§ 2.4).
+- **P5** ("Find one hundred and ninety.") opens with all three trays empty and "?" tags; nothing is built on the read, and the number builds at hint 1 (§ 2.4, D3).
 - **P6–P8** are hundreds' "more" layout: the number tag with its pill ("+10", "+100", "−10") and the start blocks from the first frame. A zero in the start number shows as an empty tray whose tag reads "0" from the first frame (P6's 305: the tens tray).
 - Layout, glyphs, tags and placement are hundreds' (`content-wave-3.md` § 3.2). Digits only; no "=".
 
@@ -112,15 +112,15 @@ P1, phone portrait (375×667), after the read has built the number:
 
 ### 2.4 Beats, problem by problem
 
-- **Lead** (scored P1, forward sessions until mastered): "No tens? Zero tens!". The (still empty) tens tray pulses on each "tens" word tick, hundreds' lead pulse on one tray. 400 ms, then the read. (Dave gave no lead; D2.)
+- **Lead** (scored P1, forward sessions until mastered): "No tens? Zero tens!". The (still empty) tens tray pulses on each "tens" word tick, hundreds' lead pulse on one tray. 400 ms, then the read. (Dave gave no lead; he confirmed this one, D2.)
 - **Read, P1–P4, builds the number:** on the word tick of "hundred(s)" the flats drop in, on "tens" the rods, on "ones" the cubes (hundreds' build). **A zero place** ("no tens") drops nothing: on its word tick the empty tray pulses once (the tag pulse that ends every build, 1 → 1.1 → 1, 300 ms), so the place visibly is done with nothing in it.
 - **Read, P5:** nothing is built; the trays stay empty with "?" tags.
 - **Read, P6–P8:** hundreds' and wave 4's: the number tag pulses on the first word tick, the pill on "ten" / "hundred". Nothing moves on the read.
 - **Wrong 1, 2:** "Hmm... try again?", poof, shake, `puzzled-tilt`. The picture doesn't change.
 - **Hints** (600 ms after the 2nd wrong's reprompt):
-  - **P1–P5 (Dave's zero ladder):**
-    1. "Look at the tens." / "Look at the ones." (the first zero place): that tray ripples.
-    2. "Zero tens." / "Zero ones." (P3: "Zero tens and zero ones."): the empty tray pulses and its tag fills "0". On P5 the number builds now (flats, rods, cubes in place order, hundreds' build drop), then the empty ones tray pulses.
+  - **P1–P5 (Dave's zero ladder, D1):**
+    1. "Look at the tens." / "Look at the ones." (the first zero place): that tray ripples. **On P5** the number builds first (1 flat, then 9 rods, hundreds' build drop), then "Look at the ones." plays and the one empty tray, the ones, ripples (D3).
+    2. "Zero tens." / "Zero ones." (P3: "Zero tens and zero ones."): the empty tray pulses and its tag fills "0".
     3. The read's question ("What number is it?"; P5 "Find one hundred and ninety."): the other tags fill left to right, so the tags read the answer.
   - **P6, P7 (+10, +100, hundreds' ladder):** "Look at the tens." / "Look at the hundreds."; "One more ten." / "One more hundred." (the block drops in with its own pill and the tag ticks, P6's tens tag 0 → 1); "What is ten more?" / "What is one hundred more?".
   - **P8 (−10, wave 4's ladder at count 1):** "Look at the tens."; "Take away one ten." (the rod lifts out, the tens tray is left empty, and its tag turns "?"); "What is ten less?".
@@ -129,7 +129,7 @@ P1, phone portrait (375×667), after the read has built the number:
 
 ### 2.5 Motion brief (Reanimated; Reduce Motion in brackets)
 
-No new motion. The zero-place pulse is the build's tag pulse, played on the word tick instead of after the last block [none]. P5's hint-2 build is hundreds' build drop [the trays fade in over 150 ms]. P8's lift-out is wave 4's, with one rod [200 ms fade, no rise]. Everything else is `content-wave-3.md` § 3.5 and `content-wave-4.md` § 2.5.
+No new motion. The zero-place pulse is the build's tag pulse, played on the word tick instead of after the last block [none]. P5's hint-1 build is hundreds' build drop [the trays fade in over 150 ms]. P8's lift-out is wave 4's, with one rod [200 ms fade, no rise]. Everything else is `content-wave-3.md` § 3.5 and `content-wave-4.md` § 2.5.
 
 ### 2.6 Data model, parser, chips, session end
 
@@ -178,7 +178,7 @@ Dave's suggested canon, checked against his rules (a zero in every start or answ
 | 2   | "Four hundreds, six tens and no ones. What number is it?" (55)   | 460    | on the read | 460, 660, 860         | gentle      |
 | 3   | "Seven hundreds, no tens and no ones. What number is it?" (55)   | 700    | on the read | 700, 500, 300         | gentle      |
 | 4   | "One hundred, no tens and eight ones. What number is it?" (55)   | 108    | on the read | 108, 18, 180          | zero-drop   |
-| 5   | "Find one hundred and ninety." (28)                              | 190    | at hint 2   | 190, 19, 109          | zero-drop   |
+| 5   | "Find one hundred and ninety." (28)                              | 190    | at hint 1   | 190, 19, 109          | zero-drop   |
 | 6   | "Three hundred and five. What is ten more?" (41)                 | 315    | at hint 2   | 315, 306, 405         | wrong-place |
 | 7   | "Six hundred and forty. What is one hundred more?" (48)          | 740    | at hint 2   | 740, 641, 650         | wrong-place |
 | 8   | "Four hundred and sixteen. What is ten less?" (43)               | 406    | at hint 2   | 406, 415, 316         | wrong-place |
@@ -220,7 +220,7 @@ P3, phone portrait, after the read and the bundle:
 
 The place-value frames: `extendedMathLayout(viewport, 'place-value')`, so L takes the chip column and the 2-line ribbon. A step-17 problem reports `'place-value'` to App's frame (`onProblemKindChange`), though its kind is `'arithmetic'`: the frame follows the stage. On P, TP and TL these are the arithmetic frames already (`mathLayout.ts:616-633`).
 
-- **Counts:** the canon's largest at any point are 9 rods (P8's answer) and 14 cubes (P6 before the bundle, 3 columns): Dave's layout risk.
+- **Counts:** the canon's largest at any point are 9 rods (P8's answer) and 14 cubes (P6 before the bundle, 3 columns): Dave's layout risk. P4 and P5 hold 13 loose cubes from the read until hint 2 (D6), below P6's 14, so the table below stands.
 - **Width** = tens (1.3 × 9 − 0.3 + 1) u + ones (1.3 × 3 − 0.3 + 1) u + g = 17u + g (g = 12, tablet 16).
 - **Height** = the equation line + the form's equation-to-visual gap + 11u (a rod's 10u + the tray pad) + the tag row (36, tablet 42).
 - **u** = the largest whole number ≤ 10 (tablet ≤ 20) that fits the problem rect. Hand-computed against the rects of `content-wave-3.md` § 3.3:
@@ -237,23 +237,24 @@ The place-value frames: `extendedMathLayout(viewport, 'place-value')`, so L take
 
 ### 3.4 Beats, problem by problem
 
-- **Lead** (scored P1, forward sessions until mastered): "Tens and ones!". The two trays pulse left to right on its word ticks (hundreds' lead pulse). 400 ms, then the read. (Dave's "Make a ten!" doesn't fit P1, which makes no ten; D4.)
-- **Read:**
+- **Lead** (scored P1, forward sessions until mastered): "Tens and ones!". The two trays pulse left to right on its word ticks (hundreds' lead pulse). 400 ms, then the read. (Dave's "Make a ten!" doesn't fit P1, which makes no ten; Dave confirmed, D4.)
+- **Read** (backward fading, D6: P3 is the one worked example of the new ten each session; P4–P5 fade its last step, the bundle, first; P6–P8 fade the drop too):
   - **P1–P3** (their blocks move on the read): on the word tick of the second number ("thirty-five") its rods drop in, then its cubes. On P3, when the cubes have landed and the ones tray holds ten or more, the bundle plays.
-  - **P4–P8:** nothing moves; the first number's blocks and the equation are the picture (fading, Dave's M10, as wave 4's start blocks).
+  - **P4–P5:** the second number's blocks drop in on the read as on P1–P3, and the bundle waits for hint 2, so the ones tray shows 13 loose cubes (P4: 7 + 6, P5: 9 + 4).
+  - **P6–P8:** nothing moves; the first number's blocks and the equation are the picture (Dave's M10, as wave 4's start blocks).
   - Chips open on `onPlay`, as today.
 - **Wrong 1, 2:** "Hmm... try again?", poof, shake, `puzzled-tilt`. The picture doesn't change.
 - **Hints** (600 ms after the 2nd wrong's reprompt); a step-17 problem sets `hintStep`, as the extended kinds do, not arithmetic's `hintBeat`:
   1. "Look at the ones.": the ones tray ripples.
-  2. P1–P2 "Look at the tens." (the tens tray ripples). P3–P8 "Ten ones make a ten.": on P4–P8 the second number's blocks drop in and the bundle plays on the word tick "make"; on P3, already bundled, the tens tray ripples. On every problem the ones tag fills with the answer's ones digit.
+  2. P1–P2 "Look at the tens." (the tens tray ripples). P3–P8 "Ten ones make a ten.": on P4–P5 the bundle plays on the word tick "make"; on P6–P8 the second number's blocks drop in and the bundle plays on "make"; on P3, already bundled, the tens tray ripples. On every problem the ones tag fills with the answer's ones digit.
   3. "How many?": the tens tag fills, so the tags read the answer.
 - **giveAnswer** (3rd wrong): blocks that haven't moved move at once and the bundle lands in its end state; both tags fill with sharing's rose ring; the guided tap plays the correct moment.
 - **Correct** ("Yes! Sixty-three!"): blocks that haven't moved move fast (spring 300 / 22; the bundle in 250 ms); the tags fill left to right; the trays pulse once. Burst, sparkle, plink, `celebration`; 250 ms exit.
 
 ### 3.5 Motion brief (Reanimated; Reduce Motion in brackets)
 
-- **Drop-in (the second number):** wave 4's many-block drop: each block starts 40 pt above its tray, spring 220 / 18, `BUILD_STAGGER_MS` (90 ms, `mobile/src/screens/math/PlaceValueStage.tsx:101`) apart, rods first, no pills. Longest: P8's 2 rods + 7 cubes, about 0.8 s + the last spring. On a fast right tap: spring 300 / 22. [200 ms crossfade per block.]
-- **The bundle (new), about 1.1 s:**
+- **Drop-in (the second number):** wave 4's many-block drop: each block starts 40 pt above its tray, spring 220 / 18, `BUILD_STAGGER_MS` (90 ms, `mobile/src/screens/math/PlaceValueStage.tsx:101`) apart, rods first, no pills. Longest: P6's 2 rods + 8 cubes, the last block starting 0.81 s in (9 × 90 ms), + its spring. On a fast right tap: spring 300 / 22. [200 ms crossfade per block.]
+- **The bundle (new), about 1.1 s.** It plays on P3 after the read's drop, and on P4–P8 on hint 2's "make" (D6):
   1. **Gather, 300 ms:** the second column's five cubes slide up and left onto the first column, 40 ms apart, spring 260 / 20, so the first ten cubes stand as one column 10u tall.
   2. **Fuse, 150 ms:** the ten cubes crossfade into one `RodGlyph` in the same place. A rod is drawn as 10 cells (`content-wave-3.md` § 3.2), so nothing jumps.
   3. **Carry, about 450 ms:** the rod rises 12 pt (tablet 16) and arcs to the next free rod slot in the tens tray, spring 220 / 18; the tens tray ripples as it lands (1 → 1.06 → 1, 300 ms).
@@ -266,6 +267,7 @@ The place-value frames: `extendedMathLayout(viewport, 'place-value')`, so L take
 
 - **No new kind, no parser change.** The read parses with the addition template (`planFromServer.ts:579`) to `{ kind: 'arithmetic', addendA, addendB, op: '+', correct }`.
 - **Which problems draw the trays:** a new core list, `PLACE_VALUE_ARITHMETIC_NODES: readonly SkillNode[] = ['add-two-digit']`, exported from `extendedProblems.ts`. An arithmetic problem whose step (its `problemNodes` entry, else the focus node) is in it draws `PlaceValueStage`'s two-tray form, takes the place-value frame and the chips below. A later `sub-two-digit` joins the list.
+- **What moves on the read** goes by the problem's position, as `moreBlocksMoveOnRead` does (`extendedProblems.ts:365`), so a review block keeps its slot's rule: a new core function `addTwoDigitReadMotion(index: number): 'drop-and-bundle' | 'drop' | 'none'`, exported from `extendedProblems.ts`, gives `'drop-and-bundle'` for P1–P3 (P1–P2 have no ten to bundle), `'drop'` for P4–P5 and `'none'` for P6–P8 (D6).
 - **`PlaceValueLayoutProblem`** (`mathLayout.ts:1328`) gains `{ kind: 'arithmetic'; addendA: number; addendB: number; correct: number }`, laid out with two trays (§ 3.3).
 - **Chips:** a new core function `addTwoDigitDistractors(correct: number, index: number): [number, number]`, called from `problemChips` (`mobile/src/screens/math/problemChips.ts:58`) for those problems and shuffled with the arithmetic LCG. `buildChipOrder` (the web's verbatim copy, `chipOrder.ts:35-37`) is not touched.
   - **P1–P3:** the answer ± 20 (the tens digit ± 2), as Dave set: 59 → 39, 79.
@@ -278,16 +280,16 @@ The place-value frames: `extendedMathLayout(viewport, 'place-value')`, so L take
 
 Dave's canon, checked against his rules (both addends 11–89 with no zero digit; answers 21–99 with no zero digit; P1–P2 without a new ten; ones sums 12, 13, 14).
 
-| P   | Read (characters)                               | Answer | New ten | Blocks move | Chips (correct first) | Class           |
-| --- | ----------------------------------------------- | ------ | ------- | ----------- | --------------------- | --------------- |
-| 1   | "Thirty-four plus twenty-five. How many?" (39)  | 59     | no      | on the read | 59, 39, 79            | gentle          |
-| 2   | "Forty-two plus thirty-six. How many?" (36)     | 78     | no      | on the read | 78, 58, 98            | gentle          |
-| 3   | "Twenty-eight plus thirty-five. How many?" (40) | 63     | yes     | on the read | 63, 43, 83            | gentle          |
-| 4   | "Forty-seven plus twenty-six. How many?" (38)   | 73     | yes     | at hint 2   | 73, 63, 74            | forgotten-carry |
-| 5   | "Thirty-nine plus forty-four. How many?" (38)   | 83     | yes     | at hint 2   | 83, 73, 82            | forgotten-carry |
-| 6   | "Fifty-six plus twenty-eight. How many?" (38)   | 84     | yes     | at hint 2   | 84, 74, 85            | forgotten-carry |
-| 7   | "Twenty-nine plus thirty-three. How many?" (40) | 62     | yes     | at hint 2   | 62, 52, 61            | forgotten-carry |
-| 8   | "Sixty-five plus twenty-seven. How many?" (39)  | 92     | yes     | at hint 2   | 92, 82, 93            | forgotten-carry |
+| P   | Read (characters)                               | Answer | New ten | Blocks move                   | Chips (correct first) | Class           |
+| --- | ----------------------------------------------- | ------ | ------- | ----------------------------- | --------------------- | --------------- |
+| 1   | "Thirty-four plus twenty-five. How many?" (39)  | 59     | no      | on the read                   | 59, 39, 79            | gentle          |
+| 2   | "Forty-two plus thirty-six. How many?" (36)     | 78     | no      | on the read                   | 78, 58, 98            | gentle          |
+| 3   | "Twenty-eight plus thirty-five. How many?" (40) | 63     | yes     | on the read                   | 63, 43, 83            | gentle          |
+| 4   | "Forty-seven plus twenty-six. How many?" (38)   | 73     | yes     | on the read; bundle at hint 2 | 73, 63, 74            | forgotten-carry |
+| 5   | "Thirty-nine plus forty-four. How many?" (38)   | 83     | yes     | on the read; bundle at hint 2 | 83, 73, 82            | forgotten-carry |
+| 6   | "Fifty-six plus twenty-eight. How many?" (38)   | 84     | yes     | at hint 2                     | 84, 74, 85            | forgotten-carry |
+| 7   | "Twenty-nine plus thirty-three. How many?" (40) | 62     | yes     | at hint 2                     | 62, 52, 61            | forgotten-carry |
+| 8   | "Sixty-five plus twenty-seven. How many?" (39)  | 92     | yes     | at hint 2                     | 92, 82, 93            | forgotten-carry |
 
 - **Per problem:** correct "Yes! <answer>!" (15–19 characters); giveAnswer "This one is <answer>." (22–26); reprompt (reused); hint1 "Look at the ones." (reused); hint2 "Look at the tens." (P1–P2, reused) or "Ten ones make a ten." (P3–P8, 20); hint3 "How many?" (reused, the multiplication canon's hint 3). Recap "You worked on adding big numbers today!" (39).
 - **Blocks:** P6 peaks at 14 cubes (6 + 8), P8 ends at 9 rods.
@@ -314,7 +316,7 @@ Dave's canon, checked against his rules (both addends 11–89 with no zero digit
 | 7   | goat  | oa   | animal    | cup, net       | gum, coat    | gum: g, short u; coat: rhyme              |
 | 8   | chain | ai   | object    | bug, sun       | can, train   | can: ch as c, ai as short a; train: rhyme |
 
-- **Gentle pairs** (mine, D5): another category, another first sound, and no letter of the target's team. All ten gentle words have e or u as their vowel, so none holds an a, i, o or y. Categories are the pack's (`wordPack.ts`: cup `vessel`, sun `celestial`, pen `stationery` …).
+- **Gentle pairs** (mine, D5, confirmed by Dave): another category, another first sound, and no letter of the target's team. All ten gentle words have e or u as their vowel, so none holds an a, i, o or y. Categories are the pack's (`wordPack.ts`: cup `vessel`, sun `celestial`, pen `stationery` …).
 - **P1 must be _tray_:** the only word ending in its team, so the `'ending-pair'` cue lights a y.
 - **`BigWordRow.vowel`:** `'a'` for ai/ay rows, `'o'` for oa rows (the team's first letter, which says its name).
 - **Phoneme tags:** no target is tagged, so `gum`'s `/g/` tag (`wordPack.ts`) raises nothing (`packages/core/src/wordSong/wordDistractors.ts:174-191` checks only a tagged target).
@@ -344,7 +346,7 @@ As § 4.1, after `snail-words`. **oo says /uː/**, a new sound, as ar was (UFLI 
 | 7   | hoop  | object    | bus, cup       | hot, roof    | hot: h, short o; roof: the team          |
 | 8   | roof  | structure | bed, fan       | rock, rope   | rock: r, short o; rope: o_e              |
 
-- **Gentle pairs** (mine, D5): another category, another first sound, and no o.
+- **Gentle pairs** (mine, D5, confirmed by Dave): another category, another first sound, and no o.
 - **`BigWordCategory`** (`packages/core/src/wordSong/bigWordsSteps.ts:37-50`) gains `'kitchen'` (_spoon_; the pack's _pan_ and _pot_ are `kitchen` already). `BigWordRow.vowel` is `'o'` for every row.
 - **_tooth_** uses th, which `digraphs-th-voiceless` taught.
 - **Weakest** (Dave's hypothesis): _roof_ and _hoop_. _pool_ is the only reserve; a failing word goes back through Dave.
@@ -378,7 +380,7 @@ Each problem also has "Hmm... try again?" (reused) and "This one is the <answer>
 
 1. "The goat sat in the boat. It has a loaf." (40, 10) → "Who sat in the boat?" (20) → **goat** / boat, loaf
 2. "The goat is on the roof. A broom is in the train." (49, 12) → "What is in the train?" (21) → **broom** / goat, train
-3. "The goat has a hoop. It sat on the stool." (41, 10) → "Where is the goat?" (18) → **stool** (On) / goat, hoop
+3. "The goat sat on the stool. It has a hoop." (41, 10) → "Where is the goat?" (18) → **stool** (On) / goat, hoop
 4. "The goat has a coat. A spoon is on the tray." (44, 11) → "What is on the tray?" (20) → **spoon** / coat, tray
 5. "The snail sat on the moon. The goat sat on a log." (49, 12) → "Who sat on the moon?" (20) → **snail** / goat, moon
 6. "The goat sat in the tent. The snail hid in the boot." (52, 12) → "Where is the snail?" (19) → **boot** (In) / tent, goat
@@ -388,9 +390,9 @@ Each problem also has "Hmm... try again?" (reused) and "This one is the <answer>
 **Rules** (a splice lint checks them; my scratch check over `taughtWords()`, `storySentences` and the pack found no breach, 2026-10-19):
 
 - **Taught words only** (wave 3's D2): a target of a Word Song canon file (the 16 new targets once their files exist), a word read in the sight-words or simple-sentences canon, or _and_, _got_, _hid_ (`scripts/spliceContentWave3Canon.ts:139-169`). No plurals, no -s or -ed endings; no exemption is needed this wave.
-- **Shape:** 2 sentences, 10–14 words; the two 14-word stories sit at P7 and P8. _It_ is always the animal of the sentence before (1, 3). No _she_.
+- **Shape:** 2 sentences, 10–14 words; the two 14-word stories sit at P7 and P8. _It_ is always the animal of the sentence before (1, 3), and no answer rests on _It_: the sentence that answers the question names its subject (D8; checked by hand on all 8). No _she_.
 - **The 16 words:** the goat is in every story, and every story uses at least 2 of the 16 (_goat_ counts); each of the 16 appears at least once. The goat answers P1 and P7 only.
-- **Chips:** all three are in the story and have a pack picture, and no trio holds a `FORBIDDEN_PAIRS` pair, old or new (§ 8). Kinds: Who → an animal, What → an object, Where → a place (a container counts: "in the boot", as bug stories' "in the cup").
+- **Chips:** all three are in the story and have a pack picture, and no trio holds a `FORBIDDEN_PAIRS` pair, old or new (§ 8). Kinds: Who → an animal, What → an object, Where → a place (a container counts: "in the boot", as bug stories' "in the cup"; Dave confirmed, D9).
   - **P1–P3:** both wrong chips are another kind than the question asks.
   - **P4–P8:** at least one wrong chip is the same kind. Story 5 and story 6 are about the snail, not the goat. Story 8 has two same-kind wrong chips, the hardest trio, last.
 - **Questions ≤ 23 characters.**
@@ -399,7 +401,7 @@ Each problem also has "Hmm... try again?" (reused) and "This one is the <answer>
 
 ## 8. New forbidden pairs
 
-Dave's 20 candidates, added to `FORBIDDEN_PAIRS` (`wordPack.ts:1676`) before the rows are coded: tray–mat, train–bus, train–van, train–car, train–jeep, chain–rope, boat–ship, boat–tub, goat–sheep, goat–dog, goat–pig, goat–cat, loaf–bun, snail–bug, broom–mop, boot–sock, stool–desk, hoop–ring, roof–tent, roof–barn. Plus one of mine: **coat–cape** (two garments worn over the body; _cape_ is a cake-words picture). 21 in all.
+Dave's 20 candidates, added to `FORBIDDEN_PAIRS` (`wordPack.ts:1676`) before the rows are coded: tray–mat, train–bus, train–van, train–car, train–jeep, chain–rope, boat–ship, boat–tub, goat–sheep, goat–dog, goat–pig, goat–cat, loaf–bun, snail–bug, broom–mop, boot–sock, stool–desk, hoop–ring, roof–tent, roof–barn. Plus one of mine: **coat–cape** (two garments worn over the body; _cape_ is a cake-words picture; Dave confirmed, D7). 21 in all.
 
 No trio in § 4.2, § 5.2 or § 7.2 contains a forbidden pair, old or new, and every chip word has a picture after § 10 (scratch script, 2026-10-19, not committed).
 
@@ -423,7 +425,7 @@ Canon lines are in § 2.7, § 3.7, § 4.2, § 5.2 and § 7.2. All copy lives in 
 - `end.bud` "Look! A new flower for <name>!" (29 / 42 / 35 / 34 / 36); `end.unlock` "You learned <previous>! Now you can do <name>!" (48 / 53 / 54 / 51 / 52). Previous: more and less, zeros, sheep stories, snail words, moon words.
 - Land 6: "Land 6: Bigger numbers." (23), "A new land! Land 6: Bigger numbers!" (35), "A new land: Bigger numbers!" (27). Land 9: "Land 9: More words and stories." (31), "A new land! Land 9: More words and stories!" (43), "A new land: More words and stories!" (35).
 
-**Total: 220 distinct new texts, 5,436 Lily characters.**
+**Total: 220 distinct new texts, 5,436 Lily characters** (recounted after Dave's changes on 2026-10-19, unchanged: D3 and D6 change no line, and D8's story 3 keeps its 41 characters).
 
 | Surface                 | Texts | Characters |
 | ----------------------- | ----- | ---------- |
@@ -437,9 +439,9 @@ Canon lines are in § 2.7, § 3.7, § 4.2, § 5.2 and § 7.2. All copy lives in 
 | canon `moon-words`      | 32    | 552        |
 | canon `goat-stories`    | 30    | 805        |
 
-- **How it was counted:** a scratch script (2026-10-19, not committed) generated every text from this spec and compared it with every `text` in `public/canon/**/*.json`, every `GUIDANCE_LINES` text and input and every `PATH_LINES` text. Repeats inside the wave count once.
+- **How it was counted:** a scratch script (2026-10-19, not committed) generated every text from this spec and compared it with every `text` in `public/canon/**/*.json`, every `GUIDANCE_LINES` text and input and every `PATH_LINES` text. Repeats inside the wave count once. The match is on the exact string, never a pattern (a loose regex once over-counted wave 4); the recount ran against `main` at 144ad7d, with the shipped lines dumped from `guidanceLines.ts` and `pathLines.ts` (258 guidance ids, 646 path lines).
 - **Reused, not billed:** "Hmm... try again?", "Look at the hundreds.", "Look at the tens.", "Look at the ones.", "One more ten.", "One more hundred.", "What is ten more?", "What is one hundred more?", "How many?", "Two letters, one sound!", "Read the story. Who, what or where?", and both reading recaps.
-- **The bill holds only if the bake de-duplicates on exact text** (`revoiceCanonLily.ts` does); `--dry-run` prints the real number first. Wave 4 rendered 4,791 of its 5,000 with retakes (`team/DECISIONS.md:87`), so this wave asks for 6,000 (T2).
+- **The bill holds only if the bake de-duplicates on exact text** (`revoiceCanonLily.ts` does); `--dry-run` prints the real number first. Wave 4 rendered 4,791 of its 5,000 with retakes (`team/DECISIONS.md:87`), so this wave asked for 6,000, and Thomas approved it (T2).
 - **Canon is spliced, not Haiku-baked:** `scripts/spliceContentWave5Canon.ts` writes the five files from § 2.7, § 3.7, `BIG_WORDS_STEPS` and `LITTLE_STORIES`; the five nodes join `PENDING_CANON_NODES` (`scripts/generateSessionCanon.ts:407`). Render: `renderGuidanceLinesLily.ts`, `renderPathLinesLily.ts`, `revoiceCanonLily.ts --unrendered`.
 
 **Prediction for the ear test** (Predict-Before-Soak):
@@ -540,7 +542,7 @@ The 7 clay pieces (§ 1) are made as the clay set was, with Thomas's tool.
 
 ## 12. Language-version readiness
 
-A Danish version of the app is planned (Thomas, 2026-10-19; `CLAUDE.md` "Users" line on PR #613). Nothing here blocks a second language:
+A Danish version of the app is planned (Thomas, 2026-10-19; `CLAUDE.md` "Users" line, #613, merged as 4783427). Nothing here blocks a second language:
 
 - **Every spoken or written word** is in a copy or canon table (§ 9.1): canon JSON, `GUIDANCE_LINES`, `PATH_LINES`, `STAGE_SPOKEN_NAMES`, `FRIENDLY_NODE_NAMES`, `LANDS`. Layout draws digits, "+", "−", "?" and pictures only.
 - **Pictures, scenes and clay pieces** hold no letters, digits or words.
@@ -551,8 +553,8 @@ A Danish version of the app is planned (Thomas, 2026-10-19; `CLAUDE.md` "Users" 
 - **`sibling-tier-checklist.md`:** all five nodes rows 1–10 and 12; the three Word Song nodes also row 11 and rows 13–15; the two math nodes instead `VALID_MATH_FOCUS_NODES` and `MATH_FOCUS_NODES`; row 16 skipped (the web is frozen). From "does not cover": the math read templates (8/8 each), `CANON_FILES` in `public/voice-qa.html` (+5 stems; hard-coded at :644) and its `EXPECTED_CANON_UNIQUE` (:643, 1181 → 1332: § 9.1's 151 new canon texts, counted the way its comment counts wave 4's 88), the committed canon, e2e seeds ending at `hundreds-addsub` or `sheep-stories`.
 - **Names:** `STAGE_SPOKEN_NAMES`, `STAGE_SPOKEN_NAME_VERBS`, `FRIENDLY_NODE_NAMES`, the Hub labels (`progressProjection.ts`), the recap list in `api/_planner.ts`, `scripts/recapFocusCopy.ts`.
 - **Map, lines:** `LANDS` (land 5 + 1 node, + NG land 6, + WS land 9), `PATH_LINES` (baked 223 → 254) with the `input` field and § 9.1's "; then this!" inputs, `PATH_ART_SET` (+5), `LandArtId` (+2), `GUIDANCE_LINES`: leads 5, peeks 10, replays 10, story words 16, so ids 258 → 299 and texts 256 → 294 (three leads share shipped texts; `guidanceLines.test.ts:56-61`).
-- **Zeros:** `PlaceValueProblem` `form` and the widened digits, the place-value and more templates, "Find <number>.", `hundredsDistractors` and `hundredsOfferedClass` for § 2.6 (`'zero-drop'`, signed count-1 `'wrong-place'`), the 10..99 allowance for the zero-drop chip only, the `extendedProblems.ts:209` comment, `CANON_MATH_FACTS`. `PlaceValueStage`: the empty tray and its tick pulse, the "0" tag, P5's hint-2 build, the "−10" pill.
-- **Adding big numbers:** `PLACE_VALUE_ARITHMETIC_NODES`, `PlaceValueLayoutProblem`'s arithmetic member and the two-tray metrics, the frame report to App, `problemChips`' branch and `addTwoDigitDistractors`, `hintStep` for these problems, `CANON_MATH_FACTS` (8 facts, generated). `PlaceValueStage`: the two-tray form under the equation, the second number's drop, the bundle (§ 3.5), the lead pulse.
+- **Zeros:** `PlaceValueProblem` `form` and the widened digits, the place-value and more templates, "Find <number>.", `hundredsDistractors` and `hundredsOfferedClass` for § 2.6 (`'zero-drop'`, signed count-1 `'wrong-place'`), the 10..99 allowance for the zero-drop chip only, the `extendedProblems.ts:209` comment, `CANON_MATH_FACTS`. `PlaceValueStage`: the empty tray and its tick pulse, the "0" tag, P5's hint-1 build, the "−10" pill.
+- **Adding big numbers:** `PLACE_VALUE_ARITHMETIC_NODES`, `addTwoDigitReadMotion`, `PlaceValueLayoutProblem`'s arithmetic member and the two-tray metrics, the frame report to App, `problemChips`' branch and `addTwoDigitDistractors`, `hintStep` for these problems, `CANON_MATH_FACTS` (8 facts, generated). `PlaceValueStage`: the two-tray form under the equation, the second number's drop, the bundle (§ 3.5) held to hint 2 on P4–P5, the lead pulse.
 - **Word Song:** `BIG_WORDS_STEPS` + 2 steps, 16 rows (`BigWordsStep`, `BIG_WORDS_STEP_IDS`); `BigWordCategory` + `'kitchen'`; `wordPack.ts` + 16 entries, 21 `FORBIDDEN_PAIRS`; `_plannerWordList.ts`, `bigWordsCanonCheck.ts`; `introSpotlight.ts`: snail words' lead as `'ending-pair'`, the new `'team-pair'` for moon words; `wordDistractors.test.ts`' CVC-axis treatment for the new rows.
 - **Stories:** `StoryNode`, `STORY_NODES`, 8 `LITTLE_STORIES` rows (a `goat` row builder), `storyMarks.generated.ts`, the scene registry.
 - **Canon, pictures:** `spliceContentWave5Canon.ts` (§ 2.7's and § 3.7's per-file lints, the story lint), `PENDING_CANON_NODES` + 5, both manifests in T4's order.
@@ -564,7 +566,7 @@ A Danish version of the app is planned (Thomas, 2026-10-19; `CLAUDE.md` "Users" 
 
 1. Zeros P1 parses to `{ kind: 'place-value', hundreds: 3, tens: 0, ones: 5, spokenOrder: ['hundreds', 'tens', 'ones'], form: 'places', correct: 305 }`; P4 to `{ hundreds: 1, tens: 0, ones: 8, correct: 108 }`; P5 to `{ kind: 'place-value', hundreds: 1, tens: 9, ones: 0, form: 'name', correct: 190 }`; P8 to `{ kind: 'more', start: 416, step: 10, count: 1, direction: 'less', correct: 406 }`. Rejected: "Three hundreds, one ten and five ones. What number is it?" (one ten), "No hundreds, four tens and two ones. What number is it?" (below 100), "Find forty-two." (below 100), "Three hundred and ninety-five. What is ten more?" (regroups), "Four hundred and five. What is ten less?" (regroups), "One hundred and five. What is one hundred less?" (below 100). Hundreds' and more and less's 16 reads still parse as before.
 2. `hundreds-zeros.json` equals § 2.7 (8/8 parse); `hundredsDistractors` returns § 2.7's chips and classes; hundreds' and more and less's chips are unchanged.
-3. `add-two-digit.json` parses 8/8 as arithmetic; `addTwoDigitDistractors` returns § 3.7's chips; the recorded class is `null` on P1–P3 and `'forgotten-carry'` on P4–P8; `CANON_MATH_FACTS['add-two-digit']` holds the 8 facts and `['hundreds-zeros']` 8 nulls.
+3. `add-two-digit.json` parses 8/8 as arithmetic; `addTwoDigitDistractors` returns § 3.7's chips; the recorded class is `null` on P1–P3 and `'forgotten-carry'` on P4–P8; `CANON_MATH_FACTS['add-two-digit']` holds the 8 facts and `['hundreds-zeros']` 8 nulls; `addTwoDigitReadMotion` gives `'drop-and-bundle'` for P1–P3, `'drop'` for P4–P5 and `'none'` for P6–P8.
 4. `BIG_WORDS_STEPS['snail-words']` and `['moon-words']` equal § 4.2 and § 5.2; no trio holds a forbidden pair; the 21 pairs exist; every picture key resolves through native `pictureAsset`.
 5. **Rows:** a snail-words P4 deals coat, cot, goat; a moon-words P1 deals moon, hen, cup; a review block keeps its step's row.
 6. `LITTLE_STORIES` holds § 7.2's 8 rows and passes the lint; `goat-stories.json` parses 8/8; `STORY_WORDS` has 87 words.
@@ -575,8 +577,8 @@ A Danish version of the app is planned (Thomas, 2026-10-19; `CLAUDE.md` "Users" 
 **Native (jest):**
 
 10. Zeros P1: the lead pulses the tens tray on both "tens"; the read drops 3 flats on "hundreds", pulses the empty tens tray on "tens" and drops 5 cubes on "ones"; all tags "?"; hint 2 fills the tens tag "0"; after hint 3 the tags read 3, 0, 5.
-11. Zeros P5: nothing is built on the read; hint 2 builds 1 flat and 9 rods and fills the ones tag "0". P8: the "−10" pill from the first frame; hint 2 lifts one rod and turns the tens tag "?"; a right tap ticks it to "0".
-12. Adding big numbers P3: the first frame shows "28 + 35", 2 rods and 8 cubes; on the tick of "thirty-five" 3 rods and 5 cubes drop in 90 ms apart; then ten cubes gather, become a rod and move to the tens tray, leaving 6 rods and 3 cubes; both tags "?". P4: nothing moves on the read; hint 2 drops the second number's blocks and plays the bundle on "make". A step-17 review block on another step's session draws the trays.
+11. Zeros P5: nothing is built on the read; hint 1 builds 1 flat and 9 rods, then ripples the empty ones tray on "Look at the ones."; hint 2 fills the ones tag "0". P8: the "−10" pill from the first frame; hint 2 lifts one rod and turns the tens tag "?"; a right tap ticks it to "0".
+12. Adding big numbers P3: the first frame shows "28 + 35", 2 rods and 8 cubes; on the tick of "thirty-five" 3 rods and 5 cubes drop in 90 ms apart; then ten cubes gather, become a rod and move to the tens tray, leaving 6 rods and 3 cubes; both tags "?". P4: on the read 2 rods and 6 cubes drop in and the ones tray holds 13 loose cubes, with no bundle; hint 2 plays the bundle on "make", leaving 7 rods and 3 cubes. P6: nothing moves on the read; hint 2 drops the second number's blocks and plays the bundle on "make". A step-17 review block on another step's session draws the trays.
 13. Reduce Motion gives § 2.5's and § 3.5's bracketed forms; rotation mid-bundle lands the end state.
 14. Snail words P1 lights tray's last two cells; moon words P1 lights moon's 2nd and 3rd cells; no lead on P2–P8, in reviews, peeks or hearts.
 15. Goat stories P1–P8 follow wave 3's story ACs; the lead plays once before P1.
@@ -588,26 +590,39 @@ A Danish version of the app is planned (Thomas, 2026-10-19; `CLAUDE.md` "Users" 
 
 ## 15. Thomas decides
 
-One recommendation each.
+Thomas approved T1–T7 by popup on 2026-10-19.
 
-- **T1. Names:** "zeros" (`hundreds-zeros`), "adding big numbers" (`add-two-digit`), "snail words", "moon words", "goat stories"; "Land 6: Bigger numbers", "Land 9: More words and stories". Recommendation: approve.
-- **T2. Lily budget (§ 9.1):** 220 texts, **5,436 characters**, chiefly the five path sets, the zeros canon and the 16 one-word clips sent as "Word,". Recommendation: approve up to **6,000**, wave 3's ceiling, since wave 4's retakes took 234 characters past its count. `--dry-run` prints the real number before any spend.
-- **T3. 7 clay pieces (§ 1):** a doughnut (zeros), an abacus (adding big numbers), a pumpkin (land 6), a snail, a crescent moon, a goat, a castle (land 9). Recommendation: approve the subjects; the look is judged when they are made.
-- **T4. Picture spend (§ 10):** 16 pictures and 8 scenes, about **$2.36**, about **$2.95** with retakes. Recommendation: approve up to $3.50. The 16 pack pictures come first, judged on the snail and moon contact sheets; the 8 scenes only after those are approved. Top up OpenAI first if the balance is low.
-- **T5. British English** (Dave's question): with many learners, does the app keep British English as its reading and voice standard? Lily is British and every word list here is checked against British usage (_boot_, _loaf_, no _pail_). Recommendation: keep British.
-- **T6. Map:** Word Song's 9 lands scroll on portrait (the shipped rule) and now on 1133×744 landscape too; Number Garden's 6th land sits near the 14 pt portrait bar, and if the build's test misses it, Number Garden scrolls on portrait on the shipped path (`PORTRAIT_FIT_LANDS` 5). Recommendation: approve both, so a failed bar doesn't stall the build.
-- **T7. The bundle motion (§ 3.5)** is the wave's one subjective call. **Prediction:** at the device check the ten cubes read as one rod before they move, and the carry reads as "a new ten" on its first viewing; on phone landscape the cubes look small but countable. Recommendation: approve the brief now; the feel is judged on device, with one tuning round allowed.
+- **T1. Names:** "zeros" (`hundreds-zeros`), "adding big numbers" (`add-two-digit`), "snail words", "moon words", "goat stories"; "Land 6: Bigger numbers", "Land 9: More words and stories". **Approved (Thomas, 2026-10-19), as written.**
+- **T2. Lily budget (§ 9.1):** 220 texts, **5,436 characters**, chiefly the five path sets, the zeros canon and the 16 one-word clips sent as "Word,". **Approved (Thomas, 2026-10-19) up to 6,000 characters,** wave 3's ceiling, since wave 4's retakes took 234 characters past its count. The render is 5,436, recounted after Dave's changes (unchanged); `--dry-run` prints the real number before any spend.
+- **T3. 7 clay pieces (§ 1):** a doughnut (zeros), an abacus (adding big numbers), a pumpkin (land 6), a snail, a crescent moon, a goat, a castle (land 9). **Approved (Thomas, 2026-10-19): the 7 subjects.** The look is judged when they are made.
+- **T4. Picture spend (§ 10):** 16 pictures and 8 scenes, about **$2.36**, about **$2.95** with retakes (unchanged by Dave's changes: no scene's refs moved). **Approved (Thomas, 2026-10-19) up to $3.50.**
+  - The 16 pack pictures come first, judged on the snail and moon contact sheets. The 8 scenes are generated only after those are approved.
+  - Top up OpenAI first if the balance is low.
+- **T5. British English** (Dave's question): with many learners, does the app keep British English as its reading and voice standard? Lily is British and every word list here is checked against British usage (_boot_, _loaf_, no _pail_). **Approved (Thomas, 2026-10-19): keep British English.**
+- **T6. Map:** Word Song's 9 lands scroll on portrait (the shipped rule) and now on 1133×744 landscape too; Number Garden's 6th land sits near the 14 pt portrait bar, and if the build's test misses it, Number Garden scrolls on portrait on the shipped path (`PORTRAIT_FIT_LANDS` 5). **Approved (Thomas, 2026-10-19): both fallbacks,** so a failed bar doesn't stall the build.
+- **T7. The bundle motion (§ 3.5)** is the wave's one subjective call. **Prediction:** at the device check the ten cubes read as one rod before they move, and the carry reads as "a new ten" on its first viewing; on phone landscape the cubes look small but countable. **Approved (Thomas, 2026-10-19): the brief.** The feel is judged on device, with one tuning round allowed.
 
 ## 16. Pedagogy assumptions for Dave (D1…)
 
-Open: Dave checks these read-only.
+**Dave checked all nine on 2026-10-19 (read-only): D1, D2, D4, D5, D7 and D9 confirmed; D3, D6 and D8 changed.** All three changes are applied above.
 
-- **D1.** Zeros' hint ladder: Dave's zero ladder on the build and name problems (P1–P5): the zero place, then "Zero tens." / "Zero ones." (P3: "Zero tens and zero ones."), then the read's question, which fills the other tags. P6–P8 keep the hundreds and more-and-less ladders ("One more ten.", "Take away one ten."), since "Zero tens." doesn't describe adding or taking away.
-- **D2.** Zeros' lead: "No tens? Zero tens!" (Dave gave none; every shipped step has one). It fits P1, which has no tens, and adds no word.
-- **D3.** Zeros P5 ("Find one hundred and ninety."): hint 1 "Look at the ones." points at a tray that is still empty, because nothing is built until hint 2. My recommendation is to keep Dave's fading as written: the learner still holds the number name in mind for one beat.
-- **D4.** Adding big numbers' lead: "Tens and ones!" instead of "Make a ten!", because P1 and P2 make no ten. The new ten is named by hint 2's "Ten ones make a ten." and shown by P3's bundle.
-- **D5.** The 16 gentle pairs in § 4.2 and § 5.2 are mine, by the rule (another category, first sound, and no letter of the team); Dave's traps are verbatim.
-- **D6.** Adding big numbers on P4–P8 shows the first number's blocks from the first frame and moves the second number's blocks and the bundle at hint 2 (wave 4's start-blocks rule).
-- **D7.** _coat–cape_ joins `FORBIDDEN_PAIRS` (mine).
-- **D8.** The 8 goat stories are mine. Dave's example 1 is story 1 verbatim; example 2 is story 4 with _tray_ for _stool_, moved to P4 because its wrong chip _coat_ is an object; example 3 is out, because its wrong chip _roof_ is a place, so it can't be the gentle Where at P3.
-- **D9.** A container counts as a place in a Where question (story 6: "Where is the snail?" → "In the boot!"), as bug stories' "in the cup" did.
+- **D1.** Zeros' hint ladder: Dave's zero ladder on the build and name problems (P1–P5): the zero place, then "Zero tens." / "Zero ones." (P3: "Zero tens and zero ones."), then the read's question, which fills the other tags. P6–P8 keep the hundreds and more-and-less ladders ("One more ten.", "Take away one ten."), since "Zero tens." doesn't describe adding or taking away. **Confirmed (Dave, 2026-10-19):** the zero ladder ties the heard "no" to the written 0, which is the step's one idea; P6–P8 keep their ladders because their idea is the change.
+- **D2.** Zeros' lead: "No tens? Zero tens!" (Dave gave none; every shipped step has one). It fits P1, which has no tens, and adds no word. **Confirmed (Dave, 2026-10-19):** it names the idea with words already spoken and is true of P1; giving away P1's tens is what a lead is for.
+- **D3. Changed by Dave.**
+  - On P5 the number builds at hint 1: 1 flat and 9 rods drop, then "Look at the ones." ripples the one empty tray. Hint 2 stays "Zero ones." with the "0" tag; hint 3 is unchanged.
+  - Why (Dave): hints play only after the 2nd wrong, so the read-time fading is kept. A ripple on one of three empty trays shows nothing; on the one empty tray beside a built 1 and 9, it shows the zero (his judgment).
+  - Applied in § 2.2, § 2.4, § 2.5, § 2.7 (P5 moves "at hint 1"), § 13 and AC 11. Was: nothing built until hint 2, hint 1 rippling a tray that was still empty (my recommendation to keep that is withdrawn).
+- **D4.** Adding big numbers' lead: "Tens and ones!" instead of "Make a ten!", because P1 and P2 make no ten. The new ten is named by hint 2's "Ten ones make a ten." and shown by P3's bundle. **Confirmed (Dave, 2026-10-19):** a lead must be true of the problem it opens; "Tens and ones!" names M16's tens-with-tens route, and hint 2 and P3's bundle name the new ten.
+- **D5.** The 16 gentle pairs in § 4.2 and § 5.2 are mine, by the rule (another category, first sound, and no letter of the team); Dave's traps are verbatim. **Confirmed (Dave, 2026-10-19):** he checked all 16; each has another category, another first sound and no letter of the target's team.
+- **D6. Changed by Dave.**
+  - On P4–P5 the second number's blocks drop in on the read, and only the bundle waits for hint 2, so 13 loose cubes show. P6–P8 stay as written (nothing moves on the read; the drop and the bundle at hint 2).
+  - Why (Dave): regrouping is the new idea, and P3 is its only worked example each session. Fading the last step first (backward fading: Renkl, Atkinson & Maier 2000; studied with older learners, near transfer only) lets P4's forgotten-carry chip 63 sit beside 13 visible cubes before the picture goes. The layout is unchanged: 13 cubes, below P6's 14.
+  - Applied in § 3.3, § 3.4, § 3.5, § 3.6 (`addTwoDigitReadMotion`, by position), § 3.7 (P4–P5 "on the read; bundle at hint 2"), § 13 and AC 3 and 12. Was: P4–P8 all moved the second number's blocks and the bundle at hint 2 (wave 4's start-blocks rule), as the addendum's fading line still says (`content-roadmap-after-path-ends.md:549`); this verdict supersedes it.
+- **D7.** _coat–cape_ joins `FORBIDDEN_PAIRS` (mine). **Confirmed (Dave, 2026-10-19):** a learner can easily call a cape a "coat", so a wrong tap would be a naming error, not a decoding error. No wave-5 trio uses the pair.
+- **D8. Changed by Dave.**
+  - Story 3 is now "The goat sat on the stool. It has a hoop." (was "The goat has a hoop. It sat on the stool."). 41 characters and 10 words, as before; the question ("Where is the goat?"), answer (_stool_, "On"), chips (goat, hoop) and scene goat-3 are unchanged (§ 7.2, § 10.2).
+  - Why (Dave): in my order the answer depended on "It", and a hoop can "sit" on a stool. Shipped sheep-3 used "hid", which only the animal can do. § 7.2's shape rule now says no answer rests on _It_.
+  - The rest stands: stories 1–2 and 4–8 pass (taught words, 10–14 words, all 16 words, kinds) and follow shipped sheep 1–8 closely. Dave's example 1 is story 1 verbatim; example 2 is story 4 with _tray_ for _stool_, at P4 because its wrong chip _coat_ is an object; example 3 is out, because its wrong chip _roof_ is a place, so it can't be the gentle Where at P3. The Lily total is unchanged (§ 9.1).
+- **D9.** A container counts as a place in a Where question (story 6: "Where is the snail?" → "In the boot!"), as bug stories' "in the cup" did. **Confirmed (Dave, 2026-10-19):** shipped in bug-1 ("in the cup") and sheep-3 ("in the cart").
+
+**No other blocking issue (Dave, 2026-10-19).** He checked decode-first, the ~200-word cap (no new core word), fingers never tied to "not yet", no speed signal, never a red X, taught-words-only stories, and no premise about one learner's school or language. His one non-blocking note is on the wording of his own #614 (rule 4 should read "not before the decode beat", since word cards keep the shipped 1500 ms decode beat before "Read the <word>."); this spec is unaffected.
