@@ -41,7 +41,7 @@ import {
  */
 
 describe('activeCombos — coverage matches the curriculum', () => {
-  it('produces 39 combos: 15 math nodes × level 1 + 24 word-song nodes × level 1 (mult-mix spliced; duck-words + crab-words, content wave 1; div-share, tent-words + cake-words spliced, content wave 2; the three story steps and hundreds spliced, content wave 3; hundreds-addsub, bee-words, car-words and sheep-stories spliced, content wave 4; blending-cv and sounding-out spliced, real blending)', () => {
+  it('produces 42 combos: 15 math nodes × level 1 + 27 word-song nodes × level 1 (mult-mix spliced; duck-words + crab-words, content wave 1; div-share, tent-words + cake-words spliced, content wave 2; the three story steps and hundreds spliced, content wave 3; hundreds-addsub, bee-words, car-words and sheep-stories spliced, content wave 4; blending-cv and sounding-out spliced, real blending; snail-words, moon-words and goat-stories spliced, content wave 5)', () => {
     // Step 2 of the planner-parser contract added cvc-words alongside
     // blending-cv as a first-class word-song content mode. Ticket
     // 86c9m3ae3 added `cvc-words-short-o` as the next-vowel sibling
@@ -89,15 +89,18 @@ describe('activeCombos — coverage matches the curriculum', () => {
     // and less, land 5; design/native/content-wave-4.md § 2.7), written by
     // a splice, and `bee-words`, `car-words` and `sheep-stories` (land 8;
     // design/native/content-wave-4.md § 3, § 4, § 6), written by
-    // scripts/spliceContentWave4Canon.ts. Real blending added
+    // scripts/spliceContentWave4Canon.ts. Content wave 5 added
+    // `snail-words`, `moon-words` and `goat-stories` (land 9;
+    // design/native/content-wave-5.md § 4, § 5, § 7), written by
+    // scripts/spliceContentWave5Canon.ts. Real blending added
     // `sounding-out` (land 2; design/native/real-blending.md § 6), written
     // with blending-cv's file by scripts/spliceRealBlendingCanon.ts.
     const combos = activeCombos()
-    expect(combos).toHaveLength(39)
+    expect(combos).toHaveLength(42)
     const mathCount = combos.filter((c) => c.track === 'math').length
     const wordSongCount = combos.filter((c) => c.track === 'word-song').length
     expect(mathCount).toBe(15)
-    expect(wordSongCount).toBe(24)
+    expect(wordSongCount).toBe(27)
   })
 
   it('every math combo names a node from VALID_MATH_FOCUS_NODES (Wave 6C — bake list emits BOTH `-no-regroup` and `-with-regroup` wire literals)', () => {
@@ -113,9 +116,9 @@ describe('activeCombos — coverage matches the curriculum', () => {
     }
   })
 
-  it('word-song combos are letter-names + letter-sounds + blending-cv + sounding-out + cvc-words + cvc-words-short-o + cvc-words-short-u + cvc-words-short-i + cvc-words-short-e + digraphs-sh + digraphs-ch + digraphs-th-voiceless + sight-words + simple-sentences + duck-words + crab-words + tent-words + cake-words + the three story steps + land 8 (bee-words, car-words, sheep-stories)', () => {
+  it('word-song combos are letter-names + letter-sounds + blending-cv + sounding-out + cvc-words + cvc-words-short-o + cvc-words-short-u + cvc-words-short-i + cvc-words-short-e + digraphs-sh + digraphs-ch + digraphs-th-voiceless + sight-words + simple-sentences + duck-words + crab-words + tent-words + cake-words + the three story steps + land 8 (bee-words, car-words, sheep-stories) + land 9 (snail-words, moon-words, goat-stories)', () => {
     const combos = activeCombos().filter((c) => c.track === 'word-song')
-    expect(combos).toHaveLength(24)
+    expect(combos).toHaveLength(27)
     const focusNodes = combos.map((c) => c.focusNode).sort()
     expect(focusNodes).toEqual([
       'bee-words',
@@ -134,12 +137,15 @@ describe('activeCombos — coverage matches the curriculum', () => {
       'digraphs-th-voiceless',
       'duck-words',
       'fox-stories',
+      'goat-stories',
       'hen-stories',
       'letter-names',
       'letter-sounds',
+      'moon-words',
       'sheep-stories',
       'sight-words',
       'simple-sentences',
+      'snail-words',
       'sounding-out',
       'tent-words',
     ])

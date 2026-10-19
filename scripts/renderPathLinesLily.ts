@@ -4,11 +4,12 @@
  *
  * Line list = `BAKED_PATH_LINES` in src/lib/emmasPath/pathLines.ts (lines
  * whose kind is not deferred), written to each line's `src` under
- * public/assets/audio/path/. A line's `input`, when it has one, is what is
- * sent (the "; then this!" takes, content wave 5 § 9.1); else its text.
- * Same request + cache shape as
- * revoiceCanonLily.ts (no tier, cache key `lily|eleven_v4|<text>` in
- * tmp/revoice-cache/), de-duplicated on text, with at most 2 requests in
+ * public/assets/audio/path/. Same request + cache shape as
+ * revoiceCanonLily.ts (no tier, cache key `lily|eleven_v4|<input>` in
+ * tmp/revoice-cache/). The input is the line's `input` when it has one
+ * (content wave 5 § 9.1: "…; then this!"), else its text, as in
+ * renderGuidanceLinesLily.ts; de-duplicated on the input, with at most 2
+ * requests in
  * flight so another job can keep one of the Starter plan's 3 slots. 429s
  * are retried by `synthesizeElevenLabs`' backoff.
  *

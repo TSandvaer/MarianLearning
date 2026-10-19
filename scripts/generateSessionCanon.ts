@@ -367,6 +367,11 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'bee-words',
   'car-words',
   'sheep-stories',
+  // Content wave 5 (design/native/content-wave-5.md § 4, § 5, § 7): land 9.
+  // Written by scripts/spliceContentWave5Canon.ts.
+  'snail-words',
+  'moon-words',
+  'goat-stories',
 ]
 
 /**
@@ -407,6 +412,9 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
  *   `scripts/spliceRealBlendingCanon.ts` from the binding tables, never
  *   Haiku-baked. blending-cv was a bake target: a `--force` bake would have
  *   overwritten its spliced file with Haiku's "Tap the <word>." plan.
+ * - snail-words, moon-words, goat-stories (content wave 5 § 9.1): written
+ *   by `scripts/spliceContentWave5Canon.ts`, never Haiku-baked; rendered
+ *   the same way.
  *
  * The deliberate render runs `npx tsx scripts/generateSessionCanon.ts
  * --include-pending`; an existing file is still skipped without `--force`.
@@ -430,6 +438,9 @@ export const PENDING_CANON_NODES: ReadonlySet<string> = new Set([
   'sheep-stories',
   'blending-cv',
   'sounding-out',
+  'snail-words',
+  'moon-words',
+  'goat-stories',
 ])
 
 /** The combos a run bakes: missing (or all, with `--force`), minus pending. */

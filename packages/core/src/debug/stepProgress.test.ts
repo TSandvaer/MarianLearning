@@ -55,18 +55,18 @@ const treeOf = (w: MasteryTrack): readonly SkillNode[] =>
   w === 'math' ? MATH_TREE : LITERACY_TREE
 
 describe('the step list', () => {
-  it('covers every step of both trees, once, in tree order (15 + 24)', () => {
-    expect(CASES).toHaveLength(39)
+  it('covers every step of both trees, once, in tree order (15 + 27)', () => {
+    expect(CASES).toHaveLength(42)
     expect(QA_STEPS.map((s) => s.node)).toEqual([
       ...MATH_TREE,
       ...LITERACY_TREE,
     ])
     expect(QA_STEPS.filter((s) => s.world === 'math')).toHaveLength(15)
-    expect(QA_STEPS.filter((s) => s.world === 'word-song')).toHaveLength(24)
+    expect(QA_STEPS.filter((s) => s.world === 'word-song')).toHaveLength(27)
   })
 
   it('gives each step a distinct readable name and its position', () => {
-    expect(new Set(QA_STEPS.map((s) => s.name)).size).toBe(39)
+    expect(new Set(QA_STEPS.map((s) => s.name)).size).toBe(42)
     expect(QA_STEPS.find((s) => s.node === 'cvc-words-short-o')).toEqual({
       node: 'cvc-words-short-o',
       world: 'word-song',
@@ -119,10 +119,22 @@ describe('the step list', () => {
       name: 'Sheep stories',
       land: 8,
     })
+    // Content wave 5 § 1: snail words, moon words, goat stories, land 9
+    // (one along for sounding out too).
+    expect(QA_STEPS.find((s) => s.node === 'snail-words')).toMatchObject({
+      position: 25,
+      name: 'Snail words',
+      land: 9,
+    })
+    expect(QA_STEPS.find((s) => s.node === 'goat-stories')).toMatchObject({
+      position: 27,
+      name: 'Goat stories',
+      land: 9,
+    })
   })
 
-  it('isStepNode accepts the 39 steps and nothing else', () => {
-    expect(QA_STEPS.filter((s) => isStepNode(s.node))).toHaveLength(39)
+  it('isStepNode accepts the 42 steps and nothing else', () => {
+    expect(QA_STEPS.filter((s) => isStepNode(s.node))).toHaveLength(42)
     expect(
       ['', 'digraphs', 'two-digit-addsub', 'banana'].filter(isStepNode),
     ).toEqual([])

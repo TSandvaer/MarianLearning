@@ -26,7 +26,7 @@
 //
 // Vanilla audio is the same vanilla SSML across canons (Azure
 // renders aren't byte-identical across calls, but the audible
-// content is "You did it!" in every canon — Marian doesn't notice).
+// content is "You did it!" in every canon — the child doesn't notice).
 //
 // Future: short-o `box`/`fox` /ks/ first-encounter
 // ------------------------------------------------
@@ -171,7 +171,7 @@ export interface FirstEncounterGateInput {
    * be undefined for legacy clients. The gate treats undefined as
    * "first encounter for everything" (greenfield posture) — same
    * as an empty list — because the read-path defaulter on the
-   * browser side ensures real Marians always have at least `[]`
+   * browser side ensures real learners always have at least `[]`
    * once they've hit the storage adapter. A truly-undefined
    * field here means "we don't know" and the safest interpretation
    * is "fire the scaffolding."

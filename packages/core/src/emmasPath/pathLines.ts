@@ -52,11 +52,10 @@ export interface PathLine {
   world: MasteryTrack
   text: string
   /**
-   * What the render sends to Lily when it is not `text` (as guidance
-   * lines' `input`): a `THEN_THIS_INPUT_STEPS` step's locked-next line goes
-   * as "<Name>! First, <previous>; then this!" (content wave 5 § 9.1; the
-   * ". Then this!" take came back scratchy twice, #599 and #607 take 3).
-   * The caption stays `text`. Undefined = `text`.
+   * What the render sends to Lily when it is not `text`, as guidance lines
+   * have it: a `THEN_THIS_INPUT_STEPS` step's locked-next line goes as
+   * "<Name>! First, <previous>; then this!" (content wave 5 § 9.1). The
+   * caption stays `text`. Undefined = `text`.
    */
   input?: string
   /** Bundled MP3 path relative to `public/`; `null` = not baked yet
@@ -65,22 +64,16 @@ export interface PathLine {
 }
 
 /**
- * The steps whose locked-next line renders from "…; then this!" (content
- * wave 5 § 9.1). Only steps whose line has no clip yet: a shipped line keeps
- * no input, so nothing already rendered re-renders. Real blending § 11:
- * sounding out's line is new, and cat words' changes text ("First,
- * sounding out.").
+ * The steps whose locked-next line goes to Lily as "…; then this!" with its
+ * caption unchanged (content wave 5 § 9.1). Two waves needed that take by
+ * ear (hen and bug stories in #599, car words in #607; `team/DECISIONS.md`),
+ * so it is the first take for a new step. Shipped lines are not listed:
+ * their committed MP3s stay as they are. Real blending § 11: sounding out's
+ * line is new, and cat words' changes text ("First, sounding out.").
  */
 export const THEN_THIS_INPUT_STEPS: ReadonlySet<SkillNode> = new Set<SkillNode>(
-  ['sounding-out', 'cvc-words'],
+  ['sounding-out', 'cvc-words', 'snail-words', 'moon-words', 'goat-stories'],
 )
-
-/**
- * One line's render input, by line id: a one-word clip goes to Lily as
- * "Word," (one word alone reads as an abbreviation: "Sat." came back as
- * "Saturday", #607; content wave 5 lesson 3). The caption stays `text`.
- */
-const LINE_INPUTS: Readonly<Record<string, string>> = {}
 
 /**
  * Two-name forms, one bake per (stop, current step) pair: 111 `locked-later`
@@ -126,7 +119,7 @@ function buildLines(): PathLine[] {
     src: string | null = DEFERRED_PATH_LINE_KINDS.has(kind)
       ? null
       : pathLineSrc(id),
-    input: string | undefined = LINE_INPUTS[id],
+    input?: string,
   ) =>
     lines.push({
       id,

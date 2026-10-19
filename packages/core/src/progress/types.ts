@@ -114,6 +114,12 @@ export type WordSongNode =
   | 'bee-words'
   | 'car-words'
   | 'sheep-stories'
+  // Content wave 5 (design/native/content-wave-5.md § 4, § 5, § 7): land 9,
+  // "More words and stories". Vowel teams ai / ay and oa, long oo, then
+  // stories that mix who, what and where.
+  | 'snail-words'
+  | 'moon-words'
+  | 'goat-stories'
 
 export type SkillNode = NumberGardenNode | WordSongNode
 

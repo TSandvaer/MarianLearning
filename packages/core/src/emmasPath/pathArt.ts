@@ -38,6 +38,7 @@ export type LandArtId =
   | 'land-ws-6'
   | 'land-ws-7'
   | 'land-ws-8'
+  | 'land-ws-9'
 
 export type UiArtId =
   | 'ui-map'
@@ -94,6 +95,9 @@ const PATH_ART_SET: Readonly<Record<PathArtId, true>> = {
   'bee-words': true,
   'car-words': true,
   'sheep-stories': true,
+  'snail-words': true,
+  'moon-words': true,
+  'goat-stories': true,
   // Land emblems
   'land-ng-1': true,
   'land-ng-2': true,
@@ -108,6 +112,7 @@ const PATH_ART_SET: Readonly<Record<PathArtId, true>> = {
   'land-ws-6': true,
   'land-ws-7': true,
   'land-ws-8': true,
+  'land-ws-9': true,
   // UI pieces
   'ui-map': true,
   'ui-house': true,

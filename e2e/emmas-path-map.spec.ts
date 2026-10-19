@@ -76,6 +76,10 @@ const WORD = [
   'bee-words',
   'car-words',
   'sheep-stories',
+  // Content wave 5: land 9, "More words and stories".
+  'snail-words',
+  'moon-words',
+  'goat-stories',
 ] as const
 
 /** Mastered before `current`, practicing at it, locked after (-1 = all mastered). */
@@ -633,10 +637,10 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     await arm(page, seedProgress({ word: 5 }))
     await openMapFromHub(page, 'word-song')
 
-    await expect(page.getByTestId('map-stop')).toHaveCount(24)
-    await expect(page.getByTestId('map-band')).toHaveCount(8)
-    // A gate before each land after the first (land 8, content wave 4).
-    await expect(page.getByTestId('map-gate')).toHaveCount(7)
+    await expect(page.getByTestId('map-stop')).toHaveCount(27)
+    await expect(page.getByTestId('map-band')).toHaveCount(9)
+    // A gate before each land after the first (land 9, content wave 5).
+    await expect(page.getByTestId('map-gate')).toHaveCount(8)
     await expect(page.getByTestId('map-emma')).toHaveAttribute(
       'data-node',
       'cvc-words-short-o',

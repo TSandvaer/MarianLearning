@@ -1146,16 +1146,19 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     phoneme: '/θ/',
     hybridMode: true,
   },
-  // ── Land 6 "Big words" and land 8's bee and car words ────────────────
-  // 46 picture targets from `bigWordsSteps.ts` (the one place their words
+  // ── Land 6 "Big words", land 8's bee and car words, land 9's snail and
+  // moon words ──
+  // 62 picture targets from `bigWordsSteps.ts` (the one place their words
   // live), in canon order: duck + crab words (content wave 1), tent + cake
   // words (content wave 2), bee + car words (content wave 4; sheep and
-  // shark keep their sh-step entries, `SHARED_BIG_WORDS`). `vowel` is set
-  // (the short vowel; for cake, bee and car words the vowel letter, which
-  // says its name or goes with the r), so the CVC-axis and cross-vowel
-  // test scans exclude them by name, as they do the ch and th words. No
-  // `phoneme` tag: ck / ng / start and end blends / magic e / ee, ea, ar
-  // share no grapheme with a pack word that says something else.
+  // shark keep their sh-step entries, `SHARED_BIG_WORDS`), snail + moon
+  // words (content wave 5; no word collides, K4). `vowel` is set (the
+  // short vowel; for cake, bee, car, snail and moon words the vowel letter,
+  // which says its name or goes with the r, or the team's first letter), so
+  // the CVC-axis and cross-vowel test scans exclude them by name, as they
+  // do the ch and th words. No `phoneme` tag: ck / ng / start and end
+  // blends / magic e / ee, ea, ar / ai, ay, oa, oo share no grapheme with a
+  // pack word that says something else.
   ...BIG_WORDS_STEP_IDS.flatMap((step) =>
     BIG_WORDS_STEPS[step]
       .filter((row) => !SHARED_BIG_WORDS.has(row.word))
@@ -1835,6 +1838,30 @@ export const FORBIDDEN_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['scarf', 'belt'], // both long strips worn on the body
   ['card', 'gift'], // both gifts
   ['seal', 'shark'], // both grey sea animals
+  // Land 9, snail and moon words (content wave 5,
+  // `design/native/content-wave-5.md` § 8, Dave's 20 candidates and
+  // coat–cape, D7), added before their rows.
+  ['tray', 'mat'], // both flat rectangles seen from above
+  ['train', 'bus'], // both vehicles in side view
+  ['train', 'van'], // both vehicles in side view
+  ['train', 'car'], // both vehicles in side view
+  ['train', 'jeep'], // both vehicles in side view
+  ['chain', 'rope'], // both long, linked or twisted lines
+  ['boat', 'ship'], // both boats on the water
+  ['boat', 'tub'], // both open hulls that hold something
+  ['goat', 'sheep'], // both four-legged farm animals in side view
+  ['goat', 'dog'], // both four-legged animals in side view
+  ['goat', 'pig'], // both four-legged animals in side view
+  ['goat', 'cat'], // both four-legged animals in side view
+  ['loaf', 'bun'], // both baked bread
+  ['snail', 'bug'], // both small garden creatures
+  ['broom', 'mop'], // both a long handle with a head on the floor
+  ['boot', 'sock'], // both worn on the foot
+  ['stool', 'desk'], // both wooden furniture on legs
+  ['hoop', 'ring'], // both a round loop
+  ['roof', 'tent'], // both a pointed roof shape
+  ['roof', 'barn'], // both a pointed roof over a building
+  ['coat', 'cape'], // both garments worn over the body (D7)
 ] as const
 
 /** True if `a` and `b` are a forbidden silhouette-similar pair. */
@@ -2196,10 +2223,11 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   // comment.
   moth: { gentle: ['bath', 'cloth'], trap: ['thin', 'math'] }, // th-pool only; path avoided (FORBIDDEN_PAIR); spec's [thin,thick] is itself a FORBIDDEN_PAIR — see deviation note above
   cloth: { gentle: ['bath', 'math'], trap: ['thin', 'moth'] }, // th-pool only
-  // ── Land 6 "Big words" (content waves 1 and 2) and land 8's bee and
-  // car words (content wave 4) — rows from `bigWordsSteps.ts`. sheep and
-  // shark keep the sh step's rows above (`SHARED_BIG_WORDS`); their bee-
-  // and car-words rows ride on the problem (`chipRow`, § 5).
+  // ── Land 6 "Big words" (content waves 1 and 2), land 8's bee and car
+  // words (content wave 4) and land 9's snail and moon words (content wave
+  // 5) — rows from `bigWordsSteps.ts`. sheep and shark keep the sh step's
+  // rows above (`SHARED_BIG_WORDS`); their bee- and car-words rows ride on
+  // the problem (`chipRow`, § 5).
   ...Object.fromEntries(
     BIG_WORDS_STEP_IDS.flatMap((step) =>
       BIG_WORDS_STEPS[step]
