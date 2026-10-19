@@ -43,6 +43,13 @@
  * Map-started session) plays no open line and shows no caption: Emma has
  * just spoken. An unlock still to celebrate plays its beat regardless.
  *
+ * Native-only, the play door (`design/native/mini-game-flower-bed.md`
+ * § 1.2): the world's open games (`games`) are decided once at mount, from
+ * the same read as the visit. A door tap follows the stop rules (armed,
+ * held through a beat, a peek out or the launch lock), cuts the line and
+ * starts the launch lock; `LAUNCH_DELAY_MS` later App opens the game
+ * (`openGame`). Nothing announces a game, and no Map line names one.
+ *
  * Debug only (`debugLog`, `EXPO_PUBLIC_DEBUG=1`): every stop tap logs the
  * stop that took the touch, its state, the path taken and the tap point
  * (`./mapTapLog.ts`).
@@ -53,6 +60,7 @@
 import type { EmmaPose } from '@marian/core/character/emmaPose'
 import type { PathLine } from '@marian/core/emmasPath/pathLines'
 import { gateLine, stopLine, stopNameLine } from '@marian/core/map/mapLines'
+import { openGames, type GameId } from '@marian/core/games/miniGames'
 import type { MapLand, MapStop } from '@marian/core/map/mapModel'
 import { stopTapAction } from '@marian/core/map/stopTap'
 import {
@@ -134,10 +142,17 @@ export interface MapVisitOptions {
   quietReturn?: boolean
   /** Debug only: one Metro line per stop tap (`./mapTapLog.ts`). */
   debugLog?: MapDebugLog
+  /**
+   * Mini-game spec § 1.2: the play door's tap opens `game`. Returns `true`
+   * once App has left for it. Without it the door does nothing.
+   */
+  openGame?: (game: GameId) => boolean
 }
 
 export interface MapVisitState {
   visit: MapVisit
+  /** The world's open games, decided at mount (§ 1.2). */
+  games: readonly GameId[]
   /** The map at the current beat phase. */
   view: MapBeatView
   phase: UnlockPhase | null
@@ -155,6 +170,8 @@ export interface MapVisitState {
   /** `tap`: where the finger landed, for the debug log only. */
   tapStop: (stop: MapStop, tap?: MapTapPoint) => void
   tapGate: (land: MapLand) => void
+  /** The play door (§ 1.2). */
+  tapDoor: (game: GameId) => void
   /** Call before leaving for the Hub. */
   leave: () => void
   /** Debug only: the Metro line logger (`./mapTapLog.ts`), or none. */
@@ -182,8 +199,16 @@ export function useMapVisit({
   replay,
   quietReturn = false,
   debugLog,
+  openGame,
 }: MapVisitOptions): MapVisitState {
-  const [visit] = useState(() => planMapVisit(readProgress(), world))
+  // One read: the visit and the open games come from the same progress.
+  const [{ visit, games }] = useState(() => {
+    const progress = readProgress()
+    return {
+      visit: planMapVisit(progress, world),
+      games: openGames(progress, world),
+    }
+  })
   const [player] = useState<MapLinePlayer>(() => createPlayer())
   const [phase, setPhase] = useState<UnlockPhase | null>(visit.phase)
   // A quiet return: no open line, so no caption either (§ 6.4).
@@ -408,6 +433,20 @@ export function useMapVisit({
     speak(stopLine(view.model, stop))
   }
 
+  /** § 1.2: the stop rules, then the launch lock until the route changes. */
+  const tapDoor = (game: GameId) => {
+    if (ignoredBecause() !== null || openGame === undefined) return
+    player.cancel()
+    const controller = new AbortController()
+    launchRef.current = controller
+    launchTimer.current = setTimeout(() => {
+      launchTimer.current = null
+      if (leftRef.current || launchRef.current !== controller) return
+      // Not opened: the lock lifts.
+      if (!openGame(game)) launchRef.current = null
+    }, LAUNCH_DELAY_MS)
+  }
+
   const tapGate = (land: MapLand) => {
     if (launchRef.current !== null) return
     if (view.tapsWait || peekRef.current !== null) return
@@ -416,6 +455,7 @@ export function useMapVisit({
 
   return {
     visit,
+    games,
     view,
     phase,
     caption,
@@ -426,6 +466,7 @@ export function useMapVisit({
     launchLocked: () => launchRef.current !== null,
     tapStop,
     tapGate,
+    tapDoor,
     leave,
     debugLog,
   }

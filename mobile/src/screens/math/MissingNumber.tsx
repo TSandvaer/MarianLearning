@@ -31,6 +31,7 @@ import Animated, {
 import { fredokaBoldWidth, type CountingMetrics } from '../../layout/mathLayout'
 import { colors, fonts } from '../../theme'
 import {
+  BLOOM_SPRING,
   EASE_IN_OUT,
   EASE_OUT,
   FADE_MS,
@@ -49,7 +50,6 @@ export const BUD_IN_MS = 200
 export const BLOOM_FADE_MS = 150
 /** Correct: bud k blooms this long after bud k − 1. */
 export const BLOOM_STAGGER_MS = 80
-const BLOOM_SPRING = { stiffness: 300, damping: 14, mass: 1 }
 
 /** How the hidden part shows: not yet, from hint 3, or the guided answer. */
 export type BudReveal = 'hidden' | 'hint' | 'guided'

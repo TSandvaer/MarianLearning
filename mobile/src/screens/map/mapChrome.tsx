@@ -1,9 +1,11 @@
 /**
  * The map's chrome (web `src/screens/Map/mapParts.tsx` + `MapScreen.tsx`;
  * map-native § 2): the sky-to-meadow backdrop over the whole screen, the
- * clay Home button, the world title and the caption slab.
+ * clay Home button, the world title and the caption slab; natively, the
+ * play door (mini-game spec § 1.2).
  */
 import type { PathLine } from '@marian/core/emmasPath/pathLines'
+import type { GameId } from '@marian/core/games/miniGames'
 import type { MasteryTrack } from '@marian/core/progress'
 import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -18,6 +20,8 @@ import { PathImage } from '../../components/PathImage'
 import type { Rect } from '../../layout/layout'
 import type { MapCaptionSlot } from '../../layout/mapScreenLayout'
 import { FILL, fonts } from '../../theme'
+import { FlowerBed } from '../game/FlowerBed'
+import { GAME_DOOR_LABELS } from '../game/gameLines'
 import { TITLE } from '../hub/cardLook'
 import { PRESS_MS } from '../hub/clay'
 
@@ -211,3 +215,68 @@ const styles = StyleSheet.create({
   slotEnd: { justifyContent: 'flex-end' },
   slab: { width: '100%' },
 })
+
+/**
+ * The play door (mini-game spec § 1.2): Home's clay disc, face and press
+ * (wood clay, the Number Garden map button's), holding the game's own
+ * picture: a full flower bed at 0.8 × the disc, still. No text, no badge,
+ * no count, no idle animation. Chrome, like Home, not a stop.
+ */
+export function GameDoor({
+  game,
+  rect,
+  k,
+  onPress,
+}: {
+  game: GameId
+  rect: Rect
+  /** Web px → pt (1 on tablets, 7/12 on phones). */
+  k: number
+  onPress: () => void
+}) {
+  const [down, setDown] = useState(false)
+  const sink = useSharedValue(0)
+  useEffect(() => {
+    sink.set(withTiming(down ? 6 * k : 0, { duration: PRESS_MS }))
+  }, [down, k, sink])
+  const pressed = useAnimatedStyle(() => ({
+    transform: [{ translateY: sink.get() }],
+  }))
+  return (
+    <Pressable
+      testID="map-game-door"
+      accessibilityRole="button"
+      accessibilityLabel={GAME_DOOR_LABELS[game]}
+      onPressIn={() => setDown(true)}
+      onPressOut={() => setDown(false)}
+      onPress={onPress}
+      style={[
+        styles.abs,
+        { left: rect.x, top: rect.y, width: rect.width, height: rect.height },
+      ]}
+    >
+      <Animated.View
+        style={[
+          styles.home,
+          {
+            borderRadius: rect.width / 2,
+            boxShadow: `inset 0 ${5 * k}px 0 rgba(255,255,255,0.3), 0 ${8 * k}px 0 #7d4a26, 0 ${12 * k}px ${16 * k}px rgba(60,30,10,0.3)`,
+          },
+          pressed,
+        ]}
+      >
+        <View
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <FlowerBed
+            width={0.8 * rect.width}
+            given={10}
+            testIDPrefix="map-game-door"
+          />
+        </View>
+      </Animated.View>
+    </Pressable>
+  )
+}

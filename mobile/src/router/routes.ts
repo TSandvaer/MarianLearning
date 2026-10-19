@@ -38,6 +38,8 @@ export { FIRST_ROUTE, type Route }
  * - map → math | literacy         native only: the current stop starts the
  *                                 Hub card's session (map-tap-to-play § 1)
  * - peek → map                    the closer's end, or the back button
+ * - map → game → map              native only: a world's play door, and the
+ *                                 round's end or Back (mini-game spec § 1.3)
  * - parent-settings → hub         `handleParentSettingsExit`
  * - reward → hub                  the web renders no screen for `reward`
  *                                 (a legacy route); the shell gives its
@@ -53,8 +55,9 @@ export const ROUTE_EXITS: Readonly<Record<Route, readonly Route[]>> = {
   'session-end': ['hub', 'map', 'math', 'literacy', 'picker'],
   reward: ['hub'],
   'parent-settings': ['hub', 'picker'],
-  map: ['hub', 'peek', 'math', 'literacy', 'picker'],
+  map: ['hub', 'peek', 'math', 'literacy', 'picker', 'game'],
   peek: ['map'],
+  game: ['map'],
 }
 
 /** Every route, in `ROUTE_EXITS` order. */
@@ -73,6 +76,7 @@ export const ROUTE_LABELS: Readonly<Record<Route, string>> = {
   map: "Emma's Path",
   peek: 'Peek',
   picker: 'Who is playing',
+  game: 'Mini-game',
 }
 
 /**
