@@ -4,9 +4,8 @@
  * the canon MP3's length, 4 segments in order), and the timing helpers.
  *
  * Real blending (`design/native/real-blending.md` § 7, § 11) adds 6 blends
- * (mat, bat, can, cap, dad, jam): 46. RED until their Lily render and
- * `npm run export-assets`, which measures them; fewer than 6 new entries
- * means a retake.
+ * (mat, bat, can, cap, dad, jam): 46, measured by `npm run export-assets`
+ * after their Lily render; fewer than 6 new entries would mean a retake.
  */
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, statSync } from 'node:fs'

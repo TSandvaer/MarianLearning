@@ -449,39 +449,37 @@ describe('the lines (§ 11, AC 7)', () => {
     expect(BAKED_PATH_LINES).toHaveLength(228)
   })
 
-  it('the 6 new guidance lines and the 7 new or changed path lines await their render', () => {
-    expect([...GUIDANCE_LINES_AWAITING_RENDER].sort()).toEqual(
-      [
-        'guide.session.intro.blending-cv',
-        'guide.session.intro.sounding-out',
-        'guide.session.peek-open.sounding-out',
-        'guide.session.peek-close.sounding-out',
-        'guide.session.replay-open.sounding-out',
-        'guide.session.replay-close.sounding-out',
-      ].sort(),
-    )
-    expect([...PATH_LINES_AWAITING_RENDER].sort()).toEqual(
-      [
-        'path.open.sounding-out',
-        'path.stop.sounding-out',
-        'path.locked.next.sounding-out',
-        'end.bud.sounding-out',
-        'end.unlock.sounding-out',
-        'path.locked.next.cvc-words',
-        'end.unlock.cvc-words',
-      ].sort(),
-    )
+  const NEW_GUIDANCE_IDS = [
+    'guide.session.intro.blending-cv',
+    'guide.session.intro.sounding-out',
+    'guide.session.peek-open.sounding-out',
+    'guide.session.peek-close.sounding-out',
+    'guide.session.replay-open.sounding-out',
+    'guide.session.replay-close.sounding-out',
+  ]
+  const NEW_PATH_IDS = [
+    'path.open.sounding-out',
+    'path.stop.sounding-out',
+    'path.locked.next.sounding-out',
+    'end.bud.sounding-out',
+    'end.unlock.sounding-out',
+    'path.locked.next.cvc-words',
+    'end.unlock.cvc-words',
+  ]
+
+  it('the 6 new guidance lines and the 7 new or changed path lines are rendered in Lily', () => {
+    for (const id of [...NEW_GUIDANCE_IDS, ...NEW_PATH_IDS]) {
+      expect(GUIDANCE_LINES_AWAITING_RENDER).not.toContain(id)
+      expect(PATH_LINES_AWAITING_RENDER).not.toContain(id)
+    }
   })
 
   it('§ 11: 13 new texts (470 characters) and 13 inputs (470 characters) in these lines', () => {
     const lines = [
-      ...GUIDANCE_LINES.filter((l) =>
-        GUIDANCE_LINES_AWAITING_RENDER.includes(l.id),
-      ),
-      ...BAKED_PATH_LINES.filter((l) =>
-        PATH_LINES_AWAITING_RENDER.includes(l.id),
-      ),
+      ...NEW_GUIDANCE_IDS.map((id) => guidanceLine(id)!),
+      ...NEW_PATH_IDS.map((id) => BAKED_PATH_LINES.find((l) => l.id === id)!),
     ]
+    expect(lines.every((l) => l !== undefined)).toBe(true)
     const texts = new Set(lines.map((l) => l.text))
     expect(texts.size).toBe(13)
     expect([...texts].reduce((n, t) => n + t.length, 0)).toBe(470)
