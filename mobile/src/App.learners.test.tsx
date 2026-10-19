@@ -351,6 +351,51 @@ describe('AC 31: the return rule', () => {
     expect(screen.queryByTestId('picker')).toBeNull()
   })
 
+  it('a switch from the Map drops the Hub’s prefetch: the next learner’s Hub requests their own session (§ 2.3 step 1)', async () => {
+    // Marian's twin on the same baseline: their Hubs prefetch under the
+    // same key, so only a discard keeps Marian's request from them.
+    const twin = {
+      ...SAM,
+      start: 'legacy-default',
+    } as unknown as typeof SAM
+    const sessionStarts = () =>
+      (globalThis.fetch as jest.Mock).mock.calls.filter(([url]) =>
+        String(url).endsWith('/api/claude'),
+      ).length
+    // Held open: Marian's request is still pending at the pick.
+    ;(globalThis.fetch as jest.Mock).mockImplementation(
+      () => new Promise(() => {}),
+    )
+    try {
+      boot([MARIAN, twin])
+      hasPlayed(MARIAN.id)
+      hasPlayed(twin.id)
+      await renderPastSplash()
+      await pick(MARIAN.id)
+      await settle(2000)
+      expect(sessionStarts()).toBe(1)
+      await fireEvent.press(screen.getByTestId('hub-map-math'))
+      await settle(3000)
+      await background(PICKER_AFTER_HIDDEN_MS)
+      expect(screen.getByTestId('picker')).toBeOnTheScreen()
+      await pick(twin.id)
+      expect(screen.getByTestId('hub')).toBeOnTheScreen()
+      expect(activeLearner()?.id).toBe(twin.id)
+      await settle(2000)
+      expect(sessionStarts()).toBe(2)
+      await fireEvent.press(screen.getByTestId('hub-card-word-song'))
+      await flushAll()
+      // The tap takes their own request, not a third one.
+      expect(sessionStarts()).toBe(2)
+    } finally {
+      ;(globalThis.fetch as jest.Mock).mockImplementation(() =>
+        Promise.reject(
+          new TypeError('Network request failed (jest is offline)'),
+        ),
+      )
+    }
+  })
+
   it('one learner: hidden 10 min on the Hub → no change', async () => {
     boot([MARIAN])
     hasPlayed(MARIAN.id)

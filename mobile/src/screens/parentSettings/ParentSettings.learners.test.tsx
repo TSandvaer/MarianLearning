@@ -391,6 +391,14 @@ describe('AC 35: adding a learner', () => {
     await flushPromises()
     expect(add).toHaveBeenCalledWith(CODE, expect.anything())
     expect(installedLearnerList()!.learners[0]!.name).toBe('Mia')
+    // The code was refused, but the name stays written: the cards show it.
+    await fireEvent.press(screen.getByTestId('ps-code-sheet-close'))
+    expect(
+      screen.getByTestId(`ps-learner-name-${MARIAN_ID}`),
+    ).toHaveTextContent('Mia')
+    expect(screen.getByTestId('ps-learner-name').props.value).toBe('Mia')
+    await fireEvent.press(screen.getByTestId('ps-learners-add-code'))
+    expect(screen.queryByTestId('ps-code-first-name-step')).toBeNull()
   })
 
   it.each<[string, AddFromBackupOutcome, string]>([

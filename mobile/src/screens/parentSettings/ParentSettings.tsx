@@ -258,11 +258,14 @@ export function ParentSettings({
       seq: s.seq + 1,
     }))
   }
+  const renamed = () => {
+    refreshList()
+    setDocVersion((v) => v + 1)
+  }
   const rename = (name: string) => {
     if (playing === null) return
     renameLearner(playing.id, name)
-    refreshList()
-    setDocVersion((v) => v + 1)
+    renamed()
   }
   const picture = (avatarId: AvatarId) => {
     if (playing === null) return
@@ -516,6 +519,8 @@ export function ParentSettings({
           layout={layout}
           learners={list.learners}
           onAdded={added}
+          // A refused code keeps learner 1's new name: the cards show it.
+          onRenamed={renamed}
           onClose={closeSheet}
           add={addFromBackup}
         />

@@ -317,6 +317,8 @@ export interface AddFromCodeSheetProps {
   layout: ParentSettingsLayout
   learners: readonly LearnerEntry[]
   onAdded: (learner: LearnerEntry) => void
+  /** Learner 1 was named (D5): written before the read, whatever it finds. */
+  onRenamed: () => void
   onClose: () => void
   /** Test seam: core's `addLearnerFromBackup` over the network. */
   add?: AddFromBackupFn
@@ -326,6 +328,7 @@ export function AddFromCodeSheet({
   layout,
   learners,
   onAdded,
+  onRenamed,
   onClose,
   add = addFromBackup,
 }: AddFromCodeSheetProps) {
@@ -352,7 +355,10 @@ export function AddFromCodeSheet({
 
   const submit = () => {
     if (!canSubmit || uuid === null) return
-    if (first !== null) renameLearner(first.id, firstName)
+    if (first !== null) {
+      renameLearner(first.id, firstName)
+      onRenamed()
+    }
     const signal = lifetime.current.signal
     setBusy(true)
     const show = (line: StatusLine) =>

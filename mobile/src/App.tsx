@@ -964,11 +964,15 @@ export default function App() {
     [],
   )
   const onQaJump = useCallback(() => onRemount('hub'), [onRemount])
-  // A pick (learner profiles § 2.3): the route to the picker already tore
-  // the kicked or prefetched session down. Install their store, let their
-  // Hub speak, start their launch reconcile, and mount afresh.
+  // A pick (learner profiles § 2.3): the route to the picker tore the
+  // kicked session down, but a Hub prefetch survives a map visit, so the
+  // return rule can reach the picker with it pending: drop it before their
+  // store goes in (every way to the picker picks here). Install their
+  // store, let their Hub speak, start their launch reconcile, and mount
+  // afresh.
   const onPickLearner = useCallback(
     (learner: LearnerEntry) => {
+      sessionPrefetcher.discard()
       const picked = activateLearner(learner.id)
       if (picked === null) return
       clearHubUnmountMark()
