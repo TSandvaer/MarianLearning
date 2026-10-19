@@ -151,7 +151,7 @@ function authHeaders(): Record<string, string> {
  * (`./lastSync.ts`). The web installs none: its row shows
  * `profile.lastPlayedISO` (frozen).
  */
-export type CloudSyncSuccessListener = () => void
+export type CloudSyncSuccessListener = (syncId: string) => void
 
 let syncSuccessListener: CloudSyncSuccessListener | null = null
 
@@ -162,9 +162,9 @@ export function setCloudSyncSuccessListener(
   syncSuccessListener = listener
 }
 
-function notifySynced(): void {
+function notifySynced(syncId: string): void {
   try {
-    syncSuccessListener?.()
+    syncSuccessListener?.(syncId)
   } catch (err) {
     // The helpers never throw; a listener that does is logged and dropped.
     const message = err instanceof Error ? err.message : String(err)
@@ -249,7 +249,7 @@ export async function pushProgressToCloud(
       body: JSON.stringify(body),
     })
     if (res.ok) {
-      notifySynced()
+      notifySynced(deviceId)
       return 'sent'
     }
     console.warn(
@@ -386,6 +386,9 @@ export type ReconcileOutcome =
   | { kind: 'cloud-error'; reason: CloudErrorReason }
   /** Cloud blob was newer but failed validation — local kept. */
   | { kind: 'cloud-blob-rejected' }
+  /** The record holds another learner's doc (learner profiles § 4.5, X3):
+   *  nothing installed, written or pushed. */
+  | { kind: 'cloud-learner-mismatch' }
 
 export interface ReconcileOptions {
   fetchImpl?: typeof fetch
@@ -485,7 +488,7 @@ export async function reconcileWithCloud(
       return { kind: 'cloud-blob-rejected' }
     }
     installLocally(validated)
-    notifySynced()
+    notifySynced(deviceId)
     return { kind: 'installed-from-cloud', progress: validated }
   }
 
@@ -502,7 +505,7 @@ export async function reconcileWithCloud(
 
   // Equal (or local is null + cloud time === -Infinity which is impossible
   // because cloudTimeMs is a number; only equality remains).
-  notifySynced()
+  notifySynced(deviceId)
   return { kind: 'noop', reason: 'equal' }
 }
 
@@ -523,7 +526,7 @@ export async function reconcileWithCloud(
  * `withDefaultedSkillLevels parity` tests in `cloudSync.test.ts` pin the
  * two paths equal.
  */
-function installCloudBlob(
+export function installCloudBlob(
   blob: unknown,
   localHistory?: SessionHistoryEntry[],
   localGoodDays?: GoodDays,

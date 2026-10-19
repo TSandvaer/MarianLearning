@@ -797,6 +797,17 @@ export interface Progress {
    * Add-only. Optional + additive — no `schemaVersion` bump.
    */
   paceHold?: SkillNode[]
+  /**
+   * Whose doc this is (learner profiles, `design/native/learner-profiles.md`
+   * § 4.5). Stamped by native's learners module on every save and push:
+   * `syncId` is the cloud record the doc belongs to, which reconcile,
+   * Restore and Add from a code check against the record key (X3). Never
+   * shown. Values are not checked against a known set (an older build or a
+   * newer avatar set must not reject the doc). The web and older builds
+   * write none and keep whatever carrier a doc has. Optional + additive —
+   * no `schemaVersion` bump.
+   */
+  learner?: { syncId?: string; avatarId?: string; language?: string }
 }
 
 /**
