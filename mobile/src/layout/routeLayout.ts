@@ -2,6 +2,7 @@ import type { Route } from '@marian/core/router/route'
 import { greetLayout } from './greetLayout'
 import { hubLayout } from './hubLayout'
 import { mathLayout, type ScreenLayout, type Viewport } from './layout'
+import { mathLayout as playLayout } from './mathLayout'
 import { sessionEndLayout } from './sessionEndLayout'
 import { wordSongLayout } from './wordSongLayout'
 
@@ -17,6 +18,9 @@ export function layoutForRoute(route: Route, viewport: Viewport): ScreenLayout {
       return greetLayout(viewport)
     case 'math':
       return mathLayout(viewport)
+    // A mini-game wears the lesson's Math frame (mini-game spec § 1.4).
+    case 'game':
+      return playLayout(viewport)
     case 'literacy':
       return wordSongLayout(viewport)
     case 'session-end':
