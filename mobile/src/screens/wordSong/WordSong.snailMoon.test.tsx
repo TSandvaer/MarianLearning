@@ -202,6 +202,25 @@ describe.each([
       expect(h.voice.texts()).toEqual([`Read the ${word}.`])
     })
 
+    it('App mounts before the session start: the ready plan still opens with the lead and its cue', async () => {
+      // App's first snapshot (the session start in flight): another plan,
+      // no intro, not ready; then the ready one, on the same mount.
+      const guide = fakeGuide()
+      const h = await renderWordSong({
+        audioReady: false,
+        sessionGuide: guide.player,
+      })
+      expect(guide.lines).toHaveLength(0)
+      expect(h.voice.lines).toHaveLength(0)
+      await h.update({ plan, audioReady: true, sessionIntro: intro })
+      expect(guide.lines.map((l) => l.id)).toEqual([intro])
+      await startGuide(guide.lines[0]!)
+      expect(litCells(word)).toEqual([...lit])
+      await endGuide(guide.lines[0]!)
+      await advance(SILENT_TEXT_WINDOW_MS)
+      expect(h.voice.texts()).toEqual([`Read the ${word}.`])
+    })
+
     it('no lead on problems 2–8; every card deals its own row', async () => {
       const guide = fakeGuide()
       const h = await renderWordSong({

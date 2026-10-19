@@ -4,10 +4,9 @@
  * exactly. The lead "Read the story. Who, what or where?" (sheep stories'
  * text) plays once, before problem 1 (no "Read the story." right after
  * it); every later card opens with "Read the story."; the Where rows
- * answer "Yes! On the stool!" / "Yes! In the boot!". Until the goat scenes
- * are picked, a story reveals its answer's pack picture (the shipped
- * fallback, § 11). Fakes for Emma's voice, the session guide and the story
- * players.
+ * answer "Yes! On the stool!" / "Yes! In the boot!". Each story reveals
+ * its own scene (§ 10.2). Fakes for Emma's voice, the session guide and the
+ * story players.
  */
 import {
   storiesOf,
@@ -162,11 +161,11 @@ describe('goat stories (AC 15)', () => {
       await advance(
         STORY_REVEAL_DELAY_MS + STORY_SCENE_LAND_MS + STORY_REVEAL_READ_GAP_MS,
       )
-      // No goat scene yet (§ 10.2 comes after the pack picks): the
-      // answer's pack picture is revealed instead (§ 11).
+      // Goat 1's own scene (§ 10.2), not the answer's pack picture.
       if (i === 0) {
-        expect(screen.getByTestId('word-story-scene-picture')).toBeTruthy()
-        expect(screen.queryByTestId('word-story-scene-art')).toBeNull()
+        const art = screen.getByTestId('word-story-scene-art')
+        expect(art.props.accessibilityLabel).toBe('goat')
+        expect(screen.queryByTestId('word-story-scene-picture')).toBeNull()
       }
       const story = h.voice.lines.at(-1)!
       expect(story.text).toBe(s.story)
