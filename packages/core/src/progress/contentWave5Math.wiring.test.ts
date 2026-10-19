@@ -252,10 +252,11 @@ describe('the lines (§ 9.1, AC 8)', () => {
     expect(pathLine('path.stop.add-two-digit')?.input).toBeUndefined()
   })
 
-  it('every new line awaits its Lily render; land 5 and more and less are not new', () => {
+  it('every new line is rendered in Lily; land 5 and more and less are not new', () => {
     for (const [id] of GUIDANCE)
-      expect(GUIDANCE_LINES_AWAITING_RENDER).toContain(id)
-    for (const [id] of PATH) expect(PATH_LINES_AWAITING_RENDER).toContain(id)
+      expect(GUIDANCE_LINES_AWAITING_RENDER).not.toContain(id)
+    for (const [id] of PATH)
+      expect(PATH_LINES_AWAITING_RENDER).not.toContain(id)
     for (const id of ['path.land.math.5', 'path.open.hundreds-addsub'])
       expect(PATH_LINES_AWAITING_RENDER).not.toContain(id)
   })

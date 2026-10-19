@@ -334,19 +334,9 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: content wave 5's Number Garden lines (§ 9.1): zeros' and adding big
- * numbers' leads, peeks and replays.
+ * Now: none.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
-  'hundreds-zeros',
-  'add-two-digit',
-].flatMap((n) => [
-  `guide.session.intro.${n}`,
-  `guide.session.peek-open.${n}`,
-  `guide.session.peek-close.${n}`,
-  `guide.session.replay-open.${n}`,
-  `guide.session.replay-close.${n}`,
-])
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 

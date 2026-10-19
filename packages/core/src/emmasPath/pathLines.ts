@@ -255,21 +255,9 @@ export const BAKED_PATH_LINES: readonly (PathLine & { src: string })[] =
  * tests expect exactly these to be missing. The render commit sets this
  * list to `[]`.
  *
- * Now: content wave 5's Number Garden lines (§ 9.1): zeros' and adding big
- * numbers' path lines, and land 6's.
+ * Now: none.
  */
-export const PATH_LINES_AWAITING_RENDER: readonly string[] = [
-  ...['hundreds-zeros', 'add-two-digit'].flatMap((n) => [
-    `path.open.${n}`,
-    `path.stop.${n}`,
-    `path.locked.next.${n}`,
-    `end.bud.${n}`,
-    `end.unlock.${n}`,
-  ]),
-  'path.land.math.6',
-  'end.land.math.6',
-  'end.land.math.6.no-number',
-]
+export const PATH_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(PATH_LINES.map((l) => [l.id, l]))
 
