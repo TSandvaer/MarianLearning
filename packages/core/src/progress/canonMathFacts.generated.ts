@@ -117,4 +117,5 @@ export const CANON_MATH_FACTS: Readonly<
   ],
   'div-share': [null, null, null, null, null, null, null, null],
   hundreds: [null, null, null, null, null, null, null, null],
+  'hundreds-addsub': [null, null, null, null, null, null, null, null],
 }

@@ -44,8 +44,14 @@ export const LANDS: readonly Land[] = [
     nodes: ['mult-2-5-10', 'mult-3-4', 'mult-6-9', 'mult-mix', 'div-share'],
   },
   // Content wave 3 (design/native/content-wave-3.md § 1, K6): a new land,
-  // since Groups is full. Step 15 ("adding hundreds") joins it later.
-  { world: 'math', number: 5, name: 'Hundreds', nodes: ['hundreds'] },
+  // since Groups is full. Content wave 4 § 1 (K1): step 15, more and
+  // less, is its 2nd stop.
+  {
+    world: 'math',
+    number: 5,
+    name: 'Hundreds',
+    nodes: ['hundreds', 'hundreds-addsub'],
+  },
   {
     world: 'word-song',
     number: 1,

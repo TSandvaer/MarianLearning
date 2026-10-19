@@ -247,6 +247,9 @@ const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {
   'div-share': "Let's share the flowers!",
   // Number Garden land 5 (content wave 3 § 5.1; Thomas approved T2).
   hundreds: 'Hundreds, tens and ones!',
+  // Number Garden land 5's 2nd stop (content wave 4 § 2.4, § 8.1; Thomas
+  // approved T2). Its pill pulses on "More" only (D1).
+  'hundreds-addsub': 'More and less!',
   // Word Song land 6 (content wave 1 § 3.3, § 4.3).
   'duck-words': 'Two letters, one sound!',
   'crab-words': 'Read all the letters!',

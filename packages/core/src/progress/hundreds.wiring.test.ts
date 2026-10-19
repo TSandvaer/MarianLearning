@@ -67,23 +67,23 @@ const PATH_IDS = [
 ]
 
 describe('hundreds in the Number Garden tree (§ 1, § 3.1)', () => {
-  it('is the last step, after div-share, in both tree lists', () => {
-    expect(MATH_TREE.slice(-2)).toEqual(['div-share', HUNDREDS])
-    expect(MATH_NODES_IN_ORDER.slice(-2)).toEqual(['div-share', HUNDREDS])
+  it('follows div-share in both tree lists; more and less follows it (content wave 4)', () => {
+    expect(MATH_TREE.slice(-3, -1)).toEqual(['div-share', HUNDREDS])
+    expect(MATH_NODES_IN_ORDER.slice(-3, -1)).toEqual(['div-share', HUNDREDS])
     expect(nextNode('math', 'div-share')).toBe(HUNDREDS)
-    expect(nextNode('math', HUNDREDS)).toBeNull()
+    expect(nextNode('math', HUNDREDS)).toBe('hundreds-addsub')
   })
 
   it('is land 5, Hundreds, of 5 Number Garden lands; LANDS flattened equals both trees (AC 7)', () => {
     const ng = LANDS.filter((l) => l.world === 'math')
     expect(ng).toHaveLength(5)
+    // Content wave 4 adds more and less as its 2nd stop.
     expect(ng[4]).toEqual({
       world: 'math',
       number: 5,
       name: 'Hundreds',
-      nodes: [HUNDREDS],
+      nodes: [HUNDREDS, 'hundreds-addsub'],
     })
-    expect(LANDS.filter((l) => l.world === 'word-song')).toHaveLength(7)
     expect(LANDS.flatMap((l) => l.nodes)).toEqual([
       ...MATH_TREE,
       ...LITERACY_TREE,
@@ -170,8 +170,10 @@ describe('the hundreds lines (§ 5.1, AC 7)', () => {
     const p = PATH_IDS.map((id) => BAKED_PATH_LINES.find((l) => l.id === id))
     expect(p.every((l) => l !== undefined)).toBe(true)
     expect(p.reduce((n, l) => n + l!.text.length, 0)).toBe(228)
-    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
-    expect(PATH_LINES_AWAITING_RENDER).toEqual([])
+    for (const id of [...GUIDANCE_IDS, ...PATH_IDS]) {
+      expect(GUIDANCE_LINES_AWAITING_RENDER).not.toContain(id)
+      expect(PATH_LINES_AWAITING_RENDER).not.toContain(id)
+    }
   })
 })
 

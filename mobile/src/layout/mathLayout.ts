@@ -30,6 +30,12 @@
  * On a phone her frame is placed by that band ({@link FIGURE_LEFT},
  * {@link FIGURE_RIGHT}), so the frame itself may overhang the screen edge.
  */
+import {
+  isMoreAndLess,
+  moreChange,
+  type MoreCount,
+  type MoreDirection,
+} from '@marian/core/math/extendedProblems'
 import { flowerRowFontSizeRem } from '@marian/core/math/flowerRowFit'
 import {
   isLandscape,
@@ -704,9 +710,11 @@ const FREDOKA_BOLD_ADVANCE: Record<string, number> = {
   '9': 0.521,
   '?': 0.476,
   '+': 0.49,
+  // U+2212, more and less's "−200" pill (content wave 4 § 2.2, D4).
+  '\u2212': 0.54,
 }
 
-/** Width of `text` (digits, "?", "+") in Fredoka 700 at `size`. */
+/** Width of `text` (digits, "?", "+", "−") in Fredoka 700 at `size`. */
 export function fredokaBoldWidth(text: string, size: number): number {
   let em = 0
   for (const ch of text) em += FREDOKA_BOLD_ADVANCE[ch] ?? 0.6
@@ -1306,6 +1314,9 @@ export const PV_ROD_GAP = 0.3
 export const PV_CUBE_COLUMN = 5
 /** A tray's padding, in u. */
 export const PV_TRAY_PAD = 0.5
+/** More and less's change blocks move this far apart (the build's
+ *  `BUILD_STAGGER_MS`, content wave 4 § 2.5). */
+export const PV_CHANGE_STAGGER_MS = 90
 /** The largest u on a phone / a tablet. */
 export const PV_PHONE_U_MAX = 10
 export const PV_TABLET_U_MAX = 20
@@ -1322,7 +1333,25 @@ export type PlaceValueLayoutProblem =
       ones: number
       correct: number
     }
-  | { kind: 'more'; start: number; step: 10 | 100; correct: number }
+  | MoreLayoutProblem
+
+/** What the layout reads of core's `MoreProblem`. */
+export interface MoreLayoutProblem {
+  kind: 'more'
+  start: number
+  step: 10 | 100
+  count: MoreCount
+  direction: MoreDirection
+  correct: number
+}
+
+/** A "more" problem's number-tag pill: "+10", "+100" (hundreds), "+200",
+ *  "−30" (more and less, U+2212, the take-away equations' sign; content
+ *  wave 4 § 2.2). Digits only, no "=". */
+export function morePillLabel(p: MoreLayoutProblem): string {
+  const change = moreChange(p)
+  return `${change < 0 ? '\u2212' : '+'}${Math.abs(change)}`
+}
 
 const digitsOf = (n: number): Record<Place, number> => ({
   hundreds: Math.floor(n / 100) % 10,
@@ -1376,6 +1405,9 @@ export interface PlaceValueMetrics {
   /** A built block drops this far (16, tablet 24); an added one 40. */
   drop: number
   addedRise: number
+  /** A lifted block rises this far as it fades out (24, tablet 32;
+   *  content wave 4 § 2.5). */
+  liftRise: number
   /** The grid line and the outline. */
   gridLine: number
   outline: number
@@ -1412,7 +1444,7 @@ export function placeValueMetrics(
     }
     if (p.kind === 'more') {
       numbers.push(p.start, p.correct)
-      pills.push(`+${p.step}`)
+      pills.push(morePillLabel(p))
     }
   }
   const numberTag = numbers.length > 0
@@ -1495,6 +1527,7 @@ export function placeValueMetrics(
     block: { width: size.width, height: size.height },
     drop: tablet ? 24 : 16,
     addedRise: 40,
+    liftRise: tablet ? 32 : 24,
     gridLine: 1,
     outline: 1.5,
     fits: (n: number) =>
@@ -1516,8 +1549,19 @@ export interface PlaceValueGeometry {
   flats: readonly PlaceValueRect[]
   rods: readonly PlaceValueRect[]
   cubes: readonly PlaceValueRect[]
-  /** A "more" problem's added block (the next in its tray) and its pill. */
+  /** Hundreds' "more" problem's added block (the next in its tray) and
+   *  its pill. */
   added: { place: Place; rect: PlaceValueRect; pill: SharePoint } | null
+  /** More and less's change (content wave 4 § 2.5): the blocks that drop
+   *  in on top of the start's (more) or lift out of it (less), in move
+   *  order, `BUILD_STAGGER_MS` apart. A lifted block is the start's own
+   *  (its `index` in place order); the last placed leaves first, so the
+   *  blocks that stay never move. */
+  change: {
+    place: Place
+    direction: MoreDirection
+    blocks: readonly { index: number; rect: PlaceValueRect; delay: number }[]
+  } | null
   /** Each tray's tag centre (under it). */
   tags: Record<Place, SharePoint>
   /** A "more" problem's number tag centre and its pill's; else `null`. */
@@ -1571,7 +1615,24 @@ export function placeValueGeometry(
   const d = startDigits(problem)
   const range = (n: number) => Array.from({ length: n }, (_, k) => k)
   let added: PlaceValueGeometry['added'] = null
-  if (problem.kind === 'more') {
+  let change: PlaceValueGeometry['change'] = null
+  if (problem.kind === 'more' && isMoreAndLess(problem)) {
+    const place: Place = problem.step === 100 ? 'hundreds' : 'tens'
+    const at = place === 'hundreds' ? flat : rod
+    const indices =
+      problem.direction === 'more'
+        ? range(problem.count).map((k) => d[place] + k)
+        : range(problem.count).map((k) => d[place] - 1 - k)
+    change = {
+      place,
+      direction: problem.direction,
+      blocks: indices.map((index, k) => ({
+        index,
+        rect: at(index),
+        delay: k * PV_CHANGE_STAGGER_MS,
+      })),
+    }
+  } else if (problem.kind === 'more') {
     const place: Place = problem.step === 100 ? 'hundreds' : 'tens'
     const rect = place === 'hundreds' ? flat(d.hundreds) : rod(d.tens)
     added = {
@@ -1615,6 +1676,7 @@ export function placeValueGeometry(
     rods: range(d.tens).map(rod),
     cubes: range(d.ones).map(cube),
     added,
+    change,
     tags,
     numberTag,
     numberPill,

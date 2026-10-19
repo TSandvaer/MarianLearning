@@ -116,6 +116,7 @@ const NUMBER_GARDEN_LABELS: Record<NumberGardenNode, string> = {
   'mult-mix': 'multiply, all the groups',
   'div-share': 'sharing',
   hundreds: 'hundreds',
+  'hundreds-addsub': 'more and less',
 }
 
 const WORD_SONG_LABELS: Record<WordSongNode, string> = {

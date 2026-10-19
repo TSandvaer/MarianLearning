@@ -192,7 +192,14 @@ export function expectedHundredsLines(
 function asProblem(spec: HundredsSpec, index: number): HundredsProblem {
   const utterances = { read: '', correct: '', reprompt: '', giveAnswer: '' }
   return spec.kind === 'more'
-    ? { ...spec, index, correct: hundredsAnswer(spec), utterances }
+    ? {
+        ...spec,
+        index,
+        count: 1,
+        direction: 'more',
+        correct: hundredsAnswer(spec),
+        utterances,
+      }
     : {
         kind: 'place-value',
         index,

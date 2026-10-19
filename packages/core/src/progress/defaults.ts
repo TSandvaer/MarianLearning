@@ -106,6 +106,7 @@ const SCHEMA_FLOOR_NODES: readonly SkillNode[] = [
   'mult-mix',
   'div-share',
   'hundreds',
+  'hundreds-addsub',
   // Word Song
   'letter-names',
   'letter-sounds',
@@ -196,6 +197,9 @@ const DEFAULT_SKILL_LEVELS: SkillLevels = {
   // Content wave 3 § 3.1: opens when div-share masters (or on load, by the
   // same read-path defaulter).
   hundreds: 'locked',
+  // Content wave 4 § 2.1: opens when hundreds masters (or on load, by the
+  // same read-path defaulter).
+  'hundreds-addsub': 'locked',
 
   // Word Song — literacy
   'letter-names': 'mastered', // alphabet mastered (minor b/d confusion)

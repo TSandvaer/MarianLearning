@@ -47,6 +47,7 @@ const MATH = [
   'mult-mix',
   'div-share',
   'hundreds',
+  'hundreds-addsub',
 ] as const
 
 /** Mastered before `current`, practicing at it, locked after. */

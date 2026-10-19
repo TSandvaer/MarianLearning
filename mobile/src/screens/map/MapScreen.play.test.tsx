@@ -284,7 +284,7 @@ it('debug only: each stop logs its state and hit rect on mount; each tap logs th
   const lines: string[] = []
   const h = await mount(progressAtStep('add-to-20'), (l) => lines.push(l))
   const stops = lines.filter((l) => l.startsWith('[map-stop] stop='))
-  expect(stops).toHaveLength(14)
+  expect(stops).toHaveLength(15)
   expect(stops).toContainEqual(
     expect.stringMatching(
       /^\[map-stop\] stop=number-recog state=mastered rect=-?\d+,-?\d+,\d+x\d+$/,
