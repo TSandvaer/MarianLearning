@@ -235,6 +235,7 @@ function PickerTile({
       testID={`picker-tile-${learner.id}`}
       accessibilityRole="button"
       accessibilityLabel={learner.name === '' ? undefined : learner.name}
+      accessibilityState={{ selected: pulsing }}
       onPressIn={() => pressTo(true)}
       onPressOut={() => pressTo(false)}
       onPress={onPress}
