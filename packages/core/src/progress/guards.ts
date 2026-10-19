@@ -46,6 +46,7 @@ const SKILL_NODES: ReadonlySet<SkillNode> = new Set<SkillNode>([
   'letter-names',
   'letter-sounds',
   'blending-cv',
+  'sounding-out',
   'cvc-words',
   'cvc-words-short-o',
   'cvc-words-short-u',

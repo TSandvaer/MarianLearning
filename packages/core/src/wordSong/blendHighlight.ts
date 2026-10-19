@@ -72,3 +72,49 @@ export function buildBlendHighlightSteps(
   })
   return steps
 }
+
+/**
+ * A blend line split into its graphemes and its whole word, or null when
+ * the text is not a blend ("f - a - n ... fan" → `["f","a","n"]`, `"fan"`).
+ * Accepts the separators `buildBlendHighlightSteps` does.
+ */
+function parseBlend(
+  blendText: string,
+): { graphemes: string[]; word: string } | null {
+  const match = blendText.trim().match(/^(.+?)\s*(?:\.{3}|…)\s*([A-Za-z]+)$/)
+  if (!match) return null
+  const graphemes = match[1]!.split(/\s+(?:-+|—)\s+/).map((g) => g.trim())
+  if (graphemes.some((g) => !/^[A-Za-z]+$/.test(g))) return null
+  return { graphemes, word: match[2]! }
+}
+
+/**
+ * The word a blend line ends on: "f - a - n ... fan" → `'fan'`; null when
+ * the text is not a blend. Real blending's two reads don't name the word,
+ * so the parser takes the target from here (`design/native/real-blending.md`
+ * § 8).
+ */
+export function blendTargetWord(blendText: string): string | null {
+  return parseBlend(blendText)?.word ?? null
+}
+
+/** Do a blend line's graphemes spell its word ("c - a - t ... hat": no)? */
+export function blendSpellsItsWord(blendText: string): boolean {
+  const blend = parseBlend(blendText)
+  return (
+    blend !== null &&
+    blend.graphemes.join('').toLowerCase() === blend.word.toLowerCase()
+  )
+}
+
+/**
+ * The sounds of a blend line without its word, for the caption while Emma
+ * says only the sounds: "f - a - n ... fan" → `'f - a - n'`. A line's
+ * caption ends fully revealed, so captioning the blend line itself would
+ * print the word at the cut (§ 4). A text that is not a blend is returned
+ * as it is.
+ */
+export function blendSoundsText(blendText: string): string {
+  const blend = parseBlend(blendText)
+  return blend === null ? blendText : blend.graphemes.join(' - ')
+}

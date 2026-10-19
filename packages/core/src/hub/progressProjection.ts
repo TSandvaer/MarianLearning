@@ -123,6 +123,7 @@ const WORD_SONG_LABELS: Record<WordSongNode, string> = {
   'letter-names': 'letter names',
   'letter-sounds': 'letter sounds',
   'blending-cv': 'blending sounds',
+  'sounding-out': 'sounding out',
   'cvc-words': 'CVC words',
   'cvc-words-short-o': 'CVC words (short o)',
   'cvc-words-short-u': 'CVC words (short u)',

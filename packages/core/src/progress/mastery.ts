@@ -177,6 +177,7 @@ export const LITERACY_TREE: readonly WordSongNode[] = [
   'letter-names',
   'letter-sounds',
   'blending-cv',
+  'sounding-out',
   'cvc-words',
   'cvc-words-short-o',
   'cvc-words-short-u',

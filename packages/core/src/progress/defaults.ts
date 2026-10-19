@@ -111,6 +111,7 @@ const SCHEMA_FLOOR_NODES: readonly SkillNode[] = [
   'letter-names',
   'letter-sounds',
   'blending-cv',
+  'sounding-out',
   'cvc-words',
   'cvc-words-short-o',
   'cvc-words-short-u',
@@ -208,6 +209,9 @@ const DEFAULT_SKILL_LEVELS: SkillLevels = {
   'letter-names': 'mastered', // alphabet mastered (minor b/d confusion)
   'letter-sounds': 'practicing', // consonants mastered, vowels mid-flight (only short a)
   'blending-cv': 'practicing', // CV confident
+  // Real blending § 1: land 2's 2nd stop, opens when blending sounds
+  // masters (on load, a learner past land 2 has it filled 'mastered', § 9).
+  'sounding-out': 'locked',
   'cvc-words': 'intro', // emerging
   // cvc-words-short-o is the next-vowel sibling tier. Locked at v1 default
   // — unlocks to 'intro' when cvc-words (short-a) is mastered. See

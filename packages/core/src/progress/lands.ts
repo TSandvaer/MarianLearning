@@ -58,7 +58,14 @@ export const LANDS: readonly Land[] = [
     name: 'Letters',
     nodes: ['letter-names', 'letter-sounds'],
   },
-  { world: 'word-song', number: 2, name: 'Blending', nodes: ['blending-cv'] },
+  // Real blending (design/native/real-blending.md § 1, T1): Emma says the
+  // sounds (blending sounds), then the learner makes them (sounding out).
+  {
+    world: 'word-song',
+    number: 2,
+    name: 'Blending',
+    nodes: ['blending-cv', 'sounding-out'],
+  },
   {
     world: 'word-song',
     number: 3,

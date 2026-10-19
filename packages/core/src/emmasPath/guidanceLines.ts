@@ -278,6 +278,11 @@ const WAVE_3_STORY_WORDS: ReadonlySet<string> = new Set(
  */
 const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {
   'mult-mix': "Let's play all the groups!",
+  // Word Song land 2 (real blending § 4, § 11; Thomas approved T1–T5):
+  // blending sounds' new format gets a lead too; sounding out's lights the
+  // letters left to right (crab words' cue, Decision 5).
+  'blending-cv': 'The sounds make a word!',
+  'sounding-out': 'Tap the letters. Hear the sounds!',
   // Number Garden land 4 (content wave 2 § 2.4, § 6.2; Thomas 2026-10-17).
   'div-share': "Let's share the flowers!",
   // Number Garden land 5 (content wave 3 § 5.1; Thomas approved T2).
@@ -329,9 +334,17 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: none.
+ * Now: real blending's two leads and sounding out's peek and replay lines
+ * (§ 11).
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
+  'guide.session.intro.blending-cv',
+  'guide.session.intro.sounding-out',
+  'guide.session.peek-open.sounding-out',
+  'guide.session.peek-close.sounding-out',
+  'guide.session.replay-open.sounding-out',
+  'guide.session.replay-close.sounding-out',
+]
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 

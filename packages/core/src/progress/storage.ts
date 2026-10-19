@@ -173,6 +173,13 @@ const TREE_PREDECESSOR: ReadonlyMap<SkillNode, SkillNode> = treePredecessors()
  *    downstream guard rejects the blob. We don't want silent
  *    coercion to mask real corruption.
  *
+ *    One exception, real blending's (`design/native/real-blending.md`
+ *    § 9, T4): a stored `'sounding-out': 'locked'` behind a mastered
+ *    `blending-cv` becomes `'mastered'`, as a missing key there does. Only
+ *    a build without the step writes that pair (its tree opens cat words,
+ *    and the key rides along), and `'locked'` there would strand the
+ *    learner: the picker stops on it and the mastery rule never opens it.
+ *
  * 3. Defaulter is a no-op when `skillLevels` is not an object —
  *    `null`, `undefined`, an array, a string. The guard rejects those
  *    cases verbatim; recovering from them would mean fabricating data.
@@ -182,7 +189,8 @@ const TREE_PREDECESSOR: ReadonlyMap<SkillNode, SkillNode> = treePredecessors()
  *    needed, returns the input unchanged.
  *
  * Input is `unknown` because this runs BEFORE `isProgressV1`. We
- * downcast defensively and only touch the `skillLevels` field.
+ * downcast defensively and only touch the `skillLevels` field (and, for
+ * real blending's fill, `unlocksCelebrated`).
  *
  * Exported for `cloudSync.ts:installCloudBlob`, so the local load and the
  * cloud install run this one function, remaps included.
@@ -279,6 +287,29 @@ export function withDefaultedSkillLevels(parsed: unknown): unknown {
       mutated = true
     }
   }
+  // Real blending (design/native/real-blending.md § 9, T4): sounding out
+  // was added behind blending sounds after learners had passed land 2. A
+  // learner with blending sounds mastered and no sounding-out key (or the
+  // older-build 'locked', note 2) has done land 2: 'mastered', not K13's
+  // 'intro', which would pull them back from cat words and beyond. The step
+  // is also marked celebrated, else the Map would play its unlock beat
+  // (pathBeats.ts `pendingUnlock`); a doc with no list gets none, as an
+  // absent list means nothing is pending.
+  let unlocksCelebrated = obj.unlocksCelebrated
+  const soundingOut = withRemap['sounding-out']
+  if (
+    withRemap['blending-cv'] === 'mastered' &&
+    (soundingOut === undefined || soundingOut === 'locked')
+  ) {
+    filled['sounding-out'] = 'mastered'
+    mutated = true
+    if (
+      Array.isArray(unlocksCelebrated) &&
+      !unlocksCelebrated.includes('sounding-out')
+    ) {
+      unlocksCelebrated = [...unlocksCelebrated, 'sounding-out']
+    }
+  }
   // Preserve any additional keys the parsed blob carried (forward
   // compatibility: a step a newer build added keeps its level here, the
   // guard lets it through, and a save hands it back to that build
@@ -290,7 +321,9 @@ export function withDefaultedSkillLevels(parsed: unknown): unknown {
     }
   }
   if (!mutated) return parsed
-  return { ...obj, skillLevels: filled }
+  return unlocksCelebrated === obj.unlocksCelebrated
+    ? { ...obj, skillLevels: filled }
+    : { ...obj, skillLevels: filled, unlocksCelebrated }
 }
 
 /**

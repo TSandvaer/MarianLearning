@@ -48,6 +48,7 @@ export const RECAP_FRIENDLY_NODE_NAMES: Record<string, string> = {
   'letter-names': 'your letters',
   'letter-sounds': 'letter sounds',
   'blending-cv': 'blending sounds',
+  'sounding-out': 'sounding out',
   'cvc-words': 'reading words',
   'cvc-words-short-o': 'reading words',
   'cvc-words-short-u': 'reading words',

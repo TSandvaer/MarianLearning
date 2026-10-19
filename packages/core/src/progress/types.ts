@@ -83,6 +83,8 @@ export type WordSongNode =
   | 'letter-names'
   | 'letter-sounds'
   | 'blending-cv'
+  // Real blending (design/native/real-blending.md § 1): land 2's 2nd stop.
+  | 'sounding-out'
   | 'cvc-words'
   | 'cvc-words-short-o'
   | 'cvc-words-short-u'

@@ -238,6 +238,16 @@ export interface WordSongProblemUtterances {
  *   (chips, scene) and sets `story`, `storyId` and `question`. Native
  *   only: the parser accepts it with `{ littleStories: true }`.
  *
+ * `listen-blend` / `sound-out` — real blending's two stops in land 2
+ *   (`design/native/real-blending.md` § 4, § 8). `listen-blend` (blending
+ *   sounds): the read is "Listen.", Emma says the sounds and the learner
+ *   finds the word's picture. `sound-out` (sounding out): the read is
+ *   "What is it?", the learner taps the letters to hear them and finds the
+ *   picture. Neither read names the word: the target comes from the
+ *   `blend` line ("f - a - n ... fan"), which both types require. The
+ *   picture stays hidden until the answer (`hidesPictureUntilAnswer`).
+ *   Native only: the parser accepts them with `{ blendReads: true }`.
+ *
  * The field is optional on the public type for back-compat: callers that
  * predate the widening (e.g. `STATIC_WORD_SONG_PLANS`) don't set it, and
  * downstream code treats the absence as `blending-cv`. The parser always
@@ -252,6 +262,8 @@ export type WordSongContentType =
   | 'sight-word'
   | 'simple-sentence'
   | 'little-story'
+  | 'listen-blend'
+  | 'sound-out'
 
 /** A single problem in the session. */
 export interface WordSongProblem {

@@ -84,6 +84,8 @@ export const FRIENDLY_NODE_NAMES: Record<SkillNode, string> = {
   'letter-names': 'your letters',
   'letter-sounds': 'letter sounds',
   'blending-cv': 'blending sounds',
+  // Real blending § 1 (T1, Thomas 2026-10-19): the recap names the step.
+  'sounding-out': 'sounding out',
   // Every CVC vowel tier + every digraph tier collapses to "reading words"
   // — Marian hears the activity, not the phonics taxonomy.
   'cvc-words': 'reading words',
@@ -170,6 +172,9 @@ export const STAGE_SPOKEN_NAMES: Record<SkillNode, string> = {
   'letter-names': 'letter names',
   'letter-sounds': 'letter sounds',
   'blending-cv': 'blending sounds',
+  // Real blending § 1 (T1, Thomas 2026-10-19): what teachers and parents
+  // call it ("sound it out"), so a learner can name the strategy.
+  'sounding-out': 'sounding out',
   'cvc-words': 'cat words',
   'cvc-words-short-o': 'dog words',
   'cvc-words-short-u': 'sun words',
@@ -229,6 +234,7 @@ export const STAGE_SPOKEN_NAME_VERBS: Record<SkillNode, 'is' | 'are'> = {
   'letter-names': 'are',
   'letter-sounds': 'are',
   'blending-cv': 'is',
+  'sounding-out': 'is',
   'cvc-words': 'are',
   'cvc-words-short-o': 'are',
   'cvc-words-short-u': 'are',

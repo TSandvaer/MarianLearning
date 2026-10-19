@@ -139,9 +139,23 @@ export function renderElevenLabsBlend(text: string): string | null {
   return `${segments.join(' - ')} ... ${parsed.word}`
 }
 
+/**
+ * Canon texts sent to Lily as another input, by exact text; the caption
+ * stays the text. Canon lines have no input field, so the map lives here,
+ * where the bake, the splices' audio index and the server's canon index
+ * all key (real blending § 11). "Listen." is a one-word line, and one word
+ * alone reads as an abbreviation ("Sat." came back as "Saturday", #607):
+ * it goes as "Listen,". No shipped text is in the map, so nothing already
+ * rendered re-renders.
+ */
+export const CANON_TEXT_INPUTS: Readonly<Record<string, string>> = {
+  'Listen.': 'Listen,',
+}
+
 /** Text sent to ElevenLabs for one utterance. Plain text plus inline IPA;
  *  never SSML (`eleven_v4` does not support SSML break tags). */
 export function renderElevenLabsText(text: string, tier?: string): string {
+  if (Object.hasOwn(CANON_TEXT_INPUTS, text)) return CANON_TEXT_INPUTS[text]!
   if (tier === 'simple-sentences') return substituteSentenceGap(text, tier)
   const blend = renderElevenLabsBlend(text)
   if (blend !== null) return blend

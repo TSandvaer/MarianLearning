@@ -61,6 +61,7 @@ import {
 } from './wordSessionPlans'
 import type { SkillNode } from '../progress/types'
 import { bigWordRowOf } from './bigWordsSteps'
+import { blendSpellsItsWord, blendTargetWord } from './blendHighlight'
 import { littleStoryForText } from './littleStories'
 import {
   SIMPLE_SENTENCE_TARGET_SET,
@@ -375,6 +376,59 @@ function parseLittleStoryProblem(
   }
 }
 
+/**
+ * Real blending's two reads (`design/native/real-blending.md` § 8), matched
+ * as exact strings. Neither names the word, so the target comes from the
+ * problem's `blend` line. A second language adds its own pair.
+ */
+export const LISTEN_BLEND_READ = 'Listen.'
+export const SOUND_OUT_READ = 'What is it?'
+
+const BLEND_READ_TYPES: ReadonlyMap<string, WordSongContentType> = new Map([
+  [LISTEN_BLEND_READ, 'listen-blend'],
+  [SOUND_OUT_READ, 'sound-out'],
+])
+
+/**
+ * A `'listen-blend'` or `'sound-out'` problem: the target is the word the
+ * `blend` line ends on, which must be a target word spelled by the line's
+ * graphemes. A missing blend, "c - a - t ... hat" or a word that is not a
+ * target rejects the plan (the session falls back).
+ */
+function parseBlendReadProblem(
+  index: number,
+  utterances: WordSongProblemUtterances,
+  contentType: WordSongContentType,
+): WordSongProblem {
+  const blend = utterances.blend
+  if (blend === undefined) {
+    throw new PlanFromServerError(
+      `word-song ${contentType} problem ${index} has no blend line`,
+    )
+  }
+  const word = blendTargetWord(blend)?.toLowerCase()
+  if (word === undefined || !TARGET_WORD_SET.has(word)) {
+    throw new PlanFromServerError(
+      `word-song ${contentType} blend "${blend}" does not end on a target word`,
+    )
+  }
+  if (!blendSpellsItsWord(blend)) {
+    throw new PlanFromServerError(
+      `word-song ${contentType} blend "${blend}" does not spell "${word}"`,
+    )
+  }
+  let target: WordEntry
+  try {
+    target = getWordEntry(word)
+  } catch (err) {
+    throw new PlanFromServerError(
+      `word-song ${contentType} wordPack lookup failed for "${word}": ` +
+        `${err instanceof Error ? err.message : String(err)}`,
+    )
+  }
+  return { index, target, utterances, contentType }
+}
+
 /** Does a read line carry the `Finish the sentence:` discriminant? Used at
  *  the assembly level to route to the simple-sentence path before the
  *  generic `parseReadLine`. */
@@ -423,6 +477,13 @@ export interface WordSongPlanFromServerOptions {
    * silent static plan (wave 1 § 1.9's rule).
    */
   readonly littleStories?: boolean
+  /**
+   * Accept real blending's two reads, "Listen." (`'listen-blend'`) and
+   * "What is it?" (`'sound-out'`), `design/native/real-blending.md` § 8.
+   * Native only, as `littleStories`. They are checked before the little
+   * stories: "What is it?" also matches a story question.
+   */
+  readonly blendReads?: boolean
   /**
    * The step the problems come from: one step for the whole plan (a
    * forward session, a peek, a replay), or one per problem in order (a
@@ -508,6 +569,16 @@ function problemFromBucket(
   }
   const utterances = bucket as WordSongProblemUtterances
 
+  // Real blending's exact reads go first: "What is it?" is also a story
+  // question, and the story branch would reject it (§ 8, K1).
+  const blendReadType =
+    options?.blendReads === true
+      ? BLEND_READ_TYPES.get(utterances.read)
+      : undefined
+  if (blendReadType !== undefined) {
+    return parseBlendReadProblem(index, utterances, blendReadType)
+  }
+
   // Simple-sentence tier (Wave 13) breaks the read-only target pattern:
   // the read gaps the answer, so the target comes from `correct` and the
   // frame + sceneId are derived from the read. Route to the dedicated
@@ -570,7 +641,10 @@ export interface WordSongWarmupProblem {
  */
 export function wordSongWarmupFromServer(
   serverPlan: unknown,
-  options?: Pick<WordSongPlanFromServerOptions, 'littleStories' | 'step'>,
+  options?: Pick<
+    WordSongPlanFromServerOptions,
+    'littleStories' | 'blendReads' | 'step'
+  >,
 ): WordSongWarmupProblem[] {
   if (!isServerPlan(serverPlan)) return []
   const byBlock = new Map<number, Partial<WordSongProblemUtterances>>()

@@ -4,7 +4,9 @@
  *
  * Line list = `BAKED_PATH_LINES` in src/lib/emmasPath/pathLines.ts (lines
  * whose kind is not deferred), written to each line's `src` under
- * public/assets/audio/path/. Same request + cache shape as
+ * public/assets/audio/path/. A line's `input`, when it has one, is what is
+ * sent (the "; then this!" takes, content wave 5 § 9.1); else its text.
+ * Same request + cache shape as
  * revoiceCanonLily.ts (no tier, cache key `lily|eleven_v4|<text>` in
  * tmp/revoice-cache/), de-duplicated on text, with at most 2 requests in
  * flight so another job can keep one of the Starter plan's 3 slots. 429s
@@ -82,11 +84,12 @@ async function main() {
   })
   for (const t of RETAKES) rmSync(cachePath(t), { force: true })
 
-  const texts = [...new Set(BAKED_PATH_LINES.map((l) => l.text))]
+  const inputOf = (l: (typeof BAKED_PATH_LINES)[number]) => l.input ?? l.text
+  const texts = [...new Set(BAKED_PATH_LINES.map(inputOf))]
   const todo = texts.filter((t) => !existsSync(cachePath(t)))
   const chars = todo.reduce((n, t) => n + t.length, 0)
   console.log(
-    `${BAKED_PATH_LINES.length} path lines, ${texts.length} unique texts; ` +
+    `${BAKED_PATH_LINES.length} path lines, ${texts.length} unique inputs; ` +
       `${todo.length} not cached (~${chars} characters to bill).`,
   )
   if (DRY) return
@@ -105,10 +108,11 @@ async function main() {
 
   const written = new Set<string>()
   const long: string[] = []
-  for (const { id, text, src } of BAKED_PATH_LINES) {
+  for (const line of BAKED_PATH_LINES) {
+    const { id, text, src } = line
     const out = join(ROOT, 'public', src)
     if (!written.has(src)) {
-      writeFileSync(out, await render(text))
+      writeFileSync(out, await render(inputOf(line)))
       written.add(src)
     }
     const s = durationSeconds(out)
