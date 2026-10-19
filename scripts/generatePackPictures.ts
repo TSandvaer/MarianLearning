@@ -16,6 +16,12 @@
  *   then: yarn embed-pictures design/references/picture-pack/transparent-<tier> public/assets/pictures
  *         (cd mobile && npm run export-assets)
  *
+ * Learner avatars (learner-profiles.md § 9), the pack flow on their own
+ * manifest; a pick writes the app's file (the web never shows avatars):
+ *   npx tsx scripts/generatePackPictures.ts --manifest design/native/avatar-manifest.json --pick avatar-fox=v1
+ *     → mobile/assets/avatars/avatar-fox.webp (500x500, transparent)
+ *   then: (cd mobile && npm run export-assets)
+ *
  * Little-story scenes (content-wave-3.md § 6), the same flow with --scenes:
  *   npx tsx scripts/generatePackPictures.ts --scenes --dry-run    (all 24)
  *   npx tsx scripts/generatePackPictures.ts --scenes --batch 1 --budget 3.3
@@ -82,6 +88,7 @@ import {
   currentPictureRelPath,
   estimateCallCost,
   formatUsd,
+  isAvatarDest,
   ledgerLine,
   parseCli,
   parseManifest,
@@ -748,13 +755,15 @@ export async function runGenerate(
   }
 }
 
-/** export-assets.mjs encodes the app's WebPs at q 85. */
+/** export-assets.mjs encodes the app's WebPs at q 85 (alpha q 90). */
 const SCENE_WEBP = { quality: 85 }
+const AVATAR_WEBP = { quality: 85, alphaQuality: 90 }
 
 /**
  * Writes the chosen variants into the embed pipeline at the pack's size:
- * 1024x1024 → 500x500 transparent PNG (PACK_PICTURE_PX). Scenes go straight
- * to the app as opaque 600x600 WebPs (SCENE_PICTURE_PX). Every pick is
+ * 1024x1024 → 500x500 transparent PNG (PACK_PICTURE_PX). Avatars go straight
+ * to the app as 500x500 transparent WebPs, scenes as opaque 600x600 WebPs
+ * (SCENE_PICTURE_PX). Every pick is
  * decoded and resized in memory first, so one bad file means nothing is
  * written.
  */
@@ -784,14 +793,15 @@ export async function runPick(
             .webp(SCENE_WEBP)
             .toBuffer()
         }
-        return await sharp(join(root, c.src))
+        const contained = sharp(join(root, c.src))
           .resize(px, px, {
             fit: 'contain',
             background: { r: 0, g: 0, b: 0, alpha: 0 },
           })
           .ensureAlpha()
-          .png()
-          .toBuffer()
+        return await (
+          isAvatarDest(c.dest) ? contained.webp(AVATAR_WEBP) : contained.png()
+        ).toBuffer()
       } catch (err) {
         throw new Error(
           `Could not read ${c.src} (nothing copied): ${(err as Error).message}`,
@@ -813,11 +823,19 @@ export async function runPick(
     log(`Next: commit ${PATHS.scenes}/story-*.webp (export-assets keeps them).`)
     return { copied: cmd.dryRun ? 0 : plan.length }
   }
-  const tiers = [...new Set(plan.map((c) => dirname(c.dest)))]
-  log('Next, per tier:')
+  const tiers = [
+    ...new Set(
+      plan.filter((c) => !isAvatarDest(c.dest)).map((c) => dirname(c.dest)),
+    ),
+  ]
+  log(tiers.length > 0 ? 'Next, per tier:' : 'Next:')
   for (const t of tiers)
     log(`  yarn embed-pictures ${t} public/assets/pictures`)
   log('  (cd mobile && npm run export-assets)')
+  if (plan.some((c) => isAvatarDest(c.dest)))
+    log(
+      `  then commit ${PATHS.avatars}/avatar-*.webp (export-assets registers them).`,
+    )
   return { copied: cmd.dryRun ? 0 : plan.length }
 }
 

@@ -41,7 +41,13 @@ export const PATHS = {
   sceneLedger:
     'design/references/picture-pack/openai/scenes/spend-ledger.jsonl',
   scenes: 'mobile/assets/scenes',
+  // The learner avatars (learner-profiles.md § 9): native only, since the web
+  // stays single-learner (§ 4.4), so a pick goes straight to the app.
+  avatars: 'mobile/assets/avatars',
 } as const
+
+/** The avatar rows' tier (design/native/avatar-manifest.json). */
+export const AVATAR_TIER = 'avatars'
 
 /** A row's look: the pack's picture-book style, or the Hub's clay
  *  (quality bar 13), e.g. the learner avatars (learner-profiles.md § 9). */
@@ -88,9 +94,21 @@ export function currentPictureRelPath(word: string): string {
   return `${PATHS.currentPictures}/${word}.webp`
 }
 
-/** Destination the existing embed pipeline reads (scripts/embed-pictures.ts). */
+/** Destination the existing embed pipeline reads (scripts/embed-pictures.ts);
+ *  an avatar's is the app's own file (avatarDestRelPath). */
 export function pickDestRelPath(tier: string, word: string): string {
+  if (tier === AVATAR_TIER) return avatarDestRelPath(word)
   return `${PATHS.packRoot}/transparent-${tier}/picture-${word}.png`
+}
+
+/** A picked avatar: a transparent WebP at the pack size, which
+ *  mobile/scripts/export-assets.mjs registers as `/native/avatars/<file>`. */
+export function avatarDestRelPath(word: string): string {
+  return `${PATHS.avatars}/${word}.webp`
+}
+
+export function isAvatarDest(dest: string): boolean {
+  return dest.startsWith(`${PATHS.avatars}/`)
 }
 
 /** Pack picture size: every shipped pack PNG-in-SVG embeds a 500x500 PNG,
@@ -636,8 +654,8 @@ function lookUpPicks<T>(
 }
 
 /** Maps picks to repo-relative copies: openai/batch-N/<word>__vK.png →
- *  transparent-<tier>/picture-<word>.png. Throws on words not in the
- *  manifest. */
+ *  transparent-<tier>/picture-<word>.png (an avatar: mobile/assets/avatars/
+ *  <word>.webp). Throws on words not in the manifest. */
 export function planPicks(
   picks: PickRequest[],
   manifest: PictureManifestEntry[],

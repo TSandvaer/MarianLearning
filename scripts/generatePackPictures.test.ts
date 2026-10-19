@@ -530,6 +530,53 @@ describe('runPick', () => {
     )
   })
 
+  it("writes an avatar pick as the app's transparent 500x500 WebP, with no embed step", async () => {
+    const manifest = 'avatar-manifest.json'
+    writeFileSync(
+      join(root, manifest),
+      JSON.stringify([
+        {
+          word: 'avatar-fox',
+          tier: 'avatars',
+          batch: 15,
+          style: 'clay',
+          subject: 'A chubby baby fox sitting.',
+          avoid: [],
+          distinctFrom: [],
+        },
+      ]),
+    )
+    mkdirSync(join(root, PATHS.outRoot, 'batch-15'), { recursive: true })
+    await sharp({
+      create: {
+        width: 1024,
+        height: 1024,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
+    })
+      .png()
+      .toFile(variant(15, 'avatar-fox__v2.png'))
+    const cmd = parseCli(['--pick', 'avatar-fox=v2', '--manifest', manifest])
+    if (cmd.mode !== 'pick') throw new Error('expected pick')
+    const r = await runPick(cmd, { root, log: (l) => logs.push(l) })
+    expect(r.copied).toBe(1)
+    const meta = await sharp(
+      join(root, PATHS.avatars, 'avatar-fox.webp'),
+    ).metadata()
+    expect([meta.width, meta.height, meta.format, meta.hasAlpha]).toEqual([
+      500,
+      500,
+      'webp',
+      true,
+    ])
+    expect(logs[0]).toBe(
+      `write ${PATHS.outRoot}/batch-15/avatar-fox__v2.png → mobile/assets/avatars/avatar-fox.webp (500x500)`,
+    )
+    expect(logs.some((l) => l.includes('embed-pictures'))).toBe(false)
+    expect(logs).toContain('  (cd mobile && npm run export-assets)')
+  })
+
   it('copies nothing when any picked variant is missing', async () => {
     await expect(
       runPick(pick('cat=v2,hat=v1'), { root, log: () => {} }),

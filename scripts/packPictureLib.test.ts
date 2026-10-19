@@ -22,6 +22,7 @@ import {
   classifyApiError,
   costFromUsage,
   estimateCallCost,
+  isAvatarDest,
   isBillingError,
   ledgerLine,
   parseCli,
@@ -753,6 +754,24 @@ describe('the avatar manifest (learner-profiles.md § 9, T2)', () => {
       expect(e.avoid).toContain('anything red')
       expect(e.distinctFrom).toHaveLength(7)
     }
+  })
+
+  it("picks straight into the app's avatar files, not the embed staging", () => {
+    const picks = planPicks(
+      parsePickArg(avatars.map((e) => `${e.word}=v1`).join(',')),
+      avatars,
+    )
+    expect(picks.map((c) => c.dest)).toEqual(
+      AVATAR_IDS.map((id) => `mobile/assets/avatars/avatar-${id}.webp`),
+    )
+    expect(picks.map((c) => isAvatarDest(c.dest))).toEqual(
+      AVATAR_IDS.map(() => true),
+    )
+    expect(picks[0].src).toBe(
+      'design/references/picture-pack/openai/batch-15/avatar-fox__v1.png',
+    )
+    const [packPick] = planPicks(parsePickArg('cat=v1'), pack)
+    expect(isAvatarDest(packPick.dest)).toBe(false)
   })
 
   it('shares no batch or key with the word pack', () => {
