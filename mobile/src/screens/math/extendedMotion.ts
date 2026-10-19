@@ -1,6 +1,6 @@
 /**
  * The motion beats of the extended Math visuals (`SkipTrack`, `GroupsRow`,
- * `NumberStrip`), spec `design/native/math-skip-counting-multiplication-native.md`
+ * `NumberStrip`, and the lift-out of `PlaceValueStage` and `TakeAwayRow`), spec `design/native/math-skip-counting-multiplication-native.md`
  * § 7. Reduce Motion: no scaling anywhere; fades only.
  */
 import { useEffect, useLayoutEffect, useRef } from 'react'
@@ -28,6 +28,19 @@ export const SPRING = { stiffness: 260, damping: 20, mass: 1 }
 
 export const EASE_IN_OUT = Easing.bezier(0.42, 0, 0.58, 1)
 export const EASE_OUT = Easing.bezier(0, 0, 0.58, 1)
+
+/** More and less's lift-out (content wave 4 § 2.5), shared with the
+ *  take-away picture: a lifted block or flower fades over 250 ms, 150 on a
+ *  fast right tap, and over 200 ms with no rise on Reduce Motion. */
+export const LIFT_MS = 250
+export const LIFT_FAST_MS = 150
+export const LIFT_REDUCED_MS = 200
+
+/** A lift-out's fade for `mode` (an instant one has none). */
+export function liftMs(mode: 'normal' | 'fast', reducedMotion: boolean) {
+  if (reducedMotion) return LIFT_REDUCED_MS
+  return mode === 'fast' ? LIFT_FAST_MS : LIFT_MS
+}
 
 /** Run `onRise` when `value` goes from falsy to truthy, or a number grows;
  *  never on mount. */

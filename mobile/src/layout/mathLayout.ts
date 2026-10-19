@@ -568,6 +568,84 @@ export function countingMetrics(
   }
 }
 
+// ── The take-away picture ─────────────────────────────────────────────────
+//
+// `design/native/take-away-picture.md` § 2; `takeAwayLayout.test.ts` pins
+// its table.
+
+/** The flash's ten-frame border (`glyphs.tsx` `CELL_BORDER`). */
+export const TAKE_AWAY_BORDER = '#F48FB1'
+
+export interface TakeAwayMetrics {
+  /** The step's frames: one (sub-to-10) or the ten and the ones. */
+  frames: 1 | 2
+  /** One flower glyph. */
+  flower: number
+  /** Between flowers, and from a flower to the frame's edge. */
+  gap: number
+  /** Between the two frames. */
+  between: number
+  frameWidth: number
+  frameHeight: number
+  /** The step's whole row (both frames for sub-to-20). */
+  width: number
+  height: number
+  /** The card's border and corner radius. */
+  border: number
+  radius: number
+  /** A lifted flower's copy rises this far as it fades. */
+  liftRise: number
+  /** Slot `k`'s centre in its frame (1 = top-left, reading order). */
+  slotCentre: (k: number) => { x: number; y: number }
+}
+
+/**
+ * The ten-frame(s) of a take-away problem on `step` in `width` (§ 2): cell
+ * pitch c = min(f₀ + g, ⌊(slot − g) / 2⌋, the width cap), flower f = c − g,
+ * a frame 5c + g by 2c + g. f₀ is 24 pt (sub-to-10) or 20 (sub-to-20) on a
+ * phone, 48 or 40 on a tablet, where the row takes the frame's height.
+ */
+export function takeAwayMetrics(
+  layout: Pick<MathLayout, 'counting' | 'visualSlot' | 'form'>,
+  step: 'sub-to-10' | 'sub-to-20',
+  width: number,
+): TakeAwayMetrics {
+  const tablet = layout.counting === 'tablet'
+  const landscape = layout.form === 'phone-landscape'
+  const frames = step === 'sub-to-20' ? 2 : 1
+  const gap = landscape ? 6 : 8
+  const between = tablet ? 32 : 24
+  const f0 = tablet ? (frames === 1 ? 48 : 40) : frames === 1 ? 24 : 20
+  const slotCap =
+    layout.visualSlot === null
+      ? Infinity
+      : Math.floor((layout.visualSlot - gap) / 2)
+  const widthCap =
+    frames === 1
+      ? Math.floor((width - gap) / 5)
+      : Math.floor((width - between - 2 * gap) / 10)
+  const pitch = Math.min(f0 + gap, slotCap, widthCap)
+  const frameWidth = 5 * pitch + gap
+  const frameHeight = 2 * pitch + gap
+  return {
+    frames,
+    flower: pitch - gap,
+    gap,
+    between,
+    frameWidth,
+    frameHeight,
+    width: frames === 1 ? frameWidth : 2 * frameWidth + between,
+    height: frameHeight,
+    border: tablet ? 3 : 2,
+    radius: Math.round(0.27 * frameHeight),
+    liftRise: tablet ? 32 : landscape ? 16 : 24,
+    slotCentre: (k) => ({
+      x: gap / 2 + (((k - 1) % 5) + 0.5) * pitch,
+      y: gap / 2 + ((k <= 5 ? 0 : 1) + 0.5) * pitch,
+    }),
+  }
+}
+
 // ── Number Garden 1 and 8–11 (number recognition, skip counting,
 //    multiplication) ────────────────────────────────────────────────────
 //

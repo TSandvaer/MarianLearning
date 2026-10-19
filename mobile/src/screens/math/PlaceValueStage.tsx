@@ -85,6 +85,7 @@ import {
 import { colors, fonts } from '../../theme'
 import {
   EASE_OUT,
+  liftMs,
   STAGGER_MS,
   useFade,
   useOnRise,
@@ -111,10 +112,8 @@ const FAST_SPRING = { stiffness: 300, damping: 22, mass: 1 }
 export const ADDED_PILL_HOLD_MS = 600
 /** About when a dropped block has landed (the spring settles later). */
 const LAND_MS = 300
-/** More and less's lift-out (§ 2.5): the fade, on a fast right tap, and
- *  Reduce Motion's fade (no rise); a drop-in's Reduce Motion crossfade. */
-const LIFT_MS = 250
-const LIFT_FAST_MS = 150
+/** A drop-in's Reduce Motion crossfade (the lift-out's fades are
+ *  `extendedMotion`'s, shared with the take-away picture). */
 const CHANGE_REDUCED_MS = 200
 /** Tags fill this far apart (sharing's), left to right. */
 export const PV_TAG_FILL_STAGGER_MS = 80
@@ -562,12 +561,10 @@ function Block({
       opacity.set(0)
       return
     }
-    const ms = leave.reducedMotion
-      ? CHANGE_REDUCED_MS
-      : leave.mode === 'fast'
-        ? LIFT_FAST_MS
-        : LIFT_MS
-    const timing = { duration: ms, easing: EASE_OUT }
+    const timing = {
+      duration: liftMs(leave.mode, leave.reducedMotion),
+      easing: EASE_OUT,
+    }
     opacity.set(withDelay(leave.delay, withTiming(0, timing)))
     if (!leave.reducedMotion)
       y.set(withDelay(leave.delay, withTiming(-leave.rise, timing)))
