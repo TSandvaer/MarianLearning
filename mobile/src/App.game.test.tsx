@@ -6,6 +6,11 @@
  * history are byte-identical, stardust is unchanged, nothing reaches the
  * network and no Session End mounts. Back mid-line, Back mid-hop and a trip
  * to the background keep all of that.
+ *
+ * The game's lines play their bundled clips on the fake expo-audio players,
+ * and the test starts and ends each one (`finishGameLine`, as App.peek's
+ * `finishGuideLine`). Left alone, a fake clip never starts: every line
+ * would sit out the 5 s start timeout and walk its caption instead.
  */
 import { STORAGE_KEY } from '@marian/core/progress'
 import { SESSION_HISTORY_KEY } from '@marian/core/sessionEnd/sessionHistory'
@@ -13,9 +18,9 @@ import { loadStardust } from '@marian/core/shared/stardust'
 import { WARM_CAP_MS } from '@marian/core/splash/splashTiming'
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
 import { AppState } from 'react-native'
-import { flush, resetFakePlayers } from '../test/fakeAudio'
+import { fakePlayers, flush, resetFakePlayers } from '../test/fakeAudio'
 import App from './App'
-import { sessionPrefetcher } from './audio'
+import { audioEngine, sessionPrefetcher } from './audio'
 import { resetLaunchReconcileForTests } from './lifecycle/launchReconcile'
 import { bootNative, type SyncKeyValueBackend } from './platform/native'
 import { resetHubAudioForTests } from './screens/hub/hubAudio'
@@ -100,9 +105,41 @@ async function settle(total: number) {
   }
 }
 
-/** Settle until `cond` holds (at most `maxMs`). */
+/** The game's line on Emma's voice channel now (`game:<line id>`), or null. */
+const gameLine = () => {
+  const label = audioEngine.voice.activeLabel
+  return label?.startsWith('game:') ? label : null
+}
+
+/**
+ * The game's line in flight plays its bundled clip: start it, and end it
+ * unless `andEnd` is false. The newest playing player: the game's sfx
+ * players were made at mount, before any line's.
+ */
+async function finishGameLine(andEnd = true): Promise<void> {
+  if (gameLine() === null) return
+  const p = [...fakePlayers]
+    .reverse()
+    .find(
+      (f) => f.calls.at(-1) === 'play' && !f.released && f.listenerCount > 0,
+    )
+  if (!p) return
+  await act(async () => {
+    p.start(1.5)
+    if (andEnd) p.finish()
+    await flush()
+  })
+}
+
+/**
+ * Settle until `cond` holds (at most `maxMs`), each game line playing
+ * through as soon as it starts.
+ */
 async function until(cond: () => boolean, maxMs = 20_000) {
-  for (let t = 0; t < maxMs && !cond(); t += 100) await settle(100)
+  for (let t = 0; t < maxMs && !cond(); t += 100) {
+    await finishGameLine()
+    await settle(100)
+  }
   expect(cond()).toBe(true)
 }
 
@@ -199,11 +236,14 @@ it('N6: Back at bed 3 during a line returns to the quiet Map at once, writing no
   const before = snapshot()
   await openGame()
   await playBeds(2)
-  // Bed 3's ask is walking its caption: Back mid-line.
-  await until(chipsOpen)
+  // Bed 3's ask is playing (its clip started, the chips open): Back mid-line.
+  await until(() => gameLine()?.startsWith('game:guide.game.bed.ask.') ?? false)
+  await finishGameLine(false)
+  expect(chipsOpen()).toBe(true)
   await fireEvent.press(screen.getByTestId('game-back-to-hub'))
   await settle(300)
   expect(onQuietMap()).toBe(true)
+  expect(gameLine()).toBeNull()
   await settle(5000)
   expect(onQuietMap()).toBe(true)
   expect(snapshot()).toEqual(before)
