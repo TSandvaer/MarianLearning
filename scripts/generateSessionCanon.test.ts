@@ -41,7 +41,7 @@ import {
  */
 
 describe('activeCombos — coverage matches the curriculum', () => {
-  it('produces 37 combos: 14 math nodes × level 1 + 23 word-song nodes × level 1 (mult-mix spliced; duck-words + crab-words, content wave 1; div-share, tent-words + cake-words spliced, content wave 2; the three story steps and hundreds spliced, content wave 3; bee-words, car-words and sheep-stories spliced, content wave 4)', () => {
+  it('produces 38 combos: 15 math nodes × level 1 + 23 word-song nodes × level 1 (mult-mix spliced; duck-words + crab-words, content wave 1; div-share, tent-words + cake-words spliced, content wave 2; the three story steps and hundreds spliced, content wave 3; hundreds-addsub, bee-words, car-words and sheep-stories spliced, content wave 4)', () => {
     // Step 2 of the planner-parser contract added cvc-words alongside
     // blending-cv as a first-class word-song content mode. Ticket
     // 86c9m3ae3 added `cvc-words-short-o` as the next-vowel sibling
@@ -85,14 +85,16 @@ describe('activeCombos — coverage matches the curriculum', () => {
     // `cake-words` (land 6; § 3–§ 4), all written by splices. Content wave
     // 3 added `fox-stories`, `hen-stories` and `bug-stories` (land 7;
     // design/native/content-wave-3.md § 4) and `hundreds` (land 5; § 3),
-    // written by a splice. Content wave 4 added `bee-words`, `car-words`
-    // and `sheep-stories` (land 8; design/native/content-wave-4.md § 3,
-    // § 4, § 6), written by scripts/spliceContentWave4Canon.ts.
+    // written by a splice. Content wave 4 added `hundreds-addsub` (more
+    // and less, land 5; design/native/content-wave-4.md § 2.7), written by
+    // a splice, and `bee-words`, `car-words` and `sheep-stories` (land 8;
+    // design/native/content-wave-4.md § 3, § 4, § 6), written by
+    // scripts/spliceContentWave4Canon.ts.
     const combos = activeCombos()
-    expect(combos).toHaveLength(37)
+    expect(combos).toHaveLength(38)
     const mathCount = combos.filter((c) => c.track === 'math').length
     const wordSongCount = combos.filter((c) => c.track === 'word-song').length
-    expect(mathCount).toBe(14)
+    expect(mathCount).toBe(15)
     expect(wordSongCount).toBe(23)
   })
 

@@ -40,29 +40,30 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'session-review': 1,
       'session-warmup': 1,
       'session-knew': 1,
-      'session-peek-open': 35,
-      'session-peek-close': 35,
-      // Content wave 4: bee, car (duck words' text) and sheep stories.
-      'session-intro': 13,
+      'session-peek-open': 36,
+      'session-peek-close': 36,
+      // Content wave 4: more and less; bee, car (duck words' text) and sheep
+      // stories.
+      'session-intro': 14,
       'session-hiding': 1,
-      'session-replay-open': 37,
-      'session-replay-close': 37,
+      'session-replay-open': 38,
+      'session-replay-close': 38,
       // Content wave 3 § 5.1: "Read the story." and the 54 word clips;
       // content wave 4 § 8.1: 17 more.
       'story-read': 1,
       'story-word': 71,
     })
-    expect(GUIDANCE_LINES).toHaveLength(253)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(253)
+    expect(GUIDANCE_LINES).toHaveLength(258)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(258)
     // Bee and car words' leads are duck words' text (content wave 4 § 11):
     // three ids, one text, three files.
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(251)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(253)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(256)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(258)
   })
 
   it('AC8: both replay sets, one line per STAGE_SPOKEN_NAMES step, with the exact texts (map-tap-to-play § 6, T1 approved 2026-10-17)', () => {
     const steps = Object.keys(STAGE_SPOKEN_NAMES) as SkillNode[]
-    expect(steps).toHaveLength(37)
+    expect(steps).toHaveLength(38)
     expect([...MATH_TREE, ...LITERACY_TREE].sort()).toEqual([...steps].sort())
     for (const node of steps) {
       const name = STAGE_SPOKEN_NAMES[node]
@@ -93,10 +94,10 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     )
     const chars = (ls: typeof open) => ls.reduce((n, l) => n + l.text.length, 0)
     // Content wave 3 adds the story steps' 3 × 29 and 3 × 21, and
-    // hundreds' 26 and 18. Content wave 4 adds bee, car and sheep's 27, 27,
-    // 31 and 19, 19, 23 (§ 8.1).
-    expect(chars(open)).toBe(1114)
-    expect(chars(close)).toBe(818)
+    // hundreds' 26 and 18; content wave 4 more and less's 31 and 23, and
+    // bee, car and sheep's 27, 27, 31 and 19, 19, 23 (§ 8.1).
+    expect(chars(open)).toBe(1145)
+    expect(chars(close)).toBe(841)
     expect(guidanceLine('guide.session.replay-close.number-recog')?.text).toBe(
       'You know numbers!',
     )
@@ -105,7 +106,8 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     )
     expect(Math.max(...[...open, ...close].map((l) => l.text.length))).toBe(45)
     // Rendered in Lily, the story steps' 6 and hundreds' pair too (content
-    // wave 3 § 5.1), and content wave 4's land-8 6 (§ 8.1).
+    // wave 3 § 5.1), more and less's pair and content wave 4's land-8 6
+    // (§ 8.1).
     expect(
       [...open, ...close].filter((l) =>
         GUIDANCE_LINES_AWAITING_RENDER.includes(l.id),
@@ -324,6 +326,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'hen-stories',
       'bug-stories',
       'hundreds',
+      'hundreds-addsub',
       'bee-words',
       'car-words',
       'sheep-stories',
@@ -359,7 +362,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(253)
+    ).toHaveLength(258)
   })
 
   it('repeats no Emma’s Path line', () => {

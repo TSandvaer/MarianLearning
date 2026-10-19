@@ -622,7 +622,7 @@
         'other',
       ]
 
-      // Canon files — 14 math + 24 word-song. Iterated in alphabetical
+      // Canon files — 15 math + 24 word-song. Iterated in alphabetical
       // (group, file-stem) order so the dedup canonical-member choice is
       // deterministic across runs. A stem whose file is not baked yet
       // (404) is skipped with a console note, so a new step can be listed
@@ -636,16 +636,18 @@
       // (sharing) adds 16 with its Lily render (#587), tent-words +
       // cake-words add 64 with theirs (#589), content wave 3's three story
       // files add 85 with theirs (#599), hundreds adds 32 with its (#603),
-      // and content wave 4's bee-words + car-words + sheep-stories add 88
-      // with theirs (#607). A line awaiting its render (empty audio) is not
+      // and content wave 4's hundreds-addsub (more and less) adds 39 with
+      // its (#608) and bee-words + car-words + sheep-stories add 88 with
+      // theirs (#607). A line awaiting its render (empty audio) is not
       // counted.
-      const EXPECTED_CANON_UNIQUE = 1142
+      const EXPECTED_CANON_UNIQUE = 1181
       const CANON_FILES = [
         // math/level-1
         ['math', 'add-to-10'],
         ['math', 'add-to-20'],
         ['math', 'div-share'],
         ['math', 'hundreds'],
+        ['math', 'hundreds-addsub'],
         ['math', 'mult-2-5-10'],
         ['math', 'mult-3-4'],
         ['math', 'mult-6-9'],
@@ -792,6 +794,10 @@
               'path-open-hundreds.mp3',
               'Here is your path! You are on hundreds.',
             ],
+            [
+              'path-open-hundreds-addsub.mp3',
+              'Here is your path! You are on more and less.',
+            ],
             ['path-open-done.mp3', 'You did all of it! Look at your flowers!'],
             [
               'path-open-letter-names.mp3',
@@ -904,6 +910,7 @@
             ['path-stop-mult-mix.mp3', 'All the groups.'],
             ['path-stop-div-share.mp3', 'Sharing.'],
             ['path-stop-hundreds.mp3', 'Hundreds.'],
+            ['path-stop-hundreds-addsub.mp3', 'More and less.'],
             ['path-stop-letter-names.mp3', 'Letter names.'],
             ['path-stop-letter-sounds.mp3', 'Letter sounds.'],
             ['path-stop-blending-cv.mp3', 'Blending sounds.'],
@@ -1001,6 +1008,10 @@
             [
               'path-locked-next-hundreds.mp3',
               'Hundreds! First, sharing. Then this!',
+            ],
+            [
+              'path-locked-next-hundreds-addsub.mp3',
+              'More and less! First, hundreds. Then this!',
             ],
             [
               'path-locked-next-letter-sounds.mp3',
@@ -1134,6 +1145,10 @@
             ['end-bud-div-share.mp3', 'Look! A new flower for sharing!'],
             ['end-bud-hundreds.mp3', 'Look! A new flower for hundreds!'],
             [
+              'end-bud-hundreds-addsub.mp3',
+              'Look! A new flower for more and less!',
+            ],
+            [
               'end-bud-letter-names.mp3',
               'Look! A new flower for letter names!',
             ],
@@ -1242,6 +1257,10 @@
             [
               'end-unlock-hundreds.mp3',
               'You learned sharing! Now you can do hundreds!',
+            ],
+            [
+              'end-unlock-hundreds-addsub.mp3',
+              'You learned hundreds! Now you can do more and less!',
             ],
             [
               'end-unlock-letter-sounds.mp3',
@@ -1472,6 +1491,10 @@
         ['guide-session-peek-open-div-share.mp3', "Let's look at sharing!"],
         ['guide-session-peek-open-hundreds.mp3', "Let's look at hundreds!"],
         [
+          'guide-session-peek-open-hundreds-addsub.mp3',
+          "Let's look at more and less!",
+        ],
+        [
           'guide-session-peek-open-letter-sounds.mp3',
           "Let's look at letter sounds!",
         ],
@@ -1591,6 +1614,10 @@
           'Hundreds are for later. You will learn it!',
         ],
         [
+          'guide-session-peek-close-hundreds-addsub.mp3',
+          'More and less are for later. You will learn it!',
+        ],
+        [
           'guide-session-peek-close-letter-sounds.mp3',
           'Letter sounds are for later. You will learn it!',
         ],
@@ -1697,6 +1724,7 @@
         ['guide-session-intro-mult-mix.mp3', "Let's play all the groups!"],
         ['guide-session-intro-div-share.mp3', "Let's share the flowers!"],
         ['guide-session-intro-hundreds.mp3', 'Hundreds, tens and ones!'],
+        ['guide-session-intro-hundreds-addsub.mp3', 'More and less!'],
         ['guide-session-hiding.mp3', 'Some flowers are hiding!'],
         [
           'guide-session-replay-open-number-recog.mp3',
@@ -1753,6 +1781,10 @@
         [
           'guide-session-replay-open-hundreds.mp3',
           "Let's play hundreds again!",
+        ],
+        [
+          'guide-session-replay-open-hundreds-addsub.mp3',
+          "Let's play more and less again!",
         ],
         [
           'guide-session-replay-open-letter-names.mp3',
@@ -1884,6 +1916,10 @@
         ['guide-session-replay-close-mult-mix.mp3', 'You know all the groups!'],
         ['guide-session-replay-close-div-share.mp3', 'You know sharing!'],
         ['guide-session-replay-close-hundreds.mp3', 'You know hundreds!'],
+        [
+          'guide-session-replay-close-hundreds-addsub.mp3',
+          'You know more and less!',
+        ],
         [
           'guide-session-replay-close-letter-names.mp3',
           'You know letter names!',

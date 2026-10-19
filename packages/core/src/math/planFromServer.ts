@@ -83,6 +83,8 @@ import {
   TWO_DIGIT_CHIP_MAX,
   type ExtendedMathProblem,
   type ExtendedMathSessionPlan,
+  type MoreCount,
+  type MoreDirection,
   type PlacePart,
 } from './extendedProblems'
 import {
@@ -454,7 +456,8 @@ function arithmeticProblem(
 
 /** One problem of an extended plan, dispatched on the read line's template.
  *  The templates are disjoint ("Tap the", comma list + "What is next?",
- *  "and what make", "plates", "What number is it?", "more?", "times",
+ *  "and what make", "plates", "What number is it?", "more?" / "less?",
+ *  "times",
  *  "plus" / "minus" / "take away"), so the order only decides which error a
  *  near-miss gets. */
 function extendedProblemFromRead(
@@ -521,7 +524,8 @@ function extendedProblemFromRead(
       `many?"; missing number "<W> and what make <W>?"; sharing "<W> ` +
       `flowers, <W> plates. How many on each plate?"; hundreds "<W> ` +
       `<place>, <W> <place> and <W> <place>. What number is it?" or "<W>. ` +
-      `What is ten more?" / "What is one hundred more?")`,
+      `What is ten more?" / "What is one hundred more?"; more and less ` +
+      `"<W>. What is <change> more?" / "… less?")`,
   )
 }
 
@@ -839,39 +843,54 @@ function matchPlaceValueRead(read: string): {
   }
 }
 
-/** Extract the start, the step and the answer from a "ten / one hundred
- *  more" `read` line (content wave 3 § 3.6).
+/** A "more" read's change words (content wave 4 § 2.6): ten … forty, one
+ *  hundred … four hundred. */
+const MORE_TENS: readonly string[] = ['ten', 'twenty', 'thirty', 'forty']
+const MORE_HUNDREDS: readonly string[] = ['one', 'two', 'three', 'four']
+
+/** Extract the start, the change and the answer from a "more" / "less"
+ *  `read` line (content wave 3 § 3.6, content wave 4 § 2.6).
  *
- *  Template (canon): `"<number>. What is ten more?"` or `"<number>. What is
- *  one hundred more?"`, the number in British words, e.g. `"Two hundred and
- *  forty-three. What is ten more?"` → start 243, step 10, correct 253.
- *  Valid when the start has three digits and no zero, nothing regroups
- *  (tens ≤ 8 for +10, hundreds ≤ 8 for +100) and the answer is at most
+ *  Template (canon): `"<number>. What is <change> more?"` or `"… less?"`,
+ *  the number in British words and `<change>` one of ten, twenty, thirty,
+ *  forty, one hundred, two hundred, three hundred or four hundred, e.g.
+ *  `"Two hundred and forty-three. What is ten more?"` → start 243, step
+ *  10, count 1, 'more', correct 253, or `"Seven hundred and sixty-five.
+ *  What is thirty less?"` → 765, 10, 3, 'less', 735. Valid when the start
+ *  and the answer have three digits and no zero: the changed digit stays
+ *  in 1..9 (no regrouping) and the answer is in 100..
  *  {@link EXTENDED_ANSWER_MAX}. Case-insensitive; throws on any drift.
- *  Disjoint from every other template (none ends "more?").
+ *  Disjoint from every other template (none ends "more?" or "less?").
  *
  *  Opt-in kind: only `mathSessionPlanFromServer(plan, { extendedKinds: true
  *  })` reads this template. */
 export function parseMoreRead(read: string): {
   start: number
   step: 10 | 100
+  count: MoreCount
+  direction: MoreDirection
   correct: number
 } {
   const more = matchMoreRead(read)
   if (more) return more
   throw new PlanFromServerError(
     `math read line "${read}" did not match the more read template ` +
-      `"<W>. What is ten more?" / "<W>. What is one hundred more?"`,
+      `"<W>. What is <ten … forty | one … four hundred> more?" / "… less?"`,
   )
 }
 
-/** {@link parseMoreRead}'s template: `null` on a miss; throws on an unknown
- *  number or a start the step can't take without a zero or a regroup. */
-function matchMoreRead(
-  read: string,
-): { start: number; step: 10 | 100; correct: number } | null {
+/** {@link parseMoreRead}'s template: `null` on a miss (a change word not in
+ *  the list included); throws on an unknown number or a start the change
+ *  can't take without a zero or a regroup. */
+function matchMoreRead(read: string): {
+  start: number
+  step: 10 | 100
+  count: MoreCount
+  direction: MoreDirection
+  correct: number
+} | null {
   const match = read.match(
-    /^\s*([a-z][a-z -]*?)\s*\.\s*what\s+is\s+(ten|one\s+hundred)\s+more\s*\?\s*$/i,
+    /^\s*([a-z][a-z -]*?)\s*\.\s*what\s+is\s+(ten|twenty|thirty|forty|(?:one|two|three|four)\s+hundred)\s+(more|less)\s*\?\s*$/i,
   )
   if (!match) return null
   const start = wordToNumber(match[1]!.toLowerCase().replace(/\s+/g, ' '))
@@ -880,22 +899,31 @@ function matchMoreRead(
       `math read line "${read}" had unrecognised number word(s)`,
     )
   }
-  const step: 10 | 100 = /^ten$/i.test(match[2]!) ? 10 : 100
+  const change = match[2]!.toLowerCase().split(/\s+/)
+  const step: 10 | 100 = change.length === 1 ? 10 : 100
+  const count = ((step === 10 ? MORE_TENS : MORE_HUNDREDS).indexOf(change[0]!) +
+    1) as MoreCount
+  const direction = match[3]!.toLowerCase() as MoreDirection
+  const sign = direction === 'less' ? -1 : 1
+  const correct = start + sign * count * step
   const d = placeDigits(start)
-  const regroups = step === 10 ? d.tens > 8 : d.hundreds > 8
+  // The changed digit must stay a digit 1..9: no zero, no regrouping.
+  const digit = (step === 10 ? d.tens : d.hundreds) + sign * count
   if (
     start < 100 ||
     d.tens === 0 ||
     d.ones === 0 ||
-    regroups ||
-    start + step > EXTENDED_ANSWER_MAX
+    digit < 1 ||
+    digit > 9 ||
+    correct > EXTENDED_ANSWER_MAX
   ) {
     throw new PlanFromServerError(
-      `math read line "${read}" asks for ${step} more than ${start}; ` +
-        `hundreds needs three digits with no zero and no regrouping`,
+      `math read line "${read}" asks for ${count * step} ${direction} than ` +
+        `${start}; the start and the answer need three digits with no ` +
+        `zero and no regrouping`,
     )
   }
-  return { start, step, correct: start + step }
+  return { start, step, count, direction, correct }
 }
 
 /** {@link parseMissingAddendRead}'s template: `null` on a miss; throws on an

@@ -239,6 +239,7 @@ export function buildCloudProgressBlob(opts: {
     'mult-mix': 'locked',
     'div-share': 'locked',
     hundreds: 'locked',
+    'hundreds-addsub': 'locked',
     'letter-names': 'mastered',
     'letter-sounds': 'practicing',
     'blending-cv': 'practicing',

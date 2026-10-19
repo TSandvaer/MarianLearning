@@ -77,6 +77,8 @@ export const FRIENDLY_NODE_NAMES: Record<SkillNode, string> = {
   'div-share': 'sharing',
   // Content wave 3 § 1 (T1, Thomas 2026-10-17): the recap names the step.
   hundreds: 'hundreds',
+  // Content wave 4 § 1 (T1, Thomas 2026-10-18): the recap names the step.
+  'hundreds-addsub': 'more and less',
 
   // ── Word Song (literacy) ──────────────────────────────────────────────
   'letter-names': 'your letters',
@@ -160,6 +162,9 @@ export const STAGE_SPOKEN_NAMES: Record<SkillNode, string> = {
   'div-share': 'sharing',
   // Content wave 3 § 1 (T1, Thomas 2026-10-17).
   hundreds: 'hundreds',
+  // Content wave 4 § 1 (K1, T1, Thomas 2026-10-18): the step's own
+  // question, "What is two hundred more?" / "… less?".
+  'hundreds-addsub': 'more and less',
 
   // ── Word Song (literacy) ──────────────────────────────────────────────
   'letter-names': 'letter names',
@@ -218,6 +223,7 @@ export const STAGE_SPOKEN_NAME_VERBS: Record<SkillNode, 'is' | 'are'> = {
   'mult-mix': 'are',
   'div-share': 'is',
   hundreds: 'are',
+  'hundreds-addsub': 'are',
 
   // ── Word Song (literacy) ──────────────────────────────────────────────
   'letter-names': 'are',

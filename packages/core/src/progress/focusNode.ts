@@ -97,6 +97,7 @@ export const MATH_NODES_IN_ORDER: readonly NumberGardenNode[] = [
   'mult-mix',
   'div-share',
   'hundreds',
+  'hundreds-addsub',
 ]
 
 /**

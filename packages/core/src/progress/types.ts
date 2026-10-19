@@ -50,6 +50,9 @@ export type NumberGardenNode =
   // Content wave 3 § 3 (hundreds): numbers to 999 built from flats, rods
   // and cubes, then ten / one hundred more. Served from canon; no fact.
   | 'hundreds'
+  // Content wave 4 § 2 (more and less): 2–4 hundreds or tens added or
+  // taken away. Served from canon; no fact.
+  | 'hundreds-addsub'
 
 // cvc-words = short-a CVC. Subsequent vowels get sibling nodes
 // (cvc-words-short-o, cvc-words-short-u, cvc-words-short-i,

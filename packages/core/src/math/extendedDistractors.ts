@@ -16,6 +16,7 @@
  * | multiply   | `pickDistractors(c, i, M)`      | `A + B`; `c ± 1` (sign by position)        | `'wrong-op'`     |
  * | divide     | `pickDistractors(c, i, 10)`     | `pickDistractors(c, i, 10)` (off by one)   | `'off-by-one'`   |
  * | hundreds   | hundreds digit ± 2 and ± 4      | see {@link hundredsDistractors}            | see below        |
+ * | more/less  | changing digit ± 2 and ± 4      | wrong place or wrong op; digit swap        | see below        |
  *
  * Sharing (content wave 2 § 2.6, K5, D4): `pickDistractors` unchanged with
  * M = 10, so no far "99" chip and no plate-count trap.
@@ -25,16 +26,23 @@
  * swapped), `'spoken-order'` (the digits in the order the read names them)
  * and `'wrong-place'` (ten / one hundred more: the other two of +1, +10,
  * +100).
+ *
+ * More and less (content wave 4 § 2.6, D3): `'gentle'` (P1–P3, the
+ * changing place's digit ± 2 and ± 4), then a first trap, `'wrong-place'`
+ * (adding: the change made in the next place down) or `'wrong-op'`
+ * (taking away: she added), and the digit swap.
  */
 
 import { GENTLE_RAMP_THROUGH, pickDistractors } from './distractors'
 import {
   EXTENDED_ANSWER_MAX,
+  isMoreAndLess,
   PLACE_PARTS,
   placeDigits,
   TWO_DIGIT_CHIP_MAX,
   type DivideProblem,
   type HundredsProblem,
+  type MoreProblem,
   type MultiplyProblem,
   type NumberRecogProblem,
   type SkipCountProblem,
@@ -64,12 +72,14 @@ export type ExtendedOfferedClass =
   | 'wrong-op'
   | HundredsOfferedClass
 
-/** Hundreds' chip classes (content wave 3 § 3.6). */
+/** Hundreds' chip classes (content wave 3 § 3.6), and more and less's
+ *  `'wrong-op'` (content wave 4 § 2.6). */
 export type HundredsOfferedClass =
   | 'gentle'
   | 'digit-swap'
   | 'spoken-order'
   | 'wrong-place'
+  | 'wrong-op'
 
 /** The kinds this module picks chips for. */
 export type ExtendedChipProblem =
@@ -199,15 +209,56 @@ export function multiplyDistractors(
 /** The class of a hundreds problem's chips (§ 3.6): `'wrong-place'` for
  *  ten / one hundred more; for a place-value read `'gentle'` on P1–P3, then
  *  `'digit-swap'` when it names the places in place order, else
- *  `'spoken-order'`. */
+ *  `'spoken-order'`. More and less (content wave 4 § 2.6): `'gentle'` on
+ *  P1–P3, then its first trap's ({@link moreAndLessTrap}). */
 export function hundredsOfferedClass(
   problem: HundredsProblem,
 ): HundredsOfferedClass {
-  if (problem.kind === 'more') return 'wrong-place'
+  if (problem.kind === 'more') {
+    if (!isMoreAndLess(problem)) return 'wrong-place'
+    if (problem.index <= GENTLE_RAMP_THROUGH) return 'gentle'
+    return moreAndLessTrap(problem).offered
+  }
   if (problem.index <= GENTLE_RAMP_THROUGH) return 'gentle'
   return problem.spokenOrder.every((p, i) => p === PLACE_PARTS[i])
     ? 'digit-swap'
     : 'spoken-order'
+}
+
+/** Whether `n` is a three-digit number with no zero digit. */
+const noZeroThreeDigits = (n: number): boolean => {
+  const d = placeDigits(n)
+  return n >= 100 && n <= HUNDREDS_CHIP_MAX && d.tens !== 0 && d.ones !== 0
+}
+
+/**
+ * More and less's first trap on P4–P8 (content wave 4 § 2.6, D3):
+ *
+ * - `'wrong-place'` when adding: the same count in the next place down (a
+ *   tens change made in the ones, a hundreds change in the tens): 532 + 30
+ *   → 535, 245 + 400 → 285.
+ * - `'wrong-op'` when taking away: she added, start + count × step (653 −
+ *   200 → 853). A value with a zero digit, a regroup or outside 100..999
+ *   is replaced by `'wrong-place'` (368 − 40: 408 → 364), and the class
+ *   follows it.
+ */
+export function moreAndLessTrap(problem: MoreProblem): {
+  value: number
+  offered: 'wrong-place' | 'wrong-op'
+} {
+  const { start, step, count, direction } = problem
+  const sign = direction === 'less' ? -1 : 1
+  const wrongPlace = {
+    value: start + (sign * count * step) / 10,
+    offered: 'wrong-place' as const,
+  }
+  if (direction === 'more') return wrongPlace
+  const added = start + count * step
+  const d = placeDigits(start)
+  const digit = (step === 10 ? d.tens : d.hundreds) + count
+  return digit <= 9 && noZeroThreeDigits(added)
+    ? { value: added, offered: 'wrong-op' }
+    : wrongPlace
 }
 
 /**
@@ -221,6 +272,10 @@ export function hundredsOfferedClass(
  *   P5's 326), and tens + 1.
  * - `'wrong-place'`: the other two of + 1, + 10 and + 100.
  *
+ * More and less (content wave 4 § 2.6, D3): `'gentle'` moves to the place
+ * that changes (P2's 354 → 374, 394); on P4–P8 the first trap
+ * ({@link moreAndLessTrap}) and the digit swap.
+ *
  * Repair (off canon): a value equal to the answer or the other value, or
  * outside 100..999, takes the next of the gentle values.
  */
@@ -231,11 +286,21 @@ export function hundredsDistractors(
   const d = placeDigits(correct)
   const number = (h: number, t: number, o: number) => 100 * h + 10 * t + o
   const tensStep = d.tens === 9 ? -1 : 1
-  const down = d.hundreds > 5 ? -1 : 1
-  const gentle = [2, 4].map((k) => correct + 100 * k * down)
+  // Gentle: the changing place's digit (more and less) or the hundreds.
+  const tensChange =
+    problem.kind === 'more' && isMoreAndLess(problem) && problem.step === 10
+  const gentleUnit = tensChange ? 10 : 100
+  const down = (tensChange ? d.tens : d.hundreds) > 5 ? -1 : 1
+  const gentle = [2, 4].map((k) => correct + gentleUnit * k * down)
+  const swapped = number(d.hundreds, d.ones, d.tens)
   let wanted: number[]
   switch (hundredsOfferedClass(problem)) {
+    case 'wrong-op':
     case 'wrong-place': {
+      if (problem.kind === 'more' && isMoreAndLess(problem)) {
+        wanted = [moreAndLessTrap(problem).value, swapped]
+        break
+      }
       const start = problem.kind === 'more' ? problem.start : correct
       wanted = [1, 10, 100]
         .filter((k) => k !== (problem.kind === 'more' ? problem.step : 0))
@@ -243,10 +308,7 @@ export function hundredsDistractors(
       break
     }
     case 'digit-swap':
-      wanted = [
-        number(d.hundreds, d.ones, d.tens),
-        number(d.hundreds, d.tens + tensStep, d.ones),
-      ]
+      wanted = [swapped, number(d.hundreds, d.tens + tensStep, d.ones)]
       break
     case 'spoken-order': {
       const order =

@@ -376,18 +376,35 @@ function buildLetterSoundsHistory(opts: {
 /**
  * Wait for a /api/claude word-song POST to fire, then return the parsed
  * body. Polls the requests array up to 15s (same shape as A4 + A8
- * siblings). Returns the LAST captured request — useful for tests that
- * drive multiple sessions and want to inspect the most-recent payload.
+ * siblings). Returns the LAST captured word-song request — useful for
+ * tests that drive multiple sessions and want to inspect the most-recent
+ * payload.
+ *
+ * Counts word-song POSTs only. The Hub prefetches the session of the
+ * world it suggests (`src/lib/audio/hubSessionPrefetch.ts`, the
+ * `onMathHubPrefetch` kick in `App.tsx`), and once today's word-song
+ * session is done the suggestion moves to Number Garden — so the reload
+ * in tests 2 + 3 fires a math POST before the word-song tap. The mock
+ * records every POST before its track check, so counting all of them let
+ * the second wait return that math body whenever the tap's request had
+ * not landed yet (PR #608 CI run 39165186102, test 2).
  */
 async function waitForWordSongRequest(
   requests: ReadonlyArray<Request>,
   minCount = 1,
 ): Promise<Record<string, unknown>> {
+  const wordSongBodies = (): Record<string, unknown>[] =>
+    requests
+      .map((r) => JSON.parse(r.postData() ?? '{}') as Record<string, unknown>)
+      .filter(
+        (body) =>
+          (body.payload as Record<string, unknown> | undefined)?.track ===
+          'word-song',
+      )
   await expect(async () => {
-    expect(requests.length).toBeGreaterThanOrEqual(minCount)
+    expect(wordSongBodies().length).toBeGreaterThanOrEqual(minCount)
   }).toPass({ timeout: 15_000 })
-  const recorded = requests[requests.length - 1]!
-  return JSON.parse(recorded.postData() ?? '{}') as Record<string, unknown>
+  return wordSongBodies().at(-1)!
 }
 
 /** Skip helper for tests that need to drive chip taps. */

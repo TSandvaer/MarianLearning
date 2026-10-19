@@ -55,18 +55,18 @@ const treeOf = (w: MasteryTrack): readonly SkillNode[] =>
   w === 'math' ? MATH_TREE : LITERACY_TREE
 
 describe('the step list', () => {
-  it('covers every step of both trees, once, in tree order (14 + 23)', () => {
-    expect(CASES).toHaveLength(37)
+  it('covers every step of both trees, once, in tree order (15 + 23)', () => {
+    expect(CASES).toHaveLength(38)
     expect(QA_STEPS.map((s) => s.node)).toEqual([
       ...MATH_TREE,
       ...LITERACY_TREE,
     ])
-    expect(QA_STEPS.filter((s) => s.world === 'math')).toHaveLength(14)
+    expect(QA_STEPS.filter((s) => s.world === 'math')).toHaveLength(15)
     expect(QA_STEPS.filter((s) => s.world === 'word-song')).toHaveLength(23)
   })
 
   it('gives each step a distinct readable name and its position', () => {
-    expect(new Set(QA_STEPS.map((s) => s.name)).size).toBe(37)
+    expect(new Set(QA_STEPS.map((s) => s.name)).size).toBe(38)
     expect(QA_STEPS.find((s) => s.node === 'cvc-words-short-o')).toEqual({
       node: 'cvc-words-short-o',
       world: 'word-song',
@@ -89,10 +89,16 @@ describe('the step list', () => {
       name: 'Sharing',
       land: 4,
     })
-    // Content wave 3 § 1: hundreds, land 5's one stop.
+    // Content wave 3 § 1: hundreds, land 5's 1st stop.
     expect(QA_STEPS.find((s) => s.node === 'hundreds')).toMatchObject({
       position: 14,
       name: 'Hundreds',
+      land: 5,
+    })
+    // Content wave 4 § 1: more and less, land 5's 2nd stop.
+    expect(QA_STEPS.find((s) => s.node === 'hundreds-addsub')).toMatchObject({
+      position: 15,
+      name: 'More and less',
       land: 5,
     })
     // Content wave 3 § 1: the story steps, land 7.
@@ -108,8 +114,8 @@ describe('the step list', () => {
     })
   })
 
-  it('isStepNode accepts the 37 steps and nothing else', () => {
-    expect(QA_STEPS.filter((s) => isStepNode(s.node))).toHaveLength(37)
+  it('isStepNode accepts the 38 steps and nothing else', () => {
+    expect(QA_STEPS.filter((s) => isStepNode(s.node))).toHaveLength(38)
     expect(
       ['', 'digraphs', 'two-digit-addsub', 'banana'].filter(isStepNode),
     ).toEqual([])
