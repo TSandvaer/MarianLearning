@@ -5,8 +5,7 @@
  * round makes zero key-value writes: the progress JSON and the session
  * history are byte-identical, stardust is unchanged, nothing reaches the
  * network and no Session End mounts. Back mid-line, Back mid-hop and a trip
- * to the background keep all of that. The game's lines await their render,
- * so they walk their captions silently (no clip plays).
+ * to the background keep all of that.
  */
 import { STORAGE_KEY } from '@marian/core/progress'
 import { SESSION_HISTORY_KEY } from '@marian/core/sessionEnd/sessionHistory'

@@ -508,10 +508,10 @@ describe('the mini-game lines (mini-game spec § 3)', () => {
     expect(Math.max(...game.map((l) => l.text.length))).toBe(30)
   })
 
-  it('C4: the 30 game lines await their Lily render (the render commit empties the list)', () => {
-    expect([...GUIDANCE_LINES_AWAITING_RENDER].sort()).toEqual(
-      game.map((l) => l.id).sort(),
-    )
+  it('C4: the 30 game lines are rendered in Lily (none awaits its render)', () => {
+    expect(
+      game.filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id)),
+    ).toEqual([])
   })
 
   it('C5: no game line says "play", "next" or "round"; only the retry says "again"', () => {
