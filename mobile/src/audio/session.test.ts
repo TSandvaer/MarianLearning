@@ -452,7 +452,7 @@ describe('session-start client', () => {
 
   it('POSTs the session-start body to apiUrl("/api/claude") and loads the audio', async () => {
     const fetch = fetchReturning(200, okResponse)
-    const payload = { track: 'math' as const, level: 1, childName: 'Marian' }
+    const payload = { track: 'math' as const, level: 1, childName: 'friend' }
     const prepared = await startSession(
       { sessionId: 'm1', payload },
       { fetch, engine, files, yieldThen: sync },

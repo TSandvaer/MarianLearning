@@ -30,7 +30,6 @@
 import { currentStepOf } from '@marian/core/hub/hubCardModel'
 import { localDateKey, now as progressNow } from '@marian/core/progress/clock'
 import {
-  defaultProgress,
   isGraduationSessionPending,
   loadProgress,
   pickFocusNode,
@@ -38,6 +37,7 @@ import {
   type ProgressTrack,
   type SkillNode,
 } from '@marian/core/progress'
+import { startProgressForActive } from '@marian/core/learners'
 import {
   sessionEndBeat,
   type SessionEndBeat,
@@ -114,7 +114,7 @@ export function writeSessionEnd(
   if (p.surface === 'word-song') grantWordSongCompletionBonus(undefined, clock)
   recordSessionEnd(p.finalStreak, undefined, clock)
 
-  const before = loadProgress() ?? defaultProgress()
+  const before = loadProgress() ?? startProgressForActive()
   const track = trackForSurface(p.surface)
   const { node: focusNode, mode: focusMode } =
     p.sessionFocus ?? pickFocusNode(before, track)
@@ -191,7 +191,7 @@ function writeReviewEnd(
 ): SessionEndResult {
   const dateISO = clock().toISOString()
   recordSessionEnd(p.finalStreak, undefined, clock)
-  const before = loadProgress() ?? defaultProgress()
+  const before = loadProgress() ?? startProgressForActive()
   const track = trackForSurface(p.surface)
   const leitnerOutcomes =
     p.surface === 'math' &&

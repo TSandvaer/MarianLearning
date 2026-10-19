@@ -7,15 +7,31 @@ describe('route shell', () => {
   })
 
   it('has a label and an exit for every route', () => {
-    expect(ROUTES).toHaveLength(10)
+    expect(ROUTES).toHaveLength(11)
     for (const route of ROUTES) {
       expect(ROUTE_LABELS[route]).toBeTruthy()
       expect(ROUTE_EXITS[route].length).toBeGreaterThan(0)
     }
   })
 
-  it('Splash only leads to Greet or Hub (nextAfterSplash)', () => {
-    expect(ROUTE_EXITS.splash).toEqual(['greet', 'hub'])
+  it('Splash only leads to the picker, Greet or Hub (nextAfterSplash)', () => {
+    expect(ROUTE_EXITS.splash).toEqual(['picker', 'greet', 'hub'])
+  })
+
+  it('learner profiles: the picker leads to Greet or the Hub, and is reached from § 1.1’s routes', () => {
+    expect(ROUTE_EXITS.picker).toEqual(['greet', 'hub'])
+    for (const from of [
+      'hub',
+      'greet',
+      'map',
+      'session-end',
+      'parent-settings',
+    ] as const) {
+      expect(ROUTE_EXITS[from]).toContain('picker')
+    }
+    for (const from of ['math', 'literacy', 'peek'] as const) {
+      expect(ROUTE_EXITS[from]).not.toContain('picker')
+    }
   })
 
   it('first launch is Splash → Greet → Math → Session End → Hub', () => {
@@ -42,7 +58,13 @@ describe('route shell', () => {
   })
 
   it('Map tap-to-play: the map starts a session or a replay, and a Map start returns to it', () => {
-    expect(ROUTE_EXITS.map).toEqual(['hub', 'peek', 'math', 'literacy'])
+    expect(ROUTE_EXITS.map).toEqual([
+      'hub',
+      'peek',
+      'math',
+      'literacy',
+      'picker',
+    ])
     expect(ROUTE_EXITS.math).toContain('map')
     expect(ROUTE_EXITS.literacy).toContain('map')
     expect(ROUTE_EXITS.peek).toEqual(['map'])

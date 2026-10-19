@@ -25,6 +25,15 @@
  *   distractor class per problem, the scaffold flags, stardust and streak
  *   (`MathSessionResult`), handed to App after problem 8.
  *
+ * Native-only, the take-away picture (`design/native/take-away-picture.md`):
+ * a subtraction on its own step `sub-to-10` / `sub-to-20` draws `TakeAwayRow`
+ * in the counting row's place, the minuend's flowers in a ten-frame (a
+ * double one on sub-to-20). The taken flowers lift on the read's "away" /
+ * "minus" in P1–P3 of a forward session or an explore peek, at hint 3
+ * everywhere else (reviews, replays, warm-up hearts), fast on a right tap
+ * and at once on the given answer; hints 1–2 ripple them. A wrong tap that
+ * cuts the read never lifts them (K9), and the minuend flash plays first.
+ *
  * Native-only, Number Garden 1 and 8–11 (core's extended kinds; spec
  * `design/native/math-skip-counting-multiplication-native.md`): a number-
  * recognition problem shows `NumberStrip`, a skip-count problem `SkipTrack`,
@@ -113,6 +122,7 @@ import {
   shouldShowSubitisingScaffold,
   shouldShowSubitisingSubScaffold,
 } from '@marian/core/math/subitisingScaffold'
+import { takeAwayTickIndex } from '@marian/core/math/takeAway'
 import {
   SLOW_FACT_MIN_MEDIAN_LATENCY_MS,
   type SkillNode,
@@ -177,6 +187,7 @@ import {
   placeValueMetrics,
   shareMetrics,
   skipTrackMetrics,
+  takeAwayMetrics,
   type ExtendedMathLayout,
   type MathLayout,
 } from '../../layout/mathLayout'
@@ -208,6 +219,13 @@ import { ShareStage } from './ShareStage'
 import { AUTO_DEAL_DELAY_MS, FILL_HOLD_MS } from './shareDeal'
 import { createSilentMathPlayer, type SilentMathPlayer } from './silentPlayer'
 import { SkipTrack } from './SkipTrack'
+import {
+  strongerLift,
+  takeAwayPicture,
+  type TakeAwayLift,
+  type TakeAwayRippleScope,
+} from './takeAwayPicture'
+import { TakeAwayRow } from './TakeAwayRow'
 
 /** Web: the chime lands 320 ms after sparkle + plink (#133 follow-up). */
 export const STREAK_CHIME_STAGGER_MS = 320
@@ -591,6 +609,17 @@ export function MathScreen({
   /** Hundreds (content wave 3 § 3.4): the step lead's words revealed so
    *  far; its ticks pulse the trays. Reset per problem. */
   const [leadRevealed, setLeadRevealed] = useState(0)
+  /** The take-away picture (`take-away-picture.md` § 3): what lifted its
+   *  taken flowers besides a P1–P3 read (hint 3, a right tap, the given
+   *  answer), and the hint lines' ripples. Reset per problem. */
+  const [takeAwayLift, setTakeAwayLift] = useState<TakeAwayLift | null>(null)
+  const [takeAwayRipple, setTakeAwayRipple] = useState(0)
+  const [takeAwayRippleScope, setTakeAwayRippleScope] =
+    useState<TakeAwayRippleScope | null>(null)
+  /** A wrong tap cut the read: its later ticks lift nothing (K9). */
+  const takeAwayReadCutRef = useRef(false)
+  /** The taken flowers have lifted (or are due to), for hint 3. */
+  const takeAwayLiftedRef = useRef(false)
   const [shakingChip, setShakingChip] = useState<number | null>(null)
   const [captionText, setCaptionText] = useState('')
   const [captionRevealed, setCaptionRevealed] = useState(0)
@@ -630,6 +659,13 @@ export function MathScreen({
     perProblemDistractorClassRef.current[problemIndex] =
       chipOrderWithClass.offeredClass
   }, [problemIndex, chipOrderWithClass.offeredClass])
+  /** Problem i's take-away picture: a subtraction on its own step, sub-to-10
+   *  or sub-to-20 (`take-away-picture.md` K1); else `null`. */
+  const takeAwayOf = useCallback(
+    (i: number) =>
+      takeAwayPicture(plan.problems[i], problemNodes?.[i] ?? focusNode),
+    [plan, problemNodes, focusNode],
+  )
 
   // ── Timers + lifetime ────────────────────────────────────────────────
 
@@ -872,13 +908,20 @@ export function MathScreen({
         }
         // Sharing's and hundreds' reads drive their stages (the total tag
         // and the plates; the trays' build, the number tag and its pill),
-        // and adding big numbers' its second number's drop.
+        // adding big numbers' its second number's drop, and a take-away
+        // read its lift, until a wrong tap cuts it (K9).
         const trays = isHundredsProblem(problem) || sumTraysAt(myProblemIndex)
         const drivesStage = problem.kind === 'divide' || trays
         await speak(
           problem.utterances.read,
           true,
-          drivesStage ? setReadRevealed : undefined,
+          drivesStage
+            ? setReadRevealed
+            : takeAwayOf(myProblemIndex) !== null
+              ? (revealed) => {
+                  if (!takeAwayReadCutRef.current) setReadRevealed(revealed)
+                }
+              : undefined,
         )
         if (!live()) return
         // A read that ended without its ticks still builds the trays.
@@ -1002,6 +1045,10 @@ export function MathScreen({
       setBudReveal('hidden')
       setReadRevealed(0)
       setLeadRevealed(0)
+      setTakeAwayLift(null)
+      setTakeAwayRipple(0)
+      setTakeAwayRippleScope(null)
+      takeAwayReadCutRef.current = false
       setAutoDeal(false)
       shareHoldRef.current = false
       tryAdvanceRef.current = null
@@ -1168,6 +1215,7 @@ export function MathScreen({
       const returnToIdle = () => {
         if (!stillLive()) return
         setHintBeat(null)
+        setTakeAwayRippleScope(null)
         poseTimerRef.current = setTimeout(() => {
           setPose('idle')
           poseTimerRef.current = null
@@ -1185,6 +1233,13 @@ export function MathScreen({
         problemNodes?.[myIndex] ?? planFocusNode,
       )
       const extended = (problem.kind !== 'arithmetic' && !missing) || sums
+      // The take-away picture (§ 3): hints 1–2 ripple every flower at the
+      // line's start; hint 3 lifts on its "away", or ripples what is left.
+      const takeAway = takeAwayOf(myIndex)
+      const rippleTakeAway = (scope: TakeAwayRippleScope) => {
+        setTakeAwayRippleScope(scope)
+        setTakeAwayRipple((n) => n + 1)
+      }
       const triple = resolveHintTriple(problem.utterances)
       if (triple === null) {
         const legacy = problem.utterances.hint
@@ -1195,6 +1250,7 @@ export function MathScreen({
       }
       if (extended) setHintStep(1)
       else setHintBeat('group-a')
+      if (takeAway !== null) rippleTakeAway('all')
       // Zeros' name read builds its number at hint 1 first (content wave 5
       // § 2.4, D3); "Look at the ones." waits for it to land.
       const buildMs = placeValueHintBuildMs(problem, reducedMotion)
@@ -1210,6 +1266,7 @@ export function MathScreen({
       await speak(triple.hint1)
       if (!stillLive()) return
       if (extended) setHintStep(2)
+      if (takeAway !== null) rippleTakeAway('all')
       // Multiplication: Emma's k-th spoken group size lights plate k (the
       // same word ticks that drive the ribbon, so the silent walk lights
       // them too). The count only goes up.
@@ -1242,10 +1299,30 @@ export function MathScreen({
       } else {
         setHintBeat('group-b')
       }
-      await speak(triple.hint3)
+      let liftOnWords: ((revealed: number) => void) | undefined
+      if (takeAway !== null) {
+        if (takeAwayLiftedRef.current || takeAway.slots.taken.length === 0) {
+          rippleTakeAway('left')
+        } else {
+          setTakeAwayRippleScope(null)
+          const tick = takeAwayTickIndex(triple.hint3)
+          liftOnWords = (revealed) => {
+            if (revealed > tick)
+              setTakeAwayLift((l) => strongerLift(l, 'normal'))
+          }
+        }
+      }
+      await speak(triple.hint3, false, liftOnWords)
       returnToIdle()
     },
-    [speak, problemIndex, problemNodes, planFocusNode, reducedMotion],
+    [
+      speak,
+      problemIndex,
+      problemNodes,
+      planFocusNode,
+      reducedMotion,
+      takeAwayOf,
+    ],
   )
 
   // ── Taps ─────────────────────────────────────────────────────────────
@@ -1262,6 +1339,8 @@ export function MathScreen({
 
       setPose('puzzled-tilt')
       if (poseTimerRef.current !== null) clearTimeout(poseTimerRef.current)
+      // A wrong tap never moves the take-away picture (K9).
+      takeAwayReadCutRef.current = true
 
       // A warm-up problem never touches the streak (review spec § 6); a
       // peek has none.
@@ -1305,6 +1384,9 @@ export function MathScreen({
         if (didScheduleGuided) {
           setGuidedActive(true)
           setHintBeat(null) // a hint it interrupted stops pulsing
+          setTakeAwayRippleScope(null)
+          // The taken flowers land pale at once (§ 3).
+          setTakeAwayLift((l) => strongerLift(l, 'instant'))
           // A missing number's buds show if hint 3 didn't (§ 1.5).
           setBudReveal((r) => (r === 'hidden' ? 'guided' : r))
           setProblemState((prev) => ({ ...prev, guidedPlayed: true }))
@@ -1333,6 +1415,8 @@ export function MathScreen({
       sfx.plink.play()
       setPose('celebration')
       setCelebrating(true)
+      // The taken flowers not lifted yet lift fast (§ 3).
+      setTakeAwayLift((l) => strongerLift(l, 'fast'))
       resolvedRef.current = true
       setProblemState((prev) => ({ ...prev, resolved: true }))
       if (hintTimerRef.current !== null) {
@@ -1609,6 +1693,25 @@ export function MathScreen({
     }
   }, [useSubScaffoldGate, showSubMinuendOverlay])
 
+  // The take-away picture (`take-away-picture.md` K1, K6): P1–P3 of a
+  // forward session or an explore peek (Dave, 2026-10-19) lift on the
+  // read's "away" / "minus"; hint 3, a right tap and the given answer lift
+  // everywhere (reviews, replays and warm-up hearts wait for hint 3).
+  const takeAway = takeAwayOf(problemIndex)
+  const takeAwayReadLift =
+    takeAway !== null &&
+    arith !== null &&
+    (scaffoldsAllowed || (isPeek && !replay)) &&
+    arith.index <= GENTLE_RAMP_THROUGH &&
+    readRevealed > takeAwayTickIndex(arith.utterances.read)
+  const takeAwayLiftNow = strongerLift(
+    takeAwayReadLift ? 'normal' : null,
+    takeAwayLift,
+  )
+  useLayoutEffect(() => {
+    takeAwayLiftedRef.current = takeAwayLiftNow !== null
+  })
+
   // ── Render ───────────────────────────────────────────────────────────
 
   const { problem: area, chips, ribbon, ribbonPadding } = layout
@@ -1624,16 +1727,28 @@ export function MathScreen({
   // Phone: the counting slot is always reserved, so the equation never
   // moves between problems (mixed-op and two-digit tiers included).
   // Tablet (web): the row is there with counters or the minuend cell.
+  const takeAwaySize =
+    takeAway === null
+      ? null
+      : takeAwayMetrics(layout, takeAway.step, area.width)
   const visualHeight =
     layout.visualSlot ??
     (counting !== null
       ? counting.height
-      : subMinuendInScope
-        ? layout.dotCard.cell
-        : 0)
+      : takeAwaySize !== null
+        ? Math.max(
+            takeAwaySize.height,
+            subMinuendInScope ? layout.dotCard.cell : 0,
+          )
+        : subMinuendInScope
+          ? layout.dotCard.cell
+          : 0)
   const showVisualRow =
     (arith !== null || missing !== null) &&
-    (layout.visualSlot !== null || counting !== null || subMinuendInScope)
+    (layout.visualSlot !== null ||
+      counting !== null ||
+      subMinuendInScope ||
+      takeAwaySize !== null)
 
   // The extended kinds' visuals, sized once per plan (spec decision 10).
   const skipMetrics = useMemo(
@@ -1926,7 +2041,10 @@ export function MathScreen({
               )}
 
               {showVisualRow && (
-                <View style={[styles.visual, { height: visualHeight }]}>
+                <View
+                  testID="math-visual-row"
+                  style={[styles.visual, { height: visualHeight }]}
+                >
                   {counting !== null && arith !== null && (
                     <CountingRow
                       addendA={arith.addendA}
@@ -1952,6 +2070,18 @@ export function MathScreen({
                           answered={problemState.resolved}
                         />
                       }
+                    />
+                  )}
+                  {takeAway !== null && takeAwaySize !== null && (
+                    <TakeAwayRow
+                      key={`take-away-${problemIndex}`}
+                      picture={takeAway}
+                      metrics={takeAwaySize}
+                      visible={!showSubMinuendOverlay}
+                      lift={takeAwayLiftNow}
+                      ripple={takeAwayRipple}
+                      rippleScope={takeAwayRippleScope}
+                      appHidden={appHidden}
                     />
                   )}
                   {showDotCardOverlay && dotCardPips !== null && (

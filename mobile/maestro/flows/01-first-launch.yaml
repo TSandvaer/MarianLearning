@@ -9,7 +9,8 @@ tags:
     stopApp: true
 - runFlow: ../subflows/open-app.yaml
 # Splash (1.75 s, too short to catch reliably) routes a fresh install to
-# Greet: sessionCount is 0.
+# Greet: one learner, who has never played. A fresh install starts at land
+# 1 in both worlds (learner profiles T7), so Math plays number-recog.
 - extendedWaitUntil:
     visible:
       id: greet

@@ -72,7 +72,7 @@ it('the payload names the step’s problems 1–3 and carries no progress hint',
   expect(buildPeekPayload('math', 'sub-to-10')).toEqual({
     track: 'math',
     level: 1,
-    childName: 'Marian',
+    childName: 'friend',
     peek: {
       blocks: [
         { node: 'sub-to-10', problem: 1 },
@@ -216,7 +216,7 @@ describe('the Map replay (map-tap-to-play § 3)', () => {
     expect(buildReplayPayload('word-song', 'cvc-words')).toEqual({
       track: 'word-song',
       level: 1,
-      childName: 'Marian',
+      childName: 'friend',
       replay: { node: 'cvc-words' },
     })
   })

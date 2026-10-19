@@ -44,7 +44,6 @@
 import {
   applyMasteryRule,
   addItem,
-  defaultProgress,
   demote,
   getOrCreateDeviceId,
   loadProgress,
@@ -62,6 +61,7 @@ import {
   type SkillNode,
   type WordSongNode,
 } from '../progress'
+import { startProgressForActive } from '../learners/startDoc'
 import { withPaceHold, withSecureDay } from '../progress/fastTrackRecord'
 import { seedUnlocksCelebrated } from '../progress/pathBeats'
 import {
@@ -325,8 +325,9 @@ export interface RecordProgressInput {
 /**
  * Append a `SessionHistoryEntry` to the persisted Progress document and
  * update `profile.lastPlayedISO`. If no document exists yet, seeds a fresh
- * one via `defaultProgress()` (which encodes Marian's diagnostic baseline —
- * see `src/lib/progress/defaults.ts`).
+ * one via `startProgressForActive()`: the playing learner's start doc
+ * (learner profiles § 4.8), Marian's diagnostic baseline for the migrated
+ * learner 1 and on the web (`../learners/startDoc.ts`).
  *
  * Best-effort: storage failures (quota, private mode, missing window) are
  * swallowed by `saveProgress` itself; this function never throws.
@@ -341,7 +342,7 @@ export interface RecordProgressInput {
 export function recordProgressOnSessionEnd(
   input: RecordProgressInput,
 ): Progress {
-  const existing = loadProgress() ?? defaultProgress()
+  const existing = loadProgress() ?? startProgressForActive()
 
   const entry = buildEntry(input)
 
@@ -496,7 +497,7 @@ export interface RecordReviewInput {
  * first encounters, scaffold counters, CVC latch or unlock seed.
  */
 export function recordReviewOnSessionEnd(input: RecordReviewInput): Progress {
-  const existing = loadProgress() ?? defaultProgress()
+  const existing = loadProgress() ?? startProgressForActive()
   const mathFactsLeitner =
     input.surface === 'math' && input.leitnerOutcomes !== undefined
       ? applyLeitnerOutcomes(

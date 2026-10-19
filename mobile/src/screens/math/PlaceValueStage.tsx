@@ -111,6 +111,7 @@ import {
 import { colors, fonts } from '../../theme'
 import {
   EASE_OUT,
+  liftMs,
   STAGGER_MS,
   useFade,
   useOnRise,
@@ -143,10 +144,6 @@ const ADDED_SPRING = { stiffness: 220, damping: 18, mass: 1 }
 const FAST_SPRING = { stiffness: 300, damping: 22, mass: 1 }
 /** The added block's pill fades this long after it lands (§ 3.5). */
 export const ADDED_PILL_HOLD_MS = 600
-/** More and less's lift-out (§ 2.5): the fade, and on a fast right tap
- *  (Reduce Motion's fade is `CHANGE_REDUCED_MS`, no rise). */
-const LIFT_MS = 250
-const LIFT_FAST_MS = 150
 /** Tags fill this far apart (sharing's), left to right. */
 export const PV_TAG_FILL_STAGGER_MS = 80
 /** A tag's numeral changes over this long (old out, new in). */
@@ -1342,12 +1339,10 @@ function Block({
       opacity.set(0)
       return
     }
-    const ms = leave.reducedMotion
-      ? CHANGE_REDUCED_MS
-      : leave.mode === 'fast'
-        ? LIFT_FAST_MS
-        : LIFT_MS
-    const timing = { duration: ms, easing: EASE_OUT }
+    const timing = {
+      duration: liftMs(leave.mode, leave.reducedMotion),
+      easing: EASE_OUT,
+    }
     opacity.set(withDelay(leave.delay, withTiming(0, timing)))
     if (!leave.reducedMotion)
       y.set(withDelay(leave.delay, withTiming(-leave.rise, timing)))

@@ -65,12 +65,20 @@ export interface PathLine {
 }
 
 /**
- * The steps whose locked-next line renders from "…; then this!" (content
- * wave 5 § 9.1). Only steps whose line has no clip yet: a shipped line keeps
- * no input, so nothing already rendered re-renders.
+ * The steps whose locked-next line goes to Lily as "…; then this!" with its
+ * caption unchanged (content wave 5 § 9.1). Two waves needed that take by
+ * ear (hen and bug stories in #599, car words in #607; `team/DECISIONS.md`),
+ * so it is the first take for a new step. Shipped lines are not listed:
+ * their committed MP3s stay as they are.
  */
 export const THEN_THIS_INPUT_STEPS: ReadonlySet<SkillNode> = new Set<SkillNode>(
-  ['hundreds-zeros', 'add-two-digit'],
+  [
+    'hundreds-zeros',
+    'add-two-digit',
+    'snail-words',
+    'moon-words',
+    'goat-stories',
+  ],
 )
 
 /**

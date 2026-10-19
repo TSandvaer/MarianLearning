@@ -1562,6 +1562,97 @@ describe('land 8 — bee words and car words (content wave 4)', () => {
   })
 })
 
+describe('land 9 — snail words and moon words (content wave 5)', () => {
+  // design/native/content-wave-5.md § 4.2 and § 5.2: [word, gentle, trap].
+  const SNAIL: readonly (readonly [string, string[], string[]])[] = [
+    ['tray', ['hen', 'cup'], ['tree', 'train']],
+    ['boat', ['sun', 'jug'], ['bat', 'bone']],
+    ['snail', ['cup', 'bed'], ['seal', 'sack']],
+    ['coat', ['hen', 'bus'], ['cot', 'goat']],
+    ['train', ['nut', 'pen'], ['chain', 'tray']],
+    ['loaf', ['sun', 'bed'], ['leaf', 'log']],
+    ['goat', ['cup', 'net'], ['gum', 'coat']],
+    ['chain', ['bug', 'sun'], ['can', 'train']],
+  ]
+  const MOON: readonly (readonly [string, string[], string[]])[] = [
+    ['moon', ['hen', 'cup'], ['mop', 'spoon']],
+    ['spoon', ['bug', 'jet'], ['sock', 'moon']],
+    ['boot', ['fan', 'pig'], ['box', 'bone']],
+    ['broom', ['hen', 'sun'], ['brick', 'boot']],
+    ['tooth', ['cup', 'pig'], ['top', 'boot']],
+    ['stool', ['jet', 'hen'], ['star', 'spoon']],
+    ['hoop', ['bus', 'cup'], ['hot', 'roof']],
+    ['roof', ['bed', 'fan'], ['rock', 'rope']],
+  ]
+
+  it('holds exactly 8 words per step, in canon order', () => {
+    expect(bigWordsOf('snail-words')).toEqual(SNAIL.map(([w]) => w))
+    expect(bigWordsOf('moon-words')).toEqual(MOON.map(([w]) => w))
+  })
+
+  it('deals the spec matrix by word (no word collides, K4): gentle P1–P3, trap P4–P8', () => {
+    for (const [word, gentle, trap] of [...SNAIL, ...MOON]) {
+      const target = getWordEntry(word)
+      expect(pickDistractors(target, 1).map((d) => d.word)).toEqual(gentle)
+      expect(pickDistractors(target, 4).map((d) => d.word)).toEqual(trap)
+    }
+  })
+
+  it('adds 16 picture targets with their own picture key, no phoneme tag and no flags', () => {
+    const rows = [...SNAIL, ...MOON]
+    const words = new Set(rows.map(([w]) => w))
+    const entries = TARGET_WORDS.filter((e) => words.has(e.word))
+    expect(entries.map((e) => e.word)).toEqual(rows.map(([w]) => w))
+    for (const e of entries)
+      expect(e).toEqual({
+        word: e.word,
+        pictureKey: e.word,
+        vowel: e.vowel,
+        category: e.category,
+        isTarget: true,
+      })
+    expect(
+      Object.fromEntries(entries.map((e) => [e.word, [e.vowel, e.category]])),
+    ).toEqual({
+      tray: ['a', 'household'],
+      boat: ['o', 'vehicle'],
+      snail: ['a', 'animal'],
+      coat: ['o', 'clothing'],
+      train: ['a', 'vehicle'],
+      loaf: ['o', 'food'],
+      goat: ['o', 'animal'],
+      chain: ['a', 'object'],
+      moon: ['o', 'celestial'],
+      spoon: ['o', 'kitchen'],
+      boot: ['o', 'clothing'],
+      broom: ['o', 'household'],
+      tooth: ['o', 'body-part'],
+      stool: ['o', 'household'],
+      hoop: ['o', 'object'],
+      roof: ['o', 'structure'],
+    })
+  })
+
+  it('no trio contains a forbidden pair, old or new (§ 8)', () => {
+    const hits: string[] = []
+    for (const [word, gentle, trap] of [...SNAIL, ...MOON])
+      for (const [a, b] of [gentle, trap])
+        for (const [x, y] of [
+          [word, a],
+          [word, b],
+          [a, b],
+        ] as const)
+          if (isForbiddenPair(x!, y!)) hits.push(`${word}: ${x}/${y}`)
+    expect(hits).toEqual([])
+  })
+
+  it("gum's /g/ tag raises nothing: only a tagged target is checked (§ 4.2)", () => {
+    expect(getWordEntry('gum').phoneme).toBeDefined()
+    expect(getWordEntry('goat').phoneme).toBeUndefined()
+    expect(() => pickDistractors(getWordEntry('goat'), 4)).not.toThrow()
+  })
+})
+
 describe('FORBIDDEN_PAIRS', () => {
   it("contains the silhouette-similarity pairs from Kyle's pack-doc + the v2 short-o + v3 short-u + v4 short-i + v5 short-e + digraphs-sh + digraphs-ch + digraphs-th additions (tickets 86c9m3ae3 / 86c9q9ben / 86c9qdba4 / 86c9teua2 / digraphs-sh / digraphs-ch / digraphs-th)", () => {
     // Per design/word-song-picture-pack.md §"Distractor pairing matrix"
@@ -1640,6 +1731,28 @@ describe('FORBIDDEN_PAIRS', () => {
       ['scarf', 'belt'],
       ['card', 'gift'],
       ['seal', 'shark'],
+      // Land 9, snail and moon words (content wave 5 § 8).
+      ['tray', 'mat'],
+      ['train', 'bus'],
+      ['train', 'van'],
+      ['train', 'car'],
+      ['train', 'jeep'],
+      ['chain', 'rope'],
+      ['boat', 'ship'],
+      ['boat', 'tub'],
+      ['goat', 'sheep'],
+      ['goat', 'dog'],
+      ['goat', 'pig'],
+      ['goat', 'cat'],
+      ['loaf', 'bun'],
+      ['snail', 'bug'],
+      ['broom', 'mop'],
+      ['boot', 'sock'],
+      ['stool', 'desk'],
+      ['hoop', 'ring'],
+      ['roof', 'tent'],
+      ['roof', 'barn'],
+      ['coat', 'cape'],
     ].map((p) => [...p].sort().join(','))
 
     for (const expected of expectedPairs) {

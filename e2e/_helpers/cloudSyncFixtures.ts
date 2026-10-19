@@ -266,6 +266,9 @@ export function buildCloudProgressBlob(opts: {
     'bee-words': 'locked',
     'car-words': 'locked',
     'sheep-stories': 'locked',
+    'snail-words': 'locked',
+    'moon-words': 'locked',
+    'goat-stories': 'locked',
   }
   return {
     schemaVersion: 1,

@@ -110,7 +110,7 @@ describe('payload (web prepareMathPathA)', () => {
     expect(buildMathSessionPayload(NO_HINTS, true)).toEqual({
       track: 'math',
       level: 1,
-      childName: 'Marian',
+      childName: 'friend',
     })
   })
 
@@ -118,7 +118,7 @@ describe('payload (web prepareMathPathA)', () => {
     expect(buildMathSessionPayload(HINTS, true)).toEqual({
       track: 'math',
       level: 1,
-      childName: 'Marian',
+      childName: 'friend',
       progress: {
         focusNode: 'add-to-10',
         recentSuccessRate: 0.75,
@@ -129,7 +129,7 @@ describe('payload (web prepareMathPathA)', () => {
     expect(buildMathSessionPayload(HINTS, false)).toEqual({
       track: 'math',
       level: 1,
-      childName: 'Marian',
+      childName: 'friend',
       progress: {
         focusNode: 'add-to-10',
         recentSuccessRate: 0.75,

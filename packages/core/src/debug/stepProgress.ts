@@ -10,14 +10,15 @@
  *     seeds are, and
  *   - the native QA step picker at the bottom of Parent Settings.
  *
- * `progressAtStep(node)` is pure and starts from Marian's defaults
- * (`defaultProgress()`). In `node`'s world, every earlier step is
+ * `progressAtStep(node)` starts from the playing learner's start doc
+ * (`learners/startDoc.ts`: Marian's defaults for the migrated learner 1
+ * and on the web). In `node`'s world, every earlier step is
  * mastered, `node` is open at `'intro'` and every later step is locked.
  * `'intro'` is the level the mastery rule gives a step when the step
  * before it masters (`applyMasteryRule`'s unlock), so a jump is
  * indistinguishable from arriving there by play. That includes the
  * first-encounter cues that key on `'intro'` (the digraphs-th mouth
- * cue). The other world keeps its defaults.
+ * cue). The other world keeps its start.
  *
  * Per-step detail the gates read, beyond `skillLevels`:
  *
@@ -60,16 +61,14 @@ import {
   writeSessionHistory,
   type SessionHistoryV2,
 } from '../sessionEnd/sessionHistory'
+import { placeAtStep, startProgressForActive } from '../learners/startDoc'
 import {
-  LETTER_SOUNDS_VOWELS,
   LITERACY_TREE,
   MATH_TREE,
-  defaultProgress,
   saveProgress,
   type MasteryTrack,
   type Progress,
   type SkillNode,
-  type WordSongNode,
 } from '../progress'
 import { now as progressNow } from '../progress/clock'
 import { landOf } from '../progress/lands'
@@ -112,32 +111,16 @@ export function isStepNode(value: string): value is SkillNode {
   return trackOf(value as SkillNode) !== null
 }
 
-/** The progress of a child who has just arrived at `node`. Pure. */
+/**
+ * The progress of a child who has just arrived at `node`, from the playing
+ * learner's start doc (learner profiles § 4.8; `defaultProgress()` with no
+ * list installed, the web). Pure apart from reading who is playing.
+ */
 export function progressAtStep(node: SkillNode): Progress {
-  const world = trackOf(node)
-  if (world === null) {
+  if (trackOf(node) === null) {
     throw new Error(`progressAtStep: '${node}' is not a step of either tree`)
   }
-  const base = defaultProgress()
-  const tree = treeOf(world)
-  const at = tree.indexOf(node)
-
-  const skillLevels = { ...base.skillLevels }
-  tree.forEach((step, i) => {
-    skillLevels[step] = i < at ? 'mastered' : i === at ? 'intro' : 'locked'
-  })
-  const out: Progress = { ...base, skillLevels }
-
-  if (world === 'word-song') {
-    const pastLetterSounds = at > LITERACY_TREE.indexOf('letter-sounds')
-    if (pastLetterSounds) {
-      const states = { ...base.literacy!.letterSoundsVowelStates! }
-      for (const vowel of LETTER_SOUNDS_VOWELS) states[vowel] = 'mastered'
-      out.literacy = { ...base.literacy, letterSoundsVowelStates: states }
-    }
-    out.lifetimeFirstEncounters = LITERACY_TREE.slice(0, at) as WordSongNode[]
-  }
-  return out
+  return placeAtStep(startProgressForActive(), node)
 }
 
 /**
@@ -169,9 +152,13 @@ export function jumpToStep(node: SkillNode): void {
   writeStepProgress(progressAtStep(node))
 }
 
-/** The picker's "Back to Marian's real start": `defaultProgress()`. */
+/**
+ * The picker's "Back to <name>'s start": the playing learner's start doc
+ * (`learnerStartProgress`; for the migrated learner 1, `defaultProgress()`
+ * as before).
+ */
 export function jumpToRealStart(): void {
-  writeStepProgress(defaultProgress())
+  writeStepProgress(startProgressForActive())
 }
 
 /**

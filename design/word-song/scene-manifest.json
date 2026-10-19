@@ -258,5 +258,74 @@
     "subject": "A wooden hand cart with a gold star on it; beside it, the sheep in a rose scarf, holding an open card.",
     "avoid": ["the star in the sky", "the sheep on the cart"],
     "refs": ["sheep", "star", "scarf", "card"]
+  },
+  {
+    "scene": "goat-1",
+    "tier": "goat-stories",
+    "batch": 5,
+    "subject": "The goat sitting in the small rowing boat on the water, a loaf of bread on the seat beside it.",
+    "avoid": ["a sail", "a person rowing"],
+    "refs": ["goat", "boat", "loaf"]
+  },
+  {
+    "scene": "goat-2",
+    "tier": "goat-stories",
+    "batch": 5,
+    "subject": "Left: the red-tiled roof on its own, the goat standing on its top. Right, on the ground: the toy train, a long broom standing upright in its open cab, the wide straw-yellow bristles sticking out high above the cab, clearly visible.",
+    "avoid": [
+      "the goat in the train",
+      "the broom on the roof",
+      "the roof on the train",
+      "a train with no broom"
+    ],
+    "refs": ["broom", "goat", "train", "roof"]
+  },
+  {
+    "scene": "goat-3",
+    "tier": "goat-stories",
+    "batch": 5,
+    "subject": "The goat sitting on the wooden stool, holding the pink hoop.",
+    "avoid": ["a chair with a back", "the goat inside the hoop"],
+    "refs": ["stool", "goat", "hoop"]
+  },
+  {
+    "scene": "goat-4",
+    "tier": "goat-stories",
+    "batch": 5,
+    "subject": "The goat wearing the blue coat; beside it, the wooden tray with a silver spoon on it.",
+    "avoid": ["the spoon in the goat's mouth", "food on the tray"],
+    "refs": ["spoon", "coat", "tray", "goat"]
+  },
+  {
+    "scene": "goat-5",
+    "tier": "goat-stories",
+    "batch": 5,
+    "subject": "Night: the snail sitting on the crescent moon in the sky; below, the goat sitting on a log.",
+    "avoid": ["the goat on the moon", "a full moon"],
+    "refs": ["snail", "goat", "moon", "log"]
+  },
+  {
+    "scene": "goat-6",
+    "tier": "goat-stories",
+    "batch": 5,
+    "subject": "The goat sitting in the open tent; beside the tent, the red boot with the snail peeking out of its top.",
+    "avoid": ["the snail in the tent", "a foot in the boot"],
+    "refs": ["boot", "tent", "goat", "snail"]
+  },
+  {
+    "scene": "goat-7",
+    "tier": "goat-stories",
+    "batch": 5,
+    "subject": "The goat and the snail sitting side by side on the wooden stool; the goat holding up one white tooth.",
+    "avoid": ["the snail holding the tooth", "a mouth or blood"],
+    "refs": ["goat", "snail", "stool", "tooth"]
+  },
+  {
+    "scene": "goat-8",
+    "tier": "goat-stories",
+    "batch": 5,
+    "subject": "The goat holding a short grey chain, a red boot beside it; behind them, a red-tiled roof with the pink hoop lying on it.",
+    "avoid": ["the chain round the goat's neck", "the hoop on the goat"],
+    "refs": ["hoop", "chain", "boot", "goat"]
   }
 ]

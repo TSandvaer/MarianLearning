@@ -86,8 +86,8 @@ describe('hundreds in the Number Garden tree (§ 1, § 3.1)', () => {
       name: 'Hundreds',
       nodes: [HUNDREDS, 'hundreds-addsub', 'hundreds-zeros'],
     })
-    // Content wave 4 adds Word Song land 8.
-    expect(LANDS.filter((l) => l.world === 'word-song')).toHaveLength(8)
+    // Content wave 4 adds Word Song land 8, content wave 5 land 9.
+    expect(LANDS.filter((l) => l.world === 'word-song')).toHaveLength(9)
     expect(LANDS.flatMap((l) => l.nodes)).toEqual([
       ...MATH_TREE,
       ...LITERACY_TREE,

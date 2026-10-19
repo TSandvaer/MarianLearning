@@ -14,13 +14,13 @@
 import {
   LITERACY_TREE,
   MATH_TREE,
-  defaultProgress,
   getSettings,
   type LetterSoundsVowel,
   type MasteryTrack,
   type Progress,
   type SkillNode,
 } from '../progress'
+import { startProgressForActive } from '../learners/startDoc'
 import { landOf } from '../progress/lands'
 import { nodeProgress } from '../progress/nodeProgress'
 import { goodDayKeysFromHistory } from '../progress/mastery'
@@ -114,7 +114,7 @@ export function buildHubCardModel(
   world: MasteryTrack,
   today: string = todayKey(),
 ): HubCardModel {
-  const p = progress ?? defaultProgress()
+  const p = progress ?? startProgressForActive()
   const current = currentStepOf(p, world)
   const cur = nodeProgress(p, current)
   const complete = treeOf(world).every(

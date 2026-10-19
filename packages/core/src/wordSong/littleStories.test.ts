@@ -55,6 +55,14 @@ sheep-5 | The seal sat on a rock. The sheep ran to the tree. | Who sat on a rock
 sheep-6 | The sheep sat in the car. The bee is on the tree. | Where is the bee? | tree | On | car, sheep
 sheep-7 | The sheep and the shark sat on the ship. The shark got a peach. | Who got a peach? | shark | | sheep, ship
 sheep-8 | The sheep has a scarf and a card. A star is on the cart. | What is on the cart? | star | | scarf, card
+goat-1 | The goat sat in the boat. It has a loaf. | Who sat in the boat? | goat | | boat, loaf
+goat-2 | The goat is on the roof. A broom is in the train. | What is in the train? | broom | | goat, train
+goat-3 | The goat sat on the stool. It has a hoop. | Where is the goat? | stool | On | goat, hoop
+goat-4 | The goat has a coat. A spoon is on the tray. | What is on the tray? | spoon | | coat, tray
+goat-5 | The snail sat on the moon. The goat sat on a log. | Who sat on the moon? | snail | | goat, moon
+goat-6 | The goat sat in the tent. The snail hid in the boot. | Where is the snail? | boot | In | tent, goat
+goat-7 | The goat and the snail sat on the stool. The goat got a tooth. | Who got a tooth? | goat | | snail, stool
+goat-8 | The goat has a chain and a boot. A hoop is on the roof. | What is on the roof? | hoop | | chain, boot
 `
   .trim()
   .split('\n')
@@ -107,11 +115,20 @@ const CHARACTERS: Record<string, [number, number]> = {
   'sheep-6': [49, 17],
   'sheep-7': [63, 16],
   'sheep-8': [56, 20],
+  // Content wave 5 § 7.2.
+  'goat-1': [40, 20],
+  'goat-2': [49, 21],
+  'goat-3': [41, 18],
+  'goat-4': [44, 20],
+  'goat-5': [49, 20],
+  'goat-6': [52, 19],
+  'goat-7': [62, 16],
+  'goat-8': [55, 20],
 }
 
-describe('LITTLE_STORIES equals § 4.7 and wave 4 § 6.2 (AC 5; wave 4 AC 6)', () => {
-  it('32 rows, 8 per step, in canon order', () => {
-    expect(LITTLE_STORIES).toHaveLength(32)
+describe('LITTLE_STORIES equals § 4.7, wave 4 § 6.2 and wave 5 § 7.2 (AC 5; wave 4 AC 6; wave 5 AC 6)', () => {
+  it('40 rows, 8 per step, in canon order', () => {
+    expect(LITTLE_STORIES).toHaveLength(40)
     expect(
       LITTLE_STORIES.map(({ id, story, question, answer, prep, wrong }) => ({
         id,
@@ -143,13 +160,19 @@ describe('LITTLE_STORIES equals § 4.7 and wave 4 § 6.2 (AC 5; wave 4 AC 6)', (
       'hen-stories': 'What',
       'bug-stories': 'Where',
     }
-    for (const s of LITTLE_STORIES.filter((r) => r.node !== 'sheep-stories'))
+    for (const s of LITTLE_STORIES.filter((r) => word[r.node] !== undefined))
       expect(s.question.split(' ')[0], s.id).toBe(word[s.node])
   })
 
   it('sheep stories mix the question word: Who, What, Where, then What, Who, Where, Who, What (wave 4 § 6.1)', () => {
     expect(
       storiesOf('sheep-stories').map((s) => s.question.split(' ')[0]),
+    ).toEqual(['Who', 'What', 'Where', 'What', 'Who', 'Where', 'Who', 'What'])
+  })
+
+  it('goat stories mix them as sheep stories do (wave 5 § 7.1)', () => {
+    expect(
+      storiesOf('goat-stories').map((s) => s.question.split(' ')[0]),
     ).toEqual(['Who', 'What', 'Where', 'What', 'Who', 'Where', 'Who', 'What'])
   })
 
@@ -227,8 +250,8 @@ describe('the rules (§ 4.7)', () => {
     expect(chips.has('shed')).toBe(false)
   })
 
-  it('71 distinct story words, one clip each (§ 5.1; wave 4 § 6.2: 54 + 17)', () => {
-    expect(STORY_WORDS).toHaveLength(71)
+  it('87 distinct story words, one clip each (§ 5.1; wave 4 § 6.2: 54 + 17; wave 5 § 7.2: + 16)', () => {
+    expect(STORY_WORDS).toHaveLength(87)
     expect(STORY_WORDS.every((w) => /^[a-z]+$/.test(w))).toBe(true)
   })
 })
@@ -312,5 +335,108 @@ describe('sheep stories (content wave 4 § 6.2, AC 6)', () => {
   it('stories 5 and 7 are answered by a friend, not the sheep', () => {
     expect(sheep[4]!.answer).toBe('seal')
     expect(sheep[6]!.answer).toBe('shark')
+  })
+})
+
+describe('goat stories (content wave 5 § 7.2, AC 6)', () => {
+  const goat = storiesOf('goat-stories')
+  const words = (story: string) =>
+    storySentences(story).flat().map(storyWordKey)
+  /** The 16 snail-words and moon-words targets (§ 4.2, § 5.2). */
+  const SNAIL_MOON = new Set([
+    ...BIG_WORDS_STEPS['snail-words'].map((r) => r.word),
+    ...BIG_WORDS_STEPS['moon-words'].map((r) => r.word),
+  ])
+  /** What each chip is in its story: who, what or where (a container
+   *  counts as a place, D9). */
+  const KIND: Record<string, 'who' | 'what' | 'where'> = {
+    goat: 'who',
+    snail: 'who',
+    loaf: 'what',
+    broom: 'what',
+    hoop: 'what',
+    coat: 'what',
+    spoon: 'what',
+    moon: 'what',
+    tooth: 'what',
+    chain: 'what',
+    boot: 'where',
+    boat: 'where',
+    train: 'where',
+    stool: 'where',
+    tray: 'where',
+    tent: 'where',
+    roof: 'where',
+  }
+
+  it('2 sentences each; the two 14-word stories sit at P7 and P8', () => {
+    for (const s of goat) expect(storySentences(s.story).length, s.id).toBe(2)
+    expect(goat.map((s) => storyWordCount(s.story))).toEqual([
+      10, 12, 10, 11, 12, 12, 14, 14,
+    ])
+  })
+
+  it('the goat is in every story; each uses at least 2 of the 16 snail and moon words, and each of the 16 appears', () => {
+    const seen = new Set<string>()
+    for (const s of goat) {
+      const w = words(s.story)
+      expect(w, s.id).toContain('goat')
+      const team = w.filter((x) => SNAIL_MOON.has(x))
+      for (const x of team) seen.add(x)
+      expect(new Set(team).size, s.id).toBeGreaterThanOrEqual(2)
+    }
+    expect([...SNAIL_MOON].filter((x) => !seen.has(x))).toEqual([])
+  })
+
+  it('no "she"; "it" only in stories 1 and 3, always the animal before, never the answer (D8)', () => {
+    for (const s of goat) expect(words(s.story), s.id).not.toContain('she')
+    expect(
+      goat.filter((s) => words(s.story).includes('it')).map((s) => s.id),
+    ).toEqual(['goat-1', 'goat-3'])
+    // The sentence that answers names its subject: the question's subject
+    // is in the first sentence, before "It".
+    for (const i of [0, 2]) {
+      const [first] = storySentences(goat[i]!.story)
+      expect(first!.map(storyWordKey), goat[i]!.id).toContain(goat[i]!.answer)
+    }
+  })
+
+  it('questions fit the ribbon slot (≤ 23 characters)', () => {
+    for (const s of goat)
+      expect(s.question.length, s.id).toBeLessThanOrEqual(23)
+  })
+
+  it('chip kinds: the answer is the asked kind; P1–P3 wrong chips are other kinds; P4–P8 have at least one of the same kind', () => {
+    const asked = (q: string) =>
+      q.split(' ')[0]!.toLowerCase() as 'who' | 'what' | 'where'
+    // In story 8 the boot is a thing the goat has, not a place.
+    const kindOf = (id: string, w: string) =>
+      id === 'goat-8' && w === 'boot' ? 'what' : KIND[w]
+    goat.forEach((s, i) => {
+      const kind = asked(s.question)
+      expect(kindOf(s.id, s.answer), s.id).toBe(kind)
+      const same = s.wrong.filter((w) => kindOf(s.id, w) === kind).length
+      if (i < 3) expect(same, s.id).toBe(0)
+      else expect(same, s.id).toBeGreaterThanOrEqual(1)
+    })
+    // Story 8: two same-kind wrong chips, the hardest trio, last.
+    expect(goat[7]!.wrong.every((w) => kindOf('goat-8', w) === 'what')).toBe(
+      true,
+    )
+  })
+
+  it('the goat answers P1 and P7 only; stories 5 and 6 are about the snail', () => {
+    expect(goat.filter((s) => s.answer === 'goat').map((s) => s.id)).toEqual([
+      'goat-1',
+      'goat-7',
+    ])
+    expect(goat[4]!.answer).toBe('snail')
+    expect(goat[5]!.question).toBe('Where is the snail?')
+  })
+
+  it('the Where rows answer "Yes! On the stool!" and "Yes! In the boot!"', () => {
+    expect(storyCorrectLine(goat[2]!)).toBe('Yes! On the stool!')
+    expect(storyCorrectLine(goat[5]!)).toBe('Yes! In the boot!')
+    expect(storyGiveAnswerLine(goat[1]!)).toBe('This one is the broom.')
   })
 })
