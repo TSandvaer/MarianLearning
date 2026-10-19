@@ -41,7 +41,7 @@ const committed = (stem: string): CanonDoc =>
   JSON.parse(readFileSync(resolve(DIR, `${stem}.json`), 'utf8'))
 
 /** § 5.1's per-step bill of new texts: [texts, characters]. */
-const NEW_TEXTS: Record<StoryNode, [number, number]> = {
+const NEW_TEXTS: Partial<Record<StoryNode, [number, number]>> = {
   'fox-stories': [25, 661],
   'hen-stories': [31, 748],
   'bug-stories': [29, 724],

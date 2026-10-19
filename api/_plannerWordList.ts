@@ -429,6 +429,20 @@ export const WORD_SONG_TARGET_WORDS_TENT = bigWordsOf('tent-words').join(', ')
  */
 export const WORD_SONG_TARGET_WORDS_CAKE = bigWordsOf('cake-words').join(', ')
 
+/**
+ * Bee words (`bee-words`, land 8, content wave 4 —
+ * `design/native/content-wave-4.md` § 3): the vowel teams ee and ea, which
+ * say E's name. Exactly 8 words, IN CANON ORDER. Same source as duck words.
+ */
+export const WORD_SONG_TARGET_WORDS_BEE = bigWordsOf('bee-words').join(', ')
+
+/**
+ * Car words (`car-words`, land 8, content wave 4 — § 4): ar, /ɑː/ in
+ * British English. Exactly 8 words, IN CANON ORDER. Same source as duck
+ * words.
+ */
+export const WORD_SONG_TARGET_WORDS_CAR = bigWordsOf('car-words').join(', ')
+
 /** Hint shown to the model so it knows the broader pack — even though it
  *  isn't authoring distractors, knowing the rhyme families helps it order
  *  the gentle-vs-trap window correctly (per Kyle's distractor spec).

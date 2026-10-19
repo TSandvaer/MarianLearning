@@ -1229,7 +1229,9 @@ describe('generateSessionPlan — word-song P0 regression + step-2 widening (86c
     // crab-words, tent-words, cake-words). The stale
     // "Ten"/"Twelve"/"Thirteen"/"Fifteen" were fixed alongside W12-03 /
     // W13-03 / content waves 1 and 2; this pin stops it regressing.
-    expect(prompt).toContain('Seventeen first-class content modes today')
+    // Content wave 4 → 19 (bee-words, car-words).
+    expect(prompt).toContain('Nineteen first-class content modes today')
+    expect(prompt).not.toContain('Seventeen first-class content modes today')
     expect(prompt).not.toContain('Fifteen first-class content modes today')
     expect(prompt).not.toContain('Thirteen first-class content modes today')
     expect(prompt).not.toContain('Twelve first-class content modes today')

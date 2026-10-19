@@ -18,6 +18,7 @@ import {
   storyWordCount,
   storyWordKey,
 } from './littleStories'
+import { BIG_WORDS_STEPS } from './bigWordsSteps'
 import { getWordEntry, isForbiddenPair } from './wordPack'
 
 /** § 4.7, as written: story → question → answer (prep) / wrong chips. */
@@ -46,6 +47,14 @@ bug-5 | The bug is in the bag. The bag is in the van. | Where is the bag? | van 
 bug-6 | The dog ran to the pond. The bug hid. It is in the tub. | Where did the dog go? | pond | To | tub, dog
 bug-7 | The bug is in the nest. The hen is on a log. | Where is the hen? | log | On | nest, bug
 bug-8 | The bug is on a lid. The lid is on the pot. | Where is the lid? | pot | On | lid, bug
+sheep-1 | The sheep sat in the jeep. It has a peach. | Who sat in the jeep? | sheep | | jeep, peach
+sheep-2 | The sheep ran to the cart. A harp is in the barn. | What is in the barn? | harp | | sheep, barn
+sheep-3 | The sheep has a leaf. It hid in the cart. | Where is the sheep? | cart | In | sheep, leaf
+sheep-4 | The bee has a seed. The sheep has a card. | What does the bee have? | seed | | card, bee
+sheep-5 | The seal sat on a rock. The sheep ran to the tree. | Who sat on a rock? | seal | | sheep, rock
+sheep-6 | The sheep sat in the car. The bee is on the tree. | Where is the bee? | tree | On | car, sheep
+sheep-7 | The sheep and the shark sat on the ship. The shark got a peach. | Who got a peach? | shark | | sheep, ship
+sheep-8 | The sheep has a scarf and a card. A star is on the cart. | What is on the cart? | star | | scarf, card
 `
   .trim()
   .split('\n')
@@ -89,11 +98,20 @@ const CHARACTERS: Record<string, [number, number]> = {
   'bug-6': [55, 21],
   'bug-7': [44, 17],
   'bug-8': [43, 17],
+  // Content wave 4 § 6.2.
+  'sheep-1': [42, 20],
+  'sheep-2': [49, 20],
+  'sheep-3': [41, 19],
+  'sheep-4': [41, 23],
+  'sheep-5': [50, 18],
+  'sheep-6': [49, 17],
+  'sheep-7': [63, 16],
+  'sheep-8': [56, 20],
 }
 
-describe('LITTLE_STORIES equals § 4.7 (AC 5)', () => {
-  it('24 rows, 8 per step, in canon order', () => {
-    expect(LITTLE_STORIES).toHaveLength(24)
+describe('LITTLE_STORIES equals § 4.7 and wave 4 § 6.2 (AC 5; wave 4 AC 6)', () => {
+  it('32 rows, 8 per step, in canon order', () => {
+    expect(LITTLE_STORIES).toHaveLength(32)
     expect(
       LITTLE_STORIES.map(({ id, story, question, answer, prep, wrong }) => ({
         id,
@@ -119,14 +137,30 @@ describe('LITTLE_STORIES equals § 4.7 (AC 5)', () => {
       )
   })
 
-  it('one question word per step: who, what, where (K3, D1)', () => {
-    const word = {
+  it('one question word per wave-3 step: who, what, where (K3, D1)', () => {
+    const word: Partial<Record<string, string>> = {
       'fox-stories': 'Who',
       'hen-stories': 'What',
       'bug-stories': 'Where',
     }
-    for (const s of LITTLE_STORIES)
+    for (const s of LITTLE_STORIES.filter((r) => r.node !== 'sheep-stories'))
       expect(s.question.split(' ')[0], s.id).toBe(word[s.node])
+  })
+
+  it('sheep stories mix the question word: Who, What, Where, then What, Who, Where, Who, What (wave 4 § 6.1)', () => {
+    expect(
+      storiesOf('sheep-stories').map((s) => s.question.split(' ')[0]),
+    ).toEqual(['Who', 'What', 'Where', 'What', 'Who', 'Where', 'Who', 'What'])
+  })
+
+  it('every Where row carries its preposition, and only Where rows do (wave 4 § 6.1)', () => {
+    for (const s of LITTLE_STORIES)
+      expect(s.prep !== undefined, s.id).toBe(s.question.startsWith('Where'))
+    const sheep = storiesOf('sheep-stories')
+    expect(storyCorrectLine(sheep[2]!)).toBe('Yes! In the cart!')
+    expect(storyCorrectLine(sheep[5]!)).toBe('Yes! On the tree!')
+    expect(storyCorrectLine(sheep[0]!)).toBe('Yes! The sheep!')
+    expect(storyGiveAnswerLine(sheep[6]!)).toBe('This one is the shark.')
   })
 
   it('the correct and given-answer lines (§ 4.6, § 4.7)', () => {
@@ -155,7 +189,7 @@ describe('LITTLE_STORIES equals § 4.7 (AC 5)', () => {
 })
 
 describe('the rules (§ 4.7)', () => {
-  it('2–3 sentences and 10–14 words; three sentences only in bug 6 and hen 8 (D2)', () => {
+  it('2–3 sentences and 10–14 words; three sentences only in bug 6 and hen 8 (D2; wave 4 § 6.2)', () => {
     for (const s of LITTLE_STORIES) {
       const n = storySentences(s.story).length
       expect(n, s.id).toBeGreaterThanOrEqual(2)
@@ -193,8 +227,90 @@ describe('the rules (§ 4.7)', () => {
     expect(chips.has('shed')).toBe(false)
   })
 
-  it('54 distinct story words, one clip each (§ 5.1)', () => {
-    expect(STORY_WORDS).toHaveLength(54)
+  it('71 distinct story words, one clip each (§ 5.1; wave 4 § 6.2: 54 + 17)', () => {
+    expect(STORY_WORDS).toHaveLength(71)
     expect(STORY_WORDS.every((w) => /^[a-z]+$/.test(w))).toBe(true)
+  })
+})
+
+describe('sheep stories (content wave 4 § 6.2, AC 6)', () => {
+  const sheep = storiesOf('sheep-stories')
+  const words = (story: string) =>
+    storySentences(story).flat().map(storyWordKey)
+  /** The 16 bee-words and car-words targets (§ 3.2, § 4.2). */
+  const BEE_CAR = new Set([
+    ...BIG_WORDS_STEPS['bee-words'].map((r) => r.word),
+    ...BIG_WORDS_STEPS['car-words'].map((r) => r.word),
+  ])
+  /** What each chip is in its story: who, what or where. */
+  const KIND: Record<string, 'who' | 'what' | 'where'> = {
+    sheep: 'who',
+    bee: 'who',
+    seal: 'who',
+    shark: 'who',
+    peach: 'what',
+    harp: 'what',
+    leaf: 'what',
+    seed: 'what',
+    card: 'what',
+    scarf: 'what',
+    star: 'what',
+    jeep: 'where',
+    barn: 'where',
+    cart: 'where',
+    rock: 'where',
+    car: 'where',
+    tree: 'where',
+    ship: 'where',
+  }
+
+  it('2 sentences each; the two 14-word stories sit at P7 and P8', () => {
+    for (const s of sheep) expect(storySentences(s.story).length, s.id).toBe(2)
+    expect(sheep.map((s) => storyWordCount(s.story))).toEqual([
+      10, 12, 10, 10, 12, 12, 14, 14,
+    ])
+  })
+
+  it('the sheep is in every story; each uses at least 2 of the 16 bee and car words, and each of the 16 appears', () => {
+    const seen = new Set<string>()
+    for (const s of sheep) {
+      const w = words(s.story)
+      expect(w, s.id).toContain('sheep')
+      const team = w.filter((x) => BEE_CAR.has(x))
+      for (const x of team) seen.add(x)
+      expect(new Set(team).size, s.id).toBeGreaterThanOrEqual(2)
+    }
+    expect([...BEE_CAR].filter((x) => !seen.has(x))).toEqual([])
+  })
+
+  it('no "she", and "it" only in stories 1 and 3', () => {
+    for (const s of sheep) expect(words(s.story), s.id).not.toContain('she')
+    expect(
+      sheep.filter((s) => words(s.story).includes('it')).map((s) => s.id),
+    ).toEqual(['sheep-1', 'sheep-3'])
+  })
+
+  it('questions fit the ribbon slot (≤ 23 characters)', () => {
+    for (const s of sheep)
+      expect(s.question.length, s.id).toBeLessThanOrEqual(23)
+  })
+
+  it('chip kinds: the answer is the asked kind; P1–P3 wrong chips are other kinds; P4–P8 have at least one of the same kind', () => {
+    const asked = (q: string) =>
+      q.split(' ')[0]!.toLowerCase() as 'who' | 'what' | 'where'
+    sheep.forEach((s, i) => {
+      const kind = asked(s.question)
+      expect(KIND[s.answer], s.id).toBe(kind)
+      const same = s.wrong.filter((w) => KIND[w] === kind).length
+      if (i < 3) expect(same, s.id).toBe(0)
+      else expect(same, s.id).toBeGreaterThanOrEqual(1)
+    })
+    // Story 8: two same-kind wrong chips, the hardest trio, last (D10).
+    expect(sheep[7]!.wrong.every((w) => KIND[w] === 'what')).toBe(true)
+  })
+
+  it('stories 5 and 7 are answered by a friend, not the sheep', () => {
+    expect(sheep[4]!.answer).toBe('seal')
+    expect(sheep[6]!.answer).toBe('shark')
   })
 })

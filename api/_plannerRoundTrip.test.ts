@@ -37,7 +37,9 @@ import { generateSessionPlan, type PlannerAnthropicClient } from './_planner.js'
 import {
   WORD_SONG_NOVEL_PROBE_WORDS,
   WORD_SONG_SIMPLE_SENTENCES,
+  WORD_SONG_TARGET_WORDS_BEE,
   WORD_SONG_TARGET_WORDS_CAKE,
+  WORD_SONG_TARGET_WORDS_CAR,
   WORD_SONG_TARGET_WORDS_CRAB,
   WORD_SONG_TARGET_WORDS_DUCK,
   WORD_SONG_TARGET_WORDS_TENT,
@@ -1438,18 +1440,22 @@ describe('simple-sentences tier — canonical pool ↔ browser-mirror alignment 
 // names the words in canon order from `bigWordsSteps.ts`, the planner keeps
 // that order (no continuant-onset reorder), and the parser reads every
 // problem as a picture-chip `cvc-word` with a real distractor trio.
-describe('planner → parser round-trip — land 6: duck, crab (content wave 1), tent and cake words (content wave 2)', () => {
+describe('planner → parser round-trip — land 6: duck, crab (content wave 1), tent and cake words (content wave 2); land 8: bee and car words (content wave 4)', () => {
   const STEPS = [
     'duck-words',
     'crab-words',
     'tent-words',
     'cake-words',
+    'bee-words',
+    'car-words',
   ] as const
   const SERVER_LIST = {
     'duck-words': WORD_SONG_TARGET_WORDS_DUCK,
     'crab-words': WORD_SONG_TARGET_WORDS_CRAB,
     'tent-words': WORD_SONG_TARGET_WORDS_TENT,
     'cake-words': WORD_SONG_TARGET_WORDS_CAKE,
+    'bee-words': WORD_SONG_TARGET_WORDS_BEE,
+    'car-words': WORD_SONG_TARGET_WORDS_CAR,
   } as const
 
   function wirePlan(words: readonly string[]): string {
@@ -1498,12 +1504,15 @@ describe('planner → parser round-trip — land 6: duck, crab (content wave 1),
       )
       expect(request).toContain(`Focus skill node: ${step}`)
 
-      const rebuilt = wordSongSessionPlanFromServer(plan)
+      const rebuilt = wordSongSessionPlanFromServer(plan, { step })
       expect(rebuilt.problems.map((p) => p.target.word)).toEqual([...words])
       for (const problem of rebuilt.problems) {
         expect(problem.contentType).toBe('cvc-word')
+        expect(problem.chipRow).toBeDefined()
         expect(() =>
-          pickDistractors(problem.target, problem.index),
+          pickDistractors(problem.target, problem.index, {
+            row: problem.chipRow,
+          }),
         ).not.toThrow()
       }
     },

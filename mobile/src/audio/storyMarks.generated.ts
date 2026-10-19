@@ -28,6 +28,14 @@ export const STORY_MARKS: Readonly<
       [2230, 3507],
     ],
   },
+  'The bee has a seed. The sheep has a card.': {
+    bytes: 29883,
+    sha256: 'd39dd533409659ca',
+    segments: [
+      [81, 1522],
+      [2026, 3443],
+    ],
+  },
   'The bug got a gem. It ran to the tent.': {
     bytes: 28002,
     sha256: '032afb169c9a9c2d',
@@ -212,6 +220,62 @@ export const STORY_MARKS: Readonly<
     segments: [
       [90, 1553],
       [2129, 3722],
+    ],
+  },
+  'The seal sat on a rock. The sheep ran to the tree.': {
+    bytes: 33853,
+    sha256: '96e88062dbb10d42',
+    segments: [
+      [43, 1672],
+      [2272, 3955],
+    ],
+  },
+  'The sheep and the shark sat on the ship. The shark got a peach.': {
+    bytes: 37615,
+    sha256: '27bb6042fc2ab594',
+    segments: [
+      [92, 2403],
+      [2925, 4456],
+    ],
+  },
+  'The sheep has a leaf. It hid in the cart.': {
+    bytes: 28002,
+    sha256: 'f29093faa10d01b0',
+    segments: [
+      [63, 1507],
+      [1944, 3239],
+    ],
+  },
+  'The sheep has a scarf and a card. A star is on the cart.': {
+    bytes: 36361,
+    sha256: '36366d59191f3e61',
+    segments: [
+      [97, 2260],
+      [2721, 4287],
+    ],
+  },
+  'The sheep ran to the cart. A harp is in the barn.': {
+    bytes: 32599,
+    sha256: '4614d3c17c70bef1',
+    segments: [
+      [48, 1776],
+      [2344, 3796],
+    ],
+  },
+  'The sheep sat in the car. The bee is on the tree.': {
+    bytes: 33853,
+    sha256: 'e41344198eef828a',
+    segments: [
+      [58, 1633],
+      [2220, 3809],
+    ],
+  },
+  'The sheep sat in the jeep. It has a peach.': {
+    bytes: 28002,
+    sha256: '544b940b6de6a0b0',
+    segments: [
+      [43, 1667],
+      [2129, 3216],
     ],
   },
 }

@@ -1434,6 +1434,134 @@ describe('land 6 — tent words and cake words (content wave 2)', () => {
   })
 })
 
+describe('land 8 — bee words and car words (content wave 4)', () => {
+  // design/native/content-wave-4.md § 3.2 and § 4.2: [word, gentle, trap].
+  const BEE: readonly (readonly [string, string[], string[]])[] = [
+    ['bee', ['cup', 'fan'], ['bed', 'tree']],
+    ['tree', ['dog', 'cap'], ['tent', 'bee']],
+    ['leaf', ['box', 'hat'], ['leg', 'seal']],
+    ['sheep', ['pot', 'map'], ['ship', 'jeep']],
+    ['jeep', ['pig', 'sun'], ['jet', 'sheep']],
+    ['seal', ['mop', 'cap'], ['sun', 'seed']],
+    ['peach', ['dog', 'bus'], ['pen', 'leaf']],
+    ['seed', ['cat', 'cup'], ['sock', 'seal']],
+  ]
+  const CAR: readonly (readonly [string, string[], string[]])[] = [
+    ['car', ['dog', 'pen'], ['cat', 'star']],
+    ['star', ['hen', 'cup'], ['sun', 'car']],
+    ['barn', ['fox', 'pen'], ['bag', 'harp']],
+    ['cart', ['sun', 'hen'], ['cat', 'car']],
+    ['shark', ['pot', 'bed'], ['ship', 'star']],
+    ['scarf', ['dog', 'bun'], ['sack', 'shark']],
+    ['card', ['pig', 'hen'], ['cap', 'cart']],
+    ['harp', ['fox', 'bus'], ['hat', 'barn']],
+  ]
+  /** The step row as a problem carries it (§ 5). */
+  const rowOf = (step: 'bee-words' | 'car-words', word: string) => {
+    const r = BIG_WORDS_STEPS[step].find((x) => x.word === word)!
+    return { gentle: r.gentle, trap: r.trap }
+  }
+
+  it('holds exactly 8 words per step, in canon order', () => {
+    expect(bigWordsOf('bee-words')).toEqual(BEE.map(([w]) => w))
+    expect(bigWordsOf('car-words')).toEqual(CAR.map(([w]) => w))
+  })
+
+  it('deals the spec matrix from each step row (gentle P1–P3, trap P4–P8)', () => {
+    for (const [step, rows] of [
+      ['bee-words', BEE],
+      ['car-words', CAR],
+    ] as const)
+      for (const [word, gentle, trap] of rows) {
+        const target = getWordEntry(word)
+        const row = rowOf(step, word)
+        expect(pickDistractors(target, 1, { row }).map((d) => d.word)).toEqual(
+          gentle,
+        )
+        expect(pickDistractors(target, 4, { row }).map((d) => d.word)).toEqual(
+          trap,
+        )
+      }
+  })
+
+  it('adds 14 picture targets with their own picture key, no phoneme tag and no flags; sheep and shark keep their sh entries', () => {
+    const rows = [...BEE, ...CAR].filter(
+      ([w]) => w !== 'sheep' && w !== 'shark',
+    )
+    const words = new Set(rows.map(([w]) => w))
+    const entries = TARGET_WORDS.filter((e) => words.has(e.word))
+    expect(entries.map((e) => e.word)).toEqual(rows.map(([w]) => w))
+    for (const e of entries)
+      expect(e).toEqual({
+        word: e.word,
+        pictureKey: e.word,
+        vowel: e.vowel,
+        category: e.category,
+        isTarget: true,
+      })
+    expect(
+      Object.fromEntries(entries.map((e) => [e.word, [e.vowel, e.category]])),
+    ).toEqual({
+      bee: ['e', 'animal'],
+      tree: ['e', 'nature'],
+      leaf: ['e', 'nature'],
+      jeep: ['e', 'vehicle'],
+      seal: ['e', 'animal'],
+      peach: ['e', 'food'],
+      seed: ['e', 'nature'],
+      car: ['a', 'vehicle'],
+      star: ['a', 'celestial'],
+      barn: ['a', 'structure'],
+      cart: ['a', 'vehicle'],
+      scarf: ['a', 'clothing'],
+      card: ['a', 'object'],
+      harp: ['a', 'object'],
+    })
+    expect(TARGET_WORDS.filter((e) => e.word === 'sheep')).toHaveLength(1)
+    expect(TARGET_WORDS.filter((e) => e.word === 'shark')).toHaveLength(1)
+  })
+
+  it('no trio contains a forbidden pair, old or new (§ 7)', () => {
+    const hits: string[] = []
+    for (const [word, gentle, trap] of [...BEE, ...CAR])
+      for (const [a, b] of [gentle, trap])
+        for (const [x, y] of [
+          [word, a],
+          [word, b],
+          [a, b],
+        ] as const)
+          if (isForbiddenPair(x!, y!)) hits.push(`${word}: ${x}/${y}`)
+    expect(hits).toEqual([])
+  })
+
+  it('every gentle chip has another first letter, another vowel letter and another category than its target (§ 3.2, § 4.2)', () => {
+    const misses: string[] = []
+    for (const [step, rows] of [
+      ['bee-words', BEE],
+      ['car-words', CAR],
+    ] as const)
+      for (const [word, gentle] of rows) {
+        const row = BIG_WORDS_STEPS[step].find((r) => r.word === word)!
+        for (const d of gentle.map(getWordEntry))
+          if (
+            d.word[0] === word[0] ||
+            d.vowel === row.vowel ||
+            d.category === row.category
+          )
+            misses.push(`${word}: ${d.word}`)
+      }
+    expect(misses).toEqual([])
+  })
+
+  it('car words: no gentle chip has a c or k sound for car, cart and card; bath is in no car-words trio', () => {
+    for (const [word, gentle, trap] of CAR) {
+      if (['car', 'cart', 'card'].includes(word))
+        for (const g of gentle) expect(g, word).not.toMatch(/c|k/)
+      expect([...gentle, ...trap], word).not.toContain('bath')
+    }
+  })
+})
+
 describe('FORBIDDEN_PAIRS', () => {
   it("contains the silhouette-similarity pairs from Kyle's pack-doc + the v2 short-o + v3 short-u + v4 short-i + v5 short-e + digraphs-sh + digraphs-ch + digraphs-th additions (tickets 86c9m3ae3 / 86c9q9ben / 86c9qdba4 / 86c9teua2 / digraphs-sh / digraphs-ch / digraphs-th)", () => {
     // Per design/word-song-picture-pack.md §"Distractor pairing matrix"
@@ -1494,6 +1622,24 @@ describe('FORBIDDEN_PAIRS', () => {
       ['desk', 'bed'],
       ['kite', 'flag'],
       ['rope', 'sack'],
+      // Land 8, bee and car words (content wave 4 § 7).
+      ['bee', 'bug'],
+      ['tree', 'pine'],
+      ['seed', 'nut'],
+      ['seed', 'egg'],
+      ['peach', 'plum'],
+      ['sheep', 'dog'],
+      ['sheep', 'pig'],
+      ['sheep', 'cat'],
+      ['jeep', 'van'],
+      ['jeep', 'bus'],
+      ['jeep', 'car'],
+      ['car', 'van'],
+      ['car', 'bus'],
+      ['barn', 'tent'],
+      ['scarf', 'belt'],
+      ['card', 'gift'],
+      ['seal', 'shark'],
     ].map((p) => [...p].sort().join(','))
 
     for (const expected of expectedPairs) {

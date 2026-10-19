@@ -59,6 +59,8 @@ import {
   type WordSongSessionPlan,
   type WordSongUtteranceSlot,
 } from './wordSessionPlans'
+import type { SkillNode } from '../progress/types'
+import { bigWordRowOf } from './bigWordsSteps'
 import { littleStoryForText } from './littleStories'
 import {
   SIMPLE_SENTENCE_TARGET_SET,
@@ -421,6 +423,14 @@ export interface WordSongPlanFromServerOptions {
    * silent static plan (wave 1 § 1.9's rule).
    */
   readonly littleStories?: boolean
+  /**
+   * The step the problems come from: one step for the whole plan (a
+   * forward session, a peek, a replay), or one per problem in order (a
+   * review's blocks; a warm-up's refs, `w<N>` = entry N). A problem of a
+   * big-words step carries that step's chip row (`chipRow`, content wave 4
+   * § 5, K4). Without it, every problem deals the by-word matrix row.
+   */
+  readonly step?: SkillNode | readonly (SkillNode | undefined)[]
 }
 
 /**
@@ -523,7 +533,23 @@ function problemFromBucket(
   }
 
   const { entry: target, contentType } = parseReadLine(utterances.read)
-  return { index, target, utterances, contentType }
+  const step =
+    typeof options?.step === 'string'
+      ? options.step
+      : options?.step?.[index - 1]
+  const row =
+    contentType === 'cvc-word' && step !== undefined
+      ? bigWordRowOf(step, target.word)
+      : undefined
+  return row === undefined
+    ? { index, target, utterances, contentType }
+    : {
+        index,
+        target,
+        utterances,
+        contentType,
+        chipRow: { gentle: row.gentle, trap: row.trap },
+      }
 }
 
 /** One warm-up block of a server response: `word.w<block>.<slot>`. */
@@ -544,7 +570,7 @@ export interface WordSongWarmupProblem {
  */
 export function wordSongWarmupFromServer(
   serverPlan: unknown,
-  options?: Pick<WordSongPlanFromServerOptions, 'littleStories'>,
+  options?: Pick<WordSongPlanFromServerOptions, 'littleStories' | 'step'>,
 ): WordSongWarmupProblem[] {
   if (!isServerPlan(serverPlan)) return []
   const byBlock = new Map<number, Partial<WordSongProblemUtterances>>()

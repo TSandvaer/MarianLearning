@@ -1,9 +1,11 @@
 /**
- * The four Word Song steps of land 6, "Big words": duck words (ck and ng
- * at the end) and crab words (start blends) from content wave 1
- * (`design/native/content-wave-1.md` § 3.2 and § 4.2); tent words (end
- * blends) and cake words (magic e) from content wave 2
- * (`design/native/content-wave-2.md` § 3.2 and § 4.2).
+ * The Word Song word steps in land 6's format. Land 6, "Big words": duck
+ * words (ck and ng at the end) and crab words (start blends) from content
+ * wave 1 (`design/native/content-wave-1.md` § 3.2 and § 4.2); tent words
+ * (end blends) and cake words (magic e) from content wave 2
+ * (`design/native/content-wave-2.md` § 3.2 and § 4.2). Land 8, "Words and
+ * stories": bee words (ee / ea) and car words (ar) from content wave 4
+ * (`design/native/content-wave-4.md` § 3.2 and § 4.2).
  *
  * THE one place their words and traps live. `wordPack.ts` builds the
  * picture-pack entries and the distractor rows from it, and the server's
@@ -21,12 +23,14 @@
  * has no blend clip (K11): the letters pulse silently and the 2nd wrong
  * plays the hint line.
  */
-/** The land-6 Word Song steps. */
+/** The land-6-format Word Song steps. */
 export type BigWordsStep =
   | 'duck-words'
   | 'crab-words'
   | 'tent-words'
   | 'cake-words'
+  | 'bee-words'
+  | 'car-words'
 
 /** The `WordCategory` values these words use (a subset; `wordPack.ts`
  *  assigns them to `WordEntry.category`, so tsc checks the subset). */
@@ -42,6 +46,8 @@ export type BigWordCategory =
   // Content wave 2: pond and pine (§ 3.2, § 4.2), bike.
   | 'nature'
   | 'vehicle'
+  // Content wave 4: star (§ 4.2; the pack's sun is celestial already).
+  | 'celestial'
 
 export interface BigWordRow {
   word: string
@@ -49,7 +55,8 @@ export interface BigWordRow {
    * The word's vowel letter. Duck, crab and tent words: its short vowel
    * (every word keeps it in British English too). Cake words: the letter
    * that says its name (content wave 2 § 4.2); nothing on the land-6 path
-   * reads it as a short sound.
+   * reads it as a short sound. Bee words: 'e', the team's first letter,
+   * which says its name; car words: 'a' (content wave 4 § 3.2, § 4.2).
    */
   vowel: 'a' | 'e' | 'i' | 'o' | 'u'
   category: BigWordCategory
@@ -65,6 +72,8 @@ export const BIG_WORDS_STEP_IDS: readonly BigWordsStep[] = [
   'crab-words',
   'tent-words',
   'cake-words',
+  'bee-words',
+  'car-words',
 ]
 
 export const BIG_WORDS_STEPS: Readonly<
@@ -321,9 +330,148 @@ export const BIG_WORDS_STEPS: Readonly<
       trap: ['bib', 'kite'], // the same start bi, short; the same i_e
     },
   ],
+  // Content wave 4 § 3.2 (Dave's words and traps, D5's gentle pairs): ee
+  // and ea both say E's name. Gentle pairs: another category, first sound
+  // and vowel letter (none has an e). sheep is also an sh-step target with
+  // its own matrix row, so this row rides on the problem (§ 5, `chipRow`).
+  'bee-words': [
+    {
+      word: 'bee',
+      vowel: 'e',
+      category: 'animal',
+      gentle: ['cup', 'fan'],
+      trap: ['bed', 'tree'], // the short word she reads; the same ee
+    },
+    {
+      word: 'tree',
+      vowel: 'e',
+      category: 'nature',
+      gentle: ['dog', 'cap'],
+      trap: ['tent', 'bee'], // t and a short e; the same ee
+    },
+    {
+      word: 'leaf',
+      vowel: 'e',
+      category: 'nature',
+      gentle: ['box', 'hat'],
+      trap: ['leg', 'seal'], // the short word; the same ea
+    },
+    {
+      word: 'sheep',
+      vowel: 'e',
+      category: 'animal',
+      gentle: ['pot', 'map'],
+      trap: ['ship', 'jeep'], // Dave's R8 contrast; rhyme
+    },
+    {
+      word: 'jeep',
+      vowel: 'e',
+      category: 'vehicle',
+      gentle: ['pig', 'sun'],
+      trap: ['jet', 'sheep'], // the short word; rhyme
+    },
+    {
+      word: 'seal',
+      vowel: 'e',
+      category: 'animal',
+      gentle: ['mop', 'cap'],
+      trap: ['sun', 'seed'], // s and a short vowel; read to the end
+    },
+    {
+      word: 'peach',
+      vowel: 'e',
+      category: 'food',
+      gentle: ['dog', 'bus'],
+      trap: ['pen', 'leaf'], // the short word; the same ea
+    },
+    {
+      word: 'seed',
+      vowel: 'e',
+      category: 'nature',
+      gentle: ['cat', 'cup'],
+      trap: ['sock', 'seal'], // s and a short vowel; the same s, e, e
+    },
+  ],
+  // Content wave 4 § 4.2: ar says /ɑː/ (Lily is British: no r sound).
+  // Gentle pairs as bee words', with no a, and no c or k sound for car,
+  // cart and card. Never put bath in a car-words trio (the British /ɑː/).
+  // shark is also an sh-step target, so its row rides on the problem.
+  'car-words': [
+    {
+      word: 'car',
+      vowel: 'a',
+      category: 'vehicle',
+      gentle: ['dog', 'pen'],
+      trap: ['cat', 'star'], // the short word; rhyme
+    },
+    {
+      word: 'star',
+      vowel: 'a',
+      category: 'celestial',
+      gentle: ['hen', 'cup'],
+      trap: ['sun', 'car'], // s and a short vowel; rhyme
+    },
+    {
+      word: 'barn',
+      vowel: 'a',
+      category: 'structure',
+      gentle: ['fox', 'pen'],
+      trap: ['bag', 'harp'], // the short word; the same ar
+    },
+    {
+      word: 'cart',
+      vowel: 'a',
+      category: 'vehicle',
+      gentle: ['sun', 'hen'],
+      trap: ['cat', 'car'], // cart without the r; read to the end
+    },
+    {
+      word: 'shark',
+      vowel: 'a',
+      category: 'animal',
+      gentle: ['pot', 'bed'],
+      trap: ['ship', 'star'], // sh and a short vowel; the same ar
+    },
+    {
+      word: 'scarf',
+      vowel: 'a',
+      category: 'clothing',
+      gentle: ['dog', 'bun'],
+      trap: ['sack', 'shark'], // s and a short a; the same ar
+    },
+    {
+      word: 'card',
+      vowel: 'a',
+      category: 'object',
+      gentle: ['pig', 'hen'],
+      trap: ['cap', 'cart'], // the short start; only the last letter differs
+    },
+    {
+      word: 'harp',
+      vowel: 'a',
+      category: 'object',
+      gentle: ['fox', 'bus'],
+      trap: ['hat', 'barn'], // the short word; the same ar
+    },
+  ],
 }
 
 /** A step's 8 words, in canon order. */
 export function bigWordsOf(step: BigWordsStep): readonly string[] {
   return BIG_WORDS_STEPS[step].map((row) => row.word)
+}
+
+/**
+ * `word`'s row in `step`, or undefined when `step` is not one of these
+ * steps or has no such word. A problem of these steps carries its own
+ * step's row (content wave 4 § 5, K4): sheep and shark are also sh-step
+ * targets, whose matrix rows stay theirs.
+ */
+export function bigWordRowOf(
+  step: string,
+  word: string,
+): BigWordRow | undefined {
+  if (!(BIG_WORDS_STEP_IDS as readonly string[]).includes(step))
+    return undefined
+  return BIG_WORDS_STEPS[step as BigWordsStep].find((r) => r.word === word)
 }

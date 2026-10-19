@@ -53,6 +53,7 @@ import {
   storyGiveAnswerLine,
   storySentences,
   storyWordKey,
+  type LittleStory,
   type StoryNode,
 } from '@marian/core/wordSong/littleStories'
 import { renderElevenLabsText } from '../api/_tts_elevenlabs.js'
@@ -76,8 +77,13 @@ export const WORD_CANON_DIR = join(
   'level-1',
 )
 
-/** The steps this script writes, in tree order. */
-export const WAVE_3_STORY_STEPS: readonly StoryNode[] = STORY_NODES
+/** The steps this script writes, in tree order (sheep stories, content
+ *  wave 4, is `spliceContentWave4Canon.ts`'s). */
+export const WAVE_3_STORY_STEPS: readonly StoryNode[] = [
+  'fox-stories',
+  'hen-stories',
+  'bug-stories',
+]
 
 /** The file whose `session.end.*` lines the new files take. */
 const SESSION_END_SOURCE = 'duck-words'
@@ -168,11 +174,16 @@ export function taughtWords(): Set<string> {
   return taught
 }
 
-/** Every way a step's lines depart from the table and § 4.7's rules. */
+/**
+ * Every way a step's lines depart from the table and § 4.7's rules. `rows`
+ * are the stories the rules read (the table's by default; a test passes
+ * its own bad rows).
+ */
 export function storyCanonViolations(
   step: StoryNode,
   utterances: readonly Line[],
   taught: ReadonlySet<string> = taughtWords(),
+  rows: readonly LittleStory[] = storiesOf(step),
 ): string[] {
   const out: string[] = []
   const problem = utterances
@@ -181,12 +192,13 @@ export function storyCanonViolations(
   const expected = expectedStoryLines(step)
   if (JSON.stringify(problem) !== JSON.stringify(expected))
     out.push(`${step}: the problem lines are not the table's`)
-  for (const s of storiesOf(step)) {
+  for (const s of rows) {
     for (const w of storySentences(s.story).flat().map(storyWordKey))
       if (!taught.has(w)) out.push(`${s.id}: "${w}" is not a taught word`)
     if (/s\b/.test(s.story.replace(/\b(is|has|bus)\b/g, '')))
       out.push(`${s.id}: a plural or -s ending`)
-    if (/ed\b/.test(s.story.replace(/\b(bed|shed|red)\b/g, '')))
+    // seed: content wave 4's sheep stories (§ 6.2).
+    if (/ed\b/.test(s.story.replace(/\b(bed|shed|red|seed)\b/g, '')))
       out.push(`${s.id}: an -ed ending`)
   }
   const recap = utterances.find((u) => u.id === 'session.end.recap.focus')

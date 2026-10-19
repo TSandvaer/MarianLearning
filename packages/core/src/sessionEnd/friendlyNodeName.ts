@@ -103,6 +103,9 @@ export const FRIENDLY_NODE_NAMES: Record<SkillNode, string> = {
   'fox-stories': 'reading stories',
   'hen-stories': 'reading stories',
   'bug-stories': 'reading stories',
+  'bee-words': 'reading words',
+  'car-words': 'reading words',
+  'sheep-stories': 'reading stories',
 }
 
 /**
@@ -190,6 +193,11 @@ export const STAGE_SPOKEN_NAMES: Record<SkillNode, string> = {
   'fox-stories': 'fox stories',
   'hen-stories': 'hen stories',
   'bug-stories': 'bug stories',
+  // Content wave 4 (design/native/content-wave-4.md § 1, T1): named after
+  // the stop pictures, as the steps before them.
+  'bee-words': 'bee words',
+  'car-words': 'car words',
+  'sheep-stories': 'sheep stories',
 }
 
 /**
@@ -238,6 +246,9 @@ export const STAGE_SPOKEN_NAME_VERBS: Record<SkillNode, 'is' | 'are'> = {
   'fox-stories': 'are',
   'hen-stories': 'are',
   'bug-stories': 'are',
+  'bee-words': 'are',
+  'car-words': 'are',
+  'sheep-stories': 'are',
 }
 
 /** "adding to ten" → "Adding to ten" (sentence-start form). */

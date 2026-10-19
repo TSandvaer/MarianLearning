@@ -24,7 +24,12 @@ import {
   STAGE_SPOKEN_NAMES,
   capitalizeSpokenName,
 } from '../sessionEnd/friendlyNodeName'
-import { STORY_WORDS } from '../wordSong/littleStories'
+import {
+  STORY_WORDS,
+  storiesOf,
+  storySentences,
+  storyWordKey,
+} from '../wordSong/littleStories'
 import { pathLineSrc, pathStepsOf } from './pathLines'
 
 /** A world (`'math'` | `'word-song'`). */
@@ -65,6 +70,13 @@ export interface GuidanceLine {
   /** The world the line suggests; `null` for world-free lines. */
   world: World | null
   text: string
+  /**
+   * What the render sends to Lily when it is not `text`: the one-word story
+   * clips that sheep stories bring go as "Word," (content wave 4 § 8.1;
+   * "Sat." came back as "Saturday", `audio-system.md`). The caption stays
+   * `text`. Undefined = `text`.
+   */
+  input?: string
   /** Bundled MP3 path relative to `public/`. */
   src: string
 }
@@ -85,7 +97,16 @@ function buildLines(): GuidanceLine[] {
     kind: GuidanceLineKind,
     text: string,
     world: World | null = null,
-  ) => lines.push({ id, kind, world, text, src: pathLineSrc(id) })
+    input?: string,
+  ) =>
+    lines.push({
+      id,
+      kind,
+      world,
+      text,
+      ...(input === undefined ? {} : { input }),
+      src: pathLineSrc(id),
+    })
 
   // Hub (screens a, c, d, a2). `world` = the world Emma suggests.
   for (const w of WORLDS)
@@ -224,17 +245,31 @@ function buildLines(): GuidanceLine[] {
       )
   // Little stories (content wave 3 § 4.4, § 5.1): "Read the story." on a
   // story card, and one clip per distinct story word that a word tap plays
-  // ("Fox."). The word list comes from `LITTLE_STORIES`.
+  // ("Fox."). The word list comes from `LITTLE_STORIES`. The words sheep
+  // stories bring are rendered from "Word," (content wave 4 § 8.1); wave
+  // 3's 54 keep their committed MP3s and take picks.
   add(STORY_READ_ID, 'story-read', 'Read the story.', 'word-song')
-  for (const word of STORY_WORDS)
+  for (const word of STORY_WORDS) {
+    const cap = `${word.charAt(0).toUpperCase()}${word.slice(1)}`
     add(
       storyWordId(word),
       'story-word',
-      `${word.charAt(0).toUpperCase()}${word.slice(1)}.`,
+      `${cap}.`,
       'word-song',
+      WAVE_3_STORY_WORDS.has(word) ? undefined : `${cap},`,
     )
+  }
   return lines
 }
+
+/** The story words wave 3 rendered from "Word." (fox, hen and bug stories). */
+const WAVE_3_STORY_WORDS: ReadonlySet<string> = new Set(
+  (['fox-stories', 'hen-stories', 'bug-stories'] as const).flatMap((n) =>
+    storiesOf(n).flatMap((s) =>
+      storySentences(s.story).flat().map(storyWordKey),
+    ),
+  ),
+)
 
 /**
  * The intro lead line of each new step (§ 6.1). A step without an entry has
@@ -261,6 +296,12 @@ const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {
   'fox-stories': 'Read the story. Who is it?',
   'hen-stories': 'Read the story. What is it?',
   'bug-stories': 'Read the story. Where is it?',
+  // Word Song land 8 (content wave 4 § 3.3, § 4.3, § 6.1; Thomas approved
+  // T2): bee and car words reuse duck words' lead and cue (D6); sheep
+  // stories mix the three question words.
+  'bee-words': 'Two letters, one sound!',
+  'car-words': 'Two letters, one sound!',
+  'sheep-stories': 'Read the story. Who, what or where?',
 }
 
 const sessionIntroId = (n: SkillNode) => `guide.session.intro.${n}`

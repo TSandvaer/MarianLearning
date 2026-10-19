@@ -59,9 +59,10 @@ describe('native asset registry', () => {
     expect(sceneAsset('no-such-scene')).toBeUndefined()
   })
 
-  it("has each little story's own scene, so none falls back to the answer's picture", () => {
-    expect(LITTLE_STORIES).toHaveLength(24)
-    for (const { id } of LITTLE_STORIES) {
+  it("has each wave-3 little story's own scene, so none falls back to the answer's picture", () => {
+    const wave3 = LITTLE_STORIES.filter((s) => s.node !== 'sheep-stories')
+    expect(wave3).toHaveLength(24)
+    for (const { id } of wave3) {
       const key = `/native/scenes/story-${id}.webp`
       expect([id, existsSync(join(SCENES, `story-${id}.webp`))]).toEqual([
         id,
@@ -71,7 +72,7 @@ describe('native asset registry', () => {
       expect(storySceneAsset(id)).toBe(WEB_ASSET_MODULES[key])
     }
     // Each its own file: 24 different modules.
-    const modules = LITTLE_STORIES.map(({ id }) => storySceneAsset(id))
+    const modules = wave3.map(({ id }) => storySceneAsset(id))
     expect(new Set(modules.map((m) => JSON.stringify(m))).size).toBe(24)
     expect(storySceneAsset(undefined)).toBeUndefined()
     expect(storySceneAsset('no-such-story')).toBeUndefined()
@@ -92,7 +93,7 @@ describe('native asset registry', () => {
     for (const key of NOVEL_PROBE_WORDS) {
       expect([key, pictureAsset(key) !== undefined]).toEqual([key, true])
     }
-    expect(pictureAsset('ship')).toBeUndefined()
+    expect(pictureAsset('shell')).toBeUndefined()
   })
 
   // Content wave 1 (design/native/content-wave-1.md § 3.5, § 4.4, AC 8)
@@ -101,11 +102,34 @@ describe('native asset registry', () => {
   // until Thomas's picture pack is embedded and `npm run export-assets`
   // bakes it (without them the problems fall back to written-word chips).
   it('has a picture for every land-6 word (duck, crab, tent and cake words)', () => {
-    const keys = Object.values(BIG_WORDS_STEPS).flatMap((rows) =>
-      rows.map((r) => r.word),
-    )
+    const keys = (
+      ['duck-words', 'crab-words', 'tent-words', 'cake-words'] as const
+    ).flatMap((step) => BIG_WORDS_STEPS[step].map((r) => r.word))
     expect(keys).toHaveLength(32)
     expect(keys.filter((key) => pictureAsset(key) === undefined)).toEqual([])
+  })
+
+  // Content wave 4 (content-wave-4.md § 9.1, AC 4): the 16 bee and car
+  // words and ship draw as pictures (Thomas's 17 picks; a missing one
+  // would draw its problem as written words, the shipped fallback).
+  it('has a picture for every bee-words and car-words word and ship (AC 4)', () => {
+    const keys = [
+      ...(['bee-words', 'car-words'] as const).flatMap((step) =>
+        BIG_WORDS_STEPS[step].map((r) => r.word),
+      ),
+      'ship',
+    ]
+    expect(keys).toHaveLength(17)
+    expect(keys.filter((key) => pictureAsset(key) === undefined)).toEqual([])
+  })
+
+  // Content wave 4 § 9.2: the 8 sheep-story scenes (Thomas's picks; a
+  // missing one would reveal the answer's picture, the shipped fallback).
+  it("has each sheep story's own scene (content wave 4 § 9.2)", () => {
+    const sheep = LITTLE_STORIES.filter((s) => s.node === 'sheep-stories')
+    expect(sheep).toHaveLength(8)
+    for (const { id } of sheep)
+      expect([id, storySceneAsset(id) !== undefined]).toEqual([id, true])
   })
 
   it("has the Hub bakes: idle Emma's shadow and a muted copy of every 256 px path art", () => {

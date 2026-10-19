@@ -170,6 +170,15 @@ export type WordCategory =
   | 'nature'
 
 /**
+ * Big-words targets that are already another step's pack entries, with
+ * that step's tags, `hybridMode` and matrix rows (content wave 4 § 5, K4):
+ * sheep and shark, the sh step's. Neither big-words spread below adds them
+ * again; their bee-words and car-words rows ride on the problem
+ * (`WordSongProblem.chipRow`).
+ */
+const SHARED_BIG_WORDS: ReadonlySet<string> = new Set(['sheep', 'shark'])
+
+/**
  * The 14 target words — all CVC short-a, in Marian's likely vocabulary.
  * Per `design/word-song-picture-pack.md` §"Per-word picture briefs".
  */
@@ -1137,24 +1146,28 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     phoneme: '/θ/',
     hybridMode: true,
   },
-  // ── Land 6 "Big words": duck, crab, tent and cake words ──────────────
-  // 32 picture targets from `bigWordsSteps.ts` (the one place their words
+  // ── Land 6 "Big words" and land 8's bee and car words ────────────────
+  // 46 picture targets from `bigWordsSteps.ts` (the one place their words
   // live), in canon order: duck + crab words (content wave 1), tent + cake
-  // words (content wave 2). `vowel` is set (the short vowel; for cake words
-  // the vowel letter, which says its name), so the CVC-axis and
-  // cross-vowel test scans exclude them by name, as they do the ch and th
-  // words. No `phoneme` tag: ck / ng / start and end blends / magic e share
-  // no grapheme with a pack word that says something else.
+  // words (content wave 2), bee + car words (content wave 4; sheep and
+  // shark keep their sh-step entries, `SHARED_BIG_WORDS`). `vowel` is set
+  // (the short vowel; for cake, bee and car words the vowel letter, which
+  // says its name or goes with the r), so the CVC-axis and cross-vowel
+  // test scans exclude them by name, as they do the ch and th words. No
+  // `phoneme` tag: ck / ng / start and end blends / magic e / ee, ea, ar
+  // share no grapheme with a pack word that says something else.
   ...BIG_WORDS_STEP_IDS.flatMap((step) =>
-    BIG_WORDS_STEPS[step].map(
-      (row): WordEntry => ({
-        word: row.word,
-        pictureKey: row.word,
-        vowel: row.vowel,
-        category: row.category,
-        isTarget: true,
-      }),
-    ),
+    BIG_WORDS_STEPS[step]
+      .filter((row) => !SHARED_BIG_WORDS.has(row.word))
+      .map(
+        (row): WordEntry => ({
+          word: row.word,
+          pictureKey: row.word,
+          vowel: row.vowel,
+          category: row.category,
+          isTarget: true,
+        }),
+      ),
   ),
   // ── Sight-words tier (Wave 11, ticket 86ca7xmr8) ──────────────────────
   // 20 high-frequency sight-word targets — Dave's W11-01 starter set
@@ -1802,6 +1815,26 @@ export const FORBIDDEN_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['desk', 'bed'], // both are furniture on four legs
   ['kite', 'flag'], // both are cloth on a stick or string
   ['rope', 'sack'], // the sack is tied shut with a rope
+  // Land 8, bee and car words (content wave 4,
+  // `design/native/content-wave-4.md` § 7, Dave's candidates), added
+  // before their rows. Dave's jar–jam waits for jar.
+  ['bee', 'bug'], // both small flying insects
+  ['tree', 'pine'], // both trees
+  ['seed', 'nut'], // both small brown kernels
+  ['seed', 'egg'], // both small ovals
+  ['peach', 'plum'], // both round stone fruits
+  ['sheep', 'dog'], // both four-legged animals in side view
+  ['sheep', 'pig'], // both four-legged animals in side view
+  ['sheep', 'cat'], // both four-legged animals in side view
+  ['jeep', 'van'], // both vehicles in side view
+  ['jeep', 'bus'], // both vehicles in side view
+  ['jeep', 'car'], // both vehicles in side view
+  ['car', 'van'], // both vehicles in side view
+  ['car', 'bus'], // both vehicles in side view
+  ['barn', 'tent'], // both a pointed roof over a door
+  ['scarf', 'belt'], // both long strips worn on the body
+  ['card', 'gift'], // both gifts
+  ['seal', 'shark'], // both grey sea animals
 ] as const
 
 /** True if `a` and `b` are a forbidden silhouette-similar pair. */
@@ -2163,13 +2196,17 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   // comment.
   moth: { gentle: ['bath', 'cloth'], trap: ['thin', 'math'] }, // th-pool only; path avoided (FORBIDDEN_PAIR); spec's [thin,thick] is itself a FORBIDDEN_PAIR — see deviation note above
   cloth: { gentle: ['bath', 'math'], trap: ['thin', 'moth'] }, // th-pool only
-  // ── Land 6 "Big words" (content waves 1 and 2) — rows from
-  // `bigWordsSteps.ts`.
+  // ── Land 6 "Big words" (content waves 1 and 2) and land 8's bee and
+  // car words (content wave 4) — rows from `bigWordsSteps.ts`. sheep and
+  // shark keep the sh step's rows above (`SHARED_BIG_WORDS`); their bee-
+  // and car-words rows ride on the problem (`chipRow`, § 5).
   ...Object.fromEntries(
     BIG_WORDS_STEP_IDS.flatMap((step) =>
-      BIG_WORDS_STEPS[step].map(
-        (row) => [row.word, { gentle: row.gentle, trap: row.trap }] as const,
-      ),
+      BIG_WORDS_STEPS[step]
+        .filter((row) => !SHARED_BIG_WORDS.has(row.word))
+        .map(
+          (row) => [row.word, { gentle: row.gentle, trap: row.trap }] as const,
+        ),
     ),
   ),
   // ── Sight-words tier (Wave 11, ticket 86ca7xmr8) ──────────────────────

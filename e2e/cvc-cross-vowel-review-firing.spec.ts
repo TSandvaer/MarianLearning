@@ -256,7 +256,7 @@ test.describe('cvc cross-vowel REVIEW FIRING (ticket 86c9qa6n3, AC6) — REGRESS
           'digraphs-th-voiceless': 'mastered',
           'sight-words': 'mastered',
           'simple-sentences': 'mastered',
-          // Content waves 1-3 (lands 6 and 7): the tree's last seven steps.
+          // Content waves 1-4 (lands 6-8): the tree's last ten steps.
           'duck-words': 'mastered',
           'crab-words': 'mastered',
           'tent-words': 'mastered',
@@ -264,6 +264,9 @@ test.describe('cvc cross-vowel REVIEW FIRING (ticket 86c9qa6n3, AC6) — REGRESS
           'fox-stories': 'mastered',
           'hen-stories': 'mastered',
           'bug-stories': 'mastered',
+          'bee-words': 'mastered',
+          'car-words': 'mastered',
+          'sheep-stories': 'mastered',
         },
       }),
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),

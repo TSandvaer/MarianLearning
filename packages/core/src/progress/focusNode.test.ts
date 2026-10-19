@@ -102,6 +102,10 @@ describe('MATH_NODES_IN_ORDER / WORD_SONG_NODES_IN_ORDER', () => {
       'fox-stories',
       'hen-stories',
       'bug-stories',
+      // Content wave 4: land 8, "Words and stories".
+      'bee-words',
+      'car-words',
+      'sheep-stories',
     ])
   })
 })
@@ -338,7 +342,7 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
     // graduation review (cvc-words-short-u) instead, which is a different
     // scenario covered by the CVC-review describe block below.
     const progress = buildProgress({}, { cvcGraduationSessionFired: true })
-    expect(pickFocusNode(progress, 'word-song').node).toBe('bug-stories')
+    expect(pickFocusNode(progress, 'word-song').node).toBe('sheep-stories')
   })
 
   it('returns the lowest non-mastered across a sweep of progress shapes', () => {

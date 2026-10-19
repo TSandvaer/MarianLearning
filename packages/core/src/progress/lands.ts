@@ -101,6 +101,14 @@ export const LANDS: readonly Land[] = [
     name: 'Stories',
     nodes: ['fox-stories', 'hen-stories', 'bug-stories'],
   },
+  // Content wave 4 (design/native/content-wave-4.md § 1, K6): bee words,
+  // car words and sheep stories. Land 7 is full of its own kind.
+  {
+    world: 'word-song',
+    number: 8,
+    name: 'Words and stories',
+    nodes: ['bee-words', 'car-words', 'sheep-stories'],
+  },
 ]
 
 /** The lands of one world, in order. */

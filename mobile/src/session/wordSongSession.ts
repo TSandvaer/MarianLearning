@@ -135,25 +135,39 @@ export interface WordSongRound {
  * needs a `review-` plan id and 8 readable problems, else it throws (the
  * failure path); a forward plan reads as before, with the warm-up blocks
  * that parse (`word.w<i>`, `i` = the ref's position) in front.
+ *
+ * Each problem learns its step (content wave 4 § 5): a review's from its
+ * block ref, a warm-up's from its ref, the forward plan's from the focus.
+ * A bee-words or car-words problem then carries its own step's chip row.
  */
 export function wordSongRoundFromServer(
   serverPlan: unknown,
-  hints: Pick<WordSongProgressHints, 'planKind' | 'intro'>,
+  hints: Pick<WordSongProgressHints, 'planKind' | 'intro'> &
+    Partial<Pick<WordSongProgressHints, 'focusNode'>>,
 ): WordSongRound {
   if (hints.planKind.kind === 'review') {
     if (!isReviewPlan(serverPlan)) {
       throw new Error('the review request was answered with a forward plan')
     }
     return {
-      plan: wordSongSessionPlanFromServer(serverPlan, NATIVE_PARSE),
+      plan: wordSongSessionPlanFromServer(serverPlan, {
+        ...NATIVE_PARSE,
+        step: hints.planKind.blocks.map((b) => b.node),
+      }),
       review: true,
       warmupCount: 0,
       intro: null,
     }
   }
-  const forward = wordSongSessionPlanFromServer(serverPlan, NATIVE_PARSE)
+  const forward = wordSongSessionPlanFromServer(serverPlan, {
+    ...NATIVE_PARSE,
+    step: hints.focusNode,
+  })
   const refs = hints.planKind.warmup
-  const warmup = wordSongWarmupFromServer(serverPlan, NATIVE_PARSE)
+  const warmup = wordSongWarmupFromServer(serverPlan, {
+    ...NATIVE_PARSE,
+    step: refs.map((r) => r.node),
+  })
     .filter((w) => w.block >= 1 && w.block <= refs.length)
     .slice(0, WARMUP_PROBLEMS)
   return {

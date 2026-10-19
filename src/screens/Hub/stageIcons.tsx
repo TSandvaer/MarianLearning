@@ -199,6 +199,10 @@ const STAGE_LABEL: Record<StageId, string> = {
   'fox-stories': 'fox',
   'hen-stories': 'hen',
   'bug-stories': 'bug',
+  // Content wave 4 (frozen web: typecheck only).
+  'bee-words': 'bee',
+  'car-words': 'car',
+  'sheep-stories': 'sheep',
 }
 
 function stageAriaLabel(stage: StageId, kind: StageIconKind): string {

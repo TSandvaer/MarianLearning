@@ -98,11 +98,15 @@ export function isPeekPlan(plan: unknown): boolean {
   return hasPlanId(plan, PEEK_PLAN_ID_PREFIX)
 }
 
-/** `serverPlan` read as exactly `count` problems of `world`'s plan shape. */
+/**
+ * `serverPlan` read as exactly `count` problems of `world`'s plan shape;
+ * `node`'s problems carry its chip rows (content wave 4 § 5).
+ */
 function blockPlanFromServer(
   world: MasteryTrack,
   serverPlan: unknown,
   count: number,
+  node?: SkillNode,
 ): PeekPlan {
   return world === 'math'
     ? {
@@ -118,6 +122,7 @@ function blockPlanFromServer(
         plan: wordSongSessionPlanFromServer(serverPlan, {
           problemCount: count,
           littleStories: true,
+          step: node,
         }),
       }
 }
@@ -126,22 +131,24 @@ function blockPlanFromServer(
 export function peekPlanFromServer(
   world: MasteryTrack,
   serverPlan: unknown,
+  node?: SkillNode,
 ): PeekPlan {
   if (!isPeekPlan(serverPlan)) {
     throw new Error('the peek request was answered with another plan')
   }
-  return blockPlanFromServer(world, serverPlan, PEEK_BLOCK_COUNT)
+  return blockPlanFromServer(world, serverPlan, PEEK_BLOCK_COUNT, node)
 }
 
 /** Read a replay response; throws on anything but a `replay-` plan of 8. */
 export function replayPlanFromServer(
   world: MasteryTrack,
   serverPlan: unknown,
+  node?: SkillNode,
 ): PeekPlan {
   if (!hasPlanId(serverPlan, REPLAY_PLAN_ID_PREFIX)) {
     throw new Error('the replay request was answered with another plan')
   }
-  return blockPlanFromServer(world, serverPlan, REPLAY_BLOCK_COUNT)
+  return blockPlanFromServer(world, serverPlan, REPLAY_BLOCK_COUNT, node)
 }
 
 export interface RequestPeekArgs {
@@ -176,7 +183,11 @@ const MAP_SESSIONS: Record<
   MapSessionMode,
   {
     payload: (world: MasteryTrack, node: SkillNode) => SessionStartPayload
-    read: (world: MasteryTrack, serverPlan: unknown) => PeekPlan
+    read: (
+      world: MasteryTrack,
+      serverPlan: unknown,
+      node: SkillNode,
+    ) => PeekPlan
   }
 > = {
   peek: { payload: buildPeekPayload, read: peekPlanFromServer },
@@ -211,7 +222,7 @@ async function requestMapSession(
     )
     try {
       if (controller.signal.aborted) throw new Error(`${mode} aborted`)
-      const plan = session.read(world, prepared.plan)
+      const plan = session.read(world, prepared.plan, node)
       recordAudio({ kind: 'note', label: mode, detail: `ready (${node})` })
       return { ...plan, mode, node, audio: prepared.audio }
     } catch (err) {

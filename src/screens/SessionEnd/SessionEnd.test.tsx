@@ -511,6 +511,9 @@ describe('SessionEnd', () => {
       'fox-stories',
       'hen-stories',
       'bug-stories',
+      'bee-words',
+      'car-words',
+      'sheep-stories',
     ] as const) {
       allMasteredWordSong[node] = 'mastered'
     }
@@ -576,6 +579,9 @@ describe('SessionEnd', () => {
       'fox-stories',
       'hen-stories',
       'bug-stories',
+      'bee-words',
+      'car-words',
+      'sheep-stories',
     ] as const) {
       allMastered[node] = 'mastered'
     }

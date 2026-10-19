@@ -77,7 +77,9 @@ const close = (a: number, b: number) => Math.abs(a - b) <= 0.051
 // the 7 bands miss the portrait bars, so (T6) the P and W forms lay Word
 // Song out on landscape's bands and scroll (their sizes stay; the last
 // column is the scrolled path's height), L scrolls further, and TL shrinks
-// again (measured, 2026-10-17).
+// again (measured, 2026-10-17). Content wave 4 added land 8
+// (`content-wave-4.md` § 1, T6): the scrolled paths grow by one band (176
+// virtual px × s) and TL shrinks again (measured, 2026-10-18).
 const TABLE: [
   string,
   Viewport,
@@ -88,7 +90,7 @@ const TABLE: [
   number,
   number | null,
 ][] = [
-  ['375×667', vp(375, 667), 'P', 0.457, 40.2, 48.5, 42.1, 617],
+  ['375×667', vp(375, 667), 'P', 0.457, 40.2, 48.5, 42.1, 697],
   [
     '430×932 (t59 b34)',
     vp(430, 932, 59, 34),
@@ -97,10 +99,10 @@ const TABLE: [
     46.15,
     55.6,
     48.2,
-    707,
+    799,
   ],
-  ['667×375', vp(667, 375), 'L', 0.45, 39.6, 47.7, 41.4, 607],
-  ['820×1180 (t24 b20)', vp(820, 1180, 24, 20), 'W', 1, 88, 106, 92, 1348],
+  ['667×375', vp(667, 375), 'L', 0.45, 39.6, 47.7, 41.4, 686],
+  ['820×1180 (t24 b20)', vp(820, 1180, 24, 20), 'W', 1, 88, 106, 92, 1524],
   [
     '744×1133 (t24 b20)',
     vp(744, 1133, 24, 20),
@@ -109,10 +111,28 @@ const TABLE: [
     79.8,
     96.2,
     83.5,
-    1223,
+    1383,
   ],
-  ['1180×820 (b20)', vp(1180, 820, 0, 20), 'TL', 0.582, 51.2, 61.6, 53.5, null],
-  ['1133×744 (b20)', vp(1133, 744, 0, 20), 'TL', 0.525, 46.2, 55.7, 48.3, null],
+  [
+    '1180×820 (b20)',
+    vp(1180, 820, 0, 20),
+    'TL',
+    0.514,
+    45.27,
+    54.53,
+    47.32,
+    null,
+  ],
+  [
+    '1133×744 (b20)',
+    vp(1133, 744, 0, 20),
+    'TL',
+    0.465,
+    40.88,
+    49.24,
+    42.74,
+    null,
+  ],
 ]
 
 describe('mapPathScale: the § 1 sizes table', () => {
@@ -170,12 +190,37 @@ describe('mapPathScale: the § 1 sizes table', () => {
     }
   })
 
+  // Content wave 4 § 1 (T6) predicted by hand that 8 lands drop 1133×744
+  // under MAP_MIN_SCALE (0.449, 0.422 in an unlock beat). Measured
+  // 2026-10-18: with Emma in one land it fits at 0.4645; only the beat that
+  // crosses into land 8 (Emma's badge in lands 7 and 8) scrolls, at the
+  // 0.45 floor, a 729 pt path in the 708 pt pane. 1180×820 fits both ways.
+  it('T6, 8 lands: tablet landscape scrolls only in the 1133×744 unlock beat into land 8', () => {
+    const cur = LITERACY_TREE.indexOf('bee-words')
+    const model = buildMapModel(seed(LITERACY_TREE, cur), 'word-song')
+    expect(model.lands).toHaveLength(8)
+    const at = (v: Viewport, badged: SkillNode[]) =>
+      mapPathScale(mapScreenLayout(v).pane, model, badged, true)
+    const big = vp(1180, 820, 0, 20)
+    const mini = vp(1133, 744, 0, 20)
+    expect(at(big, []).scrolls).toBe(false)
+    expect(at(big, ['bug-stories'])).toMatchObject({ scrolls: false })
+    expect(at(big, ['bug-stories']).s).toBeCloseTo(0.4839, 3)
+    expect(at(mini, []).scrolls).toBe(false)
+    expect(at(mini, []).s).toBeCloseTo(0.4645, 3)
+    const beat = at(mini, ['bug-stories'])
+    expect(beat.scrolls).toBe(true)
+    expect(beat.s).toBe(0.45)
+    expect(Math.round(beat.contentH)).toBe(729)
+    expect(mapScreenLayout(mini).pane.height).toBe(708)
+  })
+
   it('T6: a portrait world scrolls only past PORTRAIT_FIT_LANDS lands, and keeps its portrait scale', () => {
     expect(PORTRAIT_FIT_LANDS).toBe(6)
     const layout = mapScreenLayout(vp(375, 667))
     const ws = buildMapModel(seed(LITERACY_TREE, 0), 'word-song')
     const ng = buildMapModel(seed(MATH_TREE, 0), 'math')
-    expect(ws.lands).toHaveLength(7)
+    expect(ws.lands).toHaveLength(8)
     const k = mapPathScale(layout.pane, ws, [], false)
     expect(k.scrolls).toBe(true)
     expect(k.s).toBeCloseTo(375 / 820)

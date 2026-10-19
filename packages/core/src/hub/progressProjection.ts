@@ -141,6 +141,9 @@ const WORD_SONG_LABELS: Record<WordSongNode, string> = {
   'fox-stories': 'fox stories',
   'hen-stories': 'hen stories',
   'bug-stories': 'bug stories',
+  'bee-words': 'bee words',
+  'car-words': 'car words',
+  'sheep-stories': 'sheep stories',
 }
 
 export function labelForSkillNode(node: SkillNode): string {

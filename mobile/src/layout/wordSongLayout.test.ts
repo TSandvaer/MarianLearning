@@ -314,8 +314,16 @@ describe('every little story fits its card (content wave 3 § 4.3, AC 15: ≤ 3 
   it("P 375×667: each story's line count, the 3-liners are § 4.3's", () => {
     const P = { width: 375, height: 667, insets: NO }
     expect(storyTextWidth(wordSongLayout(P).story)).toBe(305)
-    const threeLines = new Set(['fox-8', 'hen-7', 'hen-8', 'bug-6'])
-    expect(LITTLE_STORIES).toHaveLength(24)
+    // Content wave 4 § 6.2: the two 14-word sheep stories (P7, P8) too.
+    const threeLines = new Set([
+      'fox-8',
+      'hen-7',
+      'hen-8',
+      'bug-6',
+      'sheep-7',
+      'sheep-8',
+    ])
+    expect(LITTLE_STORIES).toHaveLength(32)
     for (const s of LITTLE_STORIES)
       expect([s.id, lines(P, s.story)]).toEqual([
         s.id,
