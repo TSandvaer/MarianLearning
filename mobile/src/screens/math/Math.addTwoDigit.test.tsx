@@ -47,6 +47,7 @@ import type { MathSessionResult, PlayMathUtteranceOptions } from './mathTypes'
 import {
   BUNDLE_MS,
   BUNDLE_FAST_MS,
+  BUNDLE_FAST_STEPS,
   BUNDLE_REDUCED_MS,
   sumDropMs,
 } from './placeValueTiming'
@@ -59,17 +60,48 @@ const PORTRAIT: Viewport = {
 const HIDDEN = { includeHiddenElements: true }
 const LEAD = 'guide.session.intro.add-two-digit' as SessionGuideLineId
 
-function canonPlan(stem: string): ExtendedMathSessionPlan {
-  const json = JSON.parse(
+interface CanonLine {
+  id: string
+  text: string
+}
+
+function canonJson(stem: string): { plan: { utterances: CanonLine[] } } {
+  return JSON.parse(
     readFileSync(
       resolve(REPO_ROOT, 'public', 'canon', 'math', 'level-1', `${stem}.json`),
       'utf8',
     ),
-  ) as { plan: unknown }
-  return mathSessionPlanFromServer(json.plan, { extendedKinds: true })
+  ) as { plan: { utterances: CanonLine[] } }
+}
+
+function canonPlan(stem: string): ExtendedMathSessionPlan {
+  return mathSessionPlanFromServer(canonJson(stem).plan, {
+    extendedKinds: true,
+  })
 }
 const PLAN = canonPlan('add-two-digit')
 const SUMS = PLAN.problems as readonly ArithmeticProblem[]
+
+/** A review's copy of the canon: slot i + 1 serves canon block `from[i]`
+ *  (the server renames each block's `math.p<n>.` by its slot,
+ *  `api/_review.ts`). */
+function reviewPlan(from: readonly number[]): ExtendedMathSessionPlan {
+  const { plan } = canonJson('add-two-digit')
+  const slotOf = new Map(from.map((p, i) => [p, i + 1]))
+  return mathSessionPlanFromServer(
+    {
+      ...plan,
+      utterances: plan.utterances.map((l) => ({
+        ...l,
+        id: l.id.replace(
+          /^math\.p(\d+)\./,
+          (_, p: string) => `math.p${slotOf.get(Number(p))}.`,
+        ),
+      })),
+    },
+    { extendedKinds: true },
+  )
+}
 
 interface VoiceLine {
   text: string
@@ -246,21 +278,26 @@ const chipValues = () =>
 /** Long enough for any answer to move on (the 1.2 s dwell, < 4 s). */
 const SETTLE_MS = 2500
 
-async function answerRight(h: H, i: number) {
+async function answerRight(h: H, i: number, plan = PLAN) {
   const read = h.voice.last()
-  expect(read.text).toBe(PLAN.problems[i]!.utterances.read)
+  expect(read.text).toBe(plan.problems[i]!.utterances.read)
   await speakAll(read)
   await fireEvent.press(
-    screen.getByTestId(`math-chip-${PLAN.problems[i]!.correct}`),
+    screen.getByTestId(`math-chip-${plan.problems[i]!.correct}`),
   )
   await flush()
   await speakAll(h.voice.last())
   await advance(SETTLE_MS)
 }
 
-async function toProblem(h: H, n: number) {
-  for (let i = 0; i < n - 1; i++) await answerRight(h, i)
+async function toProblem(h: H, n: number, plan = PLAN) {
+  for (let i = 0; i < n - 1; i++) await answerRight(h, i, plan)
 }
+
+/** Ripples' and pulses' scale peaks (1 → 1.06 → 1) among `withTiming`'s
+ *  calls. */
+const ripplesIn = (timings: jest.SpyInstance) =>
+  timings.mock.calls.filter(([to]) => to === 1.06).length
 
 /** Two wrong taps (re-prompt each), then the hint's first line starts. */
 async function twoWrongs(h: H, wrong: [number, number]) {
@@ -330,6 +367,25 @@ describe('the two trays under the equation (§ 3.2, § 3.3)', () => {
   it('the same sums on another step draw no trays', async () => {
     await setup({ focusNode: 'add-to-20', planFocusNode: 'add-to-20' })
     expect(screen.queryByTestId('math-place-value', HIDDEN)).toBeNull()
+  })
+
+  it('a review block keeps its hint 2 at any slot: P1 (34 + 25, no ten) at slot 6 ripples the tens tray\'s rods on "Look at the tens."', async () => {
+    const plan = reviewPlan([6, 2, 3, 4, 5, 1, 7, 8])
+    const timings = jest.spyOn(Reanimated, 'withTiming')
+    const h = await setup({ plan })
+    await toProblem(h, 6, plan)
+    expect(equation()).toBe('34 + 25 = ?')
+    await speakAll(h.voice.last())
+    const [a, b] = chipValues().filter((v) => v !== 59)
+    await twoWrongs(h, [a!, b!])
+    expect(h.voice.last().text).toBe('Look at the ones.')
+    timings.mockClear()
+    await speakAll(h.voice.last())
+    expect(h.voice.last().text).toBe('Look at the tens.')
+    // The first number's 3 rods ripple; the second's 2 drop in.
+    expect(ripplesIn(timings)).toBe(3)
+    expect([rods(), cubes()]).toEqual([5, 9])
+    expect(bundle()).toBeNull()
   })
 })
 
@@ -412,6 +468,55 @@ describe('P3: 28 + 35, the worked example (AC 12)', () => {
     await advance(sumDropMs(SUMS[2]!, 'fast') + BUNDLE_FAST_MS)
     expect(bundle()).toBe('done')
     expect([rods(), cubes()]).toEqual([6, 3])
+  })
+
+  it("the fast bundle is § 3.5's: its four beats in 250 ms on spring 300 / 22, and no ripple, though the read ends after the tap", async () => {
+    const springs = jest.spyOn(Reanimated, 'withSpring')
+    const timings = jest.spyOn(Reanimated, 'withTiming')
+    const spring = (stiffness: number, damping: number) =>
+      springs.mock.calls.filter(
+        ([, cfg]) => cfg?.stiffness === stiffness && cfg?.damping === damping,
+      ).length
+    const timed = (ms: number) =>
+      timings.mock.calls.filter(([, cfg]) => cfg?.duration === ms).length
+    expect(
+      BUNDLE_FAST_STEPS.gather +
+        BUNDLE_FAST_STEPS.fuse +
+        BUNDLE_FAST_STEPS.carry +
+        BUNDLE_FAST_STEPS.settle,
+    ).toBe(BUNDLE_FAST_MS)
+    const h = await setup()
+    await toProblem(h, 3)
+    const read = h.voice.last()
+    await tickTo(read, 0)
+    await fireEvent.press(screen.getByTestId('math-chip-63'))
+    await flush()
+    // The read ends after the tap (her answer's line cuts it).
+    await act(async () => read.resolve())
+    await flush()
+    springs.mockClear()
+    timings.mockClear()
+    await advance(sumDropMs(SUMS[2]!, 'fast'))
+    expect(bundle()).toBe('gather')
+    // The second column's 5 cubes gather (x and y each).
+    expect(spring(300, 22)).toBe(10)
+    expect(spring(260, 20)).toBe(0)
+    await advance(BUNDLE_FAST_STEPS.gather)
+    expect(bundle()).toBe('fuse')
+    // The ten cubes fade as the rod fades in.
+    expect(timed(BUNDLE_FAST_STEPS.fuse)).toBe(11)
+    expect(timed(BUNDLE_MS.fuse)).toBe(0)
+    await advance(BUNDLE_FAST_STEPS.fuse)
+    expect(bundle()).toBe('carry')
+    expect(spring(300, 22)).toBe(12)
+    await advance(BUNDLE_FAST_STEPS.carry)
+    expect(bundle()).toBe('settle')
+    // The 3 cubes left over slide into the first column.
+    expect(timed(BUNDLE_FAST_STEPS.settle)).toBe(6)
+    await advance(BUNDLE_FAST_STEPS.settle)
+    expect(bundle()).toBe('done')
+    expect([rods(), cubes()]).toEqual([6, 3])
+    expect(ripplesIn(timings)).toBe(0)
   })
 })
 

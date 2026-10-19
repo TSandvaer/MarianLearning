@@ -551,21 +551,27 @@ type BundleMode = 'normal' | 'fast' | 'instant' | 'reduced'
  * then: the drop landing first), and runs its beats on timers: the full
  * ones, a fast tap's 250 ms, Reduce Motion's one fade. The given answer
  * (`instant`) is its end state at once, which the stage shows itself. A
- * layout change (rotation) mid-bundle lands it.
+ * layout change (rotation) mid-bundle lands it. `fast`: the run is a fast
+ * tap's, whatever the stage's mode is later (the read ending after the tap
+ * doesn't slow it down).
  */
 function useBundle(
   cue: boolean,
   mode: BundleMode,
   delayMs: () => number,
   layoutKey: string,
-): BundlePhase {
-  const [phase, setPhase] = useState<BundlePhase>('idle')
+): { phase: BundlePhase; fast: boolean } {
+  const [run, setRun] = useState<{ phase: BundlePhase; fast: boolean }>({
+    phase: 'idle',
+    fast: false,
+  })
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
   const started = useRef(false)
   useEffect(() => {
     if (!cue || started.current) return
     started.current = true
     if (mode === 'instant') return
+    const fast = mode === 'fast'
     const steps: [BundlePhase, number][] =
       mode === 'reduced'
         ? [
@@ -573,7 +579,7 @@ function useBundle(
             ['done', BUNDLE_REDUCED_MS],
           ]
         : (() => {
-            const b = mode === 'fast' ? BUNDLE_FAST_STEPS : BUNDLE_MS
+            const b = fast ? BUNDLE_FAST_STEPS : BUNDLE_MS
             return [
               ['gather', 0],
               ['fuse', b.gather],
@@ -585,7 +591,7 @@ function useBundle(
     let at = Math.max(0, delayMs())
     for (const [next, after] of steps) {
       at += after
-      timers.current.push(setTimeout(() => setPhase(next), at))
+      timers.current.push(setTimeout(() => setRun({ phase: next, fast }), at))
     }
     // The cue's rise starts it once; its mode and delay are read then.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -597,7 +603,9 @@ function useBundle(
     lastKey.current = layoutKey
     if (!started.current) return
     for (const t of timers.current) clearTimeout(t)
-    timers.current = [setTimeout(() => setPhase('done'), 0)]
+    timers.current = [
+      setTimeout(() => setRun((r) => ({ ...r, phase: 'done' })), 0),
+    ]
   }, [layoutKey])
   useEffect(
     () => () => {
@@ -605,7 +613,7 @@ function useBundle(
     },
     [],
   )
-  return phase
+  return run
 }
 
 /**
@@ -623,11 +631,12 @@ function useBundle(
  *   onto the first (40 ms apart), the ten fuse into one rod, the rod rises
  *   and arcs to the next rod slot (the tens tray ripples as it lands), and
  *   the cubes left over settle into the first column.
- * - Hints: hint 1 ripples the cubes; hint 2 ripples the rods on P1–P3 (no
- *   ten, or already bundled) and fills the ones tag; hint 3 the tens tag.
+ * - Hints: hint 1 ripples the cubes; hint 2 ripples the rods where the ones
+ *   make no ten ("Look at the tens.", at any slot) or the ten is already
+ *   bundled (P1–P3), and fills the ones tag; hint 3 the tens tag.
  * - The given answer lands everything at once and rings both tags; a right
- *   tap moves what hasn't moved fast (spring 300 / 22, the bundle in
- *   250 ms) and fills the tags left to right.
+ *   tap moves what hasn't moved fast (spring 300 / 22, the bundle's four
+ *   beats in 250 ms, no ripple) and fills the tags left to right.
  * - Reduce Motion: a drop is a 200 ms crossfade per block; the bundle
  *   fades the ten cubes out as the rod fades in at its slot, and the
  *   leftover cubes cross into the first column, 200 ms.
@@ -697,7 +706,7 @@ function SumStage({
         ? 'fast'
         : 'normal'
   const layoutKey = `${metrics.u},${width}`
-  const phase = useBundle(
+  const { phase, fast } = useBundle(
     cue,
     bundleMode,
     () =>
@@ -718,10 +727,12 @@ function SumStage({
     if (place === 'ones') return step >= 2 ? String(answer.ones) : '?'
     return step >= 3 ? String(answer.tens) : '?'
   }
-  // Ripples: hint 1 the cubes; hint 2 the rods where it names the tens or
-  // the ten is already made (P1–P3).
+  // Ripples: hint 1 the cubes; hint 2 the rods where it names the tens (the
+  // ones make no ten, at any slot a review puts the block) or the ten is
+  // already made (bundled on the read, P1–P3).
   const cubeRipple = step >= 1 ? 1 : 0
-  const rodRipple = step >= 2 && motion === 'drop-and-bundle' ? 1 : 0
+  const rodRipple =
+    step >= 2 && (!hasTen || motion === 'drop-and-bundle') ? 1 : 0
   const leadWords = leadText.split(/\s+/).filter(Boolean)
 
   const b = sum.bundle
@@ -775,6 +786,7 @@ function SumStage({
             ripple={
               place === 'tens' &&
               b !== null &&
+              !fast &&
               after('settle') &&
               shown !== 'done'
                 ? 1
@@ -858,6 +870,7 @@ function SumStage({
                       }
                       settleTo={left?.to ?? null}
                       phase={shown}
+                      fast={fast}
                       ripple={cubeRipple}
                       rippleDelay={c.index * RIPPLE_STAGGER_MS}
                       reducedMotion={reducedMotion}
@@ -875,7 +888,7 @@ function SumStage({
               u={metrics.u}
               phase={shown}
               rise={rise}
-              fast={bundleMode === 'fast'}
+              fast={fast}
             />
           )}
         {(['tens', 'ones'] as const).map((place, k) => (
@@ -919,8 +932,10 @@ const PV_TABLET_RISE_U = 13
  * 220 / 18, a fast tap's 300 / 22, Reduce Motion's 200 ms crossfade). In
  * the bundle a second-column cube slides onto the first column (gather,
  * spring 260 / 20), the ten fade as they fuse, and a cube left over slides
- * into the first column (settle, 200 ms). Reduce Motion: a leftover cube
- * crosses at once and fades in there. A layout change lands its end state.
+ * into the first column (settle, 200 ms). A fast tap's bundle (`fast`):
+ * the same moves on spring 300 / 22 and its 250 ms beats, the gather's
+ * stagger scaled to its 70 ms. Reduce Motion: a leftover cube crosses at
+ * once and fades in there. A layout change lands its end state.
  */
 function SumCube({
   testID,
@@ -930,6 +945,7 @@ function SumCube({
   gather,
   settleTo,
   phase,
+  fast,
   ripple,
   rippleDelay,
   reducedMotion,
@@ -941,10 +957,12 @@ function SumCube({
   gather: { to: PlaceValueRect; delay: number } | null
   settleTo: PlaceValueRect | null
   phase: BundlePhase
+  fast: boolean
   ripple: number
   rippleDelay: number
   reducedMotion: boolean
 }) {
+  const beats = fast ? BUNDLE_FAST_STEPS : BUNDLE_MS
   const falls = drop !== null && drop.mode !== 'instant' && !reducedMotion
   const x = useSharedValue(0)
   const y = useSharedValue(falls ? -drop!.rise : 0)
@@ -979,17 +997,15 @@ function SumCube({
   }, [])
   useEffect(() => {
     if (phase === 'gather' && gather !== null) {
-      x.set(
-        withDelay(gather.delay, withSpring(gather.to.x - rect.x, DROP_SPRING)),
-      )
-      y.set(
-        withDelay(gather.delay, withSpring(gather.to.y - rect.y, DROP_SPRING)),
-      )
+      const spring = fast ? FAST_SPRING : DROP_SPRING
+      const delay = Math.round((gather.delay * beats.gather) / BUNDLE_MS.gather)
+      x.set(withDelay(delay, withSpring(gather.to.x - rect.x, spring)))
+      y.set(withDelay(delay, withSpring(gather.to.y - rect.y, spring)))
     } else if (phase === 'fuse' && (gather !== null || settleTo === null)) {
       // One of the ten: it fades as the rod forms in its place.
-      opacity.set(withTiming(0, { duration: BUNDLE_MS.fuse, easing: EASE_OUT }))
+      opacity.set(withTiming(0, { duration: beats.fuse, easing: EASE_OUT }))
     } else if (phase === 'settle' && settleTo !== null) {
-      const t = { duration: BUNDLE_MS.settle, easing: EASE_OUT }
+      const t = { duration: beats.settle, easing: EASE_OUT }
       x.set(withTiming(settleTo.x - rect.x, t))
       y.set(withTiming(settleTo.y - rect.y, t))
     } else if (phase === 'fade') {
@@ -1049,8 +1065,9 @@ function SumCube({
 /**
  * The new ten (§ 3.5): it forms where the ten cubes stand (a 150 ms
  * crossfade; a rod is 10 cells, so nothing jumps), rises 12 pt (tablet 16)
- * and arcs to its rod slot (spring 220 / 18; a fast tap 300 / 22). Reduce
- * Motion: it fades in at its slot (200 ms), no rise or arc.
+ * and arcs to its rod slot (spring 220 / 18; a fast tap 300 / 22, its
+ * crossfade and rise on the 250 ms beats). Reduce Motion: it fades in at
+ * its slot (200 ms), no rise or arc.
  */
 function BundleRod({
   from,
@@ -1074,7 +1091,11 @@ function BundleRod({
   useEffect(() => {
     opacity.set(
       withTiming(1, {
-        duration: reduced ? BUNDLE_REDUCED_MS : BUNDLE_MS.fuse,
+        duration: reduced
+          ? BUNDLE_REDUCED_MS
+          : fast
+            ? BUNDLE_FAST_STEPS.fuse
+            : BUNDLE_MS.fuse,
         easing: EASE_OUT,
       }),
     )
