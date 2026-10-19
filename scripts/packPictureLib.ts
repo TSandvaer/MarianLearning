@@ -43,7 +43,20 @@ export const PATHS = {
   scenes: 'mobile/assets/scenes',
 } as const
 
-export function anchorRelPaths(): string[] {
+/** A row's look: the pack's picture-book style, or the Hub's clay
+ *  (quality bar 13), e.g. the learner avatars (learner-profiles.md § 9). */
+export type PictureStyle = 'pack' | 'clay'
+
+/** Clay style anchors: committed path art (no gitignored copy needed), three
+ *  clay animals with faces, none of them one of the 8 avatar animals. */
+export const CLAY_ANCHORS = [
+  'public/assets/path/cvc-words-short-o-512.webp',
+  'public/assets/path/cvc-words-short-i-512.webp',
+  'public/assets/path/bee-words-512.webp',
+] as const
+
+export function anchorRelPaths(style: PictureStyle = 'pack'): string[] {
+  if (style === 'clay') return [...CLAY_ANCHORS]
   return ANCHOR_WORDS.map((w) => `${PATHS.anchorsDir}/anchor-${w}.png`)
 }
 
@@ -111,7 +124,7 @@ export function variantsOnDisk(
 // ── Manifest ────────────────────────────────────────────────────────────────
 
 /** One row of design/word-song/picture-manifest.json. `word` is the picture
- *  key and the file stem. */
+ *  key and the file stem. `style` is absent for the pack's own rows. */
 export interface PictureManifestEntry {
   word: string
   tier: string
@@ -119,6 +132,7 @@ export interface PictureManifestEntry {
   subject: string
   avoid: string[]
   distinctFrom: string[]
+  style?: 'clay'
 }
 
 /** Lower-case slug: safe as a file stem and a directory suffix. */
@@ -211,10 +225,16 @@ export function parseManifest(raw: unknown): PictureManifestEntry[] {
   return parseRows(
     raw,
     'word',
-    (r, label) =>
-      isStringArray(r.distinctFrom)
+    (r, label) => [
+      ...(isStringArray(r.distinctFrom)
         ? []
-        : [`${label}: "distinctFrom" must be an array of strings`],
+        : [`${label}: "distinctFrom" must be an array of strings`]),
+      ...(r.style === undefined || r.style === 'clay'
+        ? []
+        : [
+            `${label}: "style" must be "clay" or absent, got ${JSON.stringify(r.style)}`,
+          ]),
+    ],
     (r) => ({
       word: r.word as string,
       tier: r.tier as string,
@@ -222,8 +242,15 @@ export function parseManifest(raw: unknown): PictureManifestEntry[] {
       subject: (r.subject as string).trim(),
       avoid: trimmedList(r.avoid),
       distinctFrom: r.distinctFrom as string[],
+      ...(r.style === 'clay' ? { style: 'clay' as const } : {}),
     }),
   )
+}
+
+export function styleOf(
+  entry: Pick<PictureManifestEntry, 'style'>,
+): PictureStyle {
+  return entry.style ?? 'pack'
 }
 
 /** One row of design/word-song/scene-manifest.json (content-wave-3.md § 6).
@@ -328,6 +355,14 @@ const STYLE_BODY =
 
 export const STYLE_INSTRUCTION = `${STYLE_BODY} The references show the style only; do not copy their subjects.`
 
+/** The clay form (quality bar 13, the Hub's path art). The contact shadow
+ *  bar 13 names is drawn in code, so PACK_RULES' "no drop shadow" stands. */
+export const CLAY_STYLE_INSTRUCTION =
+  'Draw this subject as a single glossy soft-clay, vinyl-toy 3D figure in exactly the same style ' +
+  'as the reference pictures: the same chunky rounded forms, warm saturated colours, soft light ' +
+  'from the top left and subtle gloss, the same simplicity and finish. The references show the ' +
+  'style only; do not copy their subjects.'
+
 /**
  * The scene form of STYLE_INSTRUCTION. A scene call sends the anchors first
  * and then each `refs` chip picture, which SCENE_RULES asks the model to
@@ -368,11 +403,11 @@ export function asSentence(text: string): string {
 }
 
 export function buildPrompt(
-  entry: Pick<PictureManifestEntry, 'subject' | 'avoid'>,
+  entry: Pick<PictureManifestEntry, 'subject' | 'avoid' | 'style'>,
 ): string {
   const parts = [
     `Subject: ${asSentence(entry.subject)}`,
-    STYLE_INSTRUCTION,
+    styleOf(entry) === 'clay' ? CLAY_STYLE_INSTRUCTION : STYLE_INSTRUCTION,
     PACK_RULES,
   ]
   const avoid = entry.avoid.map((s) => s.trim()).filter(Boolean)

@@ -8,12 +8,17 @@ import { existsSync, readFileSync } from 'node:fs'
 import { APIConnectionError, APIConnectionTimeoutError, APIError } from 'openai'
 import { describe, expect, it, vi } from 'vitest'
 
+import { AVATAR_IDS } from '@marian/core/learners'
+
 import {
+  anchorRelPaths,
   asSentence,
   backoffMs,
   budgetAllows,
   buildPrompt,
   buildScenePrompt,
+  CLAY_ANCHORS,
+  CLAY_STYLE_INSTRUCTION,
   classifyApiError,
   costFromUsage,
   estimateCallCost,
@@ -24,11 +29,13 @@ import {
   parsePickArg,
   parseSceneManifest,
   planPicks,
+  PACK_RULES,
   planScenePicks,
   runPool,
   SCENE_RULES,
   selectEntries,
   selectRows,
+  STYLE_INSTRUCTION,
   sumLedger,
   variantsOnDisk,
   withRetry,
@@ -172,6 +179,18 @@ describe('parseManifest', () => {
     ])
     expect(e).toEqual(row({ subject: 'A hen.', avoid: ['a duck'] }))
   })
+
+  it('keeps style "clay", leaves it absent otherwise, rejects any other', () => {
+    const [clay, plain] = parseManifest([
+      row({ word: 'avatar-fox', style: 'clay' }),
+      row(),
+    ])
+    expect(clay.style).toBe('clay')
+    expect('style' in plain).toBe(false)
+    expect(() =>
+      parseManifest([{ ...row(), style: 'pack' } as unknown]),
+    ).toThrow(/"style" must be "clay" or absent, got "pack"/)
+  })
 })
 
 describe('selectEntries', () => {
@@ -258,6 +277,24 @@ describe('buildPrompt', () => {
 
   it('omits the avoid clause when the list is empty', () => {
     expect(buildPrompt(row({ avoid: [] }))).not.toContain('Must not look like')
+  })
+
+  it('a clay row swaps the style sentence and keeps the pack rules', () => {
+    const p = buildPrompt(row({ style: 'clay' }))
+    expect(p).toContain(CLAY_STYLE_INSTRUCTION)
+    expect(p).not.toContain(STYLE_INSTRUCTION)
+    expect(p).toContain(PACK_RULES)
+    expect(p).not.toMatch(/picture-book/)
+  })
+
+  it('a clay row uses the committed clay path art as anchors', () => {
+    expect(anchorRelPaths('clay')).toEqual([...CLAY_ANCHORS])
+    expect(anchorRelPaths()).toEqual(
+      ['hen', 'sack', 'wing'].map(
+        (w) => `design/references/picture-pack/anchors-openai/anchor-${w}.png`,
+      ),
+    )
+    for (const p of CLAY_ANCHORS) expect(existsSync(repoFile(p)), p).toBe(true)
   })
 
   it('asSentence: trims, capitalises, adds a full stop only when missing', () => {
@@ -693,6 +730,37 @@ describe('the scene manifest', () => {
           `${e.scene}: ${w}.webp`,
         ).toBe(true)
       }
+    }
+  })
+})
+
+describe('the avatar manifest (learner-profiles.md § 9, T2)', () => {
+  const avatars = parseManifest(
+    readRepoJson('design/native/avatar-manifest.json'),
+  )
+  const pack = parseManifest(
+    readRepoJson('design/word-song/picture-manifest.json'),
+  )
+
+  it('holds one clay row per AvatarId, in picker order, in batch 15', () => {
+    expect(avatars.map((e) => e.word)).toEqual(
+      AVATAR_IDS.map((id) => `avatar-${id}`),
+    )
+    for (const e of avatars) {
+      expect(e.style).toBe('clay')
+      expect(e.tier).toBe('avatars')
+      expect(e.batch).toBe(15)
+      expect(e.avoid).toContain('anything red')
+      expect(e.distinctFrom).toHaveLength(7)
+    }
+  })
+
+  it('shares no batch or key with the word pack', () => {
+    const batches = new Set(pack.map((e) => e.batch))
+    const words = new Set(pack.map((e) => e.word))
+    for (const e of avatars) {
+      expect(batches.has(e.batch)).toBe(false)
+      expect(words.has(e.word)).toBe(false)
     }
   })
 })

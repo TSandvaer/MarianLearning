@@ -14,7 +14,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { APIError } from 'openai'
 import type { ImagesResponse } from 'openai/resources/images'
 import sharp from 'sharp'
@@ -32,6 +32,8 @@ import { runGenerate, runPick } from './generatePackPictures.ts'
 import type { Deps, EditImages } from './generatePackPictures.ts'
 import {
   buildScenePrompt,
+  CLAY_ANCHORS,
+  CLAY_STYLE_INSTRUCTION,
   estimateCallCost,
   formatUsd,
   parseCli,
@@ -344,6 +346,55 @@ describe('runGenerate', () => {
       /Style anchors missing:\n {2}design\/references\/picture-pack\/anchors-openai\/anchor-sack\.png/,
     )
     expect(d.createEditor).not.toHaveBeenCalled()
+  })
+
+  it('a clay row sends the clay anchors and clay style, into the pack ledger', async () => {
+    const manifest = 'clay-manifest.json'
+    writeFileSync(
+      join(root, manifest),
+      JSON.stringify([
+        {
+          word: 'avatar-fox',
+          tier: 'avatars',
+          batch: 15,
+          style: 'clay',
+          subject: 'A chubby baby fox sitting.',
+          avoid: ['anything red'],
+          distinctFrom: [],
+        },
+      ]),
+    )
+    for (const rel of CLAY_ANCHORS) {
+      mkdirSync(join(root, rel, '..'), { recursive: true })
+      await sharp({
+        create: {
+          width: 8,
+          height: 8,
+          channels: 4,
+          background: { r: 0, g: 200, b: 0, alpha: 1 },
+        },
+      })
+        .webp()
+        .toFile(join(root, rel))
+    }
+    const edit = vi.fn<EditImages>(async (params) => okResponse(params.n ?? 1))
+    const cmd = parseCli(['--words', 'avatar-fox', '--manifest', manifest])
+    if (cmd.mode !== 'generate') throw new Error('expected generate')
+    const s = await runGenerate(cmd, deps(edit))
+
+    const p = edit.mock.calls[0][0]
+    expect((p.image as File[]).map((f) => [f.name, f.type])).toEqual(
+      CLAY_ANCHORS.map((rel) => [basename(rel), 'image/webp']),
+    )
+    expect(p.prompt).toContain(CLAY_STYLE_INSTRUCTION)
+    expect(p.background).toBe('transparent')
+    expect(s.results.map((r) => [r.word, r.status, r.images])).toEqual([
+      ['avatar-fox', 'ok', 2],
+    ])
+    expect(existsSync(variant(15, 'avatar-fox__v2.png'))).toBe(true)
+    expect(ledgerLines().map((l) => [l.word, l.batch])).toEqual([
+      ['avatar-fox', 15],
+    ])
   })
 
   it('accepts an absolute --manifest path', async () => {

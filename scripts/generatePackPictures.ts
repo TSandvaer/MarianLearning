@@ -92,6 +92,7 @@ import {
   runPool,
   sceneDestRelPath,
   selectRows,
+  styleOf,
   sumLedger,
   variantRelPath,
   variantsOnDisk,
@@ -243,6 +244,8 @@ interface Row {
   tier: string
   batch: number
   prompt: string
+  /** Repo-relative style anchors, sent first (the row's style). */
+  anchors: string[]
   /** Repo-relative chip pictures sent after the anchors (scenes only). */
   refs: string[]
   /** What the app shows today, the contact sheet's first cell. */
@@ -257,6 +260,7 @@ function readRows(root: string, set: PictureSet, rel: string): Row[] {
       tier: e.tier,
       batch: e.batch,
       prompt: buildPrompt(e),
+      anchors: anchorRelPaths(styleOf(e)),
       refs: [],
       currentRel: currentPictureRelPath(e.word),
       notes: [
@@ -264,6 +268,7 @@ function readRows(root: string, set: PictureSet, rel: string): Row[] {
         ...(e.distinctFrom.length > 0
           ? [`not like: ${e.distinctFrom.join(', ')}`]
           : []),
+        ...(e.style ? [`style: ${e.style}`] : []),
       ],
     }))
   }
@@ -272,6 +277,7 @@ function readRows(root: string, set: PictureSet, rel: string): Row[] {
     tier: e.tier,
     batch: e.batch,
     prompt: buildScenePrompt(e),
+    anchors: anchorRelPaths(),
     refs: e.refs.map(currentPictureRelPath),
     currentRel: sceneDestRelPath(e.scene),
     notes: [`tier: ${e.tier}`, `refs: ${e.refs.join(', ')}`],
@@ -405,7 +411,7 @@ export async function runGenerate(
       estimate: estimateCallCost(
         n,
         e.prompt.length,
-        ANCHOR_WORDS.length + e.refs.length,
+        e.anchors.length + e.refs.length,
       ),
       existing,
       // Never overwrite a paid variant: new ones are numbered after them.
@@ -416,9 +422,11 @@ export async function runGenerate(
   const jobs = plans.filter((p) => cmd.force || p.existing.length === 0)
   const onDisk = plans.filter((p) => !cmd.force && p.existing.length > 0)
   const estTotal = roundUsd(jobs.reduce((s, j) => s + j.estimate.costUsd, 0))
-  const missingAnchors = anchorRelPaths().filter(
-    (p) => !existsSync(join(root, p)),
-  )
+  // The anchors this run needs (a dry run checks every selected row's).
+  const anchorRels = [
+    ...new Set((cmd.dryRun ? plans : jobs).flatMap((j) => j.entry.anchors)),
+  ]
+  const missingAnchors = anchorRels.filter((p) => !existsSync(join(root, p)))
   const refRels = [...new Set(jobs.flatMap((j) => j.entry.refs))]
   const missingRefs = refRels.filter((p) => !existsSync(join(root, p)))
   const ledgerTotal = readLedgerTotal(root, cfg.ledger, log)
@@ -452,7 +460,7 @@ export async function runGenerate(
     const inputs =
       noun === 'scene'
         ? `(${ANCHOR_WORDS.length} anchors + refs)`
-        : `${ANCHOR_WORDS.length} anchors`
+        : `${anchorRels.length} anchors`
     log(
       `Estimated cost: ${formatUsd(estTotal)} ` +
         `(per image returned: ${inputs} x ${MEASURED.inputImageTokens} image-in tokens @ $${RATES_PER_1M.imageInput}/1M + ${MEASURED.outputTokensPerImage} out @ $${RATES_PER_1M.imageOutput}/1M + ~prompt/4 text-in @ $${RATES_PER_1M.textInput}/1M)`,
@@ -481,7 +489,7 @@ export async function runGenerate(
     }
     log(
       missingAnchors.length === 0
-        ? 'Anchors: 3/3 present.'
+        ? `Anchors: ${anchorRels.length}/${anchorRels.length} present.`
         : `WARN anchors missing (a real run would stop): ${missingAnchors.join(', ')}`,
     )
     if (refRels.length > 0) {
@@ -503,8 +511,10 @@ export async function runGenerate(
   if (missingAnchors.length > 0 && jobs.length > 0) {
     throw new Error(
       `Style anchors missing:\n  ${missingAnchors.join('\n  ')}\n` +
-        'They are local and gitignored (not in a fresh checkout or worktree). ' +
-        `Copy anchor-hen.png, anchor-sack.png and anchor-wing.png into ${PATHS.anchorsDir}/.`,
+        (missingAnchors.some((p) => p.startsWith(PATHS.anchorsDir))
+          ? 'They are local and gitignored (not in a fresh checkout or worktree). ' +
+            `Copy anchor-hen.png, anchor-sack.png and anchor-wing.png into ${PATHS.anchorsDir}/.`
+          : 'The clay anchors are committed path art (CLAY_ANCHORS); restore them from git.'),
     )
   }
   if (missingRefs.length > 0 && jobs.length > 0) {
@@ -520,15 +530,15 @@ export async function runGenerate(
   // Anchors and refs, read once; each call sends the anchors, then its refs.
   const inputBytes = new Map<string, Buffer>(
     jobs.length > 0
-      ? [...anchorRelPaths(), ...refRels].map((rel) => [
+      ? [...anchorRels, ...refRels].map((rel) => [
           rel,
           readFileSync(join(root, rel)),
         ])
       : [],
   )
-  const inputFiles = (refs: string[]) =>
+  const inputFiles = (row: Row) =>
     Promise.all(
-      [...anchorRelPaths(), ...refs].map((rel) =>
+      [...row.anchors, ...row.refs].map((rel) =>
         toFile(inputBytes.get(rel) as Buffer, basename(rel), {
           type: rel.endsWith('.webp') ? 'image/webp' : 'image/png',
         }),
@@ -606,7 +616,7 @@ export async function runGenerate(
         async () =>
           edit({
             model: MODEL,
-            image: await inputFiles(entry.refs),
+            image: await inputFiles(entry),
             prompt,
             size: IMAGE_SIZE,
             quality: QUALITY,
