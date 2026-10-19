@@ -271,8 +271,13 @@
     "scene": "goat-2",
     "tier": "goat-stories",
     "batch": 5,
-    "subject": "The goat standing on a red-tiled roof; below it, the toy train with a broom poking out of its cab.",
-    "avoid": ["the goat in the train", "the broom on the roof"],
+    "subject": "Left: the red-tiled roof on its own, the goat standing on its top. Right, on the ground: the toy train, a long broom standing upright in its open cab, the wide straw-yellow bristles sticking out high above the cab, clearly visible.",
+    "avoid": [
+      "the goat in the train",
+      "the broom on the roof",
+      "the roof on the train",
+      "a train with no broom"
+    ],
     "refs": ["broom", "goat", "train", "roof"]
   },
   {
