@@ -2,8 +2,8 @@
  * "Who is playing?" (learner profiles § 1, ACs 27, 28, 38): the tiles in
  * add order with picture and name, one tap (chime, the chosen tile, the
  * route 400 ms later, later taps ignored), the line 300 ms after the tiles
- * land and once more 20 s after it ends, a missing clip's silent caption,
- * and nothing on a tile but the picture and the name.
+ * land and once more 20 s after it ends, the bundled Lily clip on Emma's
+ * channel, and nothing on a tile but the picture and the name.
  */
 import type { AvatarId, LearnerEntry } from '@marian/core/learners'
 import {
@@ -198,18 +198,20 @@ describe('AC 28: "Who is playing?"', () => {
     expect(h.player.playLine).toHaveBeenCalledTimes(1)
   })
 
-  it('a missing clip walks the caption silently', async () => {
+  it('the bundled Lily clip plays on Emma’s channel', async () => {
     await mount(undefined, false)
     await advance(pickerLineAt(3, false))
     await act(async () => {
       await flush()
     })
+    // One player for the line, on Emma's channel.
+    expect(fakePlayers).toHaveLength(1)
+    expect(audioEngine.voice.activeLabel).toBe('picker:guide.picker.who')
+    await act(async () => {
+      fakePlayers[0].start(1.28)
+      await flush()
+    })
     expect(screen.getByTestId('picker-bubble')).toBeOnTheScreen()
-    for (let i = 0; i < 6; i++) await advance(500)
-    expect(screen.getAllByTestId('caption-word-revealed')).toHaveLength(3)
-    // Nothing played: no player for the line, no voice on Emma's channel.
-    expect(fakePlayers).toEqual([])
-    expect(audioEngine.voice.activeLabel).toBeNull()
   })
 
   it('stops with the screen: no line after an unmount', async () => {

@@ -260,7 +260,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       )
   })
 
-  it('has the picker line (learner profiles § 1.3, T5), awaiting its Lily render', () => {
+  it('has the picker line (learner profiles § 1.3, T5), rendered in Lily', () => {
     expect(pickerWhoLine()).toEqual({
       id: 'guide.picker.who',
       kind: 'picker-who',
@@ -270,7 +270,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     })
     // 15 characters of Lily (T5).
     expect(pickerWhoLine().text).toHaveLength(15)
-    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual(['guide.picker.who'])
+    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
   })
 
   it('names the step in the peek opener and closer (Thomas 2026-10-15), with the path lines’ spoken names and their verb', () => {

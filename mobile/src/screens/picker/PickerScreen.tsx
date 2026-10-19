@@ -12,8 +12,7 @@
  *   only, 200 ms, all at once.
  * - "Who is playing?" 300 ms after the last tile lands, the caption
  *   walking as on the Hub; once more 20 s after it ends without a tap
- *   (Greet's re-prompt rule). Until its clip is bundled the caption walks
- *   silently.
+ *   (Greet's re-prompt rule).
  * - A tap: the chime, the chosen disc pulses 1 → 1.06 → 1 over 300 ms
  *   (none with Reduce Motion), and the route changes 400 ms later
  *   (`onPick`). Taps until then are ignored; the other tiles do not dim.

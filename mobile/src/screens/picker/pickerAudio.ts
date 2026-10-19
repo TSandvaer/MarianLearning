@@ -2,8 +2,8 @@
  * The picker's sound (learner profiles § 1.3, § 1.4, § 2.1).
  *
  * - "Who is playing?" (`guide.picker.who`, T5) through one manifest line
- *   player. Until its Lily render is bundled the player walks the caption
- *   silently at 165 wpm (the player contract), the shipped fallback.
+ *   player. Without a playable clip the player walks the caption silently
+ *   at 165 wpm (the player contract).
  * - The chime of a pick and of the Hub badge: one effect for the app
  *   session, made on first use (as the Hub's plink): the route changes
  *   400 ms after a pick, and a per-screen effect unloaded with the picker
