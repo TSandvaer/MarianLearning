@@ -334,17 +334,9 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: real blending's two leads and sounding out's peek and replay lines
- * (§ 11).
+ * Now: none.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
-  'guide.session.intro.blending-cv',
-  'guide.session.intro.sounding-out',
-  'guide.session.peek-open.sounding-out',
-  'guide.session.peek-close.sounding-out',
-  'guide.session.replay-open.sounding-out',
-  'guide.session.replay-close.sounding-out',
-]
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 

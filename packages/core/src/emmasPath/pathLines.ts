@@ -255,19 +255,9 @@ export const BAKED_PATH_LINES: readonly (PathLine & { src: string })[] =
  * tests expect exactly these to be missing. The render commit sets this
  * list to `[]`.
  *
- * Now: real blending's 5 sounding-out lines and the 2 cat-words lines whose
- * text changed (§ 11): their old clips said "blending sounds", so they are
- * removed until the render.
+ * Now: none.
  */
-export const PATH_LINES_AWAITING_RENDER: readonly string[] = [
-  'path.open.sounding-out',
-  'path.stop.sounding-out',
-  'path.locked.next.sounding-out',
-  'end.bud.sounding-out',
-  'end.unlock.sounding-out',
-  'path.locked.next.cvc-words',
-  'end.unlock.cvc-words',
-]
+export const PATH_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(PATH_LINES.map((l) => [l.id, l]))
 
