@@ -636,7 +636,7 @@ describe('sub-to-20 (AC 9)', () => {
   })
 })
 
-describe('fading: reviews, peeks and warm-up hearts lift at hint 3 (AC 10)', () => {
+describe('fading: reviews, replays and warm-up hearts lift at hint 3; an explore peek on the read (AC 10, Dave on K6)', () => {
   async function liftsAtHint3(h: H, problem: ArithProblem) {
     await pastGuide(h)
     expect(h.voice.last().text).toBe(problem.utterances.read)
@@ -658,14 +658,34 @@ describe('fading: reviews, peeks and warm-up hearts lift at hint 3 (AC 10)', () 
     await liftsAtHint3(h, p)
   })
 
-  it('a peek', async () => {
+  it('a replay of a mastered step', async () => {
+    const problems = SUB10.problems.map((p, i) => arith(p, i + 1))
+    const h = await setup({
+      plan: round(problems, 'replay'),
+      peek: 'sub-to-10',
+      replay: true,
+      problemNodes: problems.map(() => 'sub-to-10' as const),
+    })
+    expect(h.guide.lines.map((l) => l.id)).toEqual([
+      'guide.session.replay-open.sub-to-10',
+    ])
+    await liftsAtHint3(h, problems[0]!)
+  })
+
+  it('an explore peek (canon P1–P3 of a later stop) lifts on the read, as forward P1–P3', async () => {
     const problems = SUB10.problems.slice(0, 3).map((p, i) => arith(p, i + 1))
     const h = await setup({
       plan: round(problems, 'peek'),
       peek: 'sub-to-10',
       problemNodes: problems.map(() => 'sub-to-10' as const),
     })
-    await liftsAtHint3(h, problems[0]!)
+    await pastGuide(h)
+    const read = h.voice.last()
+    expect(read.text).toBe('Five take away five. How many are left?')
+    await tickTo(read, 1)
+    expect(taken()).toEqual([])
+    await tickOnly(read, 2)
+    expect(taken()).toEqual(ones(1, 2, 3, 4, 5))
   })
 
   it('a warm-up heart', async () => {

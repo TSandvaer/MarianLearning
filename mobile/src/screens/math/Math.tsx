@@ -21,18 +21,18 @@
  *   answer and only that chip stays tappable (no stardust for it).
  * - **Scaffolds**: the subitising dot card (add) and the minuend cell
  *   (sub-to-10) under core's gates, once per problem.
+ * - **Result**: first-tap correctness / value / latency and the offered
+ *   distractor class per problem, the scaffold flags, stardust and streak
+ *   (`MathSessionResult`), handed to App after problem 8.
  *
  * Native-only, the take-away picture (`design/native/take-away-picture.md`):
  * a subtraction on its own step `sub-to-10` / `sub-to-20` draws `TakeAwayRow`
  * in the counting row's place, the minuend's flowers in a ten-frame (a
  * double one on sub-to-20). The taken flowers lift on the read's "away" /
- * "minus" in P1–P3 of a forward session, at hint 3 everywhere else, fast on
- * a right tap and at once on the given answer; hints 1–2 ripple them. A
- * wrong tap that cuts the read never lifts them (K9), and the minuend flash
- * plays first.
- * - **Result**: first-tap correctness / value / latency and the offered
- *   distractor class per problem, the scaffold flags, stardust and streak
- *   (`MathSessionResult`), handed to App after problem 8.
+ * "minus" in P1–P3 of a forward session or an explore peek, at hint 3
+ * everywhere else (reviews, replays, warm-up hearts), fast on a right tap
+ * and at once on the given answer; hints 1–2 ripple them. A wrong tap that
+ * cuts the read never lifts them (K9), and the minuend flash plays first.
  *
  * Native-only, Number Garden 1 and 8–11 (core's extended kinds; spec
  * `design/native/math-skip-counting-multiplication-native.md`): a number-
@@ -1617,13 +1617,14 @@ export function MathScreen({
   }, [useSubScaffoldGate, showSubMinuendOverlay])
 
   // The take-away picture (`take-away-picture.md` K1, K6): P1–P3 of a
-  // forward session lift on the read's "away" / "minus"; hint 3, a right
-  // tap and the given answer lift everywhere.
+  // forward session or an explore peek (Dave, 2026-10-19) lift on the
+  // read's "away" / "minus"; hint 3, a right tap and the given answer lift
+  // everywhere (reviews, replays and warm-up hearts wait for hint 3).
   const takeAway = takeAwayOf(problemIndex)
   const takeAwayReadLift =
     takeAway !== null &&
     arith !== null &&
-    scaffoldsAllowed &&
+    (scaffoldsAllowed || (isPeek && !replay)) &&
     arith.index <= GENTLE_RAMP_THROUGH &&
     readRevealed > takeAwayTickIndex(arith.utterances.read)
   const takeAwayLiftNow = strongerLift(
