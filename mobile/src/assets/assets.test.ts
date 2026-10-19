@@ -60,7 +60,9 @@ describe('native asset registry', () => {
   })
 
   it("has each wave-3 little story's own scene, so none falls back to the answer's picture", () => {
-    const wave3 = LITTLE_STORIES.filter((s) => s.node !== 'sheep-stories')
+    const wave3 = LITTLE_STORIES.filter((s) =>
+      ['fox-stories', 'hen-stories', 'bug-stories'].includes(s.node),
+    )
     expect(wave3).toHaveLength(24)
     for (const { id } of wave3) {
       const key = `/native/scenes/story-${id}.webp`
@@ -129,6 +131,28 @@ describe('native asset registry', () => {
     const sheep = LITTLE_STORIES.filter((s) => s.node === 'sheep-stories')
     expect(sheep).toHaveLength(8)
     for (const { id } of sheep)
+      expect([id, storySceneAsset(id) !== undefined]).toEqual([id, true])
+  })
+
+  // Content wave 5 (content-wave-5.md § 10.1, AC 4): the 16 snail and moon
+  // words draw as pictures. Skipped until the parallel picture job's picks
+  // are merged in (kevin/wave5-pictures); until then each problem draws its
+  // chips as written words, the shipped fallback (§ 11).
+  it.skip('has a picture for every snail-words and moon-words word (AC 4)', () => {
+    const keys = (['snail-words', 'moon-words'] as const).flatMap((step) =>
+      BIG_WORDS_STEPS[step].map((r) => r.word),
+    )
+    expect(keys).toHaveLength(16)
+    expect(keys.filter((key) => pictureAsset(key) === undefined)).toEqual([])
+  })
+
+  // Content wave 5 § 10.2: the 8 goat-story scenes, generated after the
+  // pack picks. Skipped until they are picked; until then a goat story
+  // reveals its answer's pack picture (§ 11).
+  it.skip("has each goat story's own scene (content wave 5 § 10.2)", () => {
+    const goat = LITTLE_STORIES.filter((s) => s.node === 'goat-stories')
+    expect(goat).toHaveLength(8)
+    for (const { id } of goat)
       expect([id, storySceneAsset(id) !== undefined]).toEqual([id, true])
   })
 
