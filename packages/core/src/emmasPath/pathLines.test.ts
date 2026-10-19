@@ -18,23 +18,24 @@ import {
  *  and "sharing", "tent" and "cake" (content wave 2 K7, Thomas 2026-10-17),
  *  and "fox", "hen", "bug", "stories", "hundreds" (content wave 3 T1,
  *  Thomas 2026-10-17), and "more", "less", "bee", "car", "sheep" (content
- *  wave 4 T1, Thomas 2026-10-18). */
+ *  wave 4 T1, Thomas 2026-10-18), and "sounding", "out" (real blending T1,
+ *  Thomas 2026-10-19). */
 const SPEC_VOCAB = new Set(
   `here is your path you are on did all of it look at flowers flower a new for
   learned now can do land first then this not yet numbers adding taking away to
   ten twenty big making tens skip counting groups two three four five and letter
   letters names sounds blending words reading sentences cat dog sun pig bed ship
   chick thumb star sound pairs the duck crab sharing tent cake fox hen bug
-  stories hundreds more less bee car sheep`.split(/\s+/),
+  stories hundreds more less bee car sheep sounding out`.split(/\s+/),
 )
 const NUMERALS = new Set(['1', '2', '3', '4', '5', '6', '7', '8'])
 
 describe('STAGE_SPOKEN_NAMES (spec §4.3)', () => {
-  it('gives all 38 stages a name and no two the same', () => {
+  it('gives all 39 stages a name and no two the same', () => {
     const nodes = [...MATH_TREE, ...LITERACY_TREE]
-    expect(nodes).toHaveLength(38)
+    expect(nodes).toHaveLength(39)
     const names = nodes.map((n) => STAGE_SPOKEN_NAMES[n])
-    expect(new Set(names).size).toBe(38)
+    expect(new Set(names).size).toBe(39)
   })
 })
 
@@ -60,19 +61,22 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
     const counts: Record<string, number> = {}
     for (const l of PATH_LINES) counts[l.kind] = (counts[l.kind] ?? 0) + 1
     expect(counts).toEqual({
-      open: 38,
+      open: 39,
       'open-done': 2,
-      stop: 38,
+      stop: 39,
       land: 13,
-      'locked-next': 36,
+      'locked-next': 37,
       // Content wave 4: + 13 (more and less's stop after 14 earlier Number
       // Garden steps) and + 19 + 20 + 21 (land 8's stops after 20, 21, 22
-      // earlier Word Song steps).
-      'locked-later': 322,
-      // Content wave 4: + 20 (land 8's gate, closed from 20 steps).
-      'gate-locked': 101,
-      'end-bud': 38,
-      'end-unlock': 36,
+      // earlier Word Song steps). Real blending: + 22 (sounding out's stop
+      // after 3 earlier steps, and one more earlier step for each of the
+      // 20 after it).
+      'locked-later': 344,
+      // Content wave 4: + 20 (land 8's gate, closed from 20 steps). Real
+      // blending: + 6 (lands 3–8, each closed from one more step).
+      'gate-locked': 107,
+      'end-bud': 39,
+      'end-unlock': 37,
       'end-land': 11,
       'end-land-no-number': 11,
     })
@@ -186,9 +190,10 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
     // + 10 (tent words, cake words) = 174, the spec's + 15. Content wave
     // 3: + 18 (the three story steps, land 7) + 8 (hundreds, land 5) =
     // 200, § 5.1's + 26. Content wave 4: + 5 (more and less) and + 18 (bee
-    // words, car words, sheep stories, land 8) = 223.
-    expect(BAKED_PATH_LINES).toHaveLength(223)
-    expect(new Set(BAKED_PATH_LINES.map((l) => l.text)).size).toBe(222)
+    // words, car words, sheep stories, land 8) = 223. Real blending: + 5
+    // (sounding out) = 228.
+    expect(BAKED_PATH_LINES).toHaveLength(228)
+    expect(new Set(BAKED_PATH_LINES.map((l) => l.text)).size).toBe(227)
   })
 
   it('has a bundled MP3 for every baked line but the ones awaiting their render', () => {
@@ -200,8 +205,10 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
     expect(missing.sort()).toEqual([...PATH_LINES_AWAITING_RENDER].sort())
     // Content wave 2's tent and cake lines (§ 6.2), content wave 3's 18
     // story lines and hundreds' 8 (§ 5.1) and content wave 4's more and
-    // less 5 and 18 Word Song lines (§ 8.1) are rendered in Lily.
-    expect(PATH_LINES_AWAITING_RENDER).toEqual([])
+    // less 5 and 18 Word Song lines (§ 8.1) are rendered in Lily. Real
+    // blending's 5 sounding-out lines and the 2 cat-words lines whose text
+    // changed (§ 11) await theirs.
+    expect(PATH_LINES_AWAITING_RENDER).toHaveLength(7)
   })
 
   it('stays inside the spec §4.5 vocabulary', () => {

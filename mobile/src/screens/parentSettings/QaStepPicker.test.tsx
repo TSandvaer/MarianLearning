@@ -65,11 +65,11 @@ afterEach(() => {
 })
 
 describe('the picker', () => {
-  it('lists both worlds in tree order: 15 Number Garden steps, then 23 Word Song steps', async () => {
+  it('lists both worlds in tree order: 15 Number Garden steps, then 24 Word Song steps', async () => {
     await renderPicker()
     expect(listed('math')).toEqual([...MATH_TREE])
     expect(listed('word-song')).toEqual([...LITERACY_TREE])
-    expect(listed()).toHaveLength(38)
+    expect(listed()).toHaveLength(39)
     expect(screen.getByText('11. Big groups')).toBeOnTheScreen()
     expect(screen.getByText('12. All the groups')).toBeOnTheScreen()
     // Content wave 2 § 1: sharing, the 5th stop of land 4.
@@ -80,12 +80,16 @@ describe('the picker', () => {
     // Content wave 4 § 1: more and less, land 5's 2nd stop.
     expect(screen.getByText('15. More and less')).toBeOnTheScreen()
     expect(screen.getByText('Land 5 · hundreds')).toBeOnTheScreen()
-    expect(screen.getByText('13. Reading sentences')).toBeOnTheScreen()
-    expect(screen.getByText('14. Duck words')).toBeOnTheScreen()
-    expect(screen.getByText('15. Crab words')).toBeOnTheScreen()
+    // Real blending: sounding out, land 2's 2nd stop; every later Word Song
+    // step moves one along.
+    expect(screen.getByText('4. Sounding out')).toBeOnTheScreen()
+    expect(screen.getByText('Land 2 · sounding-out')).toBeOnTheScreen()
+    expect(screen.getByText('14. Reading sentences')).toBeOnTheScreen()
+    expect(screen.getByText('15. Duck words')).toBeOnTheScreen()
+    expect(screen.getByText('16. Crab words')).toBeOnTheScreen()
     expect(screen.getByText('Land 6 · crab-words')).toBeOnTheScreen()
-    expect(screen.getByText('16. Tent words')).toBeOnTheScreen()
-    expect(screen.getByText('17. Cake words')).toBeOnTheScreen()
+    expect(screen.getByText('17. Tent words')).toBeOnTheScreen()
+    expect(screen.getByText('18. Cake words')).toBeOnTheScreen()
     expect(screen.getByText('Land 6 · cake-words')).toBeOnTheScreen()
     expect(screen.getByText('Land 3 · cvc-words-short-o')).toBeOnTheScreen()
   })
@@ -139,7 +143,7 @@ describe('the picker', () => {
     expect(h.jump.mock.calls.map(([n]) => n)).toEqual(
       QA_STEPS.map((s) => s.node),
     )
-    expect(h.onJumped).toHaveBeenCalledTimes(38)
+    expect(h.onJumped).toHaveBeenCalledTimes(39)
   })
 
   it("Back to Marian's real start asks, then resets once", async () => {
@@ -185,7 +189,7 @@ describe('in Parent Settings', () => {
 
     await fireEvent.press(screen.getByTestId('parent-settings-qa-step-row'))
     expect(screen.getByTestId('qa-step-picker')).toBeOnTheScreen()
-    expect(listed()).toHaveLength(38)
+    expect(listed()).toHaveLength(39)
     // Opening writes nothing and jumps nowhere.
     expect(h.saved).toEqual([])
     expect(onQaJump).not.toHaveBeenCalled()

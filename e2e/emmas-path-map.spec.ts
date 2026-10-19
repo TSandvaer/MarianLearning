@@ -51,6 +51,8 @@ const WORD = [
   'letter-names',
   'letter-sounds',
   'blending-cv',
+  // Real blending: land 2's 2nd stop.
+  'sounding-out',
   'cvc-words',
   'cvc-words-short-o',
   'cvc-words-short-u',
@@ -111,7 +113,7 @@ function seedProgress(o: SeedOpts): unknown {
   const base = buildSeedProgress({
     skillLevelOverrides: {
       ...levels(MATH, o.math ?? 1),
-      ...levels(WORD, o.word ?? 3),
+      ...levels(WORD, o.word ?? 4),
     },
     history: o.history ?? [],
   } as Parameters<typeof buildSeedProgress>[0]) as {
@@ -628,10 +630,10 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
   test('Word Song mid-tree (dog words current) + per-vowel letter-sounds stays mastered', async ({
     page,
   }) => {
-    await arm(page, seedProgress({ word: 4 }))
+    await arm(page, seedProgress({ word: 5 }))
     await openMapFromHub(page, 'word-song')
 
-    await expect(page.getByTestId('map-stop')).toHaveCount(23)
+    await expect(page.getByTestId('map-stop')).toHaveCount(24)
     await expect(page.getByTestId('map-band')).toHaveCount(8)
     // A gate before each land after the first (land 8, content wave 4).
     await expect(page.getByTestId('map-gate')).toHaveCount(7)

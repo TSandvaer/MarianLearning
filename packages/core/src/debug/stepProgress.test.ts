@@ -55,22 +55,22 @@ const treeOf = (w: MasteryTrack): readonly SkillNode[] =>
   w === 'math' ? MATH_TREE : LITERACY_TREE
 
 describe('the step list', () => {
-  it('covers every step of both trees, once, in tree order (15 + 23)', () => {
-    expect(CASES).toHaveLength(38)
+  it('covers every step of both trees, once, in tree order (15 + 24)', () => {
+    expect(CASES).toHaveLength(39)
     expect(QA_STEPS.map((s) => s.node)).toEqual([
       ...MATH_TREE,
       ...LITERACY_TREE,
     ])
     expect(QA_STEPS.filter((s) => s.world === 'math')).toHaveLength(15)
-    expect(QA_STEPS.filter((s) => s.world === 'word-song')).toHaveLength(23)
+    expect(QA_STEPS.filter((s) => s.world === 'word-song')).toHaveLength(24)
   })
 
   it('gives each step a distinct readable name and its position', () => {
-    expect(new Set(QA_STEPS.map((s) => s.name)).size).toBe(38)
+    expect(new Set(QA_STEPS.map((s) => s.name)).size).toBe(39)
     expect(QA_STEPS.find((s) => s.node === 'cvc-words-short-o')).toEqual({
       node: 'cvc-words-short-o',
       world: 'word-song',
-      position: 5,
+      position: 6,
       name: 'Dog words',
       land: 3,
     })
@@ -103,19 +103,26 @@ describe('the step list', () => {
     })
     // Content wave 3 § 1: the story steps, land 7.
     expect(QA_STEPS.find((s) => s.node === 'bug-stories')).toMatchObject({
-      position: 20,
+      position: 21,
       land: 7,
     })
     // Content wave 4 § 1: bee words, car words, sheep stories, land 8.
+    // Real blending's sounding out (land 2) moves every later Word Song
+    // step one along.
+    expect(QA_STEPS.find((s) => s.node === 'sounding-out')).toMatchObject({
+      position: 4,
+      name: 'Sounding out',
+      land: 2,
+    })
     expect(QA_STEPS.find((s) => s.node === 'sheep-stories')).toMatchObject({
-      position: 23,
+      position: 24,
       name: 'Sheep stories',
       land: 8,
     })
   })
 
-  it('isStepNode accepts the 38 steps and nothing else', () => {
-    expect(QA_STEPS.filter((s) => isStepNode(s.node))).toHaveLength(38)
+  it('isStepNode accepts the 39 steps and nothing else', () => {
+    expect(QA_STEPS.filter((s) => isStepNode(s.node))).toHaveLength(39)
     expect(
       ['', 'digraphs', 'two-digit-addsub', 'banana'].filter(isStepNode),
     ).toEqual([])

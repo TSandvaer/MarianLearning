@@ -112,7 +112,7 @@ describe('reviewBaseline / reviewPool (D2)', () => {
     ])
     expect(
       reviewPool(progressAtStep('cvc-words-short-o'), 'word-song'),
-    ).toEqual(['letter-sounds', 'blending-cv', 'cvc-words'])
+    ).toEqual(['letter-sounds', 'blending-cv', 'sounding-out', 'cvc-words'])
     const done = progressAtStep('hundreds-addsub')
     done.skillLevels['hundreds-addsub'] = 'mastered'
     expect(reviewPool(done, 'math')).toEqual([])
@@ -209,7 +209,7 @@ describe('pickReviewBlocks (§ 7.2)', () => {
     expect(pickReviewBlocks(defaultProgress(), 'math', NOW_MS, 0)).toEqual([])
   })
 
-  it('Word Song mixes the three review steps, newest first', () => {
+  it('Word Song mixes the four review steps, newest first', () => {
     const refs = pickReviewBlocks(
       progressAtStep('cvc-words-short-o'),
       'word-song',
@@ -217,8 +217,9 @@ describe('pickReviewBlocks (§ 7.2)', () => {
       0,
     )
     expect(refs).toHaveLength(8)
-    expect(refs.slice(0, 3).map((r) => r.node)).toEqual([
+    expect(refs.slice(0, 4).map((r) => r.node)).toEqual([
       'cvc-words',
+      'sounding-out',
       'blending-cv',
       'letter-sounds',
     ])

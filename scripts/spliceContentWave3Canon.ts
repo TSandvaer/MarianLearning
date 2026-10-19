@@ -56,6 +56,7 @@ import {
   type LittleStory,
   type StoryNode,
 } from '@marian/core/wordSong/littleStories'
+import { blendTargetWord } from '@marian/core/wordSong/blendHighlight'
 import { renderElevenLabsText } from '../api/_tts_elevenlabs.js'
 import {
   HUNDREDS_PLAN,
@@ -161,6 +162,10 @@ export function taughtWords(): Set<string> {
         ? /^(?:Read|Tap) the ([a-z]+)\.$/.exec(u.text)
         : null
       if (m) taught.add(m[1]!)
+      // Real blending's reads don't name the word ("Listen.", "What is
+      // it?"): the target is the word its blend line ends on.
+      const blended = /\.blend$/.test(u.id) ? blendTargetWord(u.text) : null
+      if (blended !== null) taught.add(blended)
     }
     // Simple sentences' answers (the gap words) are read on the card too.
     if (stem === 'simple-sentences')

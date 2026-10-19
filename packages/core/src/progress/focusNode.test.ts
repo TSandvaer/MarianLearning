@@ -82,6 +82,7 @@ describe('MATH_NODES_IN_ORDER / WORD_SONG_NODES_IN_ORDER', () => {
       'letter-names',
       'letter-sounds',
       'blending-cv',
+      'sounding-out',
       'cvc-words',
       'cvc-words-short-o',
       'cvc-words-short-u',
