@@ -52,13 +52,15 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       // content wave 4 § 8.1: 17 more.
       'story-read': 1,
       'story-word': 71,
+      // The first mini-game, Fill the flower bed (mini-game spec § 3.1).
+      game: 30,
     })
-    expect(GUIDANCE_LINES).toHaveLength(258)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(258)
+    expect(GUIDANCE_LINES).toHaveLength(288)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(288)
     // Bee and car words' leads are duck words' text (content wave 4 § 11):
     // three ids, one text, three files.
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(256)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(258)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(286)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(288)
   })
 
   it('AC8: both replay sets, one line per STAGE_SPOKEN_NAMES step, with the exact texts (map-tap-to-play § 6, T1 approved 2026-10-17)', () => {
@@ -362,7 +364,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(258)
+    ).toHaveLength(288)
   })
 
   it('repeats no Emma’s Path line', () => {
@@ -405,5 +407,125 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     )
     expect(listed.sort()).toEqual(expected.sort())
     expect(html).toContain("appendGroup('Guidance'")
+  })
+})
+
+const NUMBER = [
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+] as const
+const Cap = (w: string) => `${w.charAt(0).toUpperCase()}${w.slice(1)}`
+
+/** Mini-game spec § 3.1, row by row: the 30 lines of Fill the flower bed. */
+function expectedGameLines(): {
+  id: string
+  world: 'math' | null
+  text: string
+}[] {
+  const lines: { id: string; world: 'math' | null; text: string }[] = [
+    { id: 'guide.game.again', world: null, text: 'Hmm... try again?' },
+  ]
+  NUMBER.forEach((n, i) =>
+    lines.push({
+      id: `guide.game.this-is.${i + 1}`,
+      world: null,
+      text: `This one is ${n}.`,
+    }),
+  )
+  lines.push({
+    id: 'guide.game.bed.open',
+    world: 'math',
+    text: 'Ten flowers in every bed!',
+  })
+  NUMBER.forEach((n, i) =>
+    lines.push({
+      id: `guide.game.bed.ask.${i + 1}`,
+      world: 'math',
+      text: `${Cap(n)} and what make ten?`,
+    }),
+  )
+  NUMBER.forEach((n, i) =>
+    lines.push({
+      id: `guide.game.bed.yes.${i + 1}`,
+      world: 'math',
+      text: `Yes! ${Cap(n)} and ${NUMBER[8 - i]} make ten!`,
+    }),
+  )
+  lines.push({
+    id: 'guide.game.bed.close',
+    world: 'math',
+    text: 'Ten every time! What a garden!',
+  })
+  return lines
+}
+
+describe('the mini-game lines (mini-game spec § 3)', () => {
+  const game = GUIDANCE_LINES.filter((l) => l.kind === 'game')
+
+  it('C4: leaves the 258 shipped lines unchanged and appends the 30 game lines', () => {
+    // The fingerprint (FNV-1a over the JSON of id, kind, world, text, input
+    // and src, in order) of the 258 lines on main at c86d551e, taken before
+    // the game lines were added.
+    const shipped = JSON.stringify(
+      GUIDANCE_LINES.slice(0, 258).map(
+        ({ id, kind, world, text, input, src }) => [
+          id,
+          kind,
+          world,
+          text,
+          input ?? null,
+          src,
+        ],
+      ),
+    )
+    let hash = 0x811c9dc5
+    for (let i = 0; i < shipped.length; i++) {
+      hash ^= shipped.charCodeAt(i)
+      hash = Math.imul(hash, 0x01000193) >>> 0
+    }
+    expect([shipped.length, hash.toString(16)]).toEqual([39492, 'eea1867e'])
+    expect(GUIDANCE_LINES.slice(258)).toEqual(game)
+  })
+
+  it('C4: has the exact texts of § 3.1, no render input and the path src', () => {
+    expect(game).toEqual(
+      expectedGameLines().map((l) => ({
+        ...l,
+        kind: 'game',
+        src: `/assets/audio/path/${l.id.replace(/\./g, '-')}.mp3`,
+      })),
+    )
+    expect(game.filter((l) => l.input !== undefined)).toEqual([])
+    expect(game.reduce((n, l) => n + l.text.length, 0)).toBe(684)
+    expect(Math.min(...game.map((l) => l.text.length))).toBe(16)
+    expect(Math.max(...game.map((l) => l.text.length))).toBe(30)
+  })
+
+  it('C4: the 30 game lines await their Lily render (the render commit empties the list)', () => {
+    expect([...GUIDANCE_LINES_AWAITING_RENDER].sort()).toEqual(
+      game.map((l) => l.id).sort(),
+    )
+  })
+
+  it('C5: no game line says "play", "next" or "round"; only the retry says "again"', () => {
+    for (const l of game) expect(l.text).not.toMatch(/\b(play|next|round)/i)
+    expect(game.filter((l) => /again/i.test(l.text)).map((l) => l.id)).toEqual([
+      'guide.game.again',
+    ])
+  })
+
+  it('C4: no line outside guide.game.* names a game (Emma never suggests one)', () => {
+    const others = GUIDANCE_LINES.filter((l) => l.kind !== 'game')
+    expect(others.filter((l) => /flower bed|\bgame\b/i.test(l.text))).toEqual(
+      [],
+    )
+    expect(others.filter((l) => l.id.startsWith('guide.game.'))).toEqual([])
   })
 })
