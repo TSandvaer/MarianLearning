@@ -12,8 +12,8 @@
  * - Both: the picture's slot stays empty until the answer, then the
  *   picture springs in and every letter lights.
  *
- * Silent: fakes for Emma's voice, the guide player and the tap player. The
- * marks fixture stands in for the six new clips until their render.
+ * Silent: fakes for Emma's voice, the guide player and the tap player; the
+ * clips' measured marks (`blendMarks.generated.ts`).
  */
 import {
   ADVANCE_AFTER_CORRECT_MS,
@@ -43,35 +43,6 @@ import {
   type Line,
 } from '../../../test/wordSongHarness'
 import { introSpotlight } from './introSpotlight'
-
-// The six new clips (mat, bat, can, cap, dad, jam) are measured at their
-// render; until then a fixture stands in. A measured entry wins.
-jest.mock('../../audio/blendMarks.generated', () => {
-  const actual = jest.requireActual<{
-    BLEND_MARKS: Record<string, unknown>
-  }>('../../audio/blendMarks.generated')
-  const fixture = (bytes: number) => ({
-    bytes,
-    sha256: 'fixture',
-    segments: [
-      [60, 420],
-      [940, 1210],
-      [1660, 1930],
-      [2650, 3150],
-    ],
-  })
-  return {
-    BLEND_MARKS: {
-      'm - a - t ... mat': fixture(31_001),
-      'b - a - t ... bat': fixture(31_002),
-      'c - a - n ... can': fixture(31_003),
-      'c - a - p ... cap': fixture(31_004),
-      'd - a - d ... dad': fixture(31_005),
-      'j - a - m ... jam': fixture(31_006),
-      ...actual.BLEND_MARKS,
-    },
-  }
-})
 
 beforeEach(() => jest.useFakeTimers())
 afterEach(() => {
