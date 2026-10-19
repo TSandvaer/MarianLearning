@@ -30,29 +30,7 @@ _The four 2026-08-02 entries are archived verbatim in [`log/decisions-archive-20
 
 _Entries from 2026-10-04 to 2026-10-13 are archived verbatim in [`log/decisions-archive-2026-10-04-to-2026-10-13.md`](log/decisions-archive-2026-10-04-to-2026-10-13.md); earlier ones in [`log/decisions-archive-2026-08-02.md`](log/decisions-archive-2026-08-02.md)._
 
-## 2026-10-13/14 — Phase 5 starts: Emma's Path on TestFlight
-
-- **Context:** Thomas's Apple Developer membership activated on 2026-10-13. His Mac has only Xcode 27, which Expo SDK 57 doesn't support.
-- **Decided:**
-  1. The app is named **Emma's Path**. The store name is "Emma's Path: Math & Reading" and the bundle ID is `dk.sandvaer.emmaspath`. The EAS slug stays `marian-tutor`, which users never see.
-  2. Store builds run on EAS's free cloud plan, pinned to the SDK 57 image (Xcode 26.6), with remote build numbers (#561, #563).
-  3. Marian tests on Thomas's iPad, because the TestFlight terms don't permit under-13 accounts and her own iPad uses a child account.
-  4. Nothing goes to the public App Store; that is Phase 6, a separate decision.
-- **Outcome:** build 0.1.0 (2) was installed through the internal group "Family" on 2026-10-14. All of Thomas's checks passed.
-- **Decided by:** Thomas (popups and messages).
-
-## 2026-10-14/15 — Pacing: no daily streak, review first, fast track, Map peek; ship build 7
-
-- **Decided:**
-  1. No daily streak. The in-session streak stays a 3/5/8 bonus. Warm-up hearts don't count toward it. Reviews chime but give no bonus stardust.
-  2. Pacing order: same-day mixed review and the daily 2-item "Remember this one?" warm-up come first, the fast track after. Leitner due dates count in calendar days.
-  3. Fast track: "secure" means 8/8 on the first tap. The first finished session of the day decides. There is no speed check anywhere. The second secure day fills the remaining flowers, unannounced, with "You know this! All your flowers grew!". No parent switch.
-  4. Explore vs progress (Thomas: "She wants to see what's in the game, but we should still keep track on her level"): the Map peek is 3 problems from any later stop, locked ones included, and counts toward nothing. It is Map-only, with no caps or lures. Peek lines name the step. "You just knew that one!" plays on a quick maths warm-up answer.
-  5. Stopgap: Parent Settings at 80%/2 in both worlds with fresh-day ON, reverted to 87.5%/3 once build 7 was installed.
-  6. Skip build 6 (it has the peek crash); ship build 7.
-  7. expo-doctor version drift warns instead of blocking (#571). Bump Expo before each TestFlight build.
-  8. Ask Dave for a content roadmap past the path ends: done, #569.
-- **Decided by:** Thomas.
+_Entries from 2026-10-13 to 2026-10-15 are archived verbatim in [`log/decisions-archive-2026-10-13-to-2026-10-15.md`](log/decisions-archive-2026-10-13-to-2026-10-15.md)._
 
 ## 2026-10-16 — Content wave 1 go; build 8 on both devices first; image-tool bake-off; kill switch re-armed
 
@@ -90,4 +68,23 @@ _Entries from 2026-10-04 to 2026-10-13 are archived verbatim in [`log/decisions-
   5. Shipped: #587 sharing, #589 tent and cake words, #588 the fig fix; TestFlight build 10, then production release 2e2675f (only new steps changed, so build first, then release).
   6. Map tap-to-play (Thomas: "if i click on an island that is unlocked on the map it should jump in"; an island means one stop). Tapping the current stop starts the Hub's own session. Tapping a mastered stop starts a replay that records nothing and closes with "You know <name>!" (60 lines approved). No gate; replays allowed only after today's flower is a documented fallback that isn't built. Spec #591 (Kyle, Dave D1–D4), build #592.
   7. The voice-QA Submit failed with "failed to create GitHub issue"; Thomas replaced `GITHUB_TOKEN` in Vercel (it takes effect from the next deployment).
+- **Decided by:** Thomas.
+
+## 2026-10-18 — Content wave 3 shipped (stories, hundreds); wave 4 approved
+
+- **Decided:**
+  1. Wave 3 stories (#599): the reading beat stays (D3); a word-tap cue was added (Kyle, Dave confirmed). Takes were picked by ear: hen/bug "Then this!" take 4 ("; then this!"), "Fig,", "Gem,", "Sat!", "Sun,". The Lily budget for wave 3 was raised to 6,000 characters (5,559 used). TestFlight build 13 is on both devices.
+  2. Wave 3 hundreds (#603): the 1 pt rose tray edge stays. Released, smoke green, TestFlight build 14, confirmed on both devices.
+  3. Parent Settings mastery default is 88% / 3 (shown as 87.5% rounded).
+  4. Wave 4 (spec #606 from Dave's #605 addendum): T1 names (more and less, bee words, car words, sheep stories, land 8 "Words and stories"), T2 Lily up to 5,000 characters, T3 clay subjects, T4 pictures + scenes up to $3.50 (pack pictures first, scenes after their approval), T5 build the stories mixed now, T6 the map scroll fallback. Dave changed D1, D3 and D9.
+  5. Thomas picked v1 for all five wave-4 clay pieces and approved all 17 pack-picture picks as Kevin proposed.
+- **Decided by:** Thomas.
+
+## 2026-10-19 — Content wave 4 shipped (more and less, land 8)
+
+- **Decided:**
+  1. Pictures: Thomas approved Kevin's picks for the 17 pack pictures and the 8 sheep-story scenes (sheep-2 v3 came from one sharpened retake, the harp missing in v1-v2). Spend $2.57 of the $3.50 cap.
+  2. Ear tests: #608 49/49 passed; #607 135/136, "Car words! First, bee words. Then this!" was scratchy and Thomas picked take 3 (input "...bee words; then this!"). Lily total 4,791 of 5,000.
+  3. Thomas checked both PRs on the device (P1/P6 of more and less, the lift-out, land 8, the ship trio) and said merge: #608 5a74911, #607 43c8f73.
+  4. Released to production (smoke green), TestFlight build 15 (EAS fe2159e8-a485-4921-b855-367f720420c7), voice-QA baseline #611.
 - **Decided by:** Thomas.
