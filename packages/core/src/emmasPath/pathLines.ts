@@ -247,15 +247,9 @@ export const BAKED_PATH_LINES: readonly (PathLine & { src: string })[] =
  * tests expect exactly these to be missing. The render commit sets this
  * list to `[]`.
  *
- * Now: content wave 5's Word Song lines (§ 9.1): land 9 and its three
- * steps, 18 lines.
+ * Now: none.
  */
-export const PATH_LINES_AWAITING_RENDER: readonly string[] =
-  BAKED_PATH_LINES.filter(
-    (l) =>
-      /\.word-song\.9(\.|$)/.test(l.id) ||
-      /\.(snail-words|moon-words|goat-stories)$/.test(l.id),
-  ).map((l) => l.id)
+export const PATH_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(PATH_LINES.map((l) => [l.id, l]))
 

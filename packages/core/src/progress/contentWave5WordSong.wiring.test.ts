@@ -202,7 +202,7 @@ describe('the lines (§ 9.1, AC 8)', () => {
     for (const l of lines) expect(l.input).toBe(`${l.text.slice(0, -1)},`)
   })
 
-  it('31 guidance lines of this half: 28 new texts (450 characters), all awaiting their Lily render but the three leads', () => {
+  it('31 guidance lines of this half: 28 new texts (450 characters), all rendered in Lily', () => {
     const g = GUIDANCE_LINES.filter(
       (l) =>
         NEW.some((n) => l.id.endsWith(`.${n}`)) ||
@@ -219,17 +219,13 @@ describe('the lines (§ 9.1, AC 8)', () => {
     ]
     expect(fresh).toHaveLength(28)
     expect(fresh.reduce((n, t) => n + t.length, 0)).toBe(450)
-    const waiting = g
+    const rendered = g
       .filter((l) => l.kind !== 'session-intro')
       .map((l) => l.id)
       .sort()
-    expect(waiting).toHaveLength(28)
-    for (const id of waiting)
-      expect(GUIDANCE_LINES_AWAITING_RENDER).toContain(id)
-    for (const n of NEW)
-      expect(GUIDANCE_LINES_AWAITING_RENDER).not.toContain(
-        `guide.session.intro.${n}`,
-      )
+    expect(rendered).toHaveLength(28)
+    for (const l of g)
+      expect(GUIDANCE_LINES_AWAITING_RENDER).not.toContain(l.id)
   })
 
   it("the three leads have their own files, copies of the shipped lead's clip (the render writes the same bytes)", () => {
@@ -247,7 +243,7 @@ describe('the lines (§ 9.1, AC 8)', () => {
     }
   })
 
-  it('18 path lines of this half (663 characters), all awaiting their Lily render', () => {
+  it('18 path lines of this half (663 characters), all rendered in Lily', () => {
     const p = BAKED_PATH_LINES.filter(
       (l) =>
         /\.word-song\.9(\.|$)/.test(l.id) ||
@@ -255,7 +251,7 @@ describe('the lines (§ 9.1, AC 8)', () => {
     )
     expect(p).toHaveLength(18)
     expect(p.reduce((n, l) => n + l.text.length, 0)).toBe(663)
-    for (const l of p) expect(PATH_LINES_AWAITING_RENDER).toContain(l.id)
+    for (const l of p) expect(PATH_LINES_AWAITING_RENDER).not.toContain(l.id)
   })
 
   it('the path lines name the land and the steps (§ 9.1)', () => {

@@ -25,7 +25,6 @@ import {
   capitalizeSpokenName,
 } from '../sessionEnd/friendlyNodeName'
 import {
-  LITTLE_STORIES,
   STORY_WORDS,
   storiesOf,
   storySentences,
@@ -263,18 +262,6 @@ function buildLines(): GuidanceLine[] {
   return lines
 }
 
-/** The story words goat stories bring (content wave 5 § 7.2): the 16. */
-const WAVE_5_STORY_WORDS: ReadonlySet<string> = new Set(
-  STORY_WORDS.filter(
-    (w) =>
-      !LITTLE_STORIES.some(
-        (s) =>
-          s.node !== 'goat-stories' &&
-          storySentences(s.story).flat().map(storyWordKey).includes(w),
-      ),
-  ),
-)
-
 /** The story words wave 3 rendered from "Word." (fox, hen and bug stories). */
 const WAVE_3_STORY_WORDS: ReadonlySet<string> = new Set(
   (['fox-stories', 'hen-stories', 'bug-stories'] as const).flatMap((n) =>
@@ -349,21 +336,9 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: content wave 5's Word Song lines (§ 9.1): land 9's peeks and
- * replays and the 16 story words goat stories bring. The three leads are
- * shipped texts (duck words' and sheep stories'), so their files are
- * copies of those clips (the bytes the render writes for that text).
+ * Now: none.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] =
-  GUIDANCE_LINES.filter(
-    (l) =>
-      (l.kind === 'story-word' &&
-        WAVE_5_STORY_WORDS.has(l.id.slice(storyWordId('').length))) ||
-      (['snail-words', 'moon-words', 'goat-stories'].some((n) =>
-        l.id.endsWith(`.${n}`),
-      ) &&
-        l.kind !== 'session-intro'),
-  ).map((l) => l.id)
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 

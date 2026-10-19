@@ -109,21 +109,13 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     )
     expect(Math.max(...[...open, ...close].map((l) => l.text.length))).toBe(45)
     // Rendered in Lily, the story steps' 6 and hundreds' pair too (content
-    // wave 3 § 5.1), more and less's pair and content wave 4's land-8 6
-    // (§ 8.1). Content wave 5's land-9 6 await their render (§ 9.1).
+    // wave 3 § 5.1), more and less's pair, content wave 4's land-8 6
+    // (§ 8.1) and content wave 5's land-9 6 (§ 9.1).
     expect(
-      [...open, ...close]
-        .filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id))
-        .map((l) => l.id)
-        .sort(),
-    ).toEqual(
-      ['snail-words', 'moon-words', 'goat-stories']
-        .flatMap((n) => [
-          `guide.session.replay-open.${n}`,
-          `guide.session.replay-close.${n}`,
-        ])
-        .sort(),
-    )
+      [...open, ...close].filter((l) =>
+        GUIDANCE_LINES_AWAITING_RENDER.includes(l.id),
+      ),
+    ).toEqual([])
   })
 
   it('bakes each world and count variant', () => {
