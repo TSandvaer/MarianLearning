@@ -465,7 +465,7 @@ The shortest line is "This one is one." (16) and the longest "Yes! Three and sev
 - **D1. Bonds beyond the lesson's three.** The game plays 1 + 9, 2 + 8, 3 + 7, 4 + 6, 5 + 5 and 9 + 1 as soon as adding to ten is current, though the canon asks only 7 + 3, 6 + 4 and 8 + 2 as missing numbers. They are inside the step's own range (`missingNumbers.ts:35-45`), and the bed shows the empty slots as the scaffold, so this is in-step content, not untaught content. **Recommendation:** keep.
 - **D2. Two wrong-tap tiers, not the lesson's three.** The lesson hints at 2 wrongs and gives the answer at 3. The game pulses the empty slots at the 1st wrong and guides at the 2nd, because the bed already shows how many are missing. **Recommendation:** two tiers.
 - **D3. Off-by-one chips on every bed** (the lesson's P4-P8 class for missing numbers, not P1-P3's gentle spread). **Recommendation:** yes, because the neighbours catch the count-on slip that the ten-frame is there to replace.
-- **D4. Six beds per round**, inside Thomas's 4-6 band and Dave's 6-10 moves. **Recommendation:** six.
+- **D4. Six beds per round**, inside #623's 4-6 band and Dave's 6-10 moves. **Recommendation:** six.
 - **D5. The closer, "Ten every time! What a garden!"** It names the trick (every bed makes ten) and then praises the garden. **Recommendation:** keep. Change it only if Dave reads "What a garden!" as praising the result over the noticing.
 
 ## 8. Child-safety and dark-pattern check
