@@ -1,6 +1,6 @@
 # Real blending: Word Song land 2, two stops (native)
 
-**Status:** spec only. Thomas approved Dave's plan by popup on 2026-10-19 (§ 16): T1 stop 2 is "sounding out", T2 Lily up to 1,000 characters, T3 a xylophone clay piece, T4 the migration, T5 letters only until the right tap.
+**Status:** spec only. Thomas approved Dave's plan by popup on 2026-10-19 (§ 16): T1 stop 2 is "sounding out", T2 Lily up to 1,000 characters, T3 a xylophone clay piece, T4 the migration, T5 letters only until the right tap. Dave confirmed D1–D4 on 2026-10-19 and added one change, stop 2's 3rd wrong (§ 17).
 
 **Source:** Dave's research note, PR #628, `design/research/real-blending-land-2-2026-10-19.md` on `origin/dave/real-blending` (1397a8f). His § 1–§ 12 are the plan. This spec makes them buildable, and the changes it makes are listed under Decisions with their reasons.
 
@@ -179,16 +179,17 @@ Shipped rules hold unless named: the chips open when the read ends; a wrong tap 
 
 **Stop 2, `sounding-out` (`'sound-out'`): you make the sounds, you find the word.**
 
-| Beat                                      | She hears                                                 | She sees                                                                                                                         | Emma                 |
-| ----------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| Lead (scored P1, forward, until mastered) | "Tap the letters. Hear the sounds!", then 400 ms          | crab words' spotlight: cell k lights k × 150 ms after the line starts, with the lit pulse; all go dark 200 ms after it ends      | as for every lead    |
-| Read                                      | "What is it?"                                             | caption "What is it?"; the chips open when it ends. No silent beat: the read never says the word, so there is nothing to protect | `listening`          |
-| Letters                                   | each tap plays that letter's sound                        | the tapped letter lights. Live from the card's first frame whenever Emma is silent. A tap is not a move and is not recorded      | idle                 |
-| Wrong 1                                   | "Hmm... try again?"                                       | poof, shake                                                                                                                      | `puzzled-tilt`       |
-| Wrong 2                                   | the sounds, cut before the word: "m… a… t"                | stop 1's read support: lights held, caption "m - a - t", dark at the cut. The learner still does the join                        | `attentive-pointing` |
-| Wrong 3                                   | "This one is mat."                                        | the guided glow                                                                                                                  | as shipped           |
-| Right (or the guided tap)                 | "Yes! That's a mat." (dad, jam: "Yes! Dad!", "Yes! Jam!") | the picture springs in; all letters lit                                                                                          | `celebration`        |
+| Beat                                      | She hears                                                        | She sees                                                                                                                                                                 | Emma                                  |
+| ----------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| Lead (scored P1, forward, until mastered) | "Tap the letters. Hear the sounds!", then 400 ms                 | crab words' spotlight: cell k lights k × 150 ms after the line starts, with the lit pulse; all go dark 200 ms after it ends                                              | as for every lead                     |
+| Read                                      | "What is it?"                                                    | caption "What is it?"; the chips open when it ends. No silent beat: the read never says the word, so there is nothing to protect                                         | `listening`                           |
+| Letters                                   | each tap plays that letter's sound                               | the tapped letter lights. Live from the card's first frame whenever Emma is silent. A tap is not a move and is not recorded                                              | idle                                  |
+| Wrong 1                                   | "Hmm... try again?"                                              | poof, shake                                                                                                                                                              | `puzzled-tilt`                        |
+| Wrong 2                                   | the sounds, cut before the word: "m… a… t"                       | stop 1's read support: lights held, caption "m - a - t", dark at the cut. The learner still does the join                                                                | `attentive-pointing`                  |
+| Wrong 3                                   | the **whole** clip, "m - a - t ... mat", then "This one is mat." | stop 1's 2nd-wrong lights during the clip (one letter lit at a time, all three on the word, shipped `litAt`); then the guided glow, which starts with "This one is mat." | `attentive-pointing`, then as shipped |
+| Right (or the guided tap)                 | "Yes! That's a mat." (dad, jam: "Yes! Dad!", "Yes! Jam!")        | the picture springs in; all letters lit                                                                                                                                  | `celebration`                         |
 
+- **Stop 2's 3rd wrong** (Dave's extra, § 17): the whole clip starts when the reprompt ends, with no 600 ms wait, and "This one is mat." starts when the clip ends. So the 3rd wrong is longer than shipped by the clip's length. The 8 shipped short-a clips end at 2,892–3,545 ms (last segment, `mobile/src/audio/blendMarks.generated.ts`); the 6 new ones are measured at the render. Chips and letters stay closed through the clip, because Emma is speaking (`tapsOpen`, `WordSong.tsx:1091`), and the glow comes on with the answer line. The caption ends on the word, as stop 1's 2nd wrong does: the answer is being given. D4's "never the word" is for the sounds.
 - **Reviews, replays, peeks and warm-ups** play each block in its own type's beats, with no lead.
 - **The caption of the sounds is never the blend line.** A line's caption ends fully revealed (`useLineSpeaker.ts`, the `finally` block), so playing the blend text as a line would print "fan" at the cut. The sounds' caption is `blendSoundsText(blend)` ("f - a - n").
 
@@ -250,7 +251,7 @@ No new motion.
 - **The per-class phoneme SSML map is not used.** It is the Azure path (`api/_tts.ts`; `.claude/docs/planner-and-canon.md:622`), live only under the opt-in `TTS_PROVIDER=azure` (`api/_session.ts:140-160`). `.claude/docs/audio-system.md` holds no blend map.
 - **The CVC phoneme-blend prompt** (`api/_planner.ts:3538-3575`): its text shape is the splice's lint (§ 6). The prompt itself is unchanged: these files are spliced, and `blending-cv`'s live path (a canon miss only) keeps "Tap the <word>." with 5 slots, which the parser still reads as the listening type.
 - **Blend marks:** `npm run export-assets` measures the new clips the shipped way (`mobile/scripts/export-assets.mjs:294-333`). **New:** 6 entries in `blendMarks.generated.ts`.
-- **Tap-to-hear, the whole-clip 2nd wrong, `litAt`:** shipped (`WordSong.tsx` `onLetterPress`, `playSecondWrong`; `mobile/src/audio/blendMarks.ts`), widened to the two types through `usesBlendClip` (§ 8).
+- **Tap-to-hear, the whole-clip 2nd wrong, `litAt`:** shipped (`WordSong.tsx` `onLetterPress`, `playSecondWrong`; `mobile/src/audio/blendMarks.ts`), widened to the two types through `usesBlendClip` (§ 8). Stop 2 plays the same whole-clip path on its 3rd wrong, before the answer (§ 4).
 - **The cut:** built from the shipped `TAP_TAIL_MS` = 80 and `MARK_LEAD_MS` = 40 (`blendMarks.ts:25-27`). **New:** `soundsCutMs(segments)`.
 - **Pictures:** the pack has all 14 targets and the 5 gentle chips (`mobile/assets/pictures/`). $0.
 - **Card, chips, entrance, lights, lead sweep:** `WordStage`'s picture card, `TapTarget`'s entrance, `LetterRow`'s `spotlight`, crab words' `'left-to-right'`. **New:** the picture's mount waits for the answer.
@@ -329,7 +330,7 @@ No new motion.
 - **Review, replay, warm-up:** blocks are copied with every slot, `blend` included (`copyBlock`, `api/_review.ts:139-155`). A stop-1 block plays the sounds wherever it runs, and a stop-2 block asks "What is it?". The tier follows the block's position in the session (shipped).
 - **Missing clip or marks** (a static plan, a byte mismatch):
   - Stop 1 plays "Listen." and then the hint line ("Let's look. Fan.") in place of the sounds, so the problem stays answerable as a listening problem.
-  - Stop 2's 2nd wrong plays the hint line.
+  - Stop 2's 2nd wrong plays the hint line, and its 3rd wrong plays "This one is mat." alone, as shipped. Without marks, stop 2 never plays the clip.
   - A letter tap only lights.
 - **The guided tap** reveals the picture like a right tap; the problem is not counted correct (shipped).
 - **Background, rotation:** as `word-song-native.md` § 8. The voice channel parks and resumes a line (#528), so sounds hidden midway resume where they stopped, still end at the cut, and the held lights follow the voice's clock. On a rotation nothing replays, lit letters stay lit, and the empty slot takes the new form's P.
@@ -466,7 +467,7 @@ A Danish version is planned (`CLAUDE.md` "Users" line). Nothing here blocks a se
 
 1. `blendReads` in `NATIVE_PARSE` and the peek's options; `blendOf` on `usesBlendClip`; `soundsCutMs`.
 2. Stop 1's read: "Listen.", 300 ms, the cut sounds as an Emma line with the held lights (`spotlight` from the marks), the caption `blendSoundsText`, the chips opening at the cut.
-3. Stop 2's 2nd wrong: the same cut sounds. Stop 1's 2nd wrong: the shipped whole-clip path.
+3. Stop 2's 2nd wrong: the same cut sounds. Stop 1's 2nd wrong: the shipped whole-clip path. Stop 2's 3rd wrong: when the reprompt ends, the problem's `blend` through the same whole-clip path (`litAt` on the marks, the blend caption), then `giveAnswer`, with the guided glow set as it starts; without marks, `giveAnswer` alone. No new core name: native reads `utterances.blend` and the marks from `blendOf`. The 3rd wrong gets longer by the clip's length (§ 4).
 4. `WordStage`: the picture slot kept empty while `hidesPictureUntilAnswer` and unsolved, then the picture mounted at the answer; all letters lit on the right tap.
 5. The intro pattern entry.
 6. Jest ACs 12–17.
@@ -516,12 +517,12 @@ A Danish version is planned (`CLAUDE.md` "Users" line). Nothing here blocks a se
     - "What is it?" with no lead; the chips open at its end.
     - A tap on m plays segment 0's window of "m - a - t ... mat" and lights m. Letters are inert while a line plays.
     - The 2nd wrong plays the sounds cut before the word, with lights held and the caption "m - a - t".
-    - The 3rd wrong plays "This one is mat." with the guided glow; the guided tap reveals the picture and is not counted correct.
+    - The 3rd wrong: when the reprompt ends, the whole clip "m - a - t ... mat" with one letter lit at a time and all three on the word, then "This one is mat." with the guided glow. The glow is off and no chip or letter answers during the clip. The guided tap reveals the picture and is not counted correct.
 15. **Leads:**
     - Stop 2's P1 lead lights the cells at 0, 150 and 300 ms; Reduce Motion lights them at once with no pulse.
     - Stop 1's lead lights nothing.
     - No lead plays on P2–P8, in reviews, peeks, replays or warm-ups.
-16. **Without marks:** stop 1 plays "Listen." then "Let's look. Fan." and opens the chips; stop 2's 2nd wrong plays the hint line; letter taps only light. A review mixing a stop-1 block, a stop-2 block and a cvc-words block plays each in its own beats.
+16. **Without marks:** stop 1 plays "Listen." then "Let's look. Fan." and opens the chips; stop 2's 2nd wrong plays the hint line, and its 3rd wrong plays "This one is mat." with no clip; letter taps only light. A review mixing a stop-1 block, a stop-2 block and a cvc-words block plays each in its own beats.
 17. **Reduce Motion:** the picture fades in over 200 ms with no scale, and the lights have no pulse.
 
 **Device** (Expo Go, `EXPO_PUBLIC_QA_STEP=blending-cv`, then `sounding-out`):
@@ -553,10 +554,11 @@ Approved by popup, 2026-10-19, as written in Dave's § 12:
 
 ## 17. D-items for Dave (pedagogy, read-only)
 
-- **D1.** Stop 2's lead lights the letters left to right with the lit pulse (crab words' cue), and all at once under Reduce Motion. Your bracket asked for "each in turn, no scale". The shipped cue saves a pattern, and Reduce Motion users still see which letters to tap.
-- **D2.** The revealed picture can't be tapped, because the problem is solved and advances (Decision 7). The word–picture link is "Yes! That's a mat." over the picture. Your § 3 had a picture tap saying the word.
-- **D3.** The older-build pair: a learner who mastered blending sounds on a build without sounding out (stored `'locked'`) is treated as T4's migrated learner (`'mastered'`) and is not sent to sounding out (§ 9).
-- **D4.** During the sounds the ribbon shows the letters, hyphenated ("f - a - n"), as the shipped 2nd-wrong blend caption does, and never the word.
+- **D1.** Stop 2's lead lights the letters left to right with the lit pulse (crab words' cue), and all at once under Reduce Motion. Your bracket asked for "each in turn, no scale". The shipped cue saves a pattern, and Reduce Motion users still see which letters to tap. **Dave: CONFIRM (2026-10-19).**
+- **D2.** The revealed picture can't be tapped, because the problem is solved and advances (Decision 7). The word–picture link is "Yes! That's a mat." over the picture. Your § 3 had a picture tap saying the word. **Dave: CONFIRM (2026-10-19).**
+- **D3.** The older-build pair: a learner who mastered blending sounds on a build without sounding out (stored `'locked'`) is treated as T4's migrated learner (`'mastered'`) and is not sent to sounding out (§ 9). **Dave: CONFIRM (2026-10-19).**
+- **D4.** During the sounds the ribbon shows the letters, hyphenated ("f - a - n"), as the shipped 2nd-wrong blend caption does, and never the word. **Dave: CONFIRM (2026-10-19).**
+- **Dave's extra, adopted by the team (2026-10-19).** On stop 2 the 3rd wrong first plays the whole blend clip, "m - a - t ... mat", with the shipped one-letter-at-a-time lights (stop 1's 2nd-wrong path, `{ kind: 'blend' }`), then "This one is mat." with the guided glow. Dave's reason is gradual release, his reasoning rather than a cited result: otherwise a learner who misses three times never hears the sounds joined into the word, which is what the stop teaches. No new audio: it is the problem's own blend clip. The 3rd wrong gets longer by the clip's length. Folded into § 4, § 7, § 10, § 14 (Devon 3) and ACs 14 and 16.
 
 ## 18. K-items for Kevin (confirm in code before building)
 
