@@ -5,7 +5,8 @@ Goal: 3rd-grade math readiness + basic English literacy by August 2026 (~3-4 mon
 
 ## Context
 
-- **Child:** Marian, age 8. Speaks Tagalog (primary) + some English. Starting Danish school August 2026.
+- **Child:** Marian, age 8. Speaks Tagalog (primary) + some English. No Danish: she has never been to Danish school (Thomas, 2026-10-19; an older line here said she was starting Danish school, which was wrong). Never premise content on Danish school, Danish goals or the Danish language.
+- **Users:** the app is multi-user, not only Marian (Thomas, 2026-10-19). Plan content for any learner of about 6-9 learning maths and English reading in the app; Marian is one user. No step may depend on one child's school, language or history. Whether this also means profiles/accounts in the product is not decided yet.
 - **Character:** Emma — original manhwa/webtoon-style young female teacher (renamed 2026-04-28 from "Melody" to drop Sanrio IP). Voice: `en-US-EmmaMultilingualNeural`. Phase 3a (audio + name) shipped 2026-04-28; Phase 3b (visual migration) shipped 2026-04-29 in PR #104. The character pivot is functionally complete — every screen consumes `emma-*.svg`. Documentation closeout in PR #121 (2026-05-02). Polish backlog tracks the PNG-in-SVG → vector re-trace and the unwired rotateZ tilt + breathing loop separately.
 - **Device:** iPad (PWA, home-screen install)
 - **Language policy:** Strict English-only in the app

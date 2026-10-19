@@ -88,3 +88,11 @@ _Entries from 2026-10-13 to 2026-10-15 are archived verbatim in [`log/decisions-
   3. Thomas checked both PRs on the device (P1/P6 of more and less, the lift-out, land 8, the ship trio) and said merge: #608 5a74911, #607 43c8f73.
   4. Released to production (smoke green), TestFlight build 15 (EAS fe2159e8-a485-4921-b855-367f720420c7), voice-QA baseline #611.
 - **Decided by:** Thomas.
+
+## 2026-10-19 — No Danish premise; the app is multi-user
+
+- **Decided:**
+  1. Marian has no Danish skills and has never been to Danish school (Thomas: "Marian has no Danish skills / she has never been to danish school"). CLAUDE.md:8's "Starting Danish school August 2026" was wrong and is corrected. Dave's roadmap had aligned maths with the Danish grade-3 goals (M2) and used Danish-language reasoning (M5, M6's digit-swap rationale, "halv tre") on that premise; his wave-5 addendum adds a dated correction section saying which of those choices still hold on other evidence.
+  2. The app is multi-user, not only Marian (Thomas: "we need to think about this app as multi-user not only Marian"). Content is planned for any learner of about 6-9; no step may depend on one child's school, language or history. Profiles/accounts in the product are not decided.
+- **Reverses:** the Danish-school premise in CLAUDE.md and in content-roadmap-after-path-ends.md:51.
+- **Decided by:** Thomas.
