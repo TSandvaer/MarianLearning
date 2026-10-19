@@ -299,6 +299,7 @@ export function loadSessionAudio(
         onPlay: opts.onPlay,
         onWordTick: opts.onWordTick,
         onTime: opts.onTime,
+        endAtMs: opts.endAtMs,
       },
     )
   }

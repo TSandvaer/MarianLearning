@@ -70,6 +70,8 @@ export {
   blendRevealAt,
   letterWindow,
   litAt,
+  soundsCutMs,
+  soundsHeldAt,
   wordWindow,
 } from './blendMarks'
 export type { Segment } from './blendMarks'

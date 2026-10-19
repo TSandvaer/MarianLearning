@@ -67,9 +67,11 @@ import {
 
 /**
  * The native app plays content wave 3's little stories (content-wave-3.md
- * § 4.6); the frozen web parses without this, so a story throws there.
+ * § 4.6) and real blending's two reads, "Listen." and "What is it?"
+ * (real-blending.md § 8); the frozen web parses without these, so a story
+ * or a real-blending problem throws there.
  */
-const NATIVE_PARSE = { littleStories: true } as const
+const NATIVE_PARSE = { littleStories: true, blendReads: true } as const
 
 export interface WordSongSessionSnapshot extends WordSongSessionExtras {
   /** The server plan (warm-ups first); `null` until resolved, and on any

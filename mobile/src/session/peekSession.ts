@@ -118,10 +118,12 @@ function blockPlanFromServer(
       }
     : {
         world,
-        // The native app plays the little stories (content wave 3).
+        // The native app plays the little stories (content wave 3) and
+        // real blending's two reads (real-blending.md § 8).
         plan: wordSongSessionPlanFromServer(serverPlan, {
           problemCount: count,
           littleStories: true,
+          blendReads: true,
           step: node,
         }),
       }

@@ -41,6 +41,15 @@ export interface SpeakHooks {
    * aloud, whose caption is the card's read-along; content wave 3 § 4.2).
    */
   keepCaption?: boolean
+  /**
+   * The ribbon shows this instead of the line's text: real blending's
+   * sounds ("f - a - n" while the blend clip plays to its cut,
+   * `design/native/real-blending.md` § 4), so the caption never ends on
+   * the word.
+   */
+  caption?: string
+  /** End the line this far into its clip (the player's `endAtMs`). */
+  endAtMs?: number
 }
 
 export interface LineSpeaker {
@@ -72,15 +81,22 @@ export function useLineSpeaker(
   const speak = useCallback<LineSpeaker['speak']>(
     async (text, hooks) => {
       const quiet = hooks?.keepCaption === true
+      const shown = hooks?.caption ?? text
       const myLine = quiet ? -1 : ++generationRef.current
       if (!quiet)
-        setCaption({ text, revealed: 0, visible: false, generation: myLine })
-      const words = text.split(/\s+/).filter(Boolean).length
+        setCaption({
+          text: shown,
+          revealed: 0,
+          visible: false,
+          generation: myLine,
+        })
+      const words = shown.split(/\s+/).filter(Boolean).length
       const mine = () => !unmounted.current && myLine === generationRef.current
       const live = () => !unmounted.current
       const reveal = (n: number) =>
         setCaption((c) => (n > c.revealed ? { ...c, revealed: n } : c))
       const opts: PlayWordSongUtteranceOptions = {
+        ...(hooks?.endAtMs !== undefined ? { endAtMs: hooks.endAtMs } : {}),
         onPlay: () => {
           if (mine()) setCaption((c) => ({ ...c, visible: true }))
         },

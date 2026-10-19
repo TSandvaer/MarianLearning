@@ -257,9 +257,9 @@ describe('stop 1, blending sounds: the read (AC 12)', () => {
     expect(sounds.text).toBe(FAN)
     expect(sounds.opts.endAtMs).toBe(cut(FAN))
     expect(h.poses.at(-1)).toBe('attentive-pointing')
+    await say(sounds, { end: false, ms: [on(FAN, 0) - 1] })
     // The ribbon shows the sounds, never the word.
     expect(caption()).toBe('f - a - n')
-    await say(sounds, { end: false, ms: [on(FAN, 0) - 1] })
     expect(lit()).toEqual([])
     await say(sounds, { end: false, ms: [on(FAN, 0)] })
     expect(lit()).toEqual([0])
@@ -379,9 +379,9 @@ describe('stop 2, sounding out: P3, mat (AC 14)', () => {
     const sounds = last(h)
     expect(sounds.text).toBe(MAT)
     expect(sounds.opts.endAtMs).toBe(cut(MAT))
-    expect(caption()).toBe('m - a - t')
     expect(h.poses.at(-1)).toBe('attentive-pointing')
     await say(sounds, { end: false, ms: [on(MAT, 0), on(MAT, 1)] })
+    expect(caption()).toBe('m - a - t')
     expect(lit()).toEqual([0, 1])
     await say(sounds, { end: false, ms: [on(MAT, 2)] })
     expect(lit()).toEqual([0, 1, 2])
@@ -428,8 +428,9 @@ describe('stop 2, sounding out: P3, mat (AC 14)', () => {
     await say(clip, { end: false, ms: [on(MAT, 3)] })
     expect(lit()).toEqual([0, 1, 2])
     expect(glowing('mat')).toBe(false)
-    await say(clip)
+    // The caption ends on the word: the answer is being given.
     expect(caption()).toBe(MAT)
+    await say(clip)
 
     const answer = last(h)
     expect(answer.text).toBe('This one is mat.')
@@ -493,6 +494,8 @@ describe('leads (AC 15)', () => {
     await advance(1)
     expect(lit()).toEqual([])
     await advance(199)
+    expect(h.voice.lines).toHaveLength(0)
+    await advance(1)
     expect(h.voice.texts()).toEqual(['What is it?'])
   })
 
