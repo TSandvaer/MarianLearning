@@ -18,6 +18,12 @@
  * Parent Settings. Emma herself is App's `EmmaStage` (idle, breathing,
  * with the baked shadow on this route).
  *
+ * With 2 to 4 learners (learner profiles § 2.1) the playing learner's
+ * picture sits top-left as a badge (48 pt, a 56 × 56 target): a tap
+ * chimes, stops Emma's line and opens "Who is playing?". Emma's 3 s press
+ * leaves out the badge's rect (plus 8 pt), so a hold on the badge never
+ * opens Parent Settings.
+ *
  * Not ported (§ 7): the parent-gate corner, PromotionCelebration, the
  * first-tap gate, cross-tab storage sync, keyboard focus.
  */
@@ -42,15 +48,23 @@ import {
   type SessionHistoryV2,
   type SkillTreeId,
 } from '@marian/core/sessionEnd/sessionHistory'
+import type { LearnerEntry } from '@marian/core/learners'
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, StyleSheet } from 'react-native'
+import { Pressable, StyleSheet, type GestureResponderEvent } from 'react-native'
 import Animated, {
   FadeIn,
   FadeOut,
   useReducedMotion,
 } from 'react-native-reanimated'
 import type { HubLayout } from '../../layout/hubLayout'
+import {
+  badgeExclusion,
+  containsPoint,
+  hubBadge,
+} from '../../layout/pickerLayout'
 import { FILL } from '../../theme'
+import { AvatarDisc } from '../picker/AvatarDisc'
+import { playPickChime } from '../picker/pickerAudio'
 import { HUB_ENTER_MS, HUB_EXIT_MS, HubBackdrop } from './HubBackdrop'
 import { HubBubble } from './HubBubble'
 import { HubCard } from './HubCard'
@@ -73,6 +87,13 @@ export interface HubProps {
   onOpenMap: (world: MasteryTrack) => void
   /** The 3 s press on Emma: App opens Parent Settings. */
   onParentLongPress: () => void
+  /**
+   * The learner playing, with 2 to 4 learners on the device: their badge
+   * (learner profiles § 2.1). Unset with one learner: no badge.
+   */
+  learnerBadge?: LearnerEntry | null
+  /** A badge tap: App opens "Who is playing?". */
+  onLearnerBadge?: () => void
   /** Test seams. */
   player?: GuidancePlayer
   /** The progress clock (the visit's "today"). */
@@ -80,6 +101,7 @@ export interface HubProps {
   /** Wall-clock ms for the 30 s rapid-remount rule. */
   wallClock?: () => number
   plink?: () => void
+  chime?: () => void
 }
 
 interface Mount {
@@ -118,10 +140,13 @@ export function Hub({
   onPickTree,
   onOpenMap,
   onParentLongPress,
+  learnerBadge = null,
+  onLearnerBadge,
   player: playerProp,
   clock = progressNow,
   wallClock = Date.now,
   plink = playPlink,
+  chime = playPickChime,
 }: HubProps) {
   const reducedMotion = useReducedMotion()
   const [player] = useState<GuidancePlayer>(
@@ -195,8 +220,35 @@ export function Hub({
     onOpenMap(world)
   }
 
+  const switchLearner = () => {
+    if (leavingRef.current || onLearnerBadge === undefined) return
+    leavingRef.current = true
+    chime()
+    stopLines.current()
+    onLearnerBadge()
+  }
+
+  // Emma's 3 s press ignores a hold that began on (or next to) the badge.
+  const pressInAt = useRef<{ x: number; y: number } | null>(null)
+  const onEmmaPressIn = (e?: GestureResponderEvent) => {
+    const at = e?.nativeEvent
+    pressInAt.current = at === undefined ? null : { x: at.pageX, y: at.pageY }
+  }
+  const onEmmaLongPress = () => {
+    const at = pressInAt.current
+    if (
+      learnerBadge !== null &&
+      at !== null &&
+      containsPoint(badgeExclusion(layout), at.x, at.y)
+    ) {
+      return
+    }
+    onParentLongPress()
+  }
+
   const current = visit.lines[line.index] ?? null
   const { emma } = layout
+  const badge = learnerBadge !== null ? hubBadge(layout) : null
   const cards = [
     { tree: 'number-garden', model: visit.numberGarden },
     { tree: 'word-song', model: visit.wordSong },
@@ -217,7 +269,8 @@ export function Hub({
           testID="hub-emma-long-press"
           accessible={false}
           delayLongPress={PARENT_LONG_PRESS_MS}
-          onLongPress={onParentLongPress}
+          onPressIn={onEmmaPressIn}
+          onLongPress={onEmmaLongPress}
           style={[
             styles.abs,
             {
@@ -251,6 +304,35 @@ export function Hub({
             onOpenMap={() => openMap(model.world)}
           />
         ))}
+        {/* Above Emma's long-press target in z (on L it sits over the
+            transparent corner of her frame). A hold does nothing. */}
+        {badge !== null && learnerBadge !== null && (
+          <Pressable
+            testID="hub-learner-badge"
+            accessibilityRole="button"
+            accessibilityLabel={
+              learnerBadge.name === '' ? undefined : learnerBadge.name
+            }
+            delayLongPress={PARENT_LONG_PRESS_MS}
+            onLongPress={() => {}}
+            onPress={switchLearner}
+            style={[
+              styles.badge,
+              {
+                left: badge.hit.x,
+                top: badge.hit.y,
+                width: badge.hit.width,
+                height: badge.hit.height,
+              },
+            ]}
+          >
+            <AvatarDisc
+              avatarId={learnerBadge.avatarId}
+              size={badge.disc.width}
+              testID="hub-learner-badge-avatar"
+            />
+          </Pressable>
+        )}
       </Animated.View>
     </>
   )
@@ -259,4 +341,10 @@ export function Hub({
 const styles = StyleSheet.create({
   foreground: { ...FILL, zIndex: 2, pointerEvents: 'box-none' },
   abs: { position: 'absolute' },
+  badge: {
+    position: 'absolute',
+    zIndex: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 })

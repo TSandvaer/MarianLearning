@@ -14,6 +14,7 @@ import type { Progress } from '@marian/core/progress'
 import { useRef } from 'react'
 import { findNodeHandle, StyleSheet, Text, View } from 'react-native'
 import { Card, PsButton, StatusSlot, type StatusLine } from './controls'
+import type { LearnerSettingsCopy } from './learnerCopy'
 import { NATIVE_COPY } from './nativeCopy'
 import type { ParentSettingsDeps } from './parentSettingsDeps'
 import { BODY_FONT_MAX, type } from './psTheme'
@@ -34,9 +35,16 @@ export interface BackupSectionProps {
   deps: ParentSettingsDeps
   /** False once the screen is gone: a late result is ignored. */
   alive: () => boolean
+  /** The selected learner's strings (learner profiles § 3.6). */
+  copy: LearnerSettingsCopy
 }
 
-export function BackupSection({ progress, deps, alive }: BackupSectionProps) {
+export function BackupSection({
+  progress,
+  deps,
+  alive,
+  copy: learnerCopy,
+}: BackupSectionProps) {
   const status = useTransientStatus<BackupStatus>('idle', resets)
   const shareAnchor = useRef<View>(null)
 
@@ -74,7 +82,7 @@ export function BackupSection({ progress, deps, alive }: BackupSectionProps) {
         {BACKUP_COPY.heading}
       </Text>
       <Text maxFontSizeMultiplier={BODY_FONT_MAX} style={type.description}>
-        {BACKUP_COPY.body}
+        {learnerCopy.backupBody}
       </Text>
       <View style={styles.buttons}>
         <PsButton

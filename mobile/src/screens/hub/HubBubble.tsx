@@ -43,6 +43,7 @@ export interface HubBubbleProps {
   text: string
   revealedCount: number
   lineKey: string
+  testID?: string
 }
 
 export function HubBubble({
@@ -50,10 +51,11 @@ export function HubBubble({
   text,
   revealedCount,
   lineKey,
+  testID = 'hub-bubble',
 }: HubBubbleProps) {
   return (
     <CaptionRibbon
-      testID="hub-bubble"
+      testID={testID}
       text={text}
       revealedCount={revealedCount}
       lineKey={lineKey}

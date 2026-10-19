@@ -12,10 +12,6 @@ export const QA_STEP_COPY = {
   close: 'Close',
   current: 'Current',
   worlds: { math: 'Number Garden', 'word-song': 'Word Song' },
-  realStart: "Back to Marian's real start",
-  realStartTitle: "Back to Marian's real start?",
-  realStartBody:
-    "Writes Marian's starting progress on this device and clears today's history. The device ID stays.",
   jumpBody:
     "Replaces this device's progress and clears today's history. The device ID stays.",
   cloud: 'With cloud backup on, it syncs like any progress.',
@@ -32,6 +28,7 @@ export function jumpMessage(step: QaStep): string {
   return `${QA_STEP_COPY.worlds[step.world]}, step ${step.position} (${step.node}). ${QA_STEP_COPY.jumpBody}\n${QA_STEP_COPY.cloud}`
 }
 
-export function realStartMessage(): string {
-  return `${QA_STEP_COPY.realStartBody}\n${QA_STEP_COPY.cloud}`
+/** The reset's alert body: the learner's (`learnerCopy.ts`), then the cloud line. */
+export function realStartMessage(body: string): string {
+  return `${body}\n${QA_STEP_COPY.cloud}`
 }
