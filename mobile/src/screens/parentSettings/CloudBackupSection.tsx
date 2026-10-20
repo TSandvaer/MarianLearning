@@ -32,12 +32,12 @@ import {
   type PushStatus,
   type RestoreStatus,
 } from '@marian/core/parentSettings/cloudBackup'
-import { restoreOutcomeMessage } from '@marian/core/parentSettings/parentSettingsModel'
 import type { Progress } from '@marian/core/progress'
 import { useRef, useState } from 'react'
 import { Alert, Keyboard, Text, View } from 'react-native'
 import { Card, type StatusLine } from './controls'
 import { DeviceIdBlock, LastSyncedBlock, RestoreBlock } from './cloudParts'
+import type { LearnerSettingsCopy } from './learnerCopy'
 import { formatLastSynced, NATIVE_COPY } from './nativeCopy'
 import type { ParentSettingsDeps } from './parentSettingsDeps'
 import { BODY_FONT_MAX, type } from './psTheme'
@@ -68,7 +68,10 @@ function copyLine(s: CopyStatus): StatusLine | null {
   return null
 }
 
-function restoreLine(s: NativeRestoreStatus): StatusLine | null {
+function restoreLine(
+  s: NativeRestoreStatus,
+  copy: LearnerSettingsCopy,
+): StatusLine | null {
   switch (s.kind) {
     case 'invalid-format':
       return { tone: 'error', text: CLOUD_BACKUP_COPY.invalidFormat }
@@ -77,7 +80,7 @@ function restoreLine(s: NativeRestoreStatus): StatusLine | null {
     case 'code-held':
       return { tone: 'error', text: NATIVE_COPY.codeHeld(s.name) }
     case 'restored':
-      return { tone: 'ok', text: restoreOutcomeMessage(s.outcome) }
+      return { tone: 'ok', text: copy.restoreOutcome(s.outcome) }
     case 'restore-failed':
       return { tone: 'error', text: restoreFailedMessage(s.reason) }
     default:
@@ -95,6 +98,8 @@ export interface CloudBackupSectionProps {
   /** The restore block's bottom (status slot included), in this card. */
   onRestoreBottom: (bottomInCard: number) => void
   onRestoreFocusChange: (focused: boolean) => void
+  /** The selected learner's strings (learner profiles § 3.6). */
+  copy: LearnerSettingsCopy
 }
 
 export function CloudBackupSection({
@@ -105,6 +110,7 @@ export function CloudBackupSection({
   compact,
   onRestoreBottom,
   onRestoreFocusChange,
+  copy,
 }: CloudBackupSectionProps) {
   const blocksY = useRef(0)
   const restoreRect = useRef<{ y: number; height: number } | null>(null)
@@ -235,7 +241,7 @@ export function CloudBackupSection({
         {CLOUD_BACKUP_COPY.heading}
       </Text>
       <Text maxFontSizeMultiplier={BODY_FONT_MAX} style={type.description}>
-        {CLOUD_BACKUP_COPY.body}
+        {copy.cloudBody}
       </Text>
       <View
         testID="parent-settings-cloud-blocks"
@@ -270,7 +276,7 @@ export function CloudBackupSection({
           focused={focused}
           onFocusChange={focusChange}
           compact={compact}
-          slot={{ status: restoreLine(status), seq: restore.seq }}
+          slot={{ status: restoreLine(status, copy), seq: restore.seq }}
           onLayout={(e) => {
             const { y, height } = e.nativeEvent.layout
             restoreRect.current = { y, height }

@@ -160,6 +160,8 @@ const DEFAULT_SKILL_LEVELS = {
   'div-share': 'locked',
   hundreds: 'locked',
   'hundreds-addsub': 'locked',
+  'hundreds-zeros': 'locked',
+  'add-two-digit': 'locked',
   'letter-names': 'mastered',
   'letter-sounds': 'practicing',
   'blending-cv': 'practicing',

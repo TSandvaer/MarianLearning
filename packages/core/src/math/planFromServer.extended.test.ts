@@ -491,7 +491,7 @@ describe('extended kinds — mixed and failing plans', () => {
         'flowers, <W> plates. How many on each plate?"; hundreds "<W> ' +
         '<place>, <W> <place> and <W> <place>. What number is it?" or "<W>. ' +
         'What is ten more?" / "What is one hundred more?"; more and less ' +
-        '"<W>. What is <change> more?" / "… less?")',
+        '"<W>. What is <change> more?" / "… less?"; zeros "Find <W>.")',
     )
   })
 

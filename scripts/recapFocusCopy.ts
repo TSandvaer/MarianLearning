@@ -44,6 +44,8 @@ export const RECAP_FRIENDLY_NODE_NAMES: Record<string, string> = {
   'div-share': 'sharing',
   hundreds: 'hundreds',
   'hundreds-addsub': 'more and less',
+  'hundreds-zeros': 'zeros',
+  'add-two-digit': 'adding big numbers',
   // Word Song (literacy)
   'letter-names': 'your letters',
   'letter-sounds': 'letter sounds',

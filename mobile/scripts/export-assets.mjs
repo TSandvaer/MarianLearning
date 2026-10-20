@@ -16,6 +16,10 @@
  *                                  and the 4 novel-probe pictures the web
  *                                  draws inline (`renderProbePictures.ts`),
  *                                  unless a pack picture exists for them
+ * - `assets/avatars/avatar-<id>.webp` kept as they are: the learner avatars
+ *                                  (learner-profiles.md § 9), which the pack
+ *                                  generator's --pick writes here; only
+ *                                  registered (`/native/avatars/...`)
  * - `src/audio/blendMarks.generated.ts` the sound segments of every baked
  *                                  Word Song blend clip (needs `ffmpeg`)
  * - `assets/scenes/<id>.webp`      every `public/assets/scenes/scene-*.svg`
@@ -216,6 +220,16 @@ for (const name of sorted(join(webAssets, 'pictures'), /^picture-.+\.svg$/)) {
     totalOut += webp.length
     registry.push([`/native/pictures/${key}`, outPath])
   }
+}
+
+// The learner avatars (design/native/learner-profiles.md § 9): written here
+// directly by `generatePackPictures.ts --pick` (design/native/
+// avatar-manifest.json), not exported from the web, which stays
+// single-learner (§ 4.4). Registered as they are (native only: keyed under
+// /native/avatars/).
+mkdirSync(join(out, 'avatars'), { recursive: true })
+for (const name of sorted(join(out, 'avatars'), /^avatar-.+\.webp$/)) {
+  registry.push([`/native/avatars/${name}`, join(out, 'avatars', name)])
 }
 
 // Simple-sentences scenes. The little stories' scenes (`story-<id>.webp`,

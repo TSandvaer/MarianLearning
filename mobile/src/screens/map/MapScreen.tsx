@@ -23,6 +23,10 @@
  * stop a replay (`onReplay`); during a launch Home and Android back are
  * ignored. A map remounted after a peek, a replay or a Map-started session
  * (`quietReturn`) opens quiet. See `useMapVisit`.
+ *
+ * Native-only, the play door (`design/native/mini-game-flower-bed.md`
+ * § 1.2): a world with an open game shows it beside Home; its tap asks App
+ * for the game (`onGame`) under the stop rules.
  */
 import type { MasteryTrack } from '@marian/core/progress'
 import { useEffect, useRef } from 'react'
@@ -34,7 +38,13 @@ import Animated, {
 } from 'react-native-reanimated'
 import type { MapScreenLayout } from '../../layout/mapScreenLayout'
 import { EASE_OUT } from './mapMotion'
-import { HomeButton, MapBackdrop, MapCaption, MapTitle } from './mapChrome'
+import {
+  GameDoor,
+  HomeButton,
+  MapBackdrop,
+  MapCaption,
+  MapTitle,
+} from './mapChrome'
 import { MapPath } from './MapPath'
 import { useMapVisit, type MapVisitOptions } from './useMapVisit'
 
@@ -54,7 +64,7 @@ export interface MapEntry {
 
 export interface MapScreenProps extends Omit<
   MapVisitOptions,
-  'world' | 'peek' | 'play' | 'replay'
+  'world' | 'peek' | 'play' | 'replay' | 'openGame'
 > {
   layout: MapScreenLayout
   world: MasteryTrack
@@ -66,6 +76,8 @@ export interface MapScreenProps extends Omit<
   onPlay?: MapVisitOptions['play']
   /** A mastered stop was tapped: its replay (`replay`). */
   onReplay?: MapVisitOptions['replay']
+  /** The play door was tapped: open the game (`openGame`). */
+  onGame?: MapVisitOptions['openGame']
 }
 
 export function MapScreen({
@@ -75,6 +87,7 @@ export function MapScreen({
   onPeek,
   onPlay,
   onReplay,
+  onGame,
   ...seams
 }: MapScreenProps) {
   const reducedMotion = useReducedMotion()
@@ -83,6 +96,7 @@ export function MapScreen({
     peek: onPeek,
     play: onPlay,
     replay: onReplay,
+    openGame: onGame,
     ...seams,
   })
   const leavingRef = useRef(false)
@@ -107,7 +121,9 @@ export function MapScreen({
     return () => sub.remove()
   }, [])
 
-  const { visit } = state
+  const { visit, tapDoor } = state
+  // One door per world; the shelf for 2+ games comes with game B (§ 1.2).
+  const game = state.games[0]
   return (
     <Animated.View
       testID="map"
@@ -122,6 +138,14 @@ export function MapScreen({
       >
         <MapPath layout={layout} state={state} reducedMotion={reducedMotion} />
         <HomeButton rect={layout.home} k={layout.homeScale} onPress={home} />
+        {game !== undefined && (
+          <GameDoor
+            game={game}
+            rect={layout.door}
+            k={layout.homeScale}
+            onPress={() => tapDoor(game)}
+          />
+        )}
         {layout.title && <MapTitle world={world} rect={layout.title} />}
         <MapCaption line={state.caption} caption={layout.caption} />
       </Animated.View>

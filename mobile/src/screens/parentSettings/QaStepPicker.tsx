@@ -10,7 +10,9 @@
  * `progressAtStep(node)` through core's `jumpToStep` (today's session
  * history cleared, the device ID kept) and calls `onJumped`. App then
  * restarts its screens on the Hub, where that step is current. "Back to
- * Marian's real start" writes `defaultProgress()` the same way.
+ * <name>'s real start" writes the playing learner's start doc the same
+ * way (learner profiles § 4.8; for the migrated learner 1, Marian's
+ * defaults as before).
  *
  * With the progress secret set, a jump is pushed and reconciled like any
  * progress; the confirm text says so in one line. There is no new cloud
@@ -22,6 +24,7 @@ import {
   jumpToStep,
   type QaStep,
 } from '@marian/core/debug/stepProgress'
+import { activeLearner, startProgressForActive } from '@marian/core/learners'
 import type { MasteryTrack, SkillNode } from '@marian/core/progress'
 import {
   Alert,
@@ -34,6 +37,7 @@ import {
 import type { ParentSettingsLayout } from '../../layout/parentSettingsLayout'
 import { FILL } from '../../theme'
 import { Card, PsButton } from './controls'
+import { learnerSettingsCopy, type LearnerSettingsCopy } from './learnerCopy'
 import {
   jumpMessage,
   jumpTitle,
@@ -85,6 +89,15 @@ export interface QaStepPickerProps {
   /** Test seams: the two writes (core's by default). */
   jump?: (node: SkillNode) => void
   resetToRealStart?: () => void
+  /** The playing learner's strings; Parent Settings passes them. */
+  copy?: LearnerSettingsCopy
+}
+
+/** The playing learner's strings, or the doc's name with no list installed. */
+function playingCopy(): LearnerSettingsCopy {
+  return learnerSettingsCopy(
+    activeLearner()?.name ?? startProgressForActive().profile.childName,
+  )
 }
 
 const WORLDS: readonly MasteryTrack[] = ['math', 'word-song']
@@ -96,6 +109,7 @@ export function QaStepPicker({
   onJumped,
   jump = jumpToStep,
   resetToRealStart = jumpToRealStart,
+  copy = playingCopy(),
 }: QaStepPickerProps) {
   const pick = (step: QaStep) =>
     Alert.alert(jumpTitle(step), jumpMessage(step), [
@@ -110,7 +124,7 @@ export function QaStepPicker({
       },
     ])
   const reset = () =>
-    Alert.alert(QA_STEP_COPY.realStartTitle, realStartMessage(), [
+    Alert.alert(copy.qaRealStartTitle, realStartMessage(copy.qaRealStartBody), [
       { text: QA_STEP_COPY.cancel, style: 'cancel' },
       {
         text: QA_STEP_COPY.reset,
@@ -219,7 +233,7 @@ export function QaStepPicker({
           <View style={styles.footer}>
             <PsButton
               testID="qa-step-real-start"
-              label={QA_STEP_COPY.realStart}
+              label={copy.qaRealStart}
               variant="secondary"
               minWidth={200}
               onPress={reset}

@@ -46,6 +46,8 @@ const MATH = [
   'div-share',
   'hundreds',
   'hundreds-addsub',
+  'hundreds-zeros',
+  'add-two-digit',
 ] as const
 const WORD = [
   'letter-names',
@@ -324,11 +326,11 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
       'data-node',
       'add-to-10',
     )
-    await expect(page.getByTestId('map-stop')).toHaveCount(15)
-    await expect(page.getByTestId('map-plinth')).toHaveCount(15)
-    await expect(page.getByTestId('map-band')).toHaveCount(5)
-    await expect(page.getByTestId('map-gate')).toHaveCount(4)
-    await expect(page.getByTestId('map-land-pill')).toHaveCount(5)
+    await expect(page.getByTestId('map-stop')).toHaveCount(17)
+    await expect(page.getByTestId('map-plinth')).toHaveCount(17)
+    await expect(page.getByTestId('map-band')).toHaveCount(6)
+    await expect(page.getByTestId('map-gate')).toHaveCount(5)
+    await expect(page.getByTestId('map-land-pill')).toHaveCount(6)
     await expect(page.getByTestId('map-title')).toHaveText('Number Garden')
     await expect(ribbon(page)).toHaveText(
       'Here is your path! You are on adding to ten.',
@@ -498,8 +500,8 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
       stop(page, current).locator('[data-testid="map-bud"][data-open="true"]'),
     ).toHaveCount(2)
     // Mastered stops carry the bloom badge; locked ones are pale + padlock
-    // (every stop after the current one: 9 since more and less, content
-    // wave 4).
+    // (every stop after the current one: 11 since zeros and adding big
+    // numbers, content wave 5).
     const lockedStops = MATH.length - 6
     await expect(page.getByTestId('map-flower-badge')).toHaveCount(5)
     await expect(page.getByTestId('map-stop-frost')).toHaveCount(lockedStops)
@@ -533,10 +535,10 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     const firstAhead = stones.indexOf('false')
     expect(firstAhead).toBeGreaterThan(0)
     expect(stones.slice(firstAhead).every((w) => w === 'false')).toBe(true)
-    // Land pills with their numbers (showLevelToMarian on): 5 since
-    // hundreds (content wave 3).
-    await expect(page.getByTestId('map-land-pill')).toHaveCount(5)
-    await expect(page.getByTestId('map-land-number')).toHaveCount(5)
+    // Land pills with their numbers (showLevelToMarian on): 6 since
+    // adding big numbers' land 6 (content wave 5).
+    await expect(page.getByTestId('map-land-pill')).toHaveCount(6)
+    await expect(page.getByTestId('map-land-number')).toHaveCount(6)
     await expectArtLoaded(page)
     await page.screenshot({ path: `${SHOTS}/map-math-mid-tree.png` })
 
@@ -684,7 +686,7 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     )
     await expect(page.getByTestId('map-emma')).toHaveAttribute(
       'data-node',
-      'hundreds-addsub',
+      'add-two-digit',
     )
     await expect(page.getByTestId('map-emma')).toHaveAttribute(
       'data-pose',
@@ -733,9 +735,9 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
   }) => {
     await arm(page, seedProgress({ math: 3, showLevelToMarian: false }))
     await openMapFromHub(page, 'math')
-    await expect(page.getByTestId('map-land-pill')).toHaveCount(5)
+    await expect(page.getByTestId('map-land-pill')).toHaveCount(6)
     await expect(page.getByTestId('map-land-number')).toHaveCount(0)
-    await expect(page.getByTestId('map-stop')).toHaveCount(15)
-    await expect(page.getByTestId('map-gate')).toHaveCount(4)
+    await expect(page.getByTestId('map-stop')).toHaveCount(17)
+    await expect(page.getByTestId('map-gate')).toHaveCount(5)
   })
 })
