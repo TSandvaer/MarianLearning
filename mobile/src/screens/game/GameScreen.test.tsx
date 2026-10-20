@@ -9,7 +9,13 @@
 import type { EmmaPose } from '@marian/core/character/emmaPose'
 import type { FlowerBedBed } from '@marian/core/games/miniGames'
 import { ANSWER_RANGE_MAX } from '@marian/core/math/distractors'
-import { act, fireEvent, render, screen } from '@testing-library/react-native'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native'
 import { BackHandler, StyleSheet } from 'react-native'
 import * as Reanimated from 'react-native-reanimated'
 import type { Sfx } from '../../audio'
@@ -187,6 +193,25 @@ const blooms = () =>
 const hops = () => screen.queryAllByTestId(/^game-hop-\d$/, HIDDEN).length
 const beads = (state: string) =>
   screen.queryAllByTestId(`game-problem-dot-${state}`, HIDDEN).length
+/** The bed in play's hole in slot `i` (§ 2.2). */
+const hole = (i: number) =>
+  screen.getByTestId(
+    new RegExp(`^game-bed-hole-${i}(-pulsed|-dipped)?$`),
+    HIDDEN,
+  )
+/** What slot `i` holds: its hole, and a given flower or a planted bloom. */
+const holds = (i: number) => {
+  const slot = within(screen.getByTestId(`game-bed-slot-${i}`, HIDDEN))
+  return {
+    hole: slot.queryAllByTestId(/^game-bed-hole-\d/, HIDDEN).length,
+    flower: slot.queryAllByTestId('game-bed-flower', HIDDEN).length,
+    bloom: slot.queryAllByTestId(/^game-bed-bloom-\d$/, HIDDEN).length,
+  }
+}
+const bedSlots = () => Array.from({ length: 10 }, (_, i) => holds(i))
+const PLANTED = { hole: 1, flower: 1, bloom: 0 }
+const EMPTY = { hole: 1, flower: 0, bloom: 0 }
+const BLOOMED = { hole: 1, flower: 0, bloom: 1 }
 
 /** The bloom of the last of `m` buds has ended this long after the tap. */
 const bloomEnd = (m: number) => HOP_MS + HOP_STAGGER_MS * (m - 1) + 150
@@ -246,15 +271,17 @@ describe('N7: the beats of § 2.4, in order', () => {
     expect(h.pose()).toBe('idle')
   })
 
-  it('a right tap: sparkle and plink, the burst, celebration, the yes line, m buds and the bead', async () => {
+  it('a right tap: sparkle and plink, the burst, celebration, the yes line, m buds and the bead; every slot then holds a hole with a flower on it', async () => {
     const h = await setup()
     await toFirstAsk(h)
     expect(flowers()).toBe(7)
-    expect(
-      screen
-        .getAllByTestId(/^game-bed-ring-\d$/, HIDDEN)
-        .map((r) => r.props.testID),
-    ).toEqual(['game-bed-ring-7', 'game-bed-ring-8', 'game-bed-ring-9'])
+    // § 2.2: a hole at every slot; the given flowers are planted in theirs.
+    expect(bedSlots()).toEqual([
+      ...Array<typeof PLANTED>(7).fill(PLANTED),
+      EMPTY,
+      EMPTY,
+      EMPTY,
+    ])
     expect(beads('completed')).toBe(0)
     await tap(3)
     expect(h.sfx.sparkle.play).toHaveBeenCalledTimes(1)
@@ -267,6 +294,14 @@ describe('N7: the beats of § 2.4, in order', () => {
     expect(blooms()).toBe(3)
     expect(beads('completed')).toBe(1)
     for (const v of chipValues()) expect(chipDisabled(v)).toBe(true)
+    // The buds land in the empty holes, and the holes stay under them.
+    await advance(bloomEnd(3))
+    expect(bedSlots()).toEqual([
+      ...Array<typeof PLANTED>(7).fill(PLANTED),
+      BLOOMED,
+      BLOOMED,
+      BLOOMED,
+    ])
   })
 
   it('then the slide and the next ask: max(yes end, last bloom end) + 400, then + 300', async () => {
@@ -329,7 +364,7 @@ describe('N7: the beats of § 2.4, in order', () => {
 })
 
 describe('N8: a wrong tap changes nothing in the bed', () => {
-  it('1st wrong: poof, shake, puzzled, "Hmm... try again?", the rings pulse; every chip still answers', async () => {
+  it('1st wrong: poof, shake, puzzled, "Hmm... try again?", the empty holes pulse; every chip still answers', async () => {
     const h = await setup()
     await toFirstAsk(h)
     await tap(2)
@@ -344,12 +379,12 @@ describe('N8: a wrong tap changes nothing in the bed', () => {
     await start(h.last())
     expect(
       screen
-        .queryAllByTestId(/^game-bed-ring-\d-pulsed$/, HIDDEN)
+        .queryAllByTestId(/^game-bed-hole-\d-pulsed$/, HIDDEN)
         .map((r) => r.props.testID),
     ).toEqual([
-      'game-bed-ring-7-pulsed',
-      'game-bed-ring-8-pulsed',
-      'game-bed-ring-9-pulsed',
+      'game-bed-hole-7-pulsed',
+      'game-bed-hole-8-pulsed',
+      'game-bed-hole-9-pulsed',
     ])
     for (const v of chipValues()) expect(chipDisabled(v)).toBe(false)
     await act(async () => h.last().resolve())
@@ -403,7 +438,7 @@ describe('N8: a wrong tap changes nothing in the bed', () => {
     await say(h.last())
     expect(h.last().id).toBe('guide.game.again')
     expect(
-      screen.queryAllByTestId(/^game-bed-ring-\d-pulsed$/, HIDDEN),
+      screen.queryAllByTestId(/^game-bed-hole-\d-pulsed$/, HIDDEN),
     ).toHaveLength(4)
   })
 })
@@ -444,7 +479,7 @@ describe('N9: the chips', () => {
 })
 
 describe('N10: the bed’s repeat tap', () => {
-  it('while the bed waits, a tap says the ask again; never during a line or after the right tap', async () => {
+  it('while the bed waits, a tap on the soil or on a hole says the ask again; never during a line or after the right tap; no tap plants a hole', async () => {
     const h = await setup()
     await advance(GAME_OPEN_DELAY_MS)
     const bed = () => fireEvent.press(screen.getByTestId('game-bed'))
@@ -468,12 +503,34 @@ describe('N10: the bed’s repeat tap', () => {
     ])
     expect(h.pose()).toBe('listening')
     await say(h.last())
+    // A tap on a hole, empty or planted, is a bed tap: the ask again (D8).
+    await fireEvent.press(hole(8))
+    await say(h.last())
+    await fireEvent.press(hole(2))
+    expect(h.ids().slice(2)).toEqual([
+      'guide.game.bed.ask.7',
+      'guide.game.bed.ask.7',
+      'guide.game.bed.ask.7',
+    ])
+    await say(h.last())
+    // No hole is planted one by one: nothing hops, blooms or sounds.
+    expect(bedSlots()).toEqual([
+      ...Array<typeof PLANTED>(7).fill(PLANTED),
+      EMPTY,
+      EMPTY,
+      EMPTY,
+    ])
+    expect(hops()).toBe(0)
+    expect(h.sfx.sparkle.play).not.toHaveBeenCalled()
+    expect(h.sfx.plink.play).not.toHaveBeenCalled()
+    expect(beads('completed')).toBe(0)
     // After the right tap: nothing, even once the yes line has ended.
     await tap(3)
     await say(h.last())
     await bed()
+    await fireEvent.press(hole(8))
     expect(h.ids().at(-1)).toBe('guide.game.bed.yes.7')
-    expect(h.ids()).toHaveLength(4)
+    expect(h.ids()).toHaveLength(6)
   })
 })
 
@@ -505,7 +562,7 @@ describe('N11: a chip tap during a line', () => {
 })
 
 describe('N12: Reduce Motion', () => {
-  it('no hop, slide or ring scale: the buds, the bed change and the hint fade', async () => {
+  it('no hop, slide or hole scale: the buds, the bed change and the hint fade', async () => {
     jest.spyOn(Reanimated, 'useReducedMotion').mockReturnValue(true)
     const h = await setup()
     await toFirstAsk(h)
@@ -513,7 +570,7 @@ describe('N12: Reduce Motion', () => {
     await start(h.last())
     expect(screen.queryAllByTestId(/-pulsed$/, HIDDEN)).toHaveLength(0)
     expect(
-      screen.queryAllByTestId(/^game-bed-ring-\d-dipped$/, HIDDEN),
+      screen.queryAllByTestId(/^game-bed-hole-\d-dipped$/, HIDDEN),
     ).toHaveLength(3)
     await act(async () => h.last().resolve())
     await flush()
@@ -521,6 +578,13 @@ describe('N12: Reduce Motion', () => {
     expect(hops()).toBe(0)
     expect(blooms()).toBe(3)
     await say(h.last())
+    // Each bud fades in over its hole, and the hole stays (§ 2.7).
+    expect(bedSlots()).toEqual([
+      ...Array<typeof PLANTED>(7).fill(PLANTED),
+      BLOOMED,
+      BLOOMED,
+      BLOOMED,
+    ])
     // The buds fade in 80 ms apart and crossfade: the last ends at 160 + 400.
     await advance(80 * 2 + 400 + GAME_STEP_GAP_MS)
     expect(screen.queryByTestId('game-bed-slide', HIDDEN)).not.toBeOnTheScreen()

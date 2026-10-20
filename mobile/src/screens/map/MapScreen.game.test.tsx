@@ -166,6 +166,12 @@ describe('N2: the door shows exactly when a game is open', () => {
     ).toHaveLength(10)
     expect(screen.queryByText(/flower/i)).not.toBeOnTheScreen()
   })
+
+  // § 1.2.1: lands with Thomas's pick of the clay piece (T6), in
+  // `GameDoorPicture` (`mapChrome.tsx`).
+  it.todo(
+    'holds the ui-flower-bed clay piece at Math.round(68 × k) pt and no FlowerBed',
+  )
 })
 
 describe('N3: a door tap follows the Map’s stop rules', () => {

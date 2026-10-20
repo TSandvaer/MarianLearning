@@ -1,21 +1,26 @@
 /**
  * Fill the flower bed's bed (mini-game spec `design/native/mini-game-flower-bed.md`
- * § 2.2): the lesson's ten-frame (`TenFrameCell`, `../math/glyphs.tsx`) with
- * flowers in its slots. The given part fills slots 0 to g − 1, top row first;
- * an empty slot is a ring in the frame's own pink. The same drawing, full
- * and still, is the play door's picture on the Map (§ 1.2).
+ * § 2.2, amended 2026-10-20 to "Soil beds"): brown soil in a wood rim, with a
+ * planting hole at every slot of the lesson's ten-frame (`TenFrameCell`,
+ * `../math/glyphs.tsx`) and one furrow between the rows. The given part's
+ * flowers fill slots 0 to g − 1, top row first, each planted in its hole; an
+ * empty slot is its hole alone. Drawn flat, in the app's existing browns:
+ * none of the progress trays' clay art (D7).
  *
- * - The right move (`filled` rises): bud j lands at `landMs(j)` and blooms
- *   at once with the lesson's bloom (`../math/MissingNumber.tsx`): a 150 ms
- *   crossfade to the flower while scaling 1 → 1.15 → 1. The hop itself is
- *   the play screen's (it flies from a chip). Reduce Motion (§ 2.7): bud j
- *   fades in at 80 × j ms (200 ms), then crossfades to its flower (200 ms).
- * - The hint (`hint` grows): the empty rings pulse once in fill order, each
- *   1 → 1.1 → 1 over 300 ms, 150 ms apart (the counting row's ripple).
- *   Reduce Motion: each dips in opacity 1 → 0.4 → 1, no scale.
+ * - The right move (`filled` rises): bud j lands in its hole at `landMs(j)`
+ *   and blooms at once with the lesson's bloom (`../math/MissingNumber.tsx`):
+ *   a 150 ms crossfade to the flower while scaling 1 → 1.15 → 1. The hop
+ *   itself is the play screen's (it flies from a chip). Reduce Motion
+ *   (§ 2.7): bud j fades in over its hole at 80 × j ms (200 ms), then
+ *   crossfades to its flower (200 ms). The hole stays under it either way.
+ * - The hint (`hint` grows): the empty holes, each with its lip, pulse once
+ *   in fill order, 1 → 1.1 → 1 over 300 ms, 150 ms apart (the counting
+ *   row's ripple). Reduce Motion: each dips in opacity 1 → 0.4 → 1, no
+ *   scale.
  *
  * The staggers are Reanimated delays (no JS timer). Nothing here is a
- * target; the play screen wraps the bed for the repeat tap.
+ * target, holes included: the play screen wraps the bed for the repeat tap,
+ * and no hole is planted one by one (D8).
  */
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
@@ -28,7 +33,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated'
-import Svg, { Circle, Rect } from 'react-native-svg'
+import Svg, { Circle, Line, Rect } from 'react-native-svg'
 import {
   BLOOM_SPRING,
   EASE_IN_OUT,
@@ -47,14 +52,18 @@ import {
   slotCentre,
 } from './flowerBedGeometry'
 
-/** The frame's border, and the empty slot's ring (no new colour). */
-const BED_PINK = '#F48FB1'
-/** An empty slot's ring: radius 7 units, a 1.5-unit stroke, no fill. */
-const RING_R = 7
-const RING_STROKE = 1.5
-/** The hint ring's peak, and Reduce Motion's dip. */
-const RING_PULSE_PEAK = 1.1
-const RING_DIP = 0.4
+/** § 2.2's browns, each already in the app (the wood clay's). */
+const SOIL = '#7d4a26'
+const RIM = '#c98a55'
+/** The holes and the furrow: the darkest brown, flat. */
+const HOLE = '#3d2112'
+const HOLE_LIP = '#a86c3c'
+/** A planting hole: radius 7 units with a 1.5-unit lip. */
+const HOLE_R = 7
+const HOLE_LIP_W = 1.5
+/** The hint's peak, and Reduce Motion's dip. */
+const HOLE_PULSE_PEAK = 1.1
+const HOLE_DIP = 0.4
 
 export const BED_SLOTS = 10
 
@@ -67,9 +76,12 @@ export interface FlowerBedProps {
   filled?: boolean
   /** Bud j lands this long after `filled` rose (the hop's flight). */
   landMs?: (j: number) => number
-  /** Each rise pulses the empty rings once (the hint, § 2.6). */
+  /** Each rise pulses the empty holes once (the hint, § 2.6). */
   hint?: number
-  /** Test-ID prefix: `<prefix>-flower`, `-ring-<i>`, `-bloom-<i>`. */
+  /**
+   * Test-ID prefix: `<prefix>-slot-<i>`, `-hole-<i>`, `-flower`,
+   * `-bloom-<i>`.
+   */
   testIDPrefix?: string
 }
 
@@ -84,6 +96,7 @@ export function FlowerBed({
   const unit = width / BED_VIEW_W
   const height = (width * BED_VIEW_H) / BED_VIEW_W
   const glyph = SLOT_GLYPH_UNITS * unit
+  const hole = holeBox(glyph, unit)
   return (
     <View style={{ width, height }}>
       <Svg
@@ -96,11 +109,21 @@ export function FlowerBed({
           y={1.5}
           width={127}
           height={57}
-          rx={16}
-          ry={16}
-          fill="#FFFFFF"
-          stroke={BED_PINK}
+          rx={8}
+          ry={8}
+          fill={SOIL}
+          stroke={RIM}
           strokeWidth={3}
+        />
+        {/* The furrow between the fives; no vertical split (D6). */}
+        <Line
+          x1={8}
+          y1={30}
+          x2={122}
+          y2={30}
+          stroke={HOLE}
+          strokeWidth={2}
+          strokeLinecap="round"
         />
       </Svg>
       {Array.from({ length: BED_SLOTS }, (_, i) => {
@@ -114,17 +137,28 @@ export function FlowerBed({
         return i < given ? (
           <View
             key={`f${i}`}
-            testID={`${testIDPrefix}-flower`}
+            testID={`${testIDPrefix}-slot-${i}`}
             style={[styles.slot, box]}
           >
-            <FlowerGlyph size={glyph} />
+            <View
+              testID={`${testIDPrefix}-hole-${i}`}
+              style={[styles.centred, hole]}
+            >
+              <HoleGlyph size={hole.width} />
+            </View>
+            <View
+              testID={`${testIDPrefix}-flower`}
+              style={StyleSheet.absoluteFill}
+            >
+              <FlowerGlyph size={glyph} />
+            </View>
           </View>
         ) : (
           <EmptySlot
             key={`e${i}`}
             index={i}
             order={i - given}
-            unit={unit}
+            hole={hole}
             box={box}
             filled={filled}
             landMs={landMs(i - given)}
@@ -137,10 +171,36 @@ export function FlowerBed({
   )
 }
 
+type Box = { left: number; top: number; width: number; height: number }
+
+/** A planting hole's box, centred in a slot `slot` pt across. */
+function holeBox(slot: number, unit: number): Box {
+  const size = 2 * (HOLE_R + HOLE_LIP_W) * unit
+  const at = (slot - size) / 2
+  return { left: at, top: at, width: size, height: size }
+}
+
+/** A planting hole: a flat dark disc with its lip, no gradient, no shadow. */
+function HoleGlyph({ size }: { size: number }) {
+  const c = HOLE_R + HOLE_LIP_W
+  return (
+    <Svg width={size} height={size} viewBox={`0 0 ${2 * c} ${2 * c}`}>
+      <Circle
+        cx={c}
+        cy={c}
+        r={HOLE_R}
+        fill={HOLE}
+        stroke={HOLE_LIP}
+        strokeWidth={HOLE_LIP_W}
+      />
+    </Svg>
+  )
+}
+
 function EmptySlot({
   index,
   order,
-  unit,
+  hole,
   box,
   filled,
   landMs,
@@ -150,16 +210,17 @@ function EmptySlot({
   index: number
   /** j: this slot's place in the fill order. */
   order: number
-  unit: number
-  box: { left: number; top: number; width: number; height: number }
+  /** The hole's box inside the slot. */
+  hole: Box
+  box: Box
   filled: boolean
   landMs: number
   hint: number
   prefix: string
 }) {
   const reducedMotion = useReducedMotion()
-  const ring = useSharedValue(1)
-  const ringScale = useSharedValue(1)
+  const dip = useSharedValue(1)
+  const pulse = useSharedValue(1)
   const bud = useSharedValue(0)
   const flower = useSharedValue(0)
   const scale = useSharedValue(1)
@@ -169,35 +230,34 @@ function EmptySlot({
     const delay = STAGGER_MS * order
     const half = { duration: PULSE_HALF_MS, easing: EASE_IN_OUT }
     if (reducedMotion) {
-      ring.set(
+      dip.set(
         withDelay(
           delay,
-          withSequence(withTiming(RING_DIP, half), withTiming(1, half)),
+          withSequence(withTiming(HOLE_DIP, half), withTiming(1, half)),
         ),
       )
       setHinted('dipped')
       return
     }
-    ringScale.set(
+    pulse.set(
       withDelay(
         delay,
-        withSequence(withTiming(RING_PULSE_PEAK, half), withTiming(1, half)),
+        withSequence(withTiming(HOLE_PULSE_PEAK, half), withTiming(1, half)),
       ),
     )
     setHinted('pulsed')
   })
 
+  // The hole stays: the bud lands in it, and it shows under the flower.
   useOnRise(filled, () => {
     if (reducedMotion) {
       const delay = BLOOM_STAGGER_MS * order
       const fade = { duration: REDUCED_BLOOM_FADE_MS, easing: EASE_OUT }
-      ring.set(withDelay(delay, withTiming(0, fade)))
       bud.set(withDelay(delay, withTiming(1, fade)))
       flower.set(withDelay(delay + REDUCED_BLOOM_FADE_MS, withTiming(1, fade)))
       return
     }
-    // The bud lands: the ring goes, the bud shows, and it blooms at once.
-    ring.set(withDelay(landMs, withTiming(0, { duration: 0 })))
+    // The bud lands: it shows, and it blooms at once.
     bud.set(withDelay(landMs, withTiming(1, { duration: 0 })))
     flower.set(withDelay(landMs, withTiming(1, { duration: BLOOM_FADE_MS })))
     scale.set(
@@ -211,9 +271,9 @@ function EmptySlot({
     )
   })
 
-  const ringStyle = useAnimatedStyle(() => ({
-    opacity: ring.get(),
-    transform: [{ scale: ringScale.get() }],
+  const holeStyle = useAnimatedStyle(() => ({
+    opacity: dip.get(),
+    transform: [{ scale: pulse.get() }],
   }))
   const bloomStyle = useAnimatedStyle(() => ({
     opacity: bud.get(),
@@ -221,36 +281,13 @@ function EmptySlot({
   }))
   const budStyle = useAnimatedStyle(() => ({ opacity: 1 - flower.get() }))
   const flowerStyle = useAnimatedStyle(() => ({ opacity: flower.get() }))
-  const ringBox = 2 * (RING_R + RING_STROKE) * unit
   return (
-    <View style={[styles.slot, box]}>
+    <View testID={`${prefix}-slot-${index}`} style={[styles.slot, box]}>
       <Animated.View
-        testID={`${prefix}-ring-${index}${hinted === null ? '' : `-${hinted}`}`}
-        style={[
-          styles.centred,
-          {
-            left: (box.width - ringBox) / 2,
-            top: (box.height - ringBox) / 2,
-            width: ringBox,
-            height: ringBox,
-          },
-          ringStyle,
-        ]}
+        testID={`${prefix}-hole-${index}${hinted === null ? '' : `-${hinted}`}`}
+        style={[styles.centred, hole, holeStyle]}
       >
-        <Svg
-          width={ringBox}
-          height={ringBox}
-          viewBox={`0 0 ${2 * (RING_R + RING_STROKE)} ${2 * (RING_R + RING_STROKE)}`}
-        >
-          <Circle
-            cx={RING_R + RING_STROKE}
-            cy={RING_R + RING_STROKE}
-            r={RING_R}
-            fill="none"
-            stroke={BED_PINK}
-            strokeWidth={RING_STROKE}
-          />
-        </Svg>
+        <HoleGlyph size={hole.width} />
       </Animated.View>
       {filled && (
         <Animated.View

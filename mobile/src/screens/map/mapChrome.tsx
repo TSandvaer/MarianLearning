@@ -219,8 +219,8 @@ const styles = StyleSheet.create({
 /**
  * The play door (mini-game spec § 1.2): Home's clay disc, face and press
  * (wood clay, the Number Garden map button's), holding the game's own
- * picture: a full flower bed at 0.8 × the disc, still. No text, no badge,
- * no count, no idle animation. Chrome, like Home, not a stop.
+ * picture (`GameDoorPicture`), fixed, full and still. No text, no badge, no
+ * count, no idle animation. Chrome, like Home, not a stop.
  */
 export function GameDoor({
   game,
@@ -270,13 +270,24 @@ export function GameDoor({
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         >
-          <FlowerBed
-            width={0.8 * rect.width}
-            given={10}
-            testIDPrefix="map-game-door"
-          />
+          <GameDoorPicture disc={rect.width} />
         </View>
       </Animated.View>
     </Pressable>
+  )
+}
+
+/**
+ * The door's picture, and the one site the door's clay piece plugs into
+ * (§ 1.2.1, T6). Until Thomas picks it, the bed's own drawing, full, at
+ * 0.8 × the disc. Then this returns `<PathImage id="ui-flower-bed"
+ * px={Math.round(68 * k)} />`, as Home draws its house, once
+ * `'ui-flower-bed'` is in `UiArtId` and `PATH_ART_SET`
+ * (`@marian/core/emmasPath/pathArt`), `yarn path-art` has built its webps
+ * and `npm run export-assets` has registered them.
+ */
+function GameDoorPicture({ disc }: { disc: number }) {
+  return (
+    <FlowerBed width={0.8 * disc} given={10} testIDPrefix="map-game-door" />
   )
 }

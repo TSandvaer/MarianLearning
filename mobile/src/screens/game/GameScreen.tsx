@@ -12,13 +12,13 @@
  * "<N> and what make ten?" (the chips open at its onPlay; the bed then waits,
  * no timer, and a tap on it asks again). A right chip: sparkle and plink,
  * the chip bursts, Emma celebrates, the bead fills, the buds hop from the
- * chip into the empty slots and bloom, and "Yes! <N> and <m> make ten!";
+ * chip into the empty holes and bloom, and "Yes! <N> and <m> make ten!";
  * after the line and the last bloom + 400 ms the bed slides out and the next
  * slides in (300 ms), its chips mount and it asks. After bed 6: Emma cheers,
  * "Ten every time! What a garden!", and the Map returns (`onExit`).
  *
  * A wrong chip (§ 2.6): poof, the chip shakes, Emma puzzled, "Hmm... try
- * again?"; nothing moves in the bed. The 1st pulses the empty rings at the
+ * again?"; nothing moves in the bed. The 1st pulses the empty holes at the
  * line's onPlay; after the 2nd's line the right chip glows, the others dim,
  * Emma points and says "This one is <m>.", and the glowing chip plays the
  * full right move. A chip tap during any line cuts it.
