@@ -3,10 +3,11 @@
  * is ignored while one drags). React Native sends every touch move to the
  * responder, whichever finger moved, and the event's top-level `pageX` /
  * `pageY` are the first changed touch's; the piece follows only the finger
- * that took it.
+ * that took it. A cancelled touch springs the piece home.
  */
 import { act, render, screen } from '@testing-library/react-native'
 import { Text } from 'react-native'
+import * as Reanimated from 'react-native-reanimated'
 
 import { resetDragForTests } from './dragLock'
 import { DragPiece } from './DragPiece'
@@ -38,6 +39,19 @@ async function send(name: string, e: ReturnType<typeof ev>) {
   })
 }
 
+/**
+ * Events React Native dispatches together, in one go: a touch-cancel is an
+ * `onResponderEnd` then an `onResponderTerminate`, with nothing between.
+ */
+async function sendTogether(...events: [string, ReturnType<typeof ev>][]) {
+  await act(async () => {
+    const props = screen.getByTestId('piece').props
+    for (const [name, e] of events) {
+      ;(props[name] as ((e: unknown) => void) | undefined)?.(e)
+    }
+  })
+}
+
 async function mount() {
   const calls = {
     onTap: jest.fn(),
@@ -59,7 +73,14 @@ async function mount() {
   return calls
 }
 
-beforeEach(resetDragForTests)
+/** The springs the piece ran (the mock's shared values do not persist). */
+const springs = jest.spyOn(Reanimated, 'withSpring')
+const springsHome = () => springs.mock.calls.filter(([to]) => to === 0).length
+
+beforeEach(() => {
+  resetDragForTests()
+  springs.mockClear()
+})
 
 const A0 = { id: '1', x: 10, y: 10 }
 const A1 = { id: '1', x: 60, y: 70 }
@@ -108,4 +129,56 @@ test('the drag ends when its own finger lifts, while the other stays down', asyn
   expect(calls.onDragStart).toHaveBeenCalledTimes(1)
   expect(calls.onDragEnd).toHaveBeenCalledTimes(1)
   expect(calls.onTap).not.toHaveBeenCalled()
+})
+
+test('a cancelled drag springs home: no drop, no tap', async () => {
+  const calls = await mount()
+  await send('onResponderGrant', ev([A0], [A0]))
+  await send('onResponderMove', ev([A1], [A1]))
+  expect(springsHome()).toBe(0)
+
+  // iOS cancels A (a system gesture): End, then Terminate.
+  await sendTogether(
+    ['onResponderEnd', ev([A1], [])],
+    ['onResponderTerminate', ev([A1], [])],
+  )
+  expect(calls.onDrop).not.toHaveBeenCalled()
+  expect(calls.onTap).not.toHaveBeenCalled()
+  expect(calls.onDragEnd).toHaveBeenCalledTimes(1)
+  // Home on both axes.
+  expect(springsHome()).toBe(2)
+})
+
+test('a cancelled touch that never dragged is not a tap', async () => {
+  const calls = await mount()
+  await send('onResponderGrant', ev([A0], [A0]))
+  await sendTogether(
+    ['onResponderEnd', ev([A0], [])],
+    ['onResponderTerminate', ev([A0], [])],
+  )
+  expect(calls.onTap).not.toHaveBeenCalled()
+  expect(calls.onDrop).not.toHaveBeenCalled()
+  expect(calls.onDragEnd).not.toHaveBeenCalled()
+})
+
+test('a lift released in one go still drops, and a still touch taps', async () => {
+  const calls = await mount()
+  await send('onResponderGrant', ev([A0], [A0]))
+  await send('onResponderMove', ev([A1], [A1]))
+  await sendTogether(
+    ['onResponderEnd', ev([A1], [])],
+    ['onResponderRelease', ev([A1], [])],
+  )
+  expect(calls.onDrop.mock.calls).toEqual([[{ x: 60, y: 70 }]])
+  expect(calls.onDragEnd).toHaveBeenCalledTimes(1)
+  // Refused (`onDrop` is false): home.
+  expect(springsHome()).toBe(2)
+
+  await send('onResponderGrant', ev([A0], [A0]))
+  await sendTogether(
+    ['onResponderEnd', ev([A0], [])],
+    ['onResponderRelease', ev([A0], [])],
+  )
+  expect(calls.onTap).toHaveBeenCalledTimes(1)
+  expect(calls.onDrop).toHaveBeenCalledTimes(1)
 })

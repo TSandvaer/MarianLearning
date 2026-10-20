@@ -10,9 +10,12 @@
  * the app has no gesture-handler dependency, and the responder events are
  * all a one-finger drag needs. Every touch move reaches the responder,
  * whichever finger moved, so the piece follows only the touch that took it
- * (by `identifier`) and its drag ends when that touch lifts. Drop points
- * are in screen points (the app's root fills the window, so `pageX` /
- * `pageY` are layout coordinates).
+ * (by `identifier`) and its drag ends when that touch lifts. A touch-cancel
+ * also arrives as `onResponderEnd`, followed in the same dispatch by
+ * `onResponderTerminate`, so a lift waits for the dispatch to finish: a
+ * terminate in it springs the piece home instead. Drop points are in screen
+ * points (the app's root fills the window, so `pageX` / `pageY` are layout
+ * coordinates).
  *
  * VoiceOver: the piece is a button; "activate" runs `onTap`, so a drag is
  * never the only way (§ 2.6, § 3.8).
@@ -85,6 +88,8 @@ export function DragPiece({
   const start = useRef<Point | null>(null)
   const finger = useRef<string | null>(null)
   const dragging = useRef(false)
+  // The drag's finger lifted at this point; drops or taps once confirmed.
+  const lifted = useRef<Point | null>(null)
   const dx = useSharedValue(0)
   const dy = useSharedValue(0)
   const scale = useSharedValue(1)
@@ -99,6 +104,7 @@ export function DragPiece({
     start.current = null
     finger.current = null
     dragging.current = false
+    lifted.current = null
     if (dragLock.held === me) dragLock.held = null
     return was
   }
@@ -155,10 +161,19 @@ export function DragPiece({
     dx.set(mx)
     dy.set(my)
   }
-  // A touch lifted (`onResponderEnd`), or the last one did (release).
+  // A touch lifted or was cancelled (`onResponderEnd`): the drag's own
+  // finger waits for the rest of the dispatch (a cancel terminates there).
   const onEnd = (e: GestureResponderEvent) => {
     if (start.current === null || dragLock.held !== me) return
+    if (lifted.current !== null) return
     const p = at(e)
+    if (p === null) return
+    lifted.current = p
+    void Promise.resolve().then(finish)
+  }
+  // The dispatch ended without a terminate: the drag's finger lifted.
+  const finish = () => {
+    const p = lifted.current
     if (p === null) return
     const was = release()
     if (!was) {
@@ -172,6 +187,11 @@ export function DragPiece({
       scale.set(1)
     } else springHome()
     onDragEnd?.()
+  }
+  // The last touch lifted (never after a cancel): no need to wait.
+  const onRelease = (e: GestureResponderEvent) => {
+    onEnd(e)
+    finish()
   }
   const onTerminate = () => {
     if (start.current === null) return
@@ -208,7 +228,7 @@ export function DragPiece({
       onResponderGrant={onGrant}
       onResponderMove={onMove}
       onResponderEnd={onEnd}
-      onResponderRelease={onEnd}
+      onResponderRelease={onRelease}
       onResponderTerminate={onTerminate}
       style={[
         styles.piece,
