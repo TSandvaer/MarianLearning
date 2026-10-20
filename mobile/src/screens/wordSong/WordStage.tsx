@@ -17,6 +17,9 @@
  * - `story` (content wave 3): empty here; the screen draws the story card
  *   at the stage's top (`./StoryCard.tsx`).
  *
+ * Sounding out's letter-tap cue: the story cue's hand over letter 0, drawn
+ * by the letter row (`./LetterRow.tsx`); WordSong runs its clock.
+ *
  * The th corner cue sits right of the picture (or of the letter row), top
  * aligned. Press feedback on the picture, glyph and scene: scale 0.96 over
  * 80 ms, back on a 300 / 20 spring; they are inert unless `tapsOpen`.
@@ -39,6 +42,7 @@ import { fonts } from '../../theme'
 import { LetterRow } from './LetterRow'
 import type { NativeRound } from './nativeRound'
 import { SentencePanel } from './SentencePanel'
+import { storyTapCueSize } from './storyTapCueMotion'
 import { ThCornerCue } from './ThCue'
 import { WordPicture } from './WordPicture'
 
@@ -128,6 +132,10 @@ export interface WordStageProps {
   showThCue: boolean
   /** The picture, glyph and scene answer taps (after the read). */
   tapsOpen: boolean
+  /** The letter-tap cue: the hand up, or leaving after her tap; null = none. */
+  tapCue?: 'run' | 'leave' | null
+  /** Letter 0 has been measured: the hand can be placed. */
+  onTapCueReady?: () => void
   onLetterPress: (index: number) => void
   onPicturePress: () => void
   onReplayRead: () => void
@@ -145,6 +153,8 @@ export function WordStage({
   resolved,
   showThCue,
   tapsOpen,
+  tapCue = null,
+  onTapCueReady,
   onLetterPress,
   onPicturePress,
   onReplayRead,
@@ -162,6 +172,10 @@ export function WordStage({
       spotlight={spotlight}
       endPulse={endPulse}
       quiet={quiet}
+      tapCue={tapCue !== null}
+      tapCueLeaving={tapCue === 'leave'}
+      tapCueSize={storyTapCueSize(l.tablet)}
+      onTapCueReady={onTapCueReady}
       onLetterPress={onLetterPress}
     />
   )
