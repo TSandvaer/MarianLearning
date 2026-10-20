@@ -115,27 +115,28 @@ P (375×667)                         W (iPad portrait)
 | [  to try it?         ]      |    |-----------------------------------------------|
 ```
 
-- **Fit check (an estimate, not a measurement):** P with the button gives the caption about 191 pt of text width at 22 pt. The longest prompt, "Groups of two, five and ten. This one is locked. Want to try it?" (64 characters), should take 4 lines, which is the slot's limit. AC 9 measures it. If it overflows at 375×667, the prompt caption drops to 20 pt in P only.
+- **Fit check (an estimate, not a measurement):** P with the button gives the caption about 191 pt of text width at 22 pt. The longest prompt, "Groups of two, five and ten. This one is locked. Want to try it?" (64 characters), should take 4 lines, which is the slot's limit. AC 10 measures it. If it overflows at 375×667, the prompt caption drops to 20 pt in P only.
 - **Hit area:** the visible button, at least 72 × 72 on phones, so no slop is needed. It sits in the caption row, never over the path, so it never covers a stop.
 - **Motion:** fade in, 200 ms, `EASE_OUT`, plus y 8 → 0 (the caption's entrance). Out: fade 150 ms. Reduce Motion: the fade only.
 - **Press:** the press sink, then on release the button fades out and `startPeek(stop, peek)` runs exactly as today (the line is cut, the request goes out, stop and gate taps wait, Home cancels).
 
 ## 5. Saying no, and waiting
 
-| What she does                            | What happens                                                                                                            |
-| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Taps the button                          | The peek starts (§ 4), unchanged from today's tap.                                                                      |
-| Taps the **same** stop again             | The prompt restarts (both clips, the button hides and re-appears with clip 2). A second tap is never a "yes".           |
-| Taps **another later** stop              | That stop's prompt replaces this one.                                                                                   |
-| Taps the current stop or a mastered stop | The prompt closes and that tap does what it does today (session or replay).                                             |
-| Taps a gate                              | The prompt closes and the gate says its land.                                                                           |
-| Taps empty map (path pane, not a stop)   | The prompt closes silently. The line in flight is cut and the caption clears.                                           |
-| Home                                     | Hub, as today.                                                                                                          |
-| Android back                             | Closes the prompt (the platform's "close the open thing first"). A second back goes to the Hub as today.                |
-| Waits                                    | Nothing. Emma does not repeat the question, nothing pulses or counts down, and the button stays until one of the above. |
+| What she does                            | What happens                                                                                                                                                                                                                          |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Taps the button                          | The peek starts (§ 4), unchanged from today's tap.                                                                                                                                                                                    |
+| Taps the **same** stop again             | The button stays. Only clip 2 replays ("This one is locked. Want to try it?"), and the caption stays as it is. During clip 1 the tap changes nothing (clip 2 and the button are already on their way). A second tap is never a "yes". |
+| Taps **another later** stop              | That stop's prompt replaces this one.                                                                                                                                                                                                 |
+| Taps the current stop or a mastered stop | The prompt closes and that tap does what it does today (session or replay).                                                                                                                                                           |
+| Taps a gate                              | The prompt closes and the gate says its land.                                                                                                                                                                                         |
+| Taps empty map (path pane, not a stop)   | The prompt closes silently. The line in flight is cut and the caption clears.                                                                                                                                                         |
+| Home                                     | Hub, as today.                                                                                                                                                                                                                        |
+| Android back                             | Closes the prompt (the platform's "close the open thing first"). A second back goes to the Hub as today.                                                                                                                              |
+| Waits                                    | Nothing. Emma does not repeat the question, nothing pulses or counts down, and the button stays until one of the above.                                                                                                               |
 
 - **No re-ask and no timeout:** a repeated question or a timer would be pressure to say yes, which E2 rules out ("Emma never asks her to keep playing or to come back").
 - **Closing writes nothing,** like the peek.
+- **Why the re-tap keeps the button (Dave, 2026-10-20):** a child who wants to say yes is likely to tap the thing she wants, which is the stop, not a button in the caption row. Hiding the button then would hide the way in at the very moment she is looking for it, and replaying the name would loop her through it again. Replaying only the question points her back at the button. [Dave's reasoning, a hypothesis]
 
 ## 6. Edge cases
 
@@ -154,7 +155,7 @@ One build PR after the render, or two small ones. Order: lines first, so the ear
 
 1. **Core + audio (PR A):** the two lines and kinds in `GUIDANCE_LINES`, a `peekAskLine(stop): GuidanceLine` helper (locked → `peek-ask.locked`, open → `peek-ask`), the Lily render (50 characters), `npm run export-audio`, and the voice-QA list. Thomas's ear test (T1) gates PR B's device check, not its build.
 2. **Native Map (PR B):**
-   - `useMapVisit`: a `prompt` state (`{ node } | null`) and `openPrompt(stop)`, which plays the two clips with the per-prompt guard and reveals the button at clip 2. `tapStop`'s `'peek'` branch opens the prompt instead of `startPeek`. A new `tapPeekButton()` calls `startPeek`. `tapGate`, other stop taps, a pane tap and Android back close it.
+   - `useMapVisit`: a `prompt` state (`{ node } | null`) and `openPrompt(stop)`, which plays the two clips with the per-prompt guard and reveals the button at clip 2. `tapStop`'s `'peek'` branch opens the prompt instead of `startPeek`; a tap on the prompt's own stop replays clip 2 only and leaves the button up (ignored during clip 1, § 5). A new `tapPeekButton()` calls `startPeek`. `tapGate`, other stop taps, a pane tap and Android back close it.
    - `mapScreenLayout`: a `peekButton: Rect` per form and the narrowed caption slot while a prompt is open (§ 4).
    - `MapScreen` / `mapChrome`: the round button (`ClayButton` look, round, sticker face) with `testID="map-peek-button"`.
    - `mapTapLog`: the path `'peek'` becomes `'peek-ask'`, and the button logs `'peek'`.
@@ -172,17 +173,19 @@ One build PR after the render, or two small ones. Order: lines first, so the ear
 4. A tap on a locked later stop plays `path.stop.<node>` and then `guide.map.peek-ask.locked`, in that order. No peek request goes out, and the caption reads "<Name>. This one is locked. Want to try it?".
 5. `map-peek-button` is absent until clip 2 starts, and present after.
 6. Pressing the button starts exactly today's peek: the line is cut, `onPeek(node, signal)` is called once, and a stop tap while it is out is ignored.
-7. A tap on another stop, a gate or the empty pane, or Android back, closes the prompt (button gone, no `onPeek`). A tap on the same stop restarts the prompt and never calls `onPeek`.
-8. Cancelling during clip 1 (any close) never starts clip 2 and never shows the button.
-9. **Layout:** at 375×667, 667×375, 820×1180 and 1180×820, the button rect is inside the safe rect, overlaps no stop's hit area and no caption text. At 375×667 the prompt for `mult-2-5-10` ("Groups of two, five and ten. …") fits its slab without clipping.
-10. With no taps for 30 s after the prompt, nothing else plays and the button is still there.
-11. The persisted progress JSON is byte-identical after a prompt that was closed without a peek.
+7. A tap on another stop, a gate or the empty pane, or Android back, closes the prompt (button gone, no `onPeek`).
+8. A tap on the same stop after the button shows plays `guide.map.peek-ask.locked` again and not `path.stop.<node>`, `map-peek-button` stays mounted the whole time, the caption is unchanged, and `onPeek` is never called. A tap on the same stop during clip 1 starts no new clip, and the button still appears when clip 2 starts.
+9. Cancelling during clip 1 (any close) never starts clip 2 and never shows the button.
+10. **Layout:** at 375×667, 667×375, 820×1180 and 1180×820, the button rect is inside the safe rect, overlaps no stop's hit area and no caption text. At 375×667 the prompt for `mult-2-5-10` ("Groups of two, five and ten. …") fits its slab without clipping.
+11. With no taps for 30 s after the prompt, nothing else plays and the button is still there.
+12. The persisted progress JSON is byte-identical after a prompt that was closed without a peek.
 
 **Device (iPhone + iPad, both orientations):**
 
-12. Tap a locked stop: Emma says its name, then "This one is locked. Want to try it?", and the button appears as she asks. The button tap opens the peek, which plays as before (opener, 3 problems, closer, back to the Map).
-13. Tap a locked stop, then tap empty map: the prompt closes, nothing starts.
-14. The button shows the tapped stop's sticker and is reachable with a thumb in every form. Nothing on the map moves when it appears.
+13. Tap a locked stop: Emma says its name, then "This one is locked. Want to try it?", and the button appears as she asks. The button tap opens the peek, which plays as before (opener, 3 problems, closer, back to the Map).
+14. Tap a locked stop, then tap empty map: the prompt closes, nothing starts.
+15. Tap a locked stop, wait for the button, tap the same stop: Emma asks "This one is locked. Want to try it?" again without the name, and the button never disappears.
+16. The button shows the tapped stop's sticker and is reachable with a thumb in every form. Nothing on the map moves when it appears.
 
 ## 9. For Thomas (T-items)
 
@@ -191,9 +194,18 @@ One build PR after the render, or two small ones. Order: lines first, so the ear
   2. "Want to try it?" (the same, for a later stop that is open; rare)
   - Ear test on `/voice-qa.html` after the render, including the pair after the longest name, "Groups of two, five and ten."
 - **T2. The button look.** Team recommendation: a round green clay button (the "All done" green) with the tapped stop's sticker and a small white play triangle, no text, at the right end of the caption row (tablet landscape: in the left column above the caption). 72 pt on phones, 112 pt on tablets.
+- **T3. Watch on device (no decision needed; from Dave's check, 2026-10-20).**
+  1. Does she still open peeks on her own after the change? A sharp drop would mean the extra step costs too much. [Dave's watch signal, not measured]
+  2. Does she ever ask why a stop is still locked after a peek? Hypothesis (unverified): a child who gets all 3 right may expect the lock to open. The closer ("<Name> is for later. You will learn it!") is meant to cover this.
 
 ## 10. For Dave (D-items)
 
+Dave did a read-only pedagogy check on 2026-10-20 against `map-tap-to-play.md` § 5, `fast-track-native.md` E2 / § 8 and `design/research/engagement-and-mini-games-2026-10-19.md`.
+
 - **D1.** Is a confirm step right for a 6–9-year-old exploring the Map alone, given that the question is spoken and the button shows the stop's own picture?
+  - **Dave: CONFIRM (2026-10-20).** Tap-to-play § 5 rejected a confirm because it "would need reading or a second, unexplained tap". Here the second tap is explained out loud with known words, and the button carries the stop's own sticker, so she can match picture to picture without reading. An unanswered question costs nothing: waiting does nothing and there is no re-ask (E2).
 - **D2.** Does asking first dampen curiosity compared with today's tap-and-go? Today's tap-to-play spec (§ 5) rejected a confirm for her own and finished stops; this one is only for stops she has not reached.
+  - **Dave: CONFIRM (2026-10-20).** The prompt makes browsing cheaper: she can tap locked stops just to hear their names, where today every such tap drops her into 3 problems she may not have meant to start. Answering a spoken question with yes is a small real choice (Patall, Cooper & Robinson 2008, as cited in the engagement research), and hearing the name plus "locked" opens the "there is more" gap before the offer (Loewenstein 1994, same doc). [reasoning, not measured] Watch signal in T3.1.
 - **D3.** Does "This one is locked" followed by "Want to try it?" teach that a lock means nothing? The peek's closer ("<Name> is for later. You will learn it!") is the team's answer; we would like his read.
+  - **Dave: CONFIRM (2026-10-20).** In this app the lock means "not your step yet", not "forbidden". The peek never opens the lock (the padlock and pale stop stay, nothing is written), and the closer says the future, so the repeated pattern (locked, then look, then "for later") teaches locked = later. The closer is enough. Keep "try": it is Thomas's word ("try it out"), and there it means sampling, not a test. [reasoning] Watch signal in T3.2.
+- **Extra (Dave: CHANGE, 2026-10-20), applied:** on a re-tap of the same stop, keep the button visible and replay only clip 2, instead of hiding the button and replaying both clips (§ 5, § 7, AC 8 and 15). "A second tap is never a yes" stays. The rest of § 5 (no re-ask, no timeout, closing writes nothing): Dave CONFIRM.
