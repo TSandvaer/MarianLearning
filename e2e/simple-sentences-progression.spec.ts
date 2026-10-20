@@ -171,6 +171,9 @@ const WORD_SONG_NODES: ReadonlyArray<string> = [
   'bee-words',
   'car-words',
   'sheep-stories',
+  'snail-words',
+  'moon-words',
+  'goat-stories',
 ]
 
 /**

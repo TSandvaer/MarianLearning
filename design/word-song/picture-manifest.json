@@ -166,6 +166,7 @@
     ],
     "distinctFrom": [
       "rug",
+      "tray",
       "bat",
       "cap",
       "cat",
@@ -195,6 +196,7 @@
       "dog",
       "pig",
       "sheep",
+      "goat",
       "bag",
       "bat",
       "box",
@@ -240,6 +242,7 @@
     ],
     "distinctFrom": [
       "bag",
+      "boat",
       "cap",
       "cat",
       "cup",
@@ -379,6 +382,7 @@
       "bus",
       "car",
       "jeep",
+      "train",
       "cup",
       "fan",
       "fox",
@@ -403,6 +407,7 @@
     "distinctFrom": [
       "clock",
       "bee",
+      "boot",
       "box",
       "bug",
       "bun",
@@ -413,6 +418,7 @@
       "man",
       "nap",
       "pan",
+      "roof",
       "sock",
       "sun",
       "tub",
@@ -431,7 +437,18 @@
       "a brand name, letters or a logo",
       "an open top"
     ],
-    "distinctFrom": ["drum", "bun", "dog", "fan", "fox", "man", "rug", "sun"]
+    "distinctFrom": [
+      "drum",
+      "bun",
+      "chain",
+      "dog",
+      "fan",
+      "fox",
+      "man",
+      "rug",
+      "sun",
+      "train"
+    ]
   },
   {
     "word": "jam",
@@ -511,12 +528,14 @@
       "fox",
       "gum",
       "hat",
+      "hoop",
       "hut",
       "mat",
       "mom",
       "mop",
       "nut",
       "pot",
+      "roof",
       "sun"
     ]
   },
@@ -580,6 +599,7 @@
       "a wig of hair"
     ],
     "distinctFrom": [
+      "broom",
       "cap",
       "cat",
       "cup",
@@ -588,10 +608,12 @@
       "hot",
       "log",
       "mom",
+      "moon",
       "pan",
       "pop",
       "pot",
       "seal",
+      "spoon",
       "sun",
       "top"
     ]
@@ -607,7 +629,7 @@
       "a hospital bed or bunk bed",
       "someone sleeping on it"
     ],
-    "distinctFrom": ["box", "fox", "hot", "pot"]
+    "distinctFrom": ["box", "coat", "fox", "goat", "hot", "pot"]
   },
   {
     "word": "dog",
@@ -624,6 +646,7 @@
       "cat",
       "pig",
       "sheep",
+      "goat",
       "bag",
       "bike",
       "box",
@@ -688,6 +711,7 @@
       "gift",
       "bag",
       "bone",
+      "boot",
       "bug",
       "bus",
       "cat",
@@ -723,7 +747,7 @@
       "a party hat",
       "a hand"
     ],
-    "distinctFrom": ["dog", "mom", "mop", "pop", "tub", "tube"]
+    "distinctFrom": ["boot", "dog", "mom", "mop", "pop", "tooth", "tub", "tube"]
   },
   {
     "word": "log",
@@ -748,6 +772,7 @@
       "fox",
       "hat",
       "jam",
+      "loaf",
       "lock",
       "man",
       "mom",
@@ -805,6 +830,7 @@
       "cup",
       "drum",
       "ship",
+      "boat",
       "bag",
       "box",
       "bug",
@@ -848,13 +874,16 @@
       "flag",
       "fox",
       "frog",
+      "goat",
       "hat",
       "hen",
+      "hoop",
       "hut",
       "jug",
       "log",
       "man",
       "mom",
+      "moon",
       "mop",
       "nest",
       "nut",
@@ -866,11 +895,14 @@
       "rock",
       "rug",
       "seed",
+      "snail",
       "star",
       "sun",
       "tag",
       "tap",
       "tent",
+      "tooth",
+      "tray",
       "van",
       "web"
     ]
@@ -889,6 +921,7 @@
     ],
     "distinctFrom": [
       "bag",
+      "boat",
       "box",
       "bug",
       "bun",
@@ -920,8 +953,10 @@
     "distinctFrom": [
       "bug",
       "bun",
+      "coat",
       "dad",
       "dog",
+      "goat",
       "hat",
       "hot",
       "jam",
@@ -991,7 +1026,8 @@
       "mom",
       "pot",
       "rug",
-      "sun"
+      "sun",
+      "train"
     ]
   },
   {
@@ -1003,6 +1039,7 @@
     "distinctFrom": [
       "fig",
       "egg",
+      "loaf",
       "can",
       "cat",
       "clock",
@@ -1036,18 +1073,21 @@
       "van",
       "car",
       "jeep",
+      "train",
       "bag",
       "box",
       "bug",
       "cap",
       "cape",
       "cat",
+      "coat",
       "cup",
       "dad",
       "dog",
       "fan",
       "hand",
       "harp",
+      "hoop",
       "hut",
       "jam",
       "king",
@@ -1078,9 +1118,11 @@
       "bag",
       "bat",
       "belt",
+      "boat",
       "bone",
       "box",
       "brick",
+      "broom",
       "bug",
       "bun",
       "bus",
@@ -1088,6 +1130,7 @@
       "car",
       "cart",
       "cat",
+      "chain",
       "crab",
       "cup",
       "dad",
@@ -1105,6 +1148,7 @@
       "jet",
       "jug",
       "kite",
+      "loaf",
       "man",
       "map",
       "mom",
@@ -1138,10 +1182,12 @@
     ],
     "distinctFrom": [
       "bee",
+      "snail",
       "bag",
       "box",
       "bus",
       "cap",
+      "chain",
       "cup",
       "dog",
       "fan",
@@ -1155,6 +1201,7 @@
       "pot",
       "rug",
       "sock",
+      "spoon",
       "sun",
       "swing",
       "tag",
@@ -1266,8 +1313,10 @@
       "dog",
       "cat",
       "sheep",
+      "goat",
       "bib",
       "bin",
+      "boot",
       "card",
       "drum",
       "fig",
@@ -1276,6 +1325,7 @@
       "lid",
       "plum",
       "sack",
+      "tooth",
       "wig"
     ]
   },
@@ -1345,6 +1395,7 @@
       "flag",
       "bed",
       "gem",
+      "goat",
       "hen",
       "jet",
       "leg",
@@ -1449,6 +1500,7 @@
       "peach",
       "sun",
       "tag",
+      "train",
       "van"
     ]
   },
@@ -1491,15 +1543,18 @@
     "distinctFrom": [
       "duck",
       "bed",
+      "broom",
       "card",
       "cart",
       "cat",
+      "coat",
       "cup",
       "egg",
       "gem",
       "jet",
       "kite",
       "leg",
+      "moon",
       "net",
       "pen",
       "plum",
@@ -1507,7 +1562,9 @@
       "rock",
       "rope",
       "star",
+      "stool",
       "sun",
+      "tray",
       "tube",
       "web"
     ]
@@ -1533,9 +1590,12 @@
       "gem",
       "hen",
       "leg",
+      "loaf",
       "net",
       "pen",
+      "roof",
       "shark",
+      "snail",
       "tent",
       "tree",
       "web"
@@ -1564,6 +1624,8 @@
       "pig",
       "sack",
       "sheep",
+      "spoon",
+      "stool",
       "sun",
       "web"
     ]
@@ -1600,6 +1662,7 @@
       "rock",
       "scarf",
       "shark",
+      "snail",
       "sock",
       "sun"
     ]
@@ -1624,6 +1687,7 @@
       "lock",
       "log",
       "ring",
+      "roof",
       "rope",
       "rug",
       "sack",
@@ -1686,7 +1750,7 @@
       "a jewellery box",
       "a bracelet"
     ],
-    "distinctFrom": ["gem", "dog", "hat", "king", "rock", "wing"]
+    "distinctFrom": ["gem", "hoop", "dog", "hat", "king", "rock", "wing"]
   },
   {
     "word": "sock",
@@ -1700,17 +1764,20 @@
       "a tied sack"
     ],
     "distinctFrom": [
+      "boot",
       "bug",
       "clock",
       "dog",
       "duck",
       "fan",
       "lock",
+      "moon",
       "rock",
       "rug",
       "sack",
       "seal",
       "seed",
+      "spoon",
       "sun"
     ]
   },
@@ -1773,7 +1840,7 @@
       "a logo on the studs",
       "a real clay brick"
     ],
-    "distinctFrom": ["box", "clock", "crab", "hat", "sun"]
+    "distinctFrom": ["box", "boot", "broom", "clock", "crab", "hat", "sun"]
   },
   {
     "word": "drum",
@@ -1854,7 +1921,7 @@
       "a bed's headboard, pillow or blanket",
       "a table with a cloth"
     ],
-    "distinctFrom": ["bed", "cat", "duck", "nest", "sun"]
+    "distinctFrom": ["bed", "stool", "cat", "duck", "nest", "sun"]
   },
   {
     "word": "belt",
@@ -1933,6 +2000,7 @@
     ],
     "distinctFrom": [
       "barn",
+      "roof",
       "bed",
       "bee",
       "belt",
@@ -1981,7 +2049,7 @@
       "a blanket or a towel",
       "a logo or a symbol"
     ],
-    "distinctFrom": ["bus", "cake", "cap", "cat", "dog"]
+    "distinctFrom": ["coat", "bus", "cake", "cap", "cat", "dog"]
   },
   {
     "word": "rope",
@@ -1994,7 +2062,16 @@
       "a sack tied with it",
       "a swing or a boat"
     ],
-    "distinctFrom": ["sack", "bone", "box", "hen", "rock", "sun"]
+    "distinctFrom": [
+      "sack",
+      "chain",
+      "bone",
+      "box",
+      "hen",
+      "rock",
+      "roof",
+      "sun"
+    ]
   },
   {
     "word": "bone",
@@ -2007,7 +2084,7 @@
       "a skeleton",
       "a dumbbell"
     ],
-    "distinctFrom": ["box", "jet", "rock", "rope", "sun"]
+    "distinctFrom": ["boat", "boot", "box", "jet", "rock", "rope", "sun"]
   },
   {
     "word": "cake",
@@ -2085,7 +2162,7 @@
       "people",
       "marks on the flag"
     ],
-    "distinctFrom": ["tub", "jeep", "shark", "sheep", "sip", "star"]
+    "distinctFrom": ["tub", "boat", "jeep", "shark", "sheep", "sip", "star"]
   },
   {
     "word": "leaf",
@@ -2093,7 +2170,7 @@
     "batch": 11,
     "subject": "One big green leaf: an oval with a pointed tip, a centre vein and side veins, and a short stem.",
     "avoid": ["a branch or a tree", "several leaves", "a feather"],
-    "distinctFrom": ["box", "hat", "leg", "peach", "pen", "seal"]
+    "distinctFrom": ["box", "hat", "leg", "loaf", "peach", "pen", "seal"]
   },
   {
     "word": "seal",
@@ -2108,6 +2185,7 @@
       "leg",
       "mop",
       "seed",
+      "snail",
       "sock",
       "sun"
     ]
@@ -2123,7 +2201,17 @@
       "a driver",
       "jeepney paint or words"
     ],
-    "distinctFrom": ["bus", "car", "van", "jet", "pig", "sheep", "ship", "sun"]
+    "distinctFrom": [
+      "bus",
+      "car",
+      "van",
+      "train",
+      "jet",
+      "pig",
+      "sheep",
+      "ship",
+      "sun"
+    ]
   },
   {
     "word": "sheep",
@@ -2140,6 +2228,7 @@
       "cat",
       "dog",
       "pig",
+      "goat",
       "jeep",
       "jet",
       "map",
@@ -2155,7 +2244,16 @@
     "batch": 11,
     "subject": "One round leafy tree: a brown trunk and a big round green crown.",
     "avoid": ["a pointed pine", "fruit (the apple-tree land art)", "a forest"],
-    "distinctFrom": ["pine", "bed", "bee", "cap", "dog", "tent"]
+    "distinctFrom": [
+      "pine",
+      "bed",
+      "bee",
+      "cap",
+      "dog",
+      "tent",
+      "train",
+      "tray"
+    ]
   },
   {
     "word": "bee",
@@ -2228,7 +2326,7 @@
       "animals or a farmer",
       "a silo"
     ],
-    "distinctFrom": ["tent", "bag", "fox", "harp", "hat", "pen"]
+    "distinctFrom": ["tent", "roof", "bag", "fox", "harp", "hat", "pen"]
   },
   {
     "word": "star",
@@ -2241,7 +2339,17 @@
       "several stars",
       "a sky"
     ],
-    "distinctFrom": ["car", "cat", "cup", "hen", "shark", "ship", "sun"]
+    "distinctFrom": [
+      "car",
+      "cat",
+      "cup",
+      "hen",
+      "shark",
+      "ship",
+      "spoon",
+      "stool",
+      "sun"
+    ]
   },
   {
     "word": "shark",
@@ -2280,6 +2388,7 @@
       "bus",
       "jeep",
       "van",
+      "train",
       "cart",
       "cat",
       "dog",
@@ -2287,5 +2396,208 @@
       "star",
       "sun"
     ]
+  },
+  {
+    "word": "train",
+    "tier": "snail-words",
+    "batch": 13,
+    "subject": "A toy steam-train engine in side view: a rose-red boiler, a black chimney, a cream cab with one window and four black wheels.",
+    "avoid": [
+      "a bus, van, car or jeep body",
+      "carriages behind it",
+      "smoke clouds",
+      "letters or numbers"
+    ],
+    "distinctFrom": [
+      "bus",
+      "car",
+      "jeep",
+      "van",
+      "can",
+      "chain",
+      "nut",
+      "pen",
+      "tray",
+      "tree"
+    ]
+  },
+  {
+    "word": "goat",
+    "tier": "snail-words",
+    "batch": 13,
+    "subject": "A goat standing in side view: a cream-white coat, two short curved horns, a small pointed beard and a short upright tail.",
+    "avoid": ["a sheep's round fleece", "a dog", "a deer's antlers", "a cow"],
+    "distinctFrom": [
+      "cat",
+      "dog",
+      "pig",
+      "sheep",
+      "coat",
+      "cot",
+      "cup",
+      "gum",
+      "net"
+    ]
+  },
+  {
+    "word": "loaf",
+    "tier": "snail-words",
+    "batch": 13,
+    "subject": "One loaf of bread in side view: a golden-brown rounded top with three diagonal cuts and a flat, paler base.",
+    "avoid": ["a round bun or roll", "slices", "a cake with icing", "a brick"],
+    "distinctFrom": ["bun", "bed", "leaf", "log", "sun"]
+  },
+  {
+    "word": "chain",
+    "tier": "snail-words",
+    "batch": 13,
+    "subject": "A short chain of six big oval links in soft grey metal, lying in a gentle S curve.",
+    "avoid": [
+      "a rope",
+      "a necklace with a pendant",
+      "a padlock or a lock",
+      "a single ring"
+    ],
+    "distinctFrom": ["rope", "bug", "can", "sun", "train", "tray"]
+  },
+  {
+    "word": "tray",
+    "tier": "snail-words",
+    "batch": 13,
+    "subject": "One empty serving tray seen from slightly above: a warm-brown wooden rectangle with a low rim all round and a cut-out handle at each end.",
+    "avoid": [
+      "a flat mat or rug",
+      "food or cups on it",
+      "a box with tall sides",
+      "a picture frame"
+    ],
+    "distinctFrom": ["mat", "chain", "cup", "hen", "train", "tree"]
+  },
+  {
+    "word": "snail",
+    "tier": "snail-words",
+    "batch": 13,
+    "subject": "A garden snail in side view: a round spiral shell in warm brown and cream, a soft grey-green body and two eye stalks.",
+    "avoid": [
+      "a slug with no shell",
+      "a bug or a ladybird",
+      "a spiral bun",
+      "a big smiling face"
+    ],
+    "distinctFrom": ["bug", "bed", "cup", "sack", "seal"]
+  },
+  {
+    "word": "coat",
+    "tier": "snail-words",
+    "batch": 13,
+    "subject": "One winter coat on its own, front view: knee length, soft blue, with a row of four big round buttons and two pockets.",
+    "avoid": [
+      "a person wearing it",
+      "a cape with no sleeves",
+      "a scarf",
+      "a dress"
+    ],
+    "distinctFrom": ["cape", "bus", "cot", "goat", "gum", "hen"]
+  },
+  {
+    "word": "boat",
+    "tier": "snail-words",
+    "batch": 13,
+    "subject": "A small wooden rowing boat in side view on a thin line of blue water: a warm-brown hull with two oars resting in it, no sail.",
+    "avoid": [
+      "a mast or sails (the ship)",
+      "a bath tub",
+      "people",
+      "big waves"
+    ],
+    "distinctFrom": ["ship", "tub", "bat", "bone", "jug", "sun"]
+  },
+  {
+    "word": "roof",
+    "tier": "moon-words",
+    "batch": 14,
+    "subject": "One pointed house roof on its own, front view: two red-tiled slopes meeting at the top and a small chimney, with no walls under it.",
+    "avoid": ["a whole house", "a tent", "a barn", "a triangle sign"],
+    "distinctFrom": [
+      "barn",
+      "tent",
+      "bed",
+      "fan",
+      "hoop",
+      "hot",
+      "rock",
+      "rope"
+    ]
+  },
+  {
+    "word": "hoop",
+    "tier": "moon-words",
+    "batch": 14,
+    "subject": "One big hula hoop standing upright, seen from the front: a thin rose-pink ring with a cream stripe wound round it.",
+    "avoid": [
+      "a finger ring with a gem",
+      "a wheel with spokes",
+      "a doughnut",
+      "a child holding it"
+    ],
+    "distinctFrom": ["ring", "bus", "cup", "hot", "roof"]
+  },
+  {
+    "word": "stool",
+    "tier": "moon-words",
+    "batch": 14,
+    "subject": "A small wooden stool in side view: a round warm-brown seat on three straight legs, no back.",
+    "avoid": ["a chair with a back", "a table or a desk", "a drum"],
+    "distinctFrom": ["desk", "hen", "jet", "spoon", "star"]
+  },
+  {
+    "word": "tooth",
+    "tier": "moon-words",
+    "batch": 14,
+    "subject": "One big white tooth on its own: a rounded top, two short roots and a small shine.",
+    "avoid": ["a bone", "a face or a mouth", "a toothbrush", "blood"],
+    "distinctFrom": ["boot", "cup", "pig", "top"]
+  },
+  {
+    "word": "moon",
+    "tier": "moon-words",
+    "batch": 14,
+    "subject": "A pale-yellow crescent moon on its own, its points to the right, with no face.",
+    "avoid": ["a full round moon or a sun disc", "a banana", "stars", "a sky"],
+    "distinctFrom": ["cup", "hen", "mop", "sock", "spoon"]
+  },
+  {
+    "word": "broom",
+    "tier": "moon-words",
+    "batch": 14,
+    "subject": "A broom standing upright: a long warm-brown handle and a wide bundle of straw-yellow bristles tied with a red band.",
+    "avoid": ["a mop", "a rake", "a short-handled brush"],
+    "distinctFrom": ["mop", "boot", "brick", "hen", "sun"]
+  },
+  {
+    "word": "boot",
+    "tier": "moon-words",
+    "batch": 14,
+    "subject": "One rose-red rain boot in side view: a tall leg, a rounded toe and a thick sole.",
+    "avoid": ["a sock", "a pair of boots", "a laced shoe", "a foot"],
+    "distinctFrom": [
+      "sock",
+      "bone",
+      "box",
+      "brick",
+      "broom",
+      "fan",
+      "pig",
+      "tooth",
+      "top"
+    ]
+  },
+  {
+    "word": "spoon",
+    "tier": "moon-words",
+    "batch": 14,
+    "subject": "One silver spoon lying at a slight angle: an oval bowl and a long thin handle.",
+    "avoid": ["a fork", "a ladle", "a pan", "food in it"],
+    "distinctFrom": ["bug", "jet", "moon", "mop", "sock", "star", "stool"]
   }
 ]

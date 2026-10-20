@@ -260,8 +260,8 @@ function buildLines(): GuidanceLine[] {
   // Little stories (content wave 3 § 4.4, § 5.1): "Read the story." on a
   // story card, and one clip per distinct story word that a word tap plays
   // ("Fox."). The word list comes from `LITTLE_STORIES`. The words sheep
-  // stories bring are rendered from "Word," (content wave 4 § 8.1); wave
-  // 3's 54 keep their committed MP3s and take picks.
+  // and goat stories bring are rendered from "Word," (content wave 4 § 8.1,
+  // wave 5 § 9.1); wave 3's 54 keep their committed MP3s and take picks.
   add(STORY_READ_ID, 'story-read', 'Read the story.', 'word-song')
   for (const word of STORY_WORDS) {
     const cap = `${word.charAt(0).toUpperCase()}${word.slice(1)}`
@@ -338,6 +338,13 @@ const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {
   'bee-words': 'Two letters, one sound!',
   'car-words': 'Two letters, one sound!',
   'sheep-stories': 'Read the story. Who, what or where?',
+  // Word Song land 9 (content wave 5 § 4.3, § 5.3, § 7.1; Thomas approved
+  // T1–T7): snail and moon words reuse duck words' line, goat stories sheep
+  // stories'. Snail words keep duck words' cue; moon words light the first
+  // "oo" (the native `introSpotlight`'s 'team-pair').
+  'snail-words': 'Two letters, one sound!',
+  'moon-words': 'Two letters, one sound!',
+  'goat-stories': 'Read the story. Who, what or where?',
 }
 
 const sessionIntroId = (n: SkillNode) => `guide.session.intro.${n}`

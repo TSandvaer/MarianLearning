@@ -157,6 +157,62 @@ export const STORY_MARKS: Readonly<
       [2253, 3906],
     ],
   },
+  'The goat and the snail sat on the stool. The goat got a tooth.': {
+    bytes: 37615,
+    sha256: '7464dd9ef2ca6947',
+    segments: [
+      [51, 2504],
+      [3044, 4498],
+    ],
+  },
+  'The goat has a chain and a boot. A hoop is on the roof.': {
+    bytes: 36361,
+    sha256: 'ec31365968422400',
+    segments: [
+      [53, 2221],
+      [2724, 4288],
+    ],
+  },
+  'The goat has a coat. A spoon is on the tray.': {
+    bytes: 32599,
+    sha256: 'a71afffbccd87571',
+    segments: [
+      [72, 1597],
+      [2145, 3834],
+    ],
+  },
+  'The goat is on the roof. A broom is in the train.': {
+    bytes: 32599,
+    sha256: '48d5e873c0798199',
+    segments: [
+      [74, 1703],
+      [2189, 3767],
+    ],
+  },
+  'The goat sat in the boat. It has a loaf.': {
+    bytes: 26121,
+    sha256: 'cad0e9b2aff475a1',
+    segments: [
+      [54, 1644],
+      [2083, 3039],
+    ],
+  },
+  'The goat sat in the tent. The snail hid in the boot.': {
+    bytes: 33853,
+    sha256: '8e946643eaf327d5',
+    segments: [
+      [39, 1690],
+      [2201, 3976],
+    ],
+  },
+  'The goat sat on the stool. It has a hoop.': {
+    bytes: 26121,
+    sha256: '8a8aceff0662fc66',
+    segments: [
+      [33, 1724],
+      [2174, 2969],
+    ],
+  },
   'The hen got a jug. Jam is in it. She has a cup.': {
     bytes: 33226,
     sha256: '53728f63be9e4318',
@@ -276,6 +332,14 @@ export const STORY_MARKS: Readonly<
     segments: [
       [43, 1667],
       [2129, 3216],
+    ],
+  },
+  'The snail sat on the moon. The goat sat on a log.': {
+    bytes: 34480,
+    sha256: '0e3e2d8e76d9c5c1',
+    segments: [
+      [60, 1796],
+      [2399, 4002],
     ],
   },
 }

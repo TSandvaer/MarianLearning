@@ -14,7 +14,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { APIError } from 'openai'
 import type { ImagesResponse } from 'openai/resources/images'
 import sharp from 'sharp'
@@ -32,6 +32,8 @@ import { runGenerate, runPick } from './generatePackPictures.ts'
 import type { Deps, EditImages } from './generatePackPictures.ts'
 import {
   buildScenePrompt,
+  CLAY_ANCHORS,
+  CLAY_STYLE_INSTRUCTION,
   estimateCallCost,
   formatUsd,
   parseCli,
@@ -346,6 +348,55 @@ describe('runGenerate', () => {
     expect(d.createEditor).not.toHaveBeenCalled()
   })
 
+  it('a clay row sends the clay anchors and clay style, into the pack ledger', async () => {
+    const manifest = 'clay-manifest.json'
+    writeFileSync(
+      join(root, manifest),
+      JSON.stringify([
+        {
+          word: 'avatar-fox',
+          tier: 'avatars',
+          batch: 15,
+          style: 'clay',
+          subject: 'A chubby baby fox sitting.',
+          avoid: ['anything red'],
+          distinctFrom: [],
+        },
+      ]),
+    )
+    for (const rel of CLAY_ANCHORS) {
+      mkdirSync(join(root, rel, '..'), { recursive: true })
+      await sharp({
+        create: {
+          width: 8,
+          height: 8,
+          channels: 4,
+          background: { r: 0, g: 200, b: 0, alpha: 1 },
+        },
+      })
+        .webp()
+        .toFile(join(root, rel))
+    }
+    const edit = vi.fn<EditImages>(async (params) => okResponse(params.n ?? 1))
+    const cmd = parseCli(['--words', 'avatar-fox', '--manifest', manifest])
+    if (cmd.mode !== 'generate') throw new Error('expected generate')
+    const s = await runGenerate(cmd, deps(edit))
+
+    const p = edit.mock.calls[0][0]
+    expect((p.image as File[]).map((f) => [f.name, f.type])).toEqual(
+      CLAY_ANCHORS.map((rel) => [basename(rel), 'image/webp']),
+    )
+    expect(p.prompt).toContain(CLAY_STYLE_INSTRUCTION)
+    expect(p.background).toBe('transparent')
+    expect(s.results.map((r) => [r.word, r.status, r.images])).toEqual([
+      ['avatar-fox', 'ok', 2],
+    ])
+    expect(existsSync(variant(15, 'avatar-fox__v2.png'))).toBe(true)
+    expect(ledgerLines().map((l) => [l.word, l.batch])).toEqual([
+      ['avatar-fox', 15],
+    ])
+  })
+
   it('accepts an absolute --manifest path', async () => {
     const cmd = parseCli([
       '--batch',
@@ -477,6 +528,53 @@ describe('runPick', () => {
     expect(logs).toContain(
       '  yarn embed-pictures design/references/picture-pack/transparent-short-a public/assets/pictures',
     )
+  })
+
+  it("writes an avatar pick as the app's transparent 500x500 WebP, with no embed step", async () => {
+    const manifest = 'avatar-manifest.json'
+    writeFileSync(
+      join(root, manifest),
+      JSON.stringify([
+        {
+          word: 'avatar-fox',
+          tier: 'avatars',
+          batch: 15,
+          style: 'clay',
+          subject: 'A chubby baby fox sitting.',
+          avoid: [],
+          distinctFrom: [],
+        },
+      ]),
+    )
+    mkdirSync(join(root, PATHS.outRoot, 'batch-15'), { recursive: true })
+    await sharp({
+      create: {
+        width: 1024,
+        height: 1024,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
+    })
+      .png()
+      .toFile(variant(15, 'avatar-fox__v2.png'))
+    const cmd = parseCli(['--pick', 'avatar-fox=v2', '--manifest', manifest])
+    if (cmd.mode !== 'pick') throw new Error('expected pick')
+    const r = await runPick(cmd, { root, log: (l) => logs.push(l) })
+    expect(r.copied).toBe(1)
+    const meta = await sharp(
+      join(root, PATHS.avatars, 'avatar-fox.webp'),
+    ).metadata()
+    expect([meta.width, meta.height, meta.format, meta.hasAlpha]).toEqual([
+      500,
+      500,
+      'webp',
+      true,
+    ])
+    expect(logs[0]).toBe(
+      `write ${PATHS.outRoot}/batch-15/avatar-fox__v2.png → mobile/assets/avatars/avatar-fox.webp (500x500)`,
+    )
+    expect(logs.some((l) => l.includes('embed-pictures'))).toBe(false)
+    expect(logs).toContain('  (cd mobile && npm run export-assets)')
   })
 
   it('copies nothing when any picked variant is missing', async () => {

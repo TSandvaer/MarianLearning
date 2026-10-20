@@ -16,6 +16,12 @@
  *   then: yarn embed-pictures design/references/picture-pack/transparent-<tier> public/assets/pictures
  *         (cd mobile && npm run export-assets)
  *
+ * Learner avatars (learner-profiles.md § 9), the pack flow on their own
+ * manifest; a pick writes the app's file (the web never shows avatars):
+ *   npx tsx scripts/generatePackPictures.ts --manifest design/native/avatar-manifest.json --pick avatar-fox=v1
+ *     → mobile/assets/avatars/avatar-fox.webp (500x500, transparent)
+ *   then: (cd mobile && npm run export-assets)
+ *
  * Little-story scenes (content-wave-3.md § 6), the same flow with --scenes:
  *   npx tsx scripts/generatePackPictures.ts --scenes --dry-run    (all 24)
  *   npx tsx scripts/generatePackPictures.ts --scenes --batch 1 --budget 3.3
@@ -82,6 +88,7 @@ import {
   currentPictureRelPath,
   estimateCallCost,
   formatUsd,
+  isAvatarDest,
   ledgerLine,
   parseCli,
   parseManifest,
@@ -92,6 +99,7 @@ import {
   runPool,
   sceneDestRelPath,
   selectRows,
+  styleOf,
   sumLedger,
   variantRelPath,
   variantsOnDisk,
@@ -243,6 +251,8 @@ interface Row {
   tier: string
   batch: number
   prompt: string
+  /** Repo-relative style anchors, sent first (the row's style). */
+  anchors: string[]
   /** Repo-relative chip pictures sent after the anchors (scenes only). */
   refs: string[]
   /** What the app shows today, the contact sheet's first cell. */
@@ -257,6 +267,7 @@ function readRows(root: string, set: PictureSet, rel: string): Row[] {
       tier: e.tier,
       batch: e.batch,
       prompt: buildPrompt(e),
+      anchors: anchorRelPaths(styleOf(e)),
       refs: [],
       currentRel: currentPictureRelPath(e.word),
       notes: [
@@ -264,6 +275,7 @@ function readRows(root: string, set: PictureSet, rel: string): Row[] {
         ...(e.distinctFrom.length > 0
           ? [`not like: ${e.distinctFrom.join(', ')}`]
           : []),
+        ...(e.style ? [`style: ${e.style}`] : []),
       ],
     }))
   }
@@ -272,6 +284,7 @@ function readRows(root: string, set: PictureSet, rel: string): Row[] {
     tier: e.tier,
     batch: e.batch,
     prompt: buildScenePrompt(e),
+    anchors: anchorRelPaths(),
     refs: e.refs.map(currentPictureRelPath),
     currentRel: sceneDestRelPath(e.scene),
     notes: [`tier: ${e.tier}`, `refs: ${e.refs.join(', ')}`],
@@ -405,7 +418,7 @@ export async function runGenerate(
       estimate: estimateCallCost(
         n,
         e.prompt.length,
-        ANCHOR_WORDS.length + e.refs.length,
+        e.anchors.length + e.refs.length,
       ),
       existing,
       // Never overwrite a paid variant: new ones are numbered after them.
@@ -416,9 +429,11 @@ export async function runGenerate(
   const jobs = plans.filter((p) => cmd.force || p.existing.length === 0)
   const onDisk = plans.filter((p) => !cmd.force && p.existing.length > 0)
   const estTotal = roundUsd(jobs.reduce((s, j) => s + j.estimate.costUsd, 0))
-  const missingAnchors = anchorRelPaths().filter(
-    (p) => !existsSync(join(root, p)),
-  )
+  // The anchors this run needs (a dry run checks every selected row's).
+  const anchorRels = [
+    ...new Set((cmd.dryRun ? plans : jobs).flatMap((j) => j.entry.anchors)),
+  ]
+  const missingAnchors = anchorRels.filter((p) => !existsSync(join(root, p)))
   const refRels = [...new Set(jobs.flatMap((j) => j.entry.refs))]
   const missingRefs = refRels.filter((p) => !existsSync(join(root, p)))
   const ledgerTotal = readLedgerTotal(root, cfg.ledger, log)
@@ -452,7 +467,7 @@ export async function runGenerate(
     const inputs =
       noun === 'scene'
         ? `(${ANCHOR_WORDS.length} anchors + refs)`
-        : `${ANCHOR_WORDS.length} anchors`
+        : `${anchorRels.length} anchors`
     log(
       `Estimated cost: ${formatUsd(estTotal)} ` +
         `(per image returned: ${inputs} x ${MEASURED.inputImageTokens} image-in tokens @ $${RATES_PER_1M.imageInput}/1M + ${MEASURED.outputTokensPerImage} out @ $${RATES_PER_1M.imageOutput}/1M + ~prompt/4 text-in @ $${RATES_PER_1M.textInput}/1M)`,
@@ -481,7 +496,7 @@ export async function runGenerate(
     }
     log(
       missingAnchors.length === 0
-        ? 'Anchors: 3/3 present.'
+        ? `Anchors: ${anchorRels.length}/${anchorRels.length} present.`
         : `WARN anchors missing (a real run would stop): ${missingAnchors.join(', ')}`,
     )
     if (refRels.length > 0) {
@@ -503,8 +518,10 @@ export async function runGenerate(
   if (missingAnchors.length > 0 && jobs.length > 0) {
     throw new Error(
       `Style anchors missing:\n  ${missingAnchors.join('\n  ')}\n` +
-        'They are local and gitignored (not in a fresh checkout or worktree). ' +
-        `Copy anchor-hen.png, anchor-sack.png and anchor-wing.png into ${PATHS.anchorsDir}/.`,
+        (missingAnchors.some((p) => p.startsWith(PATHS.anchorsDir))
+          ? 'They are local and gitignored (not in a fresh checkout or worktree). ' +
+            `Copy anchor-hen.png, anchor-sack.png and anchor-wing.png into ${PATHS.anchorsDir}/.`
+          : 'The clay anchors are committed path art (CLAY_ANCHORS); restore them from git.'),
     )
   }
   if (missingRefs.length > 0 && jobs.length > 0) {
@@ -520,15 +537,15 @@ export async function runGenerate(
   // Anchors and refs, read once; each call sends the anchors, then its refs.
   const inputBytes = new Map<string, Buffer>(
     jobs.length > 0
-      ? [...anchorRelPaths(), ...refRels].map((rel) => [
+      ? [...anchorRels, ...refRels].map((rel) => [
           rel,
           readFileSync(join(root, rel)),
         ])
       : [],
   )
-  const inputFiles = (refs: string[]) =>
+  const inputFiles = (row: Row) =>
     Promise.all(
-      [...anchorRelPaths(), ...refs].map((rel) =>
+      [...row.anchors, ...row.refs].map((rel) =>
         toFile(inputBytes.get(rel) as Buffer, basename(rel), {
           type: rel.endsWith('.webp') ? 'image/webp' : 'image/png',
         }),
@@ -606,7 +623,7 @@ export async function runGenerate(
         async () =>
           edit({
             model: MODEL,
-            image: await inputFiles(entry.refs),
+            image: await inputFiles(entry),
             prompt,
             size: IMAGE_SIZE,
             quality: QUALITY,
@@ -738,13 +755,15 @@ export async function runGenerate(
   }
 }
 
-/** export-assets.mjs encodes the app's WebPs at q 85. */
+/** export-assets.mjs encodes the app's WebPs at q 85 (alpha q 90). */
 const SCENE_WEBP = { quality: 85 }
+const AVATAR_WEBP = { quality: 85, alphaQuality: 90 }
 
 /**
  * Writes the chosen variants into the embed pipeline at the pack's size:
- * 1024x1024 → 500x500 transparent PNG (PACK_PICTURE_PX). Scenes go straight
- * to the app as opaque 600x600 WebPs (SCENE_PICTURE_PX). Every pick is
+ * 1024x1024 → 500x500 transparent PNG (PACK_PICTURE_PX). Avatars go straight
+ * to the app as 500x500 transparent WebPs, scenes as opaque 600x600 WebPs
+ * (SCENE_PICTURE_PX). Every pick is
  * decoded and resized in memory first, so one bad file means nothing is
  * written.
  */
@@ -774,14 +793,15 @@ export async function runPick(
             .webp(SCENE_WEBP)
             .toBuffer()
         }
-        return await sharp(join(root, c.src))
+        const contained = sharp(join(root, c.src))
           .resize(px, px, {
             fit: 'contain',
             background: { r: 0, g: 0, b: 0, alpha: 0 },
           })
           .ensureAlpha()
-          .png()
-          .toBuffer()
+        return await (
+          isAvatarDest(c.dest) ? contained.webp(AVATAR_WEBP) : contained.png()
+        ).toBuffer()
       } catch (err) {
         throw new Error(
           `Could not read ${c.src} (nothing copied): ${(err as Error).message}`,
@@ -803,11 +823,19 @@ export async function runPick(
     log(`Next: commit ${PATHS.scenes}/story-*.webp (export-assets keeps them).`)
     return { copied: cmd.dryRun ? 0 : plan.length }
   }
-  const tiers = [...new Set(plan.map((c) => dirname(c.dest)))]
-  log('Next, per tier:')
+  const tiers = [
+    ...new Set(
+      plan.filter((c) => !isAvatarDest(c.dest)).map((c) => dirname(c.dest)),
+    ),
+  ]
+  log(tiers.length > 0 ? 'Next, per tier:' : 'Next:')
   for (const t of tiers)
     log(`  yarn embed-pictures ${t} public/assets/pictures`)
   log('  (cd mobile && npm run export-assets)')
+  if (plan.some((c) => isAvatarDest(c.dest)))
+    log(
+      `  then commit ${PATHS.avatars}/avatar-*.webp (export-assets registers them).`,
+    )
   return { copied: cmd.dryRun ? 0 : plan.length }
 }
 

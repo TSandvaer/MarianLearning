@@ -74,6 +74,9 @@ export type WordSongNode =
   | 'bee-words'
   | 'car-words'
   | 'sheep-stories'
+  | 'snail-words'
+  | 'moon-words'
+  | 'goat-stories'
 
 /**
  * Word-song stages in declaration order. Mirrors
@@ -103,6 +106,9 @@ export const WORD_SONG_NODES_IN_ORDER: readonly WordSongNode[] = [
   'bee-words',
   'car-words',
   'sheep-stories',
+  'snail-words',
+  'moon-words',
+  'goat-stories',
 ]
 
 /**

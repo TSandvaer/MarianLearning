@@ -1,17 +1,20 @@
 /**
- * Content wave 3's little stories (`design/native/content-wave-3.md` § 4)
- * and content wave 4's sheep stories (`design/native/content-wave-4.md`
- * § 6): the one table the canon splices, the parser and the scenes read.
+ * Content wave 3's little stories (`design/native/content-wave-3.md` § 4),
+ * content wave 4's sheep stories (`design/native/content-wave-4.md` § 6)
+ * and content wave 5's goat stories (`design/native/content-wave-5.md`
+ * § 7): the one table the canon splices, the parser and the scenes read.
  *
  * Wave 3: three steps of 8 stories, one question word each (K3, D1): fox
  * stories ask "Who…?", hen stories "What…?", bug stories "Where…?". Wave
  * 4's sheep stories mix them (P1–P3 Who, What, Where; then What, Who,
- * Where, Who, What), with the bee and car words. The wire stays
+ * Where, Who, What), with the bee and car words; wave 5's goat stories use
+ * the same format with the snail and moon words. The wire stays
  * utterance-only (K5): a story's canon block carries the story in `hint`
  * and the question in `read`, and the parser finds this table's row by the
  * story text (`littleStoryForText`) to get the chips and the scene.
  *
- * Binding: wave 3 § 4.7's 24 rows and wave 4 § 6.2's 8, word for word
+ * Binding: wave 3 § 4.7's 24 rows, wave 4 § 6.2's 8 and wave 5 § 7.2's 8,
+ * word for word
  * (`littleStories.test.ts` holds them to the specs and to the rules below).
  */
 
@@ -20,6 +23,7 @@ export type StoryNode =
   | 'hen-stories'
   | 'bug-stories'
   | 'sheep-stories'
+  | 'goat-stories'
 
 /** The story steps, in tree order. */
 export const STORY_NODES: readonly StoryNode[] = [
@@ -27,6 +31,7 @@ export const STORY_NODES: readonly StoryNode[] = [
   'hen-stories',
   'bug-stories',
   'sheep-stories',
+  'goat-stories',
 ]
 
 export interface LittleStory {
@@ -42,7 +47,7 @@ export interface LittleStory {
   /** Pack words with pictures, both in the story: the wrong chips. */
   wrong: readonly [string, string]
   /**
-   * Every Where row (bug stories, and sheep stories' Where rows): the
+   * Every Where row (bug stories, and sheep and goat stories' Where rows): the
    * correct line's preposition ("Yes! In the cup!"). Who and What rows say
    * "Yes! The <answer>!".
    */
@@ -114,9 +119,27 @@ const sheep = (
   ...(prep === undefined ? {} : { prep }),
 })
 
+/** Wave 5 § 7.2: a goat story; `prep` only on its Where rows. */
+const goat = (
+  n: number,
+  story: string,
+  question: string,
+  answer: string,
+  wrong: readonly [string, string],
+  prep?: 'In' | 'On',
+): LittleStory => ({
+  id: `goat-${n}`,
+  node: 'goat-stories',
+  story,
+  question,
+  answer,
+  wrong,
+  ...(prep === undefined ? {} : { prep }),
+})
+
 /**
  * The stories in canon order: wave 3 § 4.7's 24 (fox 1–8, hen 1–8, bug
- * 1–8), then wave 4 § 6.2's sheep 1–8.
+ * 1–8), then wave 4 § 6.2's sheep 1–8, then wave 5 § 7.2's goat 1–8.
  */
 export const LITTLE_STORIES: readonly LittleStory[] = [
   fox(
@@ -348,6 +371,66 @@ export const LITTLE_STORIES: readonly LittleStory[] = [
     'star',
     ['scarf', 'card'],
   ),
+  goat(
+    1,
+    'The goat sat in the boat. It has a loaf.',
+    'Who sat in the boat?',
+    'goat',
+    ['boat', 'loaf'],
+  ),
+  goat(
+    2,
+    'The goat is on the roof. A broom is in the train.',
+    'What is in the train?',
+    'broom',
+    ['goat', 'train'],
+  ),
+  // Dave's D8: "It" is the goat, and the answer rests on the sentence that
+  // names it.
+  goat(
+    3,
+    'The goat sat on the stool. It has a hoop.',
+    'Where is the goat?',
+    'stool',
+    ['goat', 'hoop'],
+    'On',
+  ),
+  goat(
+    4,
+    'The goat has a coat. A spoon is on the tray.',
+    'What is on the tray?',
+    'spoon',
+    ['coat', 'tray'],
+  ),
+  goat(
+    5,
+    'The snail sat on the moon. The goat sat on a log.',
+    'Who sat on the moon?',
+    'snail',
+    ['goat', 'moon'],
+  ),
+  goat(
+    6,
+    'The goat sat in the tent. The snail hid in the boot.',
+    'Where is the snail?',
+    'boot',
+    ['tent', 'goat'],
+    'In',
+  ),
+  goat(
+    7,
+    'The goat and the snail sat on the stool. The goat got a tooth.',
+    'Who got a tooth?',
+    'goat',
+    ['snail', 'stool'],
+  ),
+  goat(
+    8,
+    'The goat has a chain and a boot. A hoop is on the roof.',
+    'What is on the roof?',
+    'hoop',
+    ['chain', 'boot'],
+  ),
 ]
 
 const BY_TEXT = new Map(LITTLE_STORIES.map((s) => [s.story, s]))
@@ -380,7 +463,7 @@ export function storyGiveAnswerLine(s: LittleStory): string {
   return `This one is the ${s.answer}.`
 }
 
-/** The recap of every story step (§ 4.7; wave 4 § 6.2). */
+/** The recap of every story step (§ 4.7; wave 4 § 6.2; wave 5 § 7.2). */
 export const STORY_RECAP_FOCUS = 'You worked on reading stories today!'
 
 // ── Words (the card's taps, the one-word clips) ────────────────────────
@@ -405,7 +488,8 @@ export function storyWordCount(story: string): number {
 /**
  * Every distinct word of the stories, in first-seen order: one one-word
  * clip each (`guide.story.word.<word>`, § 5.1): wave 3's 54, then the 17
- * that sheep stories bring (wave 4 § 6.2).
+ * that sheep stories bring (wave 4 § 6.2), then goat stories' 16 (wave 5
+ * § 7.2).
  */
 export const STORY_WORDS: readonly string[] = [
   ...new Set(

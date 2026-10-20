@@ -148,6 +148,23 @@ describe('WordPicture', () => {
     'scarf',
     'card',
     'harp',
+    // Land 9, content wave 5 (snail and moon words): the same.
+    'tray',
+    'boat',
+    'snail',
+    'coat',
+    'train',
+    'loaf',
+    'goat',
+    'chain',
+    'moon',
+    'spoon',
+    'boot',
+    'broom',
+    'tooth',
+    'stool',
+    'hoop',
+    'roof',
   ])
 
   it('renders a non-empty body for every picture in the curated pack', () => {
@@ -202,8 +219,9 @@ describe('WordPicture', () => {
     // 9 digraphs-sh keys + 9 digraphs-ch keys + 10 digraphs-th keys
     // (7 th targets + 3 t-contrast distractor-only entries) + 32 land-6
     // words (16 per content wave) + 14 land-8 words (content wave 4; sheep
-    // and shark are counted with the sh keys).
-    expect(fallbackCount).toBe(74)
+    // and shark are counted with the sh keys) + 16 land-9 words (content
+    // wave 5).
+    expect(fallbackCount).toBe(90)
   })
 
   it('falls back to the unknown-picture text shape for an unknown key', () => {

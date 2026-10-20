@@ -1,6 +1,6 @@
 // Word lists embedded in the planner's system prompt. Lifted out of
 // `_planner.ts` so the prompt copy stays scannable and so the (rare)
-// future case of "Marian outgrew short-a, add short-o" is a single-file
+// future case of "a learner outgrew short-a, add short-o" is a single-file
 // edit.
 //
 // IMPORTANT: this list MUST stay aligned with the canonical client-side
@@ -172,7 +172,7 @@ export const WORD_SONG_TARGET_WORDS_SHORT_E =
  *  - 4 conventional sh-CVC: `ship, shell, shed, shop` — the `/ʃ/`
  *    digraph onset + a single short vowel inside.
  *  - 3 long-vowel sight-word-hybrids: `shoe` (/uː/), `sheep` (/iː/),
- *    `shark` (/ɑːr/) — their rest-of-word vowel is OUTSIDE Marian's
+ *    `shark` (/ɑːr/) — their rest-of-word vowel is OUTSIDE the
  *    formal short-vowel phonics tiers. These carry `hybridMode: true`
  *    in `wordPack.ts`; the planner reads that flag (via
  *    `DIGRAPHS_SH_HYBRID_MODE_WORDS` below) to SUPPRESS
@@ -200,7 +200,7 @@ export const WORD_SONG_TARGET_WORDS_DIGRAPHS_SH =
 
 /**
  * The subset of the digraphs-sh pool whose `wordPack.ts` entries carry
- * `hybridMode: true` — long / r-controlled vowels outside Marian's
+ * `hybridMode: true` — long / r-controlled vowels outside the
  * formal phonics tiers (`shoe` /uː/, `sheep` /iː/, `shark` /ɑːr/).
  *
  * The planner consumes this list as the hybridMode GATE: when the
@@ -230,13 +230,13 @@ export const WORD_SONG_TARGET_WORDS_DIGRAPHS_SH_HYBRID: readonly string[] = [
  * which adopts Dave's `design/research/digraph-ch-addendum.md` §3c
  * recommended pool verbatim. Seven ch-INITIAL words:
  *  - `chin, chip, chop, chat, chest, chug, chick` — every word uses a
- *    short vowel Marian has formally covered (short-i / -o / -a / -e
+ *    short vowel the child has formally covered (short-i / -o / -a / -e
  *    / -u). All are word-initial ch (`/tʃ/` digraph onset); no ch-final
  *    (CVCC) words in v1.
  *
  * STRUCTURAL DIVERGENCE FROM THE SH TIER — ZERO hybridMode words.
  * Unlike `digraphs-sh` (whose `shoe` / `sheep` / `shark` carry a long /
- * r-controlled vowel OUTSIDE Marian's formal phonics tiers and so are
+ * r-controlled vowel OUTSIDE the formal phonics tiers and so are
  * flagged `hybridMode: true`), every ch-tier word is fully decodable.
  * There is intentionally NO `WORD_SONG_TARGET_WORDS_DIGRAPHS_CH_HYBRID`
  * analogue, and the planner does NOT inherit the sh-tier hybridMode
@@ -275,7 +275,7 @@ export const WORD_SONG_TARGET_WORDS_DIGRAPHS_CH =
  *  - 2 word-initial th: `thin` (short-i), `thick` (short-i).
  *  - 5 word-final th: `path, bath, math` (short-a), `moth, cloth`
  *    (short-o). The 5-final/2-initial asymmetry is deliberate — the
- *    word-final /θ/ stock is the stronger one for Marian (picturable
+ *    word-final /θ/ stock is the stronger one for the child (picturable
  *    nouns), while the word-initial short-vowel th stock is mostly
  *    property/event words (Dave §3c / §3f / Non-obvious finding 1).
  *  - 2 hybridMode words: `thick` (double-digraph — `th` target +
@@ -359,7 +359,7 @@ export const WORD_SONG_TARGET_WORDS_DIGRAPHS_TH_HYBRID: readonly string[] = [
  *  - Batch 1 — Pre-Primer function words (safest visual contrast):
  *    `the, a, I, is, it, in, to, go, no, do`.
  *  - Batch 2 — Primer / Grade-1 function words + common verbs (slight
- *    overlap with the CVC word pool — an ASSET, not a conflict; Marian
+ *    overlap with the CVC word pool — an ASSET, not a conflict; the child
  *    has phonics-grounded prior exposure that anchors orthographic
  *    mapping): `was, see, said, he, she, we, for, on, not, can`.
  *
@@ -370,7 +370,7 @@ export const WORD_SONG_TARGET_WORDS_DIGRAPHS_TH_HYBRID: readonly string[] = [
  *
  * STRUCTURAL DIVERGENCE FROM EVERY PRIOR TIER. Sight words are NOT
  * phonics-decodable by design. The recognition mechanic is audio-first
- * WHOLE-WORD matching (Emma speaks the target; Marian taps the matching
+ * WHOLE-WORD matching (Emma speaks the target; the child taps the matching
  * WRITTEN word among 3 written-word chips) — NOT picture-chip decoding.
  * So:
  *  - There is NO picture-pack asset for these words (`wordPack.ts` entries
@@ -443,6 +443,21 @@ export const WORD_SONG_TARGET_WORDS_BEE = bigWordsOf('bee-words').join(', ')
  */
 export const WORD_SONG_TARGET_WORDS_CAR = bigWordsOf('car-words').join(', ')
 
+/**
+ * Snail words (`snail-words`, land 9, content wave 5 —
+ * `design/native/content-wave-5.md` § 4): the vowel teams ai / ay and oa,
+ * which say the first letter's name. Exactly 8 words, IN CANON ORDER. Same
+ * source as duck words.
+ */
+export const WORD_SONG_TARGET_WORDS_SNAIL = bigWordsOf('snail-words').join(', ')
+
+/**
+ * Moon words (`moon-words`, land 9, content wave 5 — § 5): oo, /uː/ in
+ * British English. Exactly 8 words, IN CANON ORDER. Same source as duck
+ * words.
+ */
+export const WORD_SONG_TARGET_WORDS_MOON = bigWordsOf('moon-words').join(', ')
+
 /** Hint shown to the model so it knows the broader pack — even though it
  *  isn't authoring distractors, knowing the rhyme families helps it order
  *  the gentle-vs-trap window correctly (per Kyle's distractor spec).
@@ -505,7 +520,7 @@ export const WORD_SONG_DISTRACTOR_HINTS = [
 /**
  * Novel short-a CVC probe words used on the cvc-words graduation
  * session (ticket 86c9m3aec). These are NOT in the canonical 14-word
- * pack — Marian must decode them cold. Source: Dave's developmental
+ * pack — the child must decode them cold. Source: Dave's developmental
  * review § P1 + Kyle's short-o pool spec recommendation
  * (`design/word-song/short-o-pool-expansion.md` § 4 Stage 2).
  *
