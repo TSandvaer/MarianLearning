@@ -159,7 +159,11 @@ import { useAppFonts } from './fonts'
 import type { Viewport } from './layout/layout'
 import { greetLayout } from './layout/greetLayout'
 import { hubLayout } from './layout/hubLayout'
-import { extendedMathLayout, mathLayoutKind } from './layout/mathLayout'
+import {
+  extendedMathLayout,
+  mathLayout,
+  mathLayoutKind,
+} from './layout/mathLayout'
 import { mapScreenLayout } from './layout/mapScreenLayout'
 import { parentSettingsLayout } from './layout/parentSettingsLayout'
 import { wordSongLayout } from './layout/wordSongLayout'
