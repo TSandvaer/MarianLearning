@@ -95,12 +95,6 @@
  * Back, and Session End's "All done", return to that world's map, quiet (a
  * pending unlock still plays its beat). Hub starts are unchanged.
  *
- * The side mini-games (native spec `design/native/mini-game-flower-bed.md`
- * § 1.3): a world Map's play door asks App for its game; the route goes to
- * `game`, keeping the Map's handoff, and the round's end or Back returns to
- * that Map, quiet, with the handoff it had (so its Home goes where it went
- * before). A game writes nothing and never reaches Session End.
- *
  * The Play place (native spec `design/native/play-place.md` § 1.4): the
  * Hub's Play disc opens `play-place` (the Hub's frames, so Emma stays put)
  * with its open line; a tile opens `play-game` with that game in App
@@ -119,7 +113,6 @@ import {
   computeSuggestion,
   prefetchTrackFor,
 } from '@marian/core/hub/hubSuggestion'
-import type { GameId } from '@marian/core/games/miniGames'
 import type { PlayGameId } from '@marian/core/games/playPlace'
 import type { ExtendedMathProblem } from '@marian/core/math/extendedProblems'
 import { pickStaticSessionPlan } from '@marian/core/math/sessionPlans'
@@ -166,11 +159,7 @@ import { useAppFonts } from './fonts'
 import type { Viewport } from './layout/layout'
 import { greetLayout } from './layout/greetLayout'
 import { hubLayout } from './layout/hubLayout'
-import {
-  extendedMathLayout,
-  mathLayout,
-  mathLayoutKind,
-} from './layout/mathLayout'
+import { extendedMathLayout, mathLayoutKind } from './layout/mathLayout'
 import { mapScreenLayout } from './layout/mapScreenLayout'
 import { parentSettingsLayout } from './layout/parentSettingsLayout'
 import { wordSongLayout } from './layout/wordSongLayout'
@@ -195,7 +184,6 @@ import {
   GREET_BREATH_SCALE,
 } from './screens/greet/Greet'
 import { Hub } from './screens/hub/Hub'
-import { GameScreen } from './screens/game/GameScreen'
 import { PlayGameScreen } from './screens/play/PlayGameScreen'
 import { PlayPlace } from './screens/play/PlayPlace'
 import { clearHubUnmountMark } from './screens/hub/hubAudio'
@@ -386,11 +374,6 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
   const [peek, setPeek] = useState<PreparedPeek | null>(null)
   const peekRef = useRef<PreparedPeek | null>(null)
   const [peekPose, setPeekPose] = useState<EmmaPose>('idle')
-  // The mini-game on screen and the Map handoff it came from (§ 1.3); set
-  // when the route goes to `game`, cleared on the way out.
-  const [game, setGame] = useState<{ id: GameId; map: MapEntry } | null>(null)
-  const gameRef = useRef<{ id: GameId; map: MapEntry } | null>(null)
-  const [gamePose, setGamePose] = useState<EmmaPose>('idle')
   // The Play place (play-place § 1.4): the game on screen, and whether the
   // place opens quiet (back from a game) or with its line (from the Hub).
   const [playGame, setPlayGame] = useState<PlayGameId | null>(null)
@@ -425,10 +408,6 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
         peekRef.current?.audio.unload()
         peekRef.current = null
         setPeek(null)
-      }
-      if (from === 'game') {
-        gameRef.current = null
-        setGame(null)
       }
       if (from === 'play-game') setPlayGame(null)
       // Word Song's session likewise (a request in flight is aborted: it
@@ -683,27 +662,6 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
     if (current === null || routeRef.current !== 'peek') return
     returnToMap(current.world)
   }, [returnToMap])
-  // Mini-game spec § 1.2: the play door; `true` = the route changed. The
-  // Map's handoff goes with the game, so the way back keeps it.
-  const onMapGame = useCallback(
-    (id: GameId): boolean => {
-      if (mapEntry === null || routeRef.current !== 'map') return false
-      const entry = { id, map: mapEntry }
-      gameRef.current = entry
-      setGame(entry)
-      setGamePose('idle')
-      navigate('game')
-      return routeRef.current !== 'map'
-    },
-    [mapEntry, navigate],
-  )
-  // § 1.3: the round's end or Back: the same Map, quiet, its handoff kept.
-  const onGameExit = useCallback(() => {
-    const current = gameRef.current
-    if (current === null || routeRef.current !== 'game') return
-    setMapEntry({ ...current.map, quietReturn: true })
-    navigate('map')
-  }, [navigate])
   // Play-place spec § 1.4: the Hub's Play disc opens the place with its
   // line; a tile opens a game; a game's Back or natural stop returns to
   // the place, silent; Home goes to the Hub. Nothing here writes.
@@ -810,9 +768,6 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
         )
       : null
   const peekWord = wordPeek !== null ? wordSongLayout(viewport) : null
-  // A mini-game wears the lesson's Math frame as it is (§ 1.4).
-  const gameLayout =
-    route === 'game' && game !== null ? mathLayout(viewport) : null
   // Session End needs a finished session; without one (the QA route, or
   // a later arrival after it consumed its payload) the placeholder renders
   // and nothing is written.
@@ -843,7 +798,6 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
     peekMath ??
     wordSong ??
     peekWord ??
-    gameLayout ??
     playFrame ??
     place?.hub ??
     end ??
@@ -927,14 +881,6 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
               qaAutoAnswerAfterMs={qaAutoTapMs}
               debugLog={flags.debug ? logStoryCueLine : undefined}
             />
-          ) : gameLayout && game ? (
-            <GameScreen
-              key={`game-${game.id}`}
-              layout={gameLayout}
-              game={game.id}
-              onExit={onGameExit}
-              onPoseChange={setGamePose}
-            />
           ) : playFrame && playGame ? (
             <PlayGameScreen
               key={`play-${playGame}`}
@@ -988,7 +934,6 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
               onPeek={onMapPeek}
               onPlay={onMapPlay}
               onReplay={onMapReplay}
-              onGame={onMapGame}
               quietReturn={mapEntry.quietReturn === true}
               debugLog={flags.debug ? logMapLine : undefined}
             />
@@ -1034,15 +979,13 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
                   ? mathPose
                   : route === 'peek'
                     ? peekPose
-                    : route === 'game'
-                      ? gamePose
-                      : route === 'play-game'
-                        ? playPose
-                        : wordSong
-                          ? wordSongPose
-                          : end
-                            ? sessionEndPose
-                            : 'idle'
+                    : route === 'play-game'
+                      ? playPose
+                      : wordSong
+                        ? wordSongPose
+                        : end
+                          ? sessionEndPose
+                          : 'idle'
               }
               // The web's Session End Emma is a still image (no breath). On
               // the picker she breathes as on Greet (learner profiles § 1.4).

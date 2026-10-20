@@ -7,7 +7,7 @@ describe('route shell', () => {
   })
 
   it('has a label and an exit for every route', () => {
-    expect(ROUTES).toHaveLength(14)
+    expect(ROUTES).toHaveLength(13)
     for (const route of ROUTES) {
       expect(ROUTE_LABELS[route]).toBeTruthy()
       expect(ROUTE_EXITS[route].length).toBeGreaterThan(0)
@@ -64,19 +64,10 @@ describe('route shell', () => {
       'math',
       'literacy',
       'picker',
-      'game',
     ])
     expect(ROUTE_EXITS.math).toContain('map')
     expect(ROUTE_EXITS.literacy).toContain('map')
     expect(ROUTE_EXITS.peek).toEqual(['map'])
-  })
-
-  it('mini-games (spec § 1.3, N4): only the Map opens a game, and a game only returns to it', () => {
-    expect(ROUTE_EXITS.map).toContain('game')
-    expect(ROUTE_EXITS.game).toEqual(['map'])
-    expect(
-      ROUTES.filter((r) => r !== 'map' && ROUTE_EXITS[r].includes('game')),
-    ).toEqual([])
   })
 
   it('the Play place (play-place § 1.4, N3): only the Hub opens it, and a game only returns to it', () => {

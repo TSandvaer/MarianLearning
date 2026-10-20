@@ -21,10 +21,3 @@ export const WORD_SONG_HUD: HudWorld = {
   popMs: 400,
   popScale: 1.3,
 }
-
-/** The side mini-games (mini-game spec § 1.4): Math's pop, `game-*` test IDs. */
-export const GAME_HUD: HudWorld = {
-  idPrefix: 'game',
-  popMs: 250,
-  popScale: 1.25,
-}

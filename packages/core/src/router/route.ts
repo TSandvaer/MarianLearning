@@ -61,17 +61,10 @@ export type Route =
    */
   | 'picker'
   /**
-   * Native only: a side mini-game (`design/native/mini-game-flower-bed.md`
-   * § 1.3). Reached from a world's Map door; it always returns to that
-   * Map. The world and the game live in App state, as a peek's do. Not
-   * `play`: that already names the Map's current-stop start. The web never
-   * routes here.
-   */
-  | 'game'
-  /**
    * Native only: the Play place (`design/native/play-place.md` § 1.3), the
    * shared place for the games outside the path. Reached from the Hub's
-   * Play disc; Home returns to the Hub. Not `play` (see `game` above).
+   * Play disc; Home returns to the Hub. Not `play`: that already names
+   * the Map's current-stop start.
    */
   | 'play-place'
   /**

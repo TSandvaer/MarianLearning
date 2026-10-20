@@ -12,6 +12,7 @@ import {
   pickerWhoLine,
   replayLines,
   sessionIntroLine,
+  type GuidanceLineKind,
 } from './guidanceLines'
 import { PATH_LINES } from './pathLines'
 
@@ -57,18 +58,16 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'story-word': 87,
       // Learner profiles § 1.3 (T5): the picker's "Who is playing?".
       'picker-who': 1,
-      // The first mini-game, Fill the flower bed (mini-game spec § 3.1).
-      game: 30,
       // The Play place and its two games (play-place spec § 4.1).
       play: 18,
     })
-    expect(GUIDANCE_LINES).toHaveLength(354)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(354)
+    expect(GUIDANCE_LINES).toHaveLength(324)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(324)
     // Bee, car, snail and moon words' leads are duck words' text (content
-    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories': 354 ids,
-    // 349 texts, 354 files.
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(349)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(354)
+    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories': 324 ids,
+    // 319 texts, 324 files.
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(319)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(324)
   })
 
   it('AC8: both replay sets, one line per STAGE_SPOKEN_NAMES step, with the exact texts (map-tap-to-play § 6, T1 approved 2026-10-17)', () => {
@@ -393,7 +392,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(354)
+    ).toHaveLength(324)
   })
 
   it('repeats no Emma’s Path line', () => {
@@ -439,6 +438,54 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
   })
 })
 
+describe('the flower bed moved into adding to ten (flower-bed-into-add-to-10 § 6)', () => {
+  it('C3: the 30 game lines and the game kind are gone; the 306 others are unchanged', () => {
+    // The fingerprint (FNV-1a over the JSON of id, kind, world, text, input
+    // and src, in order) of the 300 lines on main at 4724665f, before the
+    // game lines were appended (299 at ae6472c5: 45621, b78acc53; 289 at
+    // 8b0935b8: 43921, 77d72c5f; 258 at c86d551e: 39492, eea1867e). Real
+    // blending's 6 session lines (§ 11) sit among them, and the Play place's
+    // 18 lines (play-place spec § 4.1) follow them; the fingerprint is of
+    // the other 300.
+    const realBlending = new Set([
+      'guide.session.intro.blending-cv',
+      'guide.session.intro.sounding-out',
+      'guide.session.peek-open.sounding-out',
+      'guide.session.peek-close.sounding-out',
+      'guide.session.replay-open.sounding-out',
+      'guide.session.replay-close.sounding-out',
+    ])
+    expect(GUIDANCE_LINES.filter((l) => realBlending.has(l.id))).toHaveLength(6)
+    const shipped = JSON.stringify(
+      GUIDANCE_LINES.filter(
+        (l) => !realBlending.has(l.id) && l.kind !== 'play',
+      ).map(({ id, kind, world, text, input, src }) => [
+        id,
+        kind,
+        world,
+        text,
+        input ?? null,
+        src,
+      ]),
+    )
+    let hash = 0x811c9dc5
+    for (let i = 0; i < shipped.length; i++) {
+      hash ^= shipped.charCodeAt(i)
+      hash = Math.imul(hash, 0x01000193) >>> 0
+    }
+    expect([shipped.length, hash.toString(16)]).toEqual([45725, '12763e65'])
+    expect(
+      GUIDANCE_LINES.filter((l) => l.id.startsWith('guide.game.')),
+    ).toEqual([])
+    // @ts-expect-error -- 'game' is no longer a GuidanceLineKind (C3).
+    const retired: GuidanceLineKind = 'game'
+    expect(GUIDANCE_LINES.filter((l) => l.kind === retired)).toEqual([])
+    expect(GUIDANCE_LINES.filter((l) => l.src.includes('guide-game-'))).toEqual(
+      [],
+    )
+  })
+})
+
 const NUMBER = [
   'one',
   'two',
@@ -451,126 +498,6 @@ const NUMBER = [
   'nine',
 ] as const
 const Cap = (w: string) => `${w.charAt(0).toUpperCase()}${w.slice(1)}`
-
-/** Mini-game spec § 3.1, row by row: the 30 lines of Fill the flower bed. */
-function expectedGameLines(): {
-  id: string
-  world: 'math' | null
-  text: string
-}[] {
-  const lines: { id: string; world: 'math' | null; text: string }[] = [
-    { id: 'guide.game.again', world: null, text: 'Hmm... try again?' },
-  ]
-  NUMBER.forEach((n, i) =>
-    lines.push({
-      id: `guide.game.this-is.${i + 1}`,
-      world: null,
-      text: `This one is ${n}.`,
-    }),
-  )
-  lines.push({
-    id: 'guide.game.bed.open',
-    world: 'math',
-    text: 'Ten flowers in every bed!',
-  })
-  NUMBER.forEach((n, i) =>
-    lines.push({
-      id: `guide.game.bed.ask.${i + 1}`,
-      world: 'math',
-      text: `${Cap(n)} and what make ten?`,
-    }),
-  )
-  NUMBER.forEach((n, i) =>
-    lines.push({
-      id: `guide.game.bed.yes.${i + 1}`,
-      world: 'math',
-      text: `Yes! ${Cap(n)} and ${NUMBER[8 - i]} make ten!`,
-    }),
-  )
-  lines.push({
-    id: 'guide.game.bed.close',
-    world: 'math',
-    text: 'Ten every time! What a garden!',
-  })
-  return lines
-}
-
-describe('the mini-game lines (mini-game spec § 3)', () => {
-  const game = GUIDANCE_LINES.filter((l) => l.kind === 'game')
-
-  it('C4: leaves the 300 shipped lines unchanged and appends the 30 game lines', () => {
-    // The fingerprint (FNV-1a over the JSON of id, kind, world, text, input
-    // and src, in order) of the 300 lines on main at 4724665f, taken before
-    // the game lines were added (299 at ae6472c5: 45621, b78acc53; 289 at
-    // 8b0935b8: 43921, 77d72c5f; 258 at c86d551e: 39492, eea1867e). Real
-    // blending's 6 session lines (§ 11) sit among them; the fingerprint is
-    // of the other 300.
-    const realBlending = new Set([
-      'guide.session.intro.blending-cv',
-      'guide.session.intro.sounding-out',
-      'guide.session.peek-open.sounding-out',
-      'guide.session.peek-close.sounding-out',
-      'guide.session.replay-open.sounding-out',
-      'guide.session.replay-close.sounding-out',
-    ])
-    const before = GUIDANCE_LINES.slice(0, 306)
-    expect(before.filter((l) => realBlending.has(l.id))).toHaveLength(6)
-    const shipped = JSON.stringify(
-      before
-        .filter((l) => !realBlending.has(l.id))
-        .map(({ id, kind, world, text, input, src }) => [
-          id,
-          kind,
-          world,
-          text,
-          input ?? null,
-          src,
-        ]),
-    )
-    let hash = 0x811c9dc5
-    for (let i = 0; i < shipped.length; i++) {
-      hash ^= shipped.charCodeAt(i)
-      hash = Math.imul(hash, 0x01000193) >>> 0
-    }
-    expect([shipped.length, hash.toString(16)]).toEqual([45725, '12763e65'])
-    expect(GUIDANCE_LINES.slice(306, 336)).toEqual(game)
-  })
-
-  it('C4: has the exact texts of § 3.1, no render input and the path src', () => {
-    expect(game).toEqual(
-      expectedGameLines().map((l) => ({
-        ...l,
-        kind: 'game',
-        src: `/assets/audio/path/${l.id.replace(/\./g, '-')}.mp3`,
-      })),
-    )
-    expect(game.filter((l) => l.input !== undefined)).toEqual([])
-    expect(game.reduce((n, l) => n + l.text.length, 0)).toBe(684)
-    expect(Math.min(...game.map((l) => l.text.length))).toBe(16)
-    expect(Math.max(...game.map((l) => l.text.length))).toBe(30)
-  })
-
-  it('C4: the 30 game lines are rendered in Lily (none awaits its render)', () => {
-    expect(
-      game.filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id)),
-    ).toEqual([])
-  })
-
-  it('C5: no game line says "play", "next" or "round"; only the retry says "again"', () => {
-    for (const l of game) expect(l.text).not.toMatch(/\b(play|next|round)/i)
-    expect(game.filter((l) => /again/i.test(l.text)).map((l) => l.id)).toEqual([
-      'guide.game.again',
-    ])
-  })
-
-  it('C4: no line outside guide.game.* names a game (Emma never suggests one)', () => {
-    const others = GUIDANCE_LINES.filter((l) => l.kind !== 'game')
-    expect(others.filter((l) => /flower bed|\bgame\b/i.test(l.text))).toEqual(
-      [],
-    )
-    expect(others.filter((l) => l.id.startsWith('guide.game.'))).toEqual([])
-  })
-})
 
 /** Play-place spec § 4.1, row by row: the 18 lines of the Play place. */
 function expectedPlayLines(): { id: string; text: string; input?: string }[] {
@@ -601,11 +528,13 @@ function expectedPlayLines(): { id: string; text: string; input?: string }[] {
 describe('the Play place lines (play-place spec § 4)', () => {
   const play = GUIDANCE_LINES.filter((l) => l.kind === 'play')
 
-  it('C7: leaves the 336 shipped lines unchanged and appends the 18 play lines', () => {
+  it('C7: leaves the 306 shipped lines unchanged and appends the 18 play lines', () => {
     // FNV-1a over the JSON of id, kind, world, text, input and src, in
-    // order, of the 336 lines on main at a8abb91b, before the play lines.
+    // order, of the 306 lines before the play lines: the 336 on main at
+    // a8abb91b (50199, 9a6b2645) less the 30 game lines retired by the
+    // flower bed's move into adding to ten.
     const shipped = JSON.stringify(
-      GUIDANCE_LINES.slice(0, 336).map(
+      GUIDANCE_LINES.slice(0, 306).map(
         ({ id, kind, world, text, input, src }) => [
           id,
           kind,
@@ -621,8 +550,8 @@ describe('the Play place lines (play-place spec § 4)', () => {
       hash ^= shipped.charCodeAt(i)
       hash = Math.imul(hash, 0x01000193) >>> 0
     }
-    expect([shipped.length, hash.toString(16)]).toEqual([50199, '9a6b2645'])
-    expect(GUIDANCE_LINES.slice(336)).toEqual(play)
+    expect([shipped.length, hash.toString(16)]).toEqual([46755, 'c9263c74'])
+    expect(GUIDANCE_LINES.slice(306)).toEqual(play)
   })
 
   it('C7: has the exact texts of § 4.1, world-free, the path src, inputs only on the totals', () => {
