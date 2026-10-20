@@ -1,0 +1,58 @@
+[
+  {
+    "word": "ui-play",
+    "tier": "game-art",
+    "batch": 17,
+    "style": "clay",
+    "subject": "A small open toy box in warm honey-yellow wood with a rounded lid tipped back, a ball striped honey and pink and a little wooden boat peeking over its rim, seen from the front and a little above.",
+    "avoid": [
+      "anything red",
+      "text, letters, digits or a sign",
+      "a house or a roof",
+      "a folded paper map",
+      "a flower bed, a planter, soil or flowers",
+      "a gift box with a bow or a ribbon",
+      "a padlock or a keyhole",
+      "a treasure chest, coins or jewels",
+      "a face on anything",
+      "a coloured circle, badge or background behind it"
+    ],
+    "distinctFrom": ["ui-house", "ui-map", "ui-flower-bed", "gift"]
+  },
+  {
+    "word": "ui-raft",
+    "tier": "game-art",
+    "batch": 17,
+    "style": "clay",
+    "subject": "A small wooden raft of five round logs tied with rope, with a short mast and a blank cream flag, floating on a little patch of blue water, a duck and a frog sitting on it.",
+    "avoid": [
+      "anything red",
+      "text, letters, digits or a sign",
+      "a number or a mark on the flag",
+      "a boat with a hull or a sail",
+      "a flower bed, a planter, soil or flowers",
+      "a wooden egg crate, eggs or compartments",
+      "a face on the raft, the logs, the flag or the water",
+      "a coloured circle, badge or background behind it"
+    ],
+    "distinctFrom": ["boat", "ui-flower-bed", "add-to-20"]
+  },
+  {
+    "word": "ui-critters",
+    "tier": "game-art",
+    "batch": 17,
+    "style": "clay",
+    "subject": "Three small round friendly creatures, one honey-yellow, one pink, one honey-yellow, sitting side by side on a short wooden log, each with big eyes and tiny feet, mouths open in song.",
+    "avoid": [
+      "anything red",
+      "text, letters, digits or a sign",
+      "musical notes",
+      "a bee, wings or black stripes",
+      "a snail or a shell",
+      "a caterpillar or one long segmented body",
+      "a face on the log",
+      "a coloured circle, badge or background behind it"
+    ],
+    "distinctFrom": ["bee-words", "snail-words"]
+  }
+]
