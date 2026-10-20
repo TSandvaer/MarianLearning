@@ -40,6 +40,19 @@
  * boot effect does (`./lifecycle/launchReconcile.ts`): off without the
  * progress secret, never waited for, local kept on any failure.
  *
+ * Learner profiles (`design/native/learner-profiles.md`): with 2 to 4
+ * learners Splash opens "Who is playing?" (`./screens/picker/`), and so do
+ * the Hub's badge, Session End's All done (and Back on the unlock Map it
+ * opened), Parent Settings' Done after the learners changed, and a return
+ * from 10 minutes in the background on Greet, the Hub, the Map or Session
+ * End (`./lifecycle/pickerReturn.ts`). A pick switches the learner: the
+ * route change already tore the kicked or prefetched session down; then
+ * that learner's store is installed (`activateLearner`), the Hub's quiet
+ * remount mark is cleared so their Hub speaks, their launch reconcile
+ * starts (once per learner per launch), and the screens mount afresh at
+ * their Greet or Hub (the QA jump's remount). One learner: none of this
+ * shows.
+ *
  * The map (`./screens/map/MapScreen.tsx`) opens with a handoff (`MapEntry`,
  * the world) from a Hub map button or Session End's "All done"; it may
  * write the unlock seen-marker on mount, so without a handoff (the QA
@@ -104,6 +117,13 @@ import {
 } from '@marian/core/progress'
 import { now as progressNow } from '@marian/core/progress/clock'
 import { pendingUnlock } from '@marian/core/progress/pathBeats'
+import {
+  activateLearner,
+  activeLearner,
+  installedLearnerList,
+  nextAfterPick,
+  type LearnerEntry,
+} from '@marian/core/learners'
 import { nextAfterSplash } from '@marian/core/router/nextAfterSplash'
 import {
   readSessionHistoryForToday,
@@ -138,8 +158,10 @@ import { parentSettingsLayout } from './layout/parentSettingsLayout'
 import { wordSongLayout } from './layout/wordSongLayout'
 import { layoutForRoute } from './layout/routeLayout'
 import { sessionEndLayout } from './layout/sessionEndLayout'
+import { pickerLayout } from './layout/pickerLayout'
 import { useAppVisibilityChange } from './lifecycle/appVisibility'
 import { reconcileOncePerLaunch } from './lifecycle/launchReconcile'
+import { opensPickerOnReturn } from './lifecycle/pickerReturn'
 import { readBuildEnv } from './platform/buildEnv'
 import { getLaunchFlags } from './platform/launchFlags'
 import {
@@ -154,10 +176,15 @@ import {
   GREET_BREATH_SCALE,
 } from './screens/greet/Greet'
 import { Hub } from './screens/hub/Hub'
+import { clearHubUnmountMark } from './screens/hub/hubAudio'
 import { MapScreen, type MapEntry } from './screens/map/MapScreen'
 import type { MapDebugLog } from './screens/map/mapTapLog'
 import { MathScreen } from './screens/math/Math'
-import { ParentSettings } from './screens/parentSettings/ParentSettings'
+import {
+  ParentSettings,
+  type ParentSettingsExit,
+} from './screens/parentSettings/ParentSettings'
+import { PickerScreen } from './screens/picker/PickerScreen'
 import type { MathSessionResult } from './screens/math/mathTypes'
 import { RoutePlaceholder } from './screens/RoutePlaceholder'
 import { SessionEnd } from './screens/sessionEnd/SessionEnd'
@@ -230,6 +257,12 @@ const logStoryCueLine = (line: string) => console.log(line)
 /** Where a session was started (map-tap-to-play § 4): its Back and end return there. */
 type SessionOrigin = 'hub' | 'map'
 
+/**
+ * Where the Map's Home goes: the Hub, or with 2+ learners the picker on a
+ * Map Session End's All done opened (learner profiles § 2.4).
+ */
+type MapBack = 'hub' | 'picker'
+
 /** The Hub card's tree of a map's world. */
 const TREE_OF: Readonly<Record<MasteryTrack, SkillTreeId>> = {
   math: 'number-garden',
@@ -251,9 +284,13 @@ interface ShellProps {
   startRoute?: Route
   /** Debug only: a QA step jump was written; mount afresh on the Hub. */
   onQaJump: () => void
+  /** A pick on "Who is playing?": App switches to that learner. */
+  onPickLearner: (learner: LearnerEntry) => void
+  /** The playing learner's data changed under the screens: mount afresh. */
+  onRemount: (start: Route) => void
 }
 
-function Shell({ startRoute, onQaJump }: ShellProps) {
+function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
   // The provider's measured frame, not `useWindowDimensions()`: on Android
   // (API 37 emulator, edge-to-edge) the window height leaves out the
   // navigation bar (667×351) while the app draws under it (667×375) and
@@ -330,6 +367,10 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
   // Where the session on screen was started (map-tap-to-play § 4); set by
   // each way into a session, kept through Session End's "Again".
   const originRef = useRef<SessionOrigin>('hub')
+  const mapBackRef = useRef<MapBack>('hub')
+  // The learners, read per render (Parent Settings can change them).
+  const learners = installedLearnerList()?.learners ?? []
+  const several = learners.length >= 2
 
   // The web's tear-downs (`handleBackToHub`, `handleSessionEndAllDone` /
   // `…Again`, the leave-effect) run BEFORE the route flips: leaving
@@ -380,10 +421,11 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
     [mathSession, wordSongSession],
   )
   // A way into the map: the handoff first, then the route (only when the
-  // map is an exit of the route we are on).
+  // map is an exit of the route we are on). `back` is where its Home goes.
   const openMap = useCallback(
-    (world: MasteryTrack) => {
+    (world: MasteryTrack, back: MapBack = 'hub') => {
       if (nextRoute(routeRef.current, 'map') !== 'map') return
+      mapBackRef.current = back
       setMapEntry({ world })
       navigate('map')
     },
@@ -391,9 +433,11 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
   )
   // Back to a world's map from a session the Map started, or a peek or a
   // replay (map-tap-to-play § 4, fast-track § 6.4): quiet, Emma has spoken.
+  // Home keeps going where it went, unless Session End hands over (`back`).
   const returnToMap = useCallback(
-    (world: MasteryTrack) => {
+    (world: MasteryTrack, back?: MapBack) => {
       if (nextRoute(routeRef.current, 'map') !== 'map') return
+      if (back !== undefined) mapBackRef.current = back
       setMapEntry({ world, quietReturn: true })
       navigate('map')
     },
@@ -476,18 +520,22 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
   // yet opens the map (which plays it); otherwise the Hub. (The route
   // flip tears the Math session down, as the web's handler does.) A
   // session the Map started returns to its map, quiet; a pending unlock
-  // plays its beat there all the same (map-tap-to-play § 4).
+  // plays its beat there all the same (map-tap-to-play § 4). With 2+
+  // learners Session End hands the device over (learner profiles § 2.4):
+  // the picker instead of the Hub, and that Map's Home opens the picker.
   const onSessionEndAllDone = useCallback(() => {
     const world: MasteryTrack =
       sessionEnd?.surface === 'word-song' ? 'word-song' : 'math'
+    const home: MapBack = several ? 'picker' : 'hub'
     if (originRef.current === 'map') {
-      returnToMap(world)
+      returnToMap(world, home)
       return
     }
     const saved = loadProgress()
-    if (saved !== null && pendingUnlock(saved, world) !== null) openMap(world)
-    else navigate('hub')
-  }, [sessionEnd, navigate, openMap, returnToMap])
+    if (saved !== null && pendingUnlock(saved, world) !== null) {
+      openMap(world, home)
+    } else navigate(home)
+  }, [sessionEnd, several, navigate, openMap, returnToMap])
   // Web `handleSessionEndAgain` (not-yet day): another session, same world.
   const onSessionEndAgain = useCallback(
     () => navigate(sessionEnd?.surface === 'word-song' ? 'literacy' : 'math'),
@@ -539,8 +587,11 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
   )
   // Web `handleHubOpenMap`; the map's Home is web `handleMapBack` (the
   // map stamps the Hub's rapid-remount clock, so the Hub stays quiet).
-  const onHubMap = openMap
-  const onMapHome = useCallback(() => navigate('hub'), [navigate])
+  const onHubMap = useCallback(
+    (world: MasteryTrack) => openMap(world, 'hub'),
+    [openMap],
+  )
+  const onMapHome = useCallback(() => navigate(mapBackRef.current), [navigate])
   // Fast-track spec § 6.1: a later stop's tap (a peek), and map-tap-to-play
   // § 3: a mastered stop's (a replay, the same route under the same rules).
   // The map waits (taps held) until this settles; `true` = it opened. Home
@@ -601,23 +652,52 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
     [],
   )
   const onHubParent = useCallback(() => navigate('parent-settings'), [navigate])
-  // Web `handleParentSettingsExit`.
-  const onParentSettingsExit = useCallback(() => navigate('hub'), [navigate])
+  // The Hub badge (learner profiles § 2.1).
+  const onHubBadge = useCallback(() => navigate('picker'), [navigate])
+  // Web `handleParentSettingsExit`. With the learners or the playing
+  // learner changed (§ 3.1): the picker with 2+ learners, else that
+  // learner's Greet or Hub, mounted afresh on their store. A moved start
+  // of the playing learner remounts on the Hub, as a QA jump does.
+  const onParentSettingsExit = useCallback(
+    (exit?: ParentSettingsExit) => {
+      const count = installedLearnerList()?.learners.length ?? 0
+      const playing = activeLearner()
+      if (exit?.learnersChanged && count >= 2) navigate('picker')
+      else if (exit?.learnersChanged && playing !== null) {
+        onRemount(nextAfterPick(playing))
+      } else if (exit?.playingDocMoved) onRemount('hub')
+      else navigate('hub')
+    },
+    [navigate, onRemount],
+  )
 
   // Audio session (plays in silent mode, doNotMix), the voice channel's
   // background/interruption handling, and the boot-time cache sweep.
   useAudioEngine(flags.debug)
 
   // The web's visibilitychange use, natively. The audio engine subscribes
-  // itself (above); the shell only logs the edge in debug mode.
+  // itself (above); the shell logs the edge in debug mode, and applies the
+  // return rule (learner profiles § 2.2).
+  const hiddenAtRef = useRef<number | null>(null)
   useAppVisibilityChange(
     useCallback(
       (hidden: boolean) => {
         if (flags.debug) {
           console.log(`[lifecycle] ${hidden ? 'hidden' : 'visible'}`)
         }
+        if (hidden) {
+          hiddenAtRef.current = Date.now()
+          return
+        }
+        const since = hiddenAtRef.current
+        hiddenAtRef.current = null
+        if (since === null) return
+        const count = installedLearnerList()?.learners.length ?? 0
+        if (opensPickerOnReturn(routeRef.current, Date.now() - since, count)) {
+          navigate('picker')
+        }
       },
-      [flags.debug],
+      [flags.debug, navigate],
     ),
   )
 
@@ -665,6 +745,11 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
     route === 'parent-settings'
       ? parentSettingsLayout(viewport, fontScale)
       : null
+  // "Who is playing?" needs 2+ learners; otherwise the placeholder.
+  const picker =
+    route === 'picker' && several
+      ? pickerLayout(viewport, learners.length)
+      : null
   const layout =
     greet ??
     math ??
@@ -674,6 +759,7 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
     end ??
     hub ??
     map ??
+    picker ??
     layoutForRoute(route, viewport)
 
   return (
@@ -776,6 +862,8 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               onPickTree={onHubPick}
               onOpenMap={onHubMap}
               onParentLongPress={onHubParent}
+              learnerBadge={several ? activeLearner() : null}
+              onLearnerBadge={onHubBadge}
             />
           ) : map && mapEntry ? (
             <MapScreen
@@ -795,6 +883,12 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
               onExit={onParentSettingsExit}
               // The step picker is debug-only, gated like the seeds.
               onQaJump={flags.debug ? onQaJump : undefined}
+            />
+          ) : picker ? (
+            <PickerScreen
+              layout={picker}
+              learners={learners}
+              onPick={onPickLearner}
             />
           ) : end ? (
             <SessionEnd
@@ -831,13 +925,19 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
                         ? sessionEndPose
                         : 'idle'
               }
-              // The web's Session End Emma is a still image (no breath).
-              breath={route === 'greet' ? GREET_BREATH : end ? null : BREATH}
+              // The web's Session End Emma is a still image (no breath). On
+              // the picker she breathes as on Greet (learner profiles § 1.4).
+              breath={
+                route === 'greet' || picker ? GREET_BREATH : end ? null : BREATH
+              }
               motion={route === 'greet' ? 'greet' : 'character'}
-              // Read at mount: a returning launch lands on the Hub, where
-              // she is already there (a fade), not Greet's arrival.
-              entrance={route === 'hub' ? 'fade' : 'slide'}
-              shadow={route === 'hub'}
+              // Read at mount: a returning launch lands on the Hub (or the
+              // picker, in the Hub's frame), where she is already there (a
+              // fade), not Greet's arrival.
+              entrance={
+                route === 'hub' || route === 'picker' ? 'fade' : 'slide'
+              }
+              shadow={route === 'hub' || picker !== null}
             />
           )}
         </>
@@ -860,13 +960,36 @@ function parseQaRoute(raw: string | undefined): Route {
 
 export default function App() {
   const fontsReady = useAppFonts()
-  // A QA step jump mounts the screens afresh on the Hub (debug only).
+  // A QA step jump mounts the screens afresh on the Hub (debug only), and
+  // a learner switch on that learner's Greet or Hub.
   const [shell, setShell] = useState<{ key: number; start?: Route }>({
     key: 0,
   })
-  const onQaJump = useCallback(
-    () => setShell((prev) => ({ key: prev.key + 1, start: 'hub' })),
+  const onRemount = useCallback(
+    (start: Route) => setShell((prev) => ({ key: prev.key + 1, start })),
     [],
+  )
+  const onQaJump = useCallback(() => onRemount('hub'), [onRemount])
+  // A pick (learner profiles § 2.3): the route to the picker tore the
+  // kicked session down, but a Hub prefetch survives a map visit, so the
+  // return rule can reach the picker with it pending: drop it before their
+  // store goes in (every way to the picker picks here). Install their
+  // store, let their Hub speak, start their launch reconcile, and mount
+  // afresh.
+  const onPickLearner = useCallback(
+    (learner: LearnerEntry) => {
+      sessionPrefetcher.discard()
+      const picked = activateLearner(learner.id)
+      if (picked === null) return
+      clearHubUnmountMark()
+      void reconcileOncePerLaunch().then((result) => {
+        if (getLaunchFlags().debug) {
+          console.log(`[cloudSync] launch reconcile: ${result.kind}`)
+        }
+      })
+      onRemount(nextAfterPick(picked))
+    },
+    [onRemount],
   )
 
   // The web's boot-time cloud reconcile: once per launch, from the first
@@ -886,7 +1009,13 @@ export default function App() {
   if (!fontsReady) return null
   return (
     <SafeAreaProvider>
-      <Shell key={shell.key} startRoute={shell.start} onQaJump={onQaJump} />
+      <Shell
+        key={shell.key}
+        startRoute={shell.start}
+        onQaJump={onQaJump}
+        onPickLearner={onPickLearner}
+        onRemount={onRemount}
+      />
     </SafeAreaProvider>
   )
 }

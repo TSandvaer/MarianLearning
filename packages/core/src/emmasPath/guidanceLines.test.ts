@@ -9,6 +9,7 @@ import {
   GUIDANCE_LINES_AWAITING_RENDER,
   guidanceLine,
   peekLines,
+  pickerWhoLine,
   replayLines,
   sessionIntroLine,
 } from './guidanceLines'
@@ -53,14 +54,16 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       // content wave 4 § 8.1: 17 more; content wave 5 § 9.1: 16 more.
       'story-read': 1,
       'story-word': 87,
+      // Learner profiles § 1.3 (T5): the picker's "Who is playing?".
+      'picker-who': 1,
     })
-    expect(GUIDANCE_LINES).toHaveLength(299)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(299)
+    expect(GUIDANCE_LINES).toHaveLength(300)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(300)
     // Bee, car, snail and moon words' leads are duck words' text (content
-    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories': 299 ids,
-    // 294 texts, 299 files.
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(294)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(299)
+    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories': 300 ids,
+    // 295 texts, 300 files.
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(295)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(300)
   })
 
   it('AC8: both replay sets, one line per STAGE_SPOKEN_NAMES step, with the exact texts (map-tap-to-play § 6, T1 approved 2026-10-17)', () => {
@@ -261,6 +264,19 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       )
   })
 
+  it('has the picker line (learner profiles § 1.3, T5), rendered in Lily', () => {
+    expect(pickerWhoLine()).toEqual({
+      id: 'guide.picker.who',
+      kind: 'picker-who',
+      world: null,
+      text: 'Who is playing?',
+      src: '/assets/audio/path/guide-picker-who.mp3',
+    })
+    // 15 characters of Lily (T5).
+    expect(pickerWhoLine().text).toHaveLength(15)
+    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
+  })
+
   it('names the step in the peek opener and closer (Thomas 2026-10-15), with the path lines’ spoken names and their verb', () => {
     expect(peekLines('sub-to-10')).toMatchObject({
       open: {
@@ -370,7 +386,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(299)
+    ).toHaveLength(300)
   })
 
   it('repeats no Emma’s Path line', () => {

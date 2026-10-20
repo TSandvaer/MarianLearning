@@ -70,6 +70,15 @@ export function markHubUnmount(nowMs: number): void {
   lastUnmountAt = nowMs
 }
 
+/**
+ * Forget the last unmount (learner profiles § 2.3 step 3, K2): a pick is
+ * a new visit, so the next learner's Hub speaks even within 30 s of the
+ * last one.
+ */
+export function clearHubUnmountMark(): void {
+  lastUnmountAt = null
+}
+
 /** Test seam: forget the last unmount and drop the module players. */
 export function resetHubAudioForTests(): void {
   lastUnmountAt = null

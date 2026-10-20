@@ -10,6 +10,7 @@
  * The images are WebP exports of the web assets (`npm run export-assets`).
  */
 import type { EmmaPose } from '@marian/core/character/emmaPose'
+import type { AvatarId } from '@marian/core/learners'
 import {
   pathArtSrc,
   type PathArtId,
@@ -98,4 +99,15 @@ export function pathArtMutedAsset(id: PathArtId): NativeImage | undefined {
  */
 export function pathArtLockedAsset(id: SkillNode): NativeImage | undefined {
   return assetForWebPath(`/native/path/${id}-256-locked.webp`)
+}
+
+/**
+ * A learner's clay animal (learner profiles § 9, T2): native only (the
+ * web stays single-learner), registered under
+ * `/native/avatars/avatar-<id>.webp` (PR #633). The one AvatarId → asset
+ * site. `undefined` until the picture is bundled: the avatar shows its
+ * colour disc alone.
+ */
+export function avatarAsset(id: AvatarId): NativeImage | undefined {
+  return assetForWebPath(`/native/avatars/avatar-${id}.webp`)
 }
