@@ -44,6 +44,11 @@ import type { PlayMathUtteranceOptions } from './mathTypes'
 const NO_INSETS = { top: 0, bottom: 0, left: 0, right: 0 }
 const PORTRAIT: Viewport = { width: 375, height: 667, insets: NO_INSETS }
 const LANDSCAPE: Viewport = { width: 667, height: 375, insets: NO_INSETS }
+const TABLET: Viewport = {
+  width: 820,
+  height: 1180,
+  insets: { top: 24, bottom: 20, left: 0, right: 0 },
+}
 const HIDDEN = { includeHiddenElements: true }
 
 function canonPlan(stem: string): ExtendedMathSessionPlan {
@@ -303,6 +308,8 @@ describe('N3: 7 full slots, 3 of bare soil, at the row’s size', () => {
   it.each([
     ['375 × 667', PORTRAIT, 156, 72],
     ['667 × 375', LANDSCAPE, 138.7, 64],
+    // The tablet: no reserved slot; the row's 51.2 pt flowers (§ 3).
+    ['820 × 1180 (t24 b20)', TABLET, 332.8, 153.6],
   ] as const)('%s', async (_, viewport, width, height) => {
     const h = await setup({}, viewport)
     const seen = { guide: 0 }
@@ -319,8 +326,11 @@ describe('N3: 7 full slots, 3 of bare soil, at the row’s size', () => {
     const b = box('math-bed')
     expect(b.width).toBeCloseTo(width, 1)
     expect(b.height).toBeCloseTo(height, 1)
-    // The visual row keeps its height, so the equation does not move.
-    expect(box('math-visual-row').height).toBe(rowAtP3)
+    // A phone's visual row keeps its height, so the equation does not
+    // move; a tablet's row is the bed's height (the row's, before).
+    if (viewport === TABLET)
+      expect(box('math-visual-row').height).toBe(b.height)
+    else expect(box('math-visual-row').height).toBe(rowAtP3)
   })
 })
 
