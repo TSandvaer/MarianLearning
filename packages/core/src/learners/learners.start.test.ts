@@ -9,6 +9,7 @@ import { join, relative } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { setKeyValueStore, type KeyValueStore } from '../platform/keyValueStore'
 import { defaultProgress } from '../progress/defaults'
+import { landsOf } from '../progress/lands'
 import { LITERACY_TREE, MATH_TREE } from '../progress/mastery'
 import { reviewBaseline } from '../progress/reviewPlan'
 import { STORAGE_KEY, loadProgress, saveProgress } from '../progress/storage'
@@ -84,15 +85,9 @@ describe('learnerStartProgress (AC 16)', () => {
       'sub-to-10': 'mastered',
       'sub-to-20': 'mastered',
       'two-digit-addsub-no-regroup': 'intro',
-      'two-digit-addsub-with-regroup': 'locked',
-      'skip-counting': 'locked',
-      'mult-2-5-10': 'locked',
-      'mult-3-4': 'locked',
-      'mult-6-9': 'locked',
-      'mult-mix': 'locked',
-      'div-share': 'locked',
-      hundreds: 'locked',
-      'hundreds-addsub': 'locked',
+      // Every later step locked, read from the tree so a new land's steps
+      // don't break this.
+      ...Object.fromEntries(MATH_TREE.slice(6).map((n) => [n, 'locked'])),
     })
     const ws = levelsOf(p, LITERACY_TREE)
     expect(ws['letter-names']).toBe('mastered')
@@ -222,7 +217,7 @@ describe('setLearnerStart (AC 17, D1)', () => {
   it('a finished world shows its last land', () => {
     const p = defaultProgress()
     for (const n of MATH_TREE) p.skillLevels[n] = 'mastered'
-    expect(currentLand(p, 'math').number).toBe(5)
+    expect(currentLand(p, 'math').number).toBe(landsOf('math').length)
     expect(currentLand(defaultProgress(), 'math').number).toBe(2)
   })
 })

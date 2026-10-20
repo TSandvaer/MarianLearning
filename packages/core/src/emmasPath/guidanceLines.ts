@@ -321,6 +321,11 @@ const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {
   // Number Garden land 5's 2nd stop (content wave 4 § 2.4, § 8.1; Thomas
   // approved T2). Its pill pulses on "More" only (D1).
   'hundreds-addsub': 'More and less!',
+  // Number Garden land 5's 3rd stop and land 6 (content wave 5 § 2.4,
+  // § 3.4, § 9.1; Thomas approved T2; Dave D2, D4): the empty tens tray
+  // pulses on each "tens"; the two trays pulse on "Tens" and "ones".
+  'hundreds-zeros': 'No tens? Zero tens!',
+  'add-two-digit': 'Tens and ones!',
   // Word Song land 6 (content wave 1 § 3.3, § 4.3).
   'duck-words': 'Two letters, one sound!',
   'crab-words': 'Read all the letters!',

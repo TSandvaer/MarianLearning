@@ -145,17 +145,21 @@ describe('mapPathScale: the § 1 sizes table', () => {
   })
 
   // Content wave 3 added Number Garden land 5 (`content-wave-3.md` § 1):
-  // L scrolls further (369 → 448 pt, measured 2026-10-18).
-  it('Number Garden scrolls less in L (448 pt content)', () => {
-    expect(Math.round(worst(vp(667, 375), 'math').scroll!)).toBe(448)
+  // L scrolls further (369 → 448 pt, measured 2026-10-18). Content wave 5
+  // added land 6 (`content-wave-5.md` § 1 predicted 527 pt; measured
+  // 2026-10-19: 527).
+  it('Number Garden scrolls less in L (527 pt content)', () => {
+    expect(Math.round(worst(vp(667, 375), 'math').scroll!)).toBe(527)
   })
 
   // Content wave 3 § 1 ("Map fit, not measured"): Number Garden's 5 lands
   // were predicted to fit the portrait forms. Measured 2026-10-18: no
   // portrait form scrolls, the sizes are the Word Song table's or larger,
   // and the current stop's worst overhang is +0.8 pt at 820×1180 (the bar
-  // is 14).
-  it('Number Garden: 5 lands fit every portrait form; the current stop ends ≤ 14 pt below the pane', () => {
+  // is 14). Content wave 5 § 1 (T6) added land 6 = PORTRAIT_FIT_LANDS and
+  // predicted 13.6 pt at 820×1180 (Word Song's 6-land figure); measured
+  // 2026-10-19: 13.6, inside the bar, so Number Garden still fits.
+  it('Number Garden: 6 lands fit every portrait form; the current stop ends ≤ 14 pt below the pane', () => {
     const overhangs: Record<string, number> = {}
     for (const [name, v] of TABLE) {
       const layout = mapScreenLayout(v)
@@ -163,7 +167,7 @@ describe('mapPathScale: the § 1 sizes table', () => {
       let worstPt = -Infinity
       for (let cur = 0; cur < MATH_TREE.length; cur++) {
         const model = buildMapModel(seed(MATH_TREE, cur), 'math')
-        expect(model.lands).toHaveLength(5)
+        expect(model.lands).toHaveLength(6)
         const k = mapPathScale(layout.pane, model, [], layout.landscape)
         expect(k.scrolls).toBe(false)
         const geo = layoutMap(model, k.virtualW, k.virtualH)
@@ -175,7 +179,7 @@ describe('mapPathScale: the § 1 sizes table', () => {
     expect(Object.keys(overhangs)).toHaveLength(4)
     for (const pt of Object.values(overhangs))
       expect(pt).toBeLessThanOrEqual(14)
-    expect(overhangs['820×1180 (t24 b20)']).toBe(0.8)
+    expect(overhangs['820×1180 (t24 b20)']).toBe(13.6)
   })
 
   // Content wave 5 (T6): with 9 lands, 1133×744 joins the scrolled forms.

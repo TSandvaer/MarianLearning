@@ -78,21 +78,22 @@ const PATH: readonly [string, string][] = [
 ]
 
 describe('more and less in the Number Garden tree (§ 1, § 2.1)', () => {
-  it('is the last step, after hundreds, in both tree lists', () => {
-    expect(MATH_TREE.slice(-2)).toEqual(['hundreds', ADDSUB])
-    expect(MATH_NODES_IN_ORDER.slice(-2)).toEqual(['hundreds', ADDSUB])
+  it('follows hundreds in both tree lists; zeros follows it (content wave 5)', () => {
+    expect(MATH_TREE.slice(-4, -2)).toEqual(['hundreds', ADDSUB])
+    expect(MATH_NODES_IN_ORDER.slice(-4, -2)).toEqual(['hundreds', ADDSUB])
     expect(nextNode('math', 'hundreds')).toBe(ADDSUB)
-    expect(nextNode('math', ADDSUB)).toBeNull()
+    expect(nextNode('math', ADDSUB)).toBe('hundreds-zeros')
   })
 
-  it('is the 2nd stop of land 5, Hundreds, of 5 Number Garden lands; LANDS flattened equals both trees (AC 8)', () => {
+  it('is the 2nd stop of land 5, Hundreds, of 6 Number Garden lands; LANDS flattened equals both trees (AC 8)', () => {
     const ng = LANDS.filter((l) => l.world === 'math')
-    expect(ng).toHaveLength(5)
+    // Content wave 5 adds land 6 and zeros as land 5's 3rd stop.
+    expect(ng).toHaveLength(6)
     expect(ng[4]).toEqual({
       world: 'math',
       number: 5,
       name: 'Hundreds',
-      nodes: ['hundreds', ADDSUB],
+      nodes: ['hundreds', ADDSUB, 'hundreds-zeros'],
     })
     expect(LANDS.flatMap((l) => l.nodes)).toEqual([
       ...MATH_TREE,

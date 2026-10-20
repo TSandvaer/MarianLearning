@@ -139,7 +139,11 @@ import { useAppFonts } from './fonts'
 import type { Viewport } from './layout/layout'
 import { greetLayout } from './layout/greetLayout'
 import { hubLayout } from './layout/hubLayout'
-import { extendedMathLayout, mathLayout } from './layout/mathLayout'
+import {
+  extendedMathLayout,
+  mathLayout,
+  mathLayoutKind,
+} from './layout/mathLayout'
 import { mapScreenLayout } from './layout/mapScreenLayout'
 import { parentSettingsLayout } from './layout/parentSettingsLayout'
 import { wordSongLayout } from './layout/wordSongLayout'
@@ -666,7 +670,13 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
   const mathKind =
     reportedKind !== null && reportedKind.plan === mathState.plan
       ? reportedKind.kind
-      : (mathState.plan?.problems[0]?.kind ?? 'arithmetic')
+      : mathLayoutKind(
+          mathState.plan?.problems[0],
+          mathState.problemNodes?.[0] ??
+            (mathState.plan !== null
+              ? mathSession.sessionFocus?.node
+              : undefined),
+        )
   const math = route === 'math' ? extendedMathLayout(viewport, mathKind) : null
   const wordSong = route === 'literacy' ? wordSongLayout(viewport) : null
   // The peek's screen: its world's frames; Math's follow the problem kind.
@@ -678,7 +688,7 @@ function Shell({ startRoute, onQaJump }: ShellProps) {
           viewport,
           reportedKind !== null && reportedKind.plan === mathPeek.plan
             ? reportedKind.kind
-            : (mathPeek.plan.problems[0]?.kind ?? 'arithmetic'),
+            : mathLayoutKind(mathPeek.plan.problems[0], mathPeek.node),
         )
       : null
   const peekWord = wordPeek !== null ? wordSongLayout(viewport) : null

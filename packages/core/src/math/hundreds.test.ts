@@ -180,7 +180,8 @@ describe('the hundreds reads (§ 3.6, AC 2)', () => {
       'a place twice',
       'Two hundreds, three tens and four tens. What number is it?',
     ],
-    ['a zero digit in the start', 'Two hundred and four. What is ten more?'],
+    // A zero in the start parses since zeros (content wave 5 § 2.6);
+    // hundreds keeps none by its canon lint (`hundredsCanonCheck.ts`).
     ['regrouping on +10', 'Two hundred and ninety-three. What is ten more?'],
     [
       'regrouping on +100',

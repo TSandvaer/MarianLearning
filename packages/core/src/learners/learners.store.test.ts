@@ -16,6 +16,7 @@ import {
   setCloudSyncSuccessListener,
 } from '../progress/cloudSync'
 import { DEVICE_ID_STORAGE_KEY, readStoredDeviceId } from '../progress/deviceId'
+import { landsOf } from '../progress/lands'
 import { LAST_SYNC_STORAGE_KEY } from '../progress/lastSync'
 import { STORAGE_KEY, loadProgress } from '../progress/storage'
 import { NOT_YET_NUDGE_STORAGE_KEY } from '../sessionEnd/notYetNudge'
@@ -300,7 +301,7 @@ describe('addLearner', () => {
       addLearner({
         name: 'Ana',
         avatarId: 'frog',
-        start: { math: 6, wordSong: 1 },
+        start: { math: landsOf('math').length + 1, wordSong: 1 },
       }),
     ).toThrow()
     addLearner({ name: 'Ana', avatarId: 'frog', start })

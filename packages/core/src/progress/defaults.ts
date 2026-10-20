@@ -107,6 +107,8 @@ const SCHEMA_FLOOR_NODES: readonly SkillNode[] = [
   'div-share',
   'hundreds',
   'hundreds-addsub',
+  'hundreds-zeros',
+  'add-two-digit',
   // Word Song
   'letter-names',
   'letter-sounds',
@@ -206,6 +208,11 @@ const DEFAULT_SKILL_LEVELS: SkillLevels = {
   // Content wave 4 § 2.1: opens when hundreds masters (or on load, by the
   // same read-path defaulter).
   'hundreds-addsub': 'locked',
+  // Content wave 5 § 2.1, § 3.1: zeros opens when more and less masters,
+  // adding big numbers when zeros does (or on load, by the same read-path
+  // defaulter).
+  'hundreds-zeros': 'locked',
+  'add-two-digit': 'locked',
 
   // Word Song — literacy
   'letter-names': 'mastered', // alphabet mastered (minor b/d confusion)

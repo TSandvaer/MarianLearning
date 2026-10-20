@@ -46,7 +46,7 @@ import {
   useOnRise,
 } from './extendedMotion'
 import { FlowerGlyph } from './glyphs'
-import { BUILD_STAGGER_MS } from './PlaceValueStage'
+import { BUILD_STAGGER_MS } from './placeValueTiming'
 import type {
   TakeAwayLift,
   TakeAwayPicture,

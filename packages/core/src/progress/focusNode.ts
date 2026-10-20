@@ -98,6 +98,8 @@ export const MATH_NODES_IN_ORDER: readonly NumberGardenNode[] = [
   'div-share',
   'hundreds',
   'hundreds-addsub',
+  'hundreds-zeros',
+  'add-two-digit',
 ]
 
 /**

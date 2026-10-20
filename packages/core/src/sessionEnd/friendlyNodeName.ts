@@ -79,6 +79,9 @@ export const FRIENDLY_NODE_NAMES: Record<SkillNode, string> = {
   hundreds: 'hundreds',
   // Content wave 4 § 1 (T1, Thomas 2026-10-18): the recap names the step.
   'hundreds-addsub': 'more and less',
+  // Content wave 5 § 1 (T1, Thomas 2026-10-19): the recap names the step.
+  'hundreds-zeros': 'zeros',
+  'add-two-digit': 'adding big numbers',
 
   // ── Word Song (literacy) ──────────────────────────────────────────────
   'letter-names': 'your letters',
@@ -168,6 +171,10 @@ export const STAGE_SPOKEN_NAMES: Record<SkillNode, string> = {
   // Content wave 4 § 1 (K1, T1, Thomas 2026-10-18): the step's own
   // question, "What is two hundred more?" / "… less?".
   'hundreds-addsub': 'more and less',
+  // Content wave 5 § 1 (K1, K2, T1, Thomas 2026-10-19): the step's new
+  // idea, and what the step does ("big numbers" is the 2-digit step's).
+  'hundreds-zeros': 'zeros',
+  'add-two-digit': 'adding big numbers',
 
   // ── Word Song (literacy) ──────────────────────────────────────────────
   'letter-names': 'letter names',
@@ -232,6 +239,8 @@ export const STAGE_SPOKEN_NAME_VERBS: Record<SkillNode, 'is' | 'are'> = {
   'div-share': 'is',
   hundreds: 'are',
   'hundreds-addsub': 'are',
+  'hundreds-zeros': 'are',
+  'add-two-digit': 'is',
 
   // ── Word Song (literacy) ──────────────────────────────────────────────
   'letter-names': 'are',
