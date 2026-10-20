@@ -88,6 +88,13 @@ describe('route shell', () => {
     expect(ROUTE_LABELS['play-game']).toBe('Play game')
   })
 
+  it('flower bed into adding to ten (N10): the side-game route is gone', () => {
+    expect(ROUTES as readonly string[]).not.toContain('game')
+    for (const route of ROUTES) {
+      expect(ROUTE_EXITS[route] as readonly string[]).not.toContain('game')
+    }
+  })
+
   it('ignores a jump that is not an exit', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
     expect(nextRoute('greet', 'hub')).toBe('greet')

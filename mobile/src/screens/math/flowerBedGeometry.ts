@@ -1,41 +1,46 @@
 /**
- * Fill the flower bed's numbers (mini-game spec `design/native/mini-game-flower-bed.md`
- * § 2.2, § 2.4): the bed's size in Math's problem rect, its slot centres and
- * where the chips sit, so a bud can hop from a chip to a slot. Pure maths.
+ * The flower bed's numbers on the lesson card (`design/native/flower-bed-into-add-to-10.md`
+ * § 3, § 4; the look from `design/native/mini-game-flower-bed.md` § 2.2): the
+ * bed's size in the visual row, its slot centres and where the chips sit, so
+ * a bud can hop from a chip to a slot. Pure maths.
  */
-import type { Rect } from '../../layout/layout'
-import type { MathLayout } from '../../layout/mathLayout'
-import { FADE_MS } from '../math/extendedMotion'
-import { BLOOM_FADE_MS, BLOOM_STAGGER_MS } from '../math/MissingNumber'
-import { FRAME_COLUMNS, FRAME_ROWS } from '../math/tenFrame'
+import type { ExtendedMathLayout, MathLayout } from '../../layout/mathLayout'
+import { FADE_MS } from './extendedMotion'
+import { BLOOM_FADE_MS, BLOOM_STAGGER_MS } from './MissingNumber'
+import { FRAME_COLUMNS, FRAME_ROWS } from './tenFrame'
 
 /** The ten-frame's viewBox (`TenFrameCell`). */
 export const BED_VIEW_W = 130
 export const BED_VIEW_H = 60
-/** The bed never grows past this (pt). */
-export const BED_MAX_W = 560
 /** A flower or a bud in a slot, in bed units. */
 export const SLOT_GLYPH_UNITS = 20
+/** The bed's side margin inside the problem rect (pt). */
+const BED_MARGIN = 16
 
 export interface Point {
   x: number
   y: number
 }
 
-/** `bedW = min(problem.width − 32, 560, problem.height × 130 / 60)`, centred. */
-export function bedRect(problem: Rect): Rect {
+/**
+ * § 3: the bed's flowers are the counting row's (`flower`, its
+ * `countingMetrics(…).size`), so `bedW = min(130 × unit, slotH × 130 / 60,
+ * areaWidth − 32)` with `unit = flower / 20`; the height is `bedW × 60 / 130`.
+ * `slotH` is the phone's reserved visual slot, or the tablet's space under
+ * the equation.
+ */
+export function bedSize(
+  flower: number,
+  slotH: number,
+  areaWidth: number,
+): { width: number; height: number } {
+  const unit = flower / SLOT_GLYPH_UNITS
   const width = Math.min(
-    problem.width - 32,
-    BED_MAX_W,
-    (problem.height * BED_VIEW_W) / BED_VIEW_H,
+    BED_VIEW_W * unit,
+    (slotH * BED_VIEW_W) / BED_VIEW_H,
+    areaWidth - 2 * BED_MARGIN,
   )
-  const height = (width * BED_VIEW_H) / BED_VIEW_W
-  return {
-    x: problem.x + (problem.width - width) / 2,
-    y: problem.y + (problem.height - height) / 2,
-    width,
-    height,
-  }
+  return { width, height: (width * BED_VIEW_H) / BED_VIEW_W }
 }
 
 /** Slot `i`'s centre inside a bed `width` pt wide: top row first, left to right. */
@@ -47,21 +52,29 @@ export function slotCentre(i: number, width: number): Point {
   }
 }
 
-/** The centre of chip `i` of `count` in Math's centred chip row. */
+/** The centre of chip `i` of `count` in Math's centred chip row (or, in
+ *  phone landscape, its centred column). */
 export function chipCentre(
   chips: MathLayout['chips'],
+  axis: ExtendedMathLayout['chipsAxis'] | undefined,
   i: number,
   count: number,
 ): Point {
   const { rect, size, gap } = chips
-  const row = count * size + (count - 1) * gap
-  return {
-    x: rect.x + (rect.width - row) / 2 + size / 2 + i * (size + gap),
-    y: rect.y + rect.height / 2,
-  }
+  const line = count * size + (count - 1) * gap
+  const along = size / 2 + i * (size + gap)
+  return axis === 'column'
+    ? {
+        x: rect.x + rect.width / 2,
+        y: rect.y + (rect.height - line) / 2 + along,
+      }
+    : {
+        x: rect.x + (rect.width - line) / 2 + along,
+        y: rect.y + rect.height / 2,
+      }
 }
 
-/** Reduce Motion: bud j's fade-in, then its crossfade (§ 2.7). */
+/** Reduce Motion: bud j's fade-in, then its crossfade (§ 4). */
 export const REDUCED_BLOOM_FADE_MS = FADE_MS
 
 /** When bud j is in its flower, after the right move: the bloom's end. */
