@@ -12,7 +12,7 @@
 //     Haiku for session generation (Sonnet for stumble explanations). NOT
 //     `claude-haiku-latest` — model swaps are deliberate code changes,
 //     not surprises that show up in production.
-//  2. Prompt caching: the system prompt (Marian profile + voice config +
+//  2. Prompt caching: the system prompt (learner profile + voice config +
 //     output JSON schema description) carries `cache_control: ephemeral`
 //     on its last block. The volatile per-call inputs (track, level,
 //     childName) sit in the user message, which never enters the cache
@@ -73,6 +73,8 @@ import {
   WORD_SONG_TARGET_WORDS_CAKE,
   WORD_SONG_TARGET_WORDS_BEE,
   WORD_SONG_TARGET_WORDS_CAR,
+  WORD_SONG_TARGET_WORDS_SNAIL,
+  WORD_SONG_TARGET_WORDS_MOON,
   WORD_SONG_DISTRACTOR_HINTS,
   WORD_SONG_NOVEL_PROBE_WORDS_FOR_PROMPT,
   WORD_SONG_SIMPLE_SENTENCES_GENTLE_FOR_PROMPT,
@@ -152,7 +154,7 @@ export const VALID_MATH_FOCUS_NODES: readonly string[] = [
   // wire but has no first-class content yet — a session request for
   // it would currently fall through to Anthropic with no matching
   // prompt block, so the focus picker should not surface it until
-  // PR B wires the canon + prompt. Marian's `defaultProgress` has
+  // PR B wires the canon + prompt. The `defaultProgress` has
   // with-regroup at `'locked'`, so the picker never returns it in
   // v1 anyway.
   'two-digit-addsub-no-regroup',
@@ -218,6 +220,13 @@ export const VALID_WORD_SONG_FOCUS_NODES: readonly string[] = [
   'bee-words',
   'car-words',
   'sheep-stories',
+  // Content wave 5 (design/native/content-wave-5.md § 4, § 5, § 7): land 9.
+  // Snail and moon words are land-6-format word steps (first-class below,
+  // as bee and car words); goat stories is canon-only, as the stories
+  // before it. All three are written by scripts/spliceContentWave5Canon.ts.
+  'snail-words',
+  'moon-words',
+  'goat-stories',
 ]
 
 // ── continuant-onset CVC reorder (Q1, design/research/cvc-blend-audio-phonics.md)
@@ -227,11 +236,11 @@ export const VALID_WORD_SONG_FOCUS_NODES: readonly string[] = [
 // f, v, s, m, n, l, r, h) more reliably than words with a STOP onset (b, c/k,
 // d, g, p, t — and the affricate /dʒ/ = `j`, which behaves like a stop for
 // sequencing). Ordering continuant-onset words ahead of stop-onset words inside
-// a session lets Marian build the blending schema on the easier shapes first.
+// a session lets the child build the blending schema on the easier shapes first.
 //
 // The wire is utterance-only and the problem index in `word.p<N>.<slot>` ids is
 // POSITIONAL (the browser parser buckets by index and walks p1..p8 in order —
-// see src/screens/WordSong/planFromServer.ts), so the order Marian experiences
+// see src/screens/WordSong/planFromServer.ts), so the order the child experiences
 // problems is exactly the p-index order. This reorder is a DETERMINISTIC
 // post-Haiku pass: it stable-partitions the 8 problem groups into
 // [continuant-onset, then stop-onset], preserving each group's slot bundle and
@@ -443,7 +452,7 @@ export interface GenerateSessionPlanArgs {
    *  further; for now level is a passthrough so the wire shape is forward-
    *  compatible. */
   level: number
-  /** The child's name. Used for the friendly opening line ("Hi Marian!").
+  /** The child's name. Used for the friendly opening line ("Hi <name>!").
    *  Bounded: pre-validated upstream; we still escape on use. */
   childName: string
   /**
@@ -476,8 +485,8 @@ export interface GenerateSessionPlanArgs {
    * Graduation-session hint (ticket 86c9m3aec). When `true` AND the
    * effective focus node is `cvc-words`, the planner instructs Haiku
    * to mix 2–3 novel short-a probe words (`nap, rat, map, tap`) into
-   * the 8-problem set so the mastery engine can verify Marian
-   * generalises her decoding beyond the canonical 14-word pack. Other
+   * the 8-problem set so the mastery engine can verify the child
+   * generalises decoding beyond the canonical 14-word pack. Other
    * focus nodes ignore the flag — graduation is currently
    * cvc-words-only.
    *
@@ -508,7 +517,7 @@ export interface GenerateSessionPlanArgs {
   leitner?: LeitnerHintItem[]
   /**
    * Slow-fact hint (M4.x — follow-up to 86c9pwgc8). List of
-   * "accurate but slow" facts: Marian gets these right reliably
+   * "accurate but slow" facts: the child gets these right reliably
    * (≥80% over ≥5 attempts) but answers slowly (median latency
    * ≥5000ms). The planner adds a directive instructing Haiku to
    * dose these back in for automaticity-building practice.
@@ -530,7 +539,7 @@ export interface GenerateSessionPlanArgs {
    * via `buildLetterSoundsDirective` so Dave's directive (in
    * `WORD_SONG_TRACK_GUIDE`) can cycle through the locked vowel ladder
    * `/æ (mastered)/ → /ɒ/ → /ʌ/ → /ɪ/ → /ɛ/`. When omitted, the
-   * directive falls back to `/ɒ/` (Marian's next-vowel-to-master per
+   * directive falls back to `/ɒ/` (the next vowel to master per
    * `phonics-sequence-marian.md` §Q1).
    *
    * Why a hint, not derived state
@@ -1093,7 +1102,7 @@ const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
   // Wave 13 (ticket 86ca8e6fr) — `simple-sentences`, the sentence-
   // COMPLETION (cloze) tier (land 5's last step; content wave 1's
   // duck-words and crab-words follow it). Emma reads a 3–4 word sentence with
-  // one word gapped ("Finish the sentence: The cat ___ the bag."); Marian
+  // one word gapped ("Finish the sentence: The cat ___ the bag."); the child
   // taps the written-word chip that fills the gap. The target is carried
   // in the `correct` line ("Yes! Bit.") NOT the gapped read — Emma never
   // speaks the answer (cloze). See the SIMPLE-SENTENCES block in
@@ -1115,6 +1124,10 @@ const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
   // same fixed 8-word shape and the same block.
   'bee-words',
   'car-words',
+  // Content wave 5 — land 9's snail words (ai / ay, oa) and moon words
+  // (long oo), the same fixed 8-word shape and the same block.
+  'snail-words',
+  'moon-words',
 ]
 
 /**
@@ -1227,7 +1240,7 @@ function buildUserMessage(args: GenerateSessionPlanArgs): string {
   //     /æ/ (mastered) → /ɒ/ → /ʌ/ → /ɪ/ → /ɛ/
   // /æ/ is the anchor (NOT a current-target candidate). The four
   // candidate IPAs are /ɒ/, /ʌ/, /ɪ/, /ɛ/. When omitted or
-  // unrecognised, falls back to /ɒ/ (Marian's next-vowel-to-master).
+  // unrecognised, falls back to /ɒ/ (the next vowel to master).
   //
   // Lives in the user message (volatile per call). The cache prefix
   // (system prompt) is unchanged so two letter-sounds calls with
@@ -1341,7 +1354,7 @@ function buildSlowFactDirective(items: readonly SlowFactHintItem[]): string {
     `  (closer to the counting → retrieval flip) over the deepest-`,
     `  counting facts.`,
     `- These slow facts are CORRECT-but-slow. They are not stumbles —`,
-    `  do not use the hint or giveAnswer slot copy as if Marian is`,
+    `  do not use the hint or giveAnswer slot copy as if the child is`,
     `  expected to fail. Use the standard "<addend-A> plus <addend-B>.`,
     `  How many?" template.`,
     `- The slow-fact picks count toward the no-repeat rule (do not`,
@@ -1388,7 +1401,7 @@ function buildGraduationDirective(): string {
  *     /æ (mastered)/ → /ɒ/ → /ʌ/ → /ɪ/ → /ɛ/
  * (`phonics-sequence-marian.md` §Q1, `design/word-song/letter-sounds-
  * content.md §1.4`). Unrecognised IPA strings fall through to the
- * /ɒ/ default — Marian's next-vowel-to-master.
+ * /ɒ/ default — the next vowel to master.
  */
 const LETTER_SOUNDS_VOWEL_CANDIDATES: readonly string[] = ['ɒ', 'ʌ', 'ɪ', 'ɛ']
 const LETTER_SOUNDS_DEFAULT_VOWEL = 'ɒ'
@@ -1493,7 +1506,7 @@ export function parseLetterSoundsVowelStates(
  * Algorithm (locked, `design/word-song/letter-sounds-content.md §1.4`):
  *   1. Walk the ladder `/o/ → /u/ → /i/ → /e/`.
  *   2. First vowel in `'practicing'` state is current-target (common
- *      case — Marian mid-stream on a vowel).
+ *      case — the child mid-stream on a vowel).
  *   3. If no vowel is `'practicing'`, the first `'intro'` (unintroduced)
  *      vowel becomes current-target (emission begins; W9.3 mastery rule
  *      flips it to `'practicing'` on session-end).
@@ -1539,7 +1552,7 @@ export function deriveCurrentTargetVowel(
 }
 
 /**
- * Is this a "non-fallback" state map — i.e. does Marian have real
+ * Is this a "non-fallback" state map — i.e. does the child have real
  * per-vowel progress beyond greenfield all-`'intro'`? (Wave 9 W9.4 —
  * ticket 86c9ya3r9.) Drives the canon + in-memory-cache bypass: an
  * all-`'intro'` map derives `/o/` exactly as the baked canon's default
@@ -1563,7 +1576,7 @@ export function letterSoundsStatesAreNonFallback(
  * block) to pick which short vowel is the LIFT of THIS session.
  *
  * Without this hint, the directive falls back to its safe default
- * (`/ɒ/`) on every session, and Marian never progresses past short-o.
+ * (`/ɒ/`) on every session, and the child never progresses past short-o.
  * The directive's own VOWEL-LADDER SELF-CHECK + ADJACENT-VOWEL-BAN
  * SELF-CHECK gate the picked vowel against the locked ladder.
  *
@@ -1631,7 +1644,7 @@ Rules:
 - Exactly 8 problems per plan.
 - Each problem's utterance slots depend on the track (the track-specific guide below is authoritative):
   · MATH track — exactly 7 utterances with these slot names: read, correct, reprompt, hint1, hint2, hint3, giveAnswer. The single hint is split into three escalating sub-step utterances (hint1 -> hint2 -> hint3); see the MATH track guide's per-slot templates for the per-tier hint1/hint2/hint3 wording.
-  · WORD-SONG track — exactly 5 REQUIRED utterances with these slot names: read, correct, reprompt, hint, giveAnswer. ONE tier — and only one — carries a 6th OPTIONAL slot: for cvc-word problems (read line "Read the <word>." drawn from a cvc-words / cvc-words-short-* pool) ALSO emit a "blend" utterance, making 6 utterances for each cvc-word problem. Every OTHER word-song tier (letter-names, letter-sounds, blending-cv, digraphs-*, sight-words, simple-sentences, duck-words, crab-words, tent-words, cake-words, bee-words, car-words) stays at exactly 5 — NEVER emit a "blend" slot on those. See the BLEND slot directive in the WORD-SONG track guide for the exact blend-line shape.
+  · WORD-SONG track — exactly 5 REQUIRED utterances with these slot names: read, correct, reprompt, hint, giveAnswer. ONE tier — and only one — carries a 6th OPTIONAL slot: for cvc-word problems (read line "Read the <word>." drawn from a cvc-words / cvc-words-short-* pool) ALSO emit a "blend" utterance, making 6 utterances for each cvc-word problem. Every OTHER word-song tier (letter-names, letter-sounds, blending-cv, digraphs-*, sight-words, simple-sentences, duck-words, crab-words, tent-words, cake-words, bee-words, car-words, snail-words, moon-words) stays at exactly 5 — NEVER emit a "blend" slot on those. See the BLEND slot directive in the WORD-SONG track guide for the exact blend-line shape.
 - Utterance ids follow the pattern "<track>.p<N>.<slot>" — e.g. "math.p1.read", "math.p1.hint1", "math.p1.hint2", "math.p1.hint3", "word.p1.read", "word.p1.hint", "word.p1.blend" (cvc-word only), etc. The N is the 1-based problem index.
 - Lines are spoken aloud by Emma's TTS voice. Keep them short (1 short sentence is ideal; 2 if needed for the hint). No abbreviations Emma can't read aloud naturally. No emoji. No exclamation marks beyond one per line.
 - The "reprompt" line for every problem should be "Hmm... try again?" verbatim — that's the spec wording, intentionally repeated for cache locality.
@@ -1641,7 +1654,7 @@ Session-End utterances (REQUIRED — append to the same flat utterances array):
 After the per-problem utterances (8 × 7 = 56 for MATH, 8 × 5 = 40 for WORD-SONG — or 8 × 6 = 48 on the cvc-word tier, which adds the optional "blend" slot per problem), append the following Session-End utterances. The Session-End screen looks them up by exact id at runtime and degrades gracefully on a miss, but every id below MUST be emitted so the celebration never falls back to silent captions.
 
   - "session.end.opener" — text: "You did it!"
-  - "session.end.recap.focus" — text: "You worked on <spoken-focus-name> today!" where <spoken-focus-name> is a short, warm, CHILD-FACING phrase for the focus skill node named in the user message. Spell any numbers out as words and drop curriculum jargon — Emma is speaking to an 8-year-old, not a parent. Use exactly these phrases per focus node: add-to-10 -> "adding to ten"; add-to-20 -> "adding to twenty"; sub-to-10 -> "taking away to ten"; sub-to-20 -> "taking away to twenty"; number-recog -> "your numbers"; two-digit-addsub-no-regroup / two-digit-addsub-with-regroup -> "bigger numbers"; skip-counting -> "skip counting"; mult-2-5-10 / mult-3-4 / mult-6-9 / mult-mix -> "counting in groups"; div-share -> "sharing"; hundreds -> "hundreds"; hundreds-addsub -> "more and less"; letter-names -> "your letters"; letter-sounds -> "letter sounds"; blending-cv -> "blending sounds"; any cvc-words* tier, any digraphs* tier, sight-words, duck-words, crab-words, tent-words, cake-words, bee-words and car-words -> "reading words"; simple-sentences -> "reading sentences"; fox-stories, hen-stories, bug-stories and sheep-stories -> "reading stories". Exactly one line; never use digits; one exclamation mark.
+  - "session.end.recap.focus" — text: "You worked on <spoken-focus-name> today!" where <spoken-focus-name> is a short, warm, CHILD-FACING phrase for the focus skill node named in the user message. Spell any numbers out as words and drop curriculum jargon — Emma is speaking to an 8-year-old, not a parent. Use exactly these phrases per focus node: add-to-10 -> "adding to ten"; add-to-20 -> "adding to twenty"; sub-to-10 -> "taking away to ten"; sub-to-20 -> "taking away to twenty"; number-recog -> "your numbers"; two-digit-addsub-no-regroup / two-digit-addsub-with-regroup -> "bigger numbers"; skip-counting -> "skip counting"; mult-2-5-10 / mult-3-4 / mult-6-9 / mult-mix -> "counting in groups"; div-share -> "sharing"; hundreds -> "hundreds"; hundreds-addsub -> "more and less"; letter-names -> "your letters"; letter-sounds -> "letter sounds"; blending-cv -> "blending sounds"; any cvc-words* tier, any digraphs* tier, sight-words, duck-words, crab-words, tent-words, cake-words, bee-words, car-words, snail-words and moon-words -> "reading words"; simple-sentences -> "reading sentences"; fox-stories, hen-stories, bug-stories, sheep-stories and goat-stories -> "reading stories". Exactly one line; never use digits; one exclamation mark.
   - "session.end.recap.1" through "session.end.recap.11" — one entry per N in 1..11. The N=1 line is "You earned one star!"; for N >= 2 the line is "You earned <number-word> stars!" with the number spelled out (one, two, three, four, five, six, seven, eight, nine, ten, eleven). Never use digits; never use "stars" with N=1.
   - "session.end.streak.3" through "session.end.streak.8" — one entry per N in 3..8. Each line is "<number-word> in a row! Wow!" with the number spelled out (three, four, five, six, seven, eight). Capitalise the leading word.
   - "session.end.goodbye" — text: "See you soon."
@@ -1681,7 +1694,7 @@ The user message names a focus skill node. Generate problems specifically for th
   POOL-MEMBERSHIP SELF-CHECK <rule band="hard">apply before emitting every problem</rule>: verify the chosen (a, b) ordered pair appears verbatim above. Sums below 3 or above 10 are FORBIDDEN; neither addend may be 0; neither addend may exceed 9. <self-check>If a candidate (a, b) is NOT on the 44-pair list — e.g. 0+3, 5+6 (sum > 10), or 4+4 read as a sum-9 fact — REJECT and re-pick from the pool above.</self-check>
 
   CATEGORY-MIX BUDGET <rule band="hard">apply BEFORE selecting any facts — this is the FIRST rule because Haiku's prior empirically saturates ONE category at a time when the cap is buried late in the rule list</rule>:
-     · sums-to-10:   AT MOST 2. (Pool has 9 facts: 1+9, 9+1, 2+8, 8+2, 3+7, 7+3, 4+6, 6+4, 5+5. High-leverage anchor — Marian's diagnostic flags this category as top priority — but doubles + plus-one + general MUST also fit in the 8-slot session.)
+     · sums-to-10:   AT MOST 2. (Pool has 9 facts: 1+9, 9+1, 2+8, 8+2, 3+7, 7+3, 4+6, 6+4, 5+5. High-leverage anchor — sums-to-10 automaticity is the top priority at this step — but doubles + plus-one + general MUST also fit in the 8-slot session.)
      · doubles:      AT MOST 2. (Pool has 3 facts: 2+2, 3+3, 4+4 — 5+5 is sums-to-10 by category priority. Doubles-prior is the EMPIRICALLY-OBSERVED failure mode for add-to-10 — see FAILURE MODES below.)
      · plus-one:     AT MOST 2. (Pool has 14 facts: 1+2, 2+1, 1+3, 3+1, 1+4, 4+1, 1+5, 5+1, 1+6, 6+1, 1+7, 7+1, 1+8, 8+1. Largest category by pool size — STRUCTURAL saturation risk if discriminate-tier loses headroom.)
      · near-doubles: AT MOST 3. (Pool has 6 facts: 2+3, 3+2, 3+4, 4+3, 4+5, 5+4. Slightly relaxed cap because the doubles-plus-one derivation IS a productive bridge strategy.)
@@ -1707,7 +1720,7 @@ The user message names a focus skill node. Generate problems specifically for th
      · DO NOT place any HARD-band fact (sum 9-10) at P1, P2, or P3. HARD-band only appears at P5 or later.
      · The ONLY facts allowed at P1, P2, P3 are: 1+2, 2+1, 1+3, 3+1, 1+4, 4+1, 2+2, 2+3, 3+2.
   3. Problems 4-8 (discriminate): draw from MEDIUM + HARD bands. Recent-score modulation: low score (< 0.5) -> bias toward MEDIUM and avoid HARD-band sums-to-10; high score (>= 0.85) -> push into HARD and ensure a sums-to-10 anchor; mid score -> balanced mix. HARD-band facts (sum 9-10) appear at P5 or later only.
-  4. HIGH-LEVERAGE COVERAGE RULE <rule band="hard">: at least one sums-to-10 fact (1+9, 9+1, 2+8, 8+2, 3+7, 7+3, 4+6, 6+4, 5+5) MUST appear somewhere in problems 4-8. This is the highest-leverage category — Marian's April diagnostic flags sums-to-10 automaticity as the top priority; it bridges to add-to-20's make-10 mental model. <self-check>Scan P4, P5, P6, P7, P8. If zero have category=sums-to-10, REJECT and SWAP one P4-P8 fact for a sums-to-10 fact (respecting the sums-to-10 cap of 2 and band-by-slot rules — sums-to-10 facts are HARD band, so they fit P5-P8 only).</self-check>
+  4. HIGH-LEVERAGE COVERAGE RULE <rule band="hard">: at least one sums-to-10 fact (1+9, 9+1, 2+8, 8+2, 3+7, 7+3, 4+6, 6+4, 5+5) MUST appear somewhere in problems 4-8. This is the highest-leverage category — sums-to-10 automaticity is the top priority at this step; it bridges to add-to-20's make-10 mental model. <self-check>Scan P4, P5, P6, P7, P8. If zero have category=sums-to-10, REJECT and SWAP one P4-P8 fact for a sums-to-10 fact (respecting the sums-to-10 cap of 2 and band-by-slot rules — sums-to-10 facts are HARD band, so they fit P5-P8 only).</self-check>
   5. NO bond twice in one session, in either shape or order (see NO BOND TWICE under MISSING-NUMBER PROBLEMS below): "2+3" and "3+2" are the same bond, so at most one of them.
   6. DOUBLES-CAP SELF-CHECK <rule band="hard">re-statement of CATEGORY-MIX BUDGET above</rule>: AT MOST TWO problems across the 8-problem session may carry the doubles category (drawn from {2+2, 3+3, 4+4}). CATEGORY-CARVE-OUT — 5+5 is sums-to-10 by priority, NOT doubles; do NOT count 5+5 toward the doubles cap. Before emitting a third doubles fact, REJECT it. NEGATIVE ANCHOR: it is FORBIDDEN to place 2+2 AND 3+3 AND 4+4 in the same session (the full doubles trifecta — known failure mode per PR #266 attempts 1-2, both bakes shipped all three before composition-lint caught them). <self-check>After placing all 8 facts, count {2+2, 3+3, 4+4} occurrences. If > 2, REJECT and SWAP the surplus for a sums-to-10 or near-doubles fact at the same slot.</self-check>
   7. SUMS-TO-10-CAP SELF-CHECK <rule band="hard">re-statement</rule>: AT MOST TWO problems across the 8-problem session may carry the sums-to-10 category (drawn from {1+9, 9+1, 2+8, 8+2, 3+7, 7+3, 4+6, 6+4, 5+5}). Before emitting a third sums-to-10 fact, REJECT it. This cap interacts with the HIGH-LEVERAGE COVERAGE RULE above: place EXACTLY 1 or 2 sums-to-10 facts in P5-P8; never 0 (violates coverage rule), never 3+ (violates this cap).
@@ -1821,13 +1834,13 @@ The user message names a focus skill node. Generate problems specifically for th
   - hint3 (add + question): "And <addend-B> more. How many now?" e.g. "And five more. How many now?"
   - giveAnswer: "This one is <answer>." e.g. "This one is thirteen."
 
-  PROSODY: numbers are spelled out as words ("one", "two", ... "nine", "ten", "eleven", ... "eighteen"). Capitalize the first word of each sentence. The "plus" template renders cleanly on en-GB-OliviaNeural rate -10% for all values in [1, 18]; no SSML overrides required (validated by sub-to-20 §4 for the same teen-number range). Do NOT verbally decompose the addends (e.g. do NOT say "eight plus two plus three" instead of "eight plus five") — per Dave § 2 (L2 context note, sub-to-20 research), verbal decomposition adds L2 cognitive load without pedagogical benefit. The decomposition IS the mental work Marian does to bridge; it stays internal.
+  PROSODY: numbers are spelled out as words ("one", "two", ... "nine", "ten", "eleven", ... "eighteen"). Capitalize the first word of each sentence. The "plus" template renders cleanly on en-GB-OliviaNeural rate -10% for all values in [1, 18]; no SSML overrides required (validated by sub-to-20 §4 for the same teen-number range). Do NOT verbally decompose the addends (e.g. do NOT say "eight plus two plus three" instead of "eight plus five") — per Dave § 2 (L2 context note, sub-to-20 research), verbal decomposition adds L2 cognitive load without pedagogical benefit. The decomposition IS the mental work the child does to bridge; it stays internal.
 - sub-to-10: subtraction with both operands in 0-10 and answer in 0-10. read: "<minuend> minus <subtrahend>. How many are left?" e.g. "Seven minus three. How many are left?"
 
   FIRST-SESSION READ-LINE — SESSION-LEVEL TEMPLATE CHOICE (not per-problem). Make this choice ONCE for the entire 8-problem session:
     · IF this is the very first session on this node (lifetimeFirstEncounters['sub-to-10'] not yet set) → choose the "take away" template: "<minuend> take away <subtrahend>. How many are left?" e.g. "Eight take away three. How many are left?"
     · ELSE → choose the "minus" template: "<minuend> minus <subtrahend>. How many are left?" e.g. "Seven minus three. How many are left?"
-  Then USE THE CHOSEN TEMPLATE ACROSS ALL 8 PROBLEMS. DO NOT mix "take away" and "minus" within a single session. DO NOT switch templates partway through. The "take away" framing matches Marian's mental model from counting back (physical removal); subsequent sessions revert to "minus". Emma's voice config is unchanged — the SSML and prosody pipeline does not change for this tier.
+  Then USE THE CHOSEN TEMPLATE ACROSS ALL 8 PROBLEMS. DO NOT mix "take away" and "minus" within a single session. DO NOT switch templates partway through. The "take away" framing matches the child's mental model from counting back (physical removal); subsequent sessions revert to "minus". Emma's voice config is unchanged — the SSML and prosody pipeline does not change for this tier.
 
   FACT POOL (22 facts total — this is the ONLY allowed pool. Pick exactly 8 distinct facts FROM THIS LIST per session. No duplicates. DO NOT invent facts outside this list; e.g. 7-2, 8-5, 9-3, 9-2, 5-3, 4-3, 5-4 are NOT in the pool and are FORBIDDEN). EVERY FACT IS LABELED INLINE WITH ITS BAND AND CATEGORY, and annotated with (a+b) = the wrong-op trap value used at render time. IN means the trap is <= 10 (a usable in-range wrong-op distractor); OOR means the trap is > 10 (silently downgrades to off-by-one at render time per design/math/sub-to-10-content.md §3.2); ALIAS means the trap aliases the correct answer (forbidden, downgrades). Preserve the BAND/CATEGORY binding when composing the session:
     · 5-5=0   [EASY/subtract-self]   (a+b=10 IN — boundary)
@@ -1867,7 +1880,7 @@ The user message names a focus skill node. Generate problems specifically for th
      · The ONLY facts allowed at P1, P2, P3 are: 5-5, 8-8, 7-0, 9-0, 10-5, 8-4, 6-3, 9-1.
   3. Problems 4-8 (discriminate): draw from MEDIUM + HARD bands. Recent-score modulation: low score (< 0.5) → bias toward MEDIUM; high score (>= 0.85) → bias toward HARD; mid score → balanced. HARD-band facts (8-3, 9-4, 7-4, 9-6, 7-3, 6-4) appear at P5 or later only.
   4. At least one take-from-10 fact (10-3 or 10-7) MUST appear somewhere in problems 4-8.
-  5. DUAL-EXPOSURE RULE: never pair a subtraction fact and its addition inverse in the same session. E.g. if 10-7=3 is included, 7+3=10 (or 3+7=10) is FORBIDDEN. This rule is forward-compatible — when Marian later moves to mixed add+sub sessions, this rule remains in force per Dave's research on inverse-principle interference.
+  5. DUAL-EXPOSURE RULE: never pair a subtraction fact and its addition inverse in the same session. E.g. if 10-7=3 is included, 7+3=10 (or 3+7=10) is FORBIDDEN. This rule is forward-compatible — when the child later moves to mixed add+sub sessions, this rule remains in force per Dave's research on inverse-principle interference.
   6. NO duplicate facts within the 8-problem set. Before emitting P2 through P8, scan all prior problems' (a, b) pairs and reject any candidate already used. E.g. if P1 is 8-3, then 8-3 is FORBIDDEN at P2 through P8.
   7. Category cap: at most one each of subtract-self, subtract-zero, doubles, subtract-one, subtract-two; at most two of take-from-10; at most two of general.
 
@@ -2042,7 +2055,7 @@ The user message names a focus skill node. Generate problems specifically for th
      · FORBIDDEN mixes: 8+/0-, 7+/1-, 4+/4-, 3+/5-.
   5. Problem 4: MEDIUM-band only (HARD-band still forbidden at P4).
   6. Problems 5-8 (discriminate): draw from MEDIUM + HARD bands. Recent-score modulation: low score (< 0.5) -> bias toward MEDIUM and REDUCE "-" count to exactly 2; high score (>= 0.85) -> push toward HARD with >= 1 near-boundary-no-cross in P5-P8; mid score -> balanced.
-  7. HIGH-LEVERAGE COVERAGE RULE: at least one near-boundary-no-cross fact MUST appear in P5-P8 (drawn from: 23+6, 41+8, 32+7, 55+4, 27+2, 47+2, 35-4, 48-7, 52-1, 64-3, OR the MEDIUM-band near-boundary 34+5 or 26-5 if placed at P5+). This is the actual learning target of the tier — Marian must recognise that even when the units value is near 9 (or near 0), the operation does NOT cross the decade.
+  7. HIGH-LEVERAGE COVERAGE RULE: at least one near-boundary-no-cross fact MUST appear in P5-P8 (drawn from: 23+6, 41+8, 32+7, 55+4, 27+2, 47+2, 35-4, 48-7, 52-1, 64-3, OR the MEDIUM-band near-boundary 34+5 or 26-5 if placed at P5+). This is the actual learning target of the tier — the child must recognise that even when the units value is near 9 (or near 0), the operation does NOT cross the decade.
   8. ROUND-TEN-ANCHOR-CAP SELF-CHECK (re-statement of CATEGORY-MIX BUDGET): AT MOST ONE problem across the entire 8-problem session may carry the round-ten-anchor category (drawn from: 20+3, 30+5, 40+2). Before emitting a second round-ten-anchor, REJECT it. Haiku's uncapped prior empirically saturates this category — left unguarded, a bake can land 2 or 3 round-ten facts in the same 8-problem session (20+3 AND 30+5, or all three of 20+3/30+5/40+2), which is the failure mode this cap prevents. Pick at most 1; let the other two lie unused for this session. NEGATIVE ANCHOR: it is FORBIDDEN to place 20+3 AND 30+5 in the same session; FORBIDDEN to place 20+3 AND 40+2; FORBIDDEN to place 30+5 AND 40+2.
   9. MID-DECADE-UNITS-SHIFT-CAP SELF-CHECK (re-statement): AT MOST FOUR problems across the entire 8-problem session may carry the mid-decade-units-shift category. Before emitting a fifth, REJECT it and SWAP for a near-boundary-no-cross or round-ten-anchor or tens-doubles-echo fact. NEGATIVE ANCHOR — mid-decade-units-shift IS the largest pool category (11 facts), but an 8-problem session with 5 or more mid-decade-units-shift facts crowds out the near-boundary-no-cross learning target (rule 7). CONCRETE NUMERIC GUARD — if you have selected 4 mid-decade-units-shift facts already, every remaining slot MUST carry a DIFFERENT category; if you have selected 5 or more, the canon will be REJECTED by lint and the bake fails.
   10. NEAR-BOUNDARY-NO-CROSS-CAP SELF-CHECK (re-statement): AT MOST FIVE problems may carry the near-boundary-no-cross category. Before emitting a sixth, REJECT it. (Cap binds only on near-boundary-heavy sessions; typical sessions land at 3-4.)
@@ -2080,7 +2093,7 @@ The user message names a focus skill node. Generate problems specifically for th
 
   STRATEGY PROHIBITION (LOAD-BEARING): never invoke or suggest the make-ten-bridge / cross-10-bridge decomposition strategy from add-to-20 in this tier. FORBIDDEN hint text: "Look. Twenty-three. Plus two is twenty-five, then plus two more is twenty-seven" (decomposes through a fictitious intermediate). ALLOWED hint text: "Look. Twenty-three. And four more. How many now?" — the count-on framing is decade-agnostic and does NOT compete with add-to-20's bridge strategy. The pedagogical job at this tier is place-value preservation; the strategy being taught is "the tens digit does not change when no carry/borrow occurs."
 
-  Do NOT verbally decompose the two-digit operand (e.g. do NOT say "twenty and three plus four" instead of "twenty-three plus four"). The decomposition IS the mental work Marian does to preserve place value; it stays internal.
+  Do NOT verbally decompose the two-digit operand (e.g. do NOT say "twenty and three plus four" instead of "twenty-three plus four"). The decomposition IS the mental work the child does to preserve place value; it stays internal.
 - two-digit-addsub-with-regroup: addition OR subtraction within one mixed-op session, WITH regrouping required. <drift-guard>RULE_IDENTITY=two-digit-addsub-with-regroup; SPEC=design/math/two-digit-addsub-with-regroup-content.md; LINT=scripts/compositionLint.ts:3104 (POOL) + 3416 (RULES) + 3938 (BINDING). Do NOT rename, re-band, re-cap, or substitute facts under any seed.</drift-guard> For ADDITION: first operand two-digit in [10, 60], second operand single-digit in [1, 9], units column sums to STRICTLY > 9 (carry REQUIRED). For SUBTRACTION: minuend two-digit in [10, 64], subtrahend single-digit in [1, 9], minuend's units digit STRICTLY < subtrahend (borrow REQUIRED), result two-digit in [17, 64]. read for "+": "<addend-A> plus <addend-B>. How many?" e.g. "Twenty-seven plus six. How many?". read for "-": "<minuend> minus <subtrahend>. How many are left?" e.g. "Thirty-two minus five. How many are left?".
 
   REGROUP-REQUIRED SELF-CHECK <rule band="hard">apply BEFORE emitting every problem</rule>:
@@ -2184,7 +2197,7 @@ The user message names a focus skill node. Generate problems specifically for th
 
   STRATEGY PROHIBITION <rule band="hard">NEW for Wave 5; spec §1.6</rule>: the read-line MUST NOT verbally pre-execute the regroup. FORBIDDEN: "Twenty-seven plus six. Carry the one to thirty. How many?" (gives the answer scaffold-first). FORBIDDEN: "Thirty-two minus five. Borrow from the thirty. How many are left?" (same). The regroup procedure IS the conceptual learning target — verbalising it pre-emptively short-circuits the diagnostic. The hint slot (NOT the read slot) carries the scaffold per the existing hint template. <self-check>After composing each read-line, scan for any of the strings "carry", "borrow", "regroup", or any clause-after-the-operand explaining the operation. If present in the read slot, REJECT and strip back to the bare operand-operator-operand-question template.</self-check>
 
-  Do NOT verbally decompose the two-digit operand (e.g. do NOT say "twenty and seven plus six" instead of "twenty-seven plus six"). The decomposition IS the mental work Marian does to execute the regroup; verbalising it short-circuits the diagnostic.
+  Do NOT verbally decompose the two-digit operand (e.g. do NOT say "twenty and seven plus six" instead of "twenty-seven plus six"). The decomposition IS the mental work the child does to execute the regroup; verbalising it short-circuits the diagnostic.
 - skip-counting: count by 2s, 5s, or 10s. read: "Two, four, six, ... what's next?" Answer is the next term.
 - mult-2-5-10: multiplication by 2, 5, or 10. read: "Two times <X>. How many?" Answer is the product.
 - mult-3-4: multiplication by 3 or 4. read: same template.
@@ -2249,6 +2262,8 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 //   - cake-words           → "Read the <word>." (magic e, fixed 8, content wave 2)
 //   - bee-words            → "Read the <word>." (ee / ea, fixed 8, content wave 4)
 //   - car-words            → "Read the <word>." (ar, fixed 8, content wave 4)
+//   - snail-words          → "Read the <word>." (ai / ay, oa, fixed 8, content wave 5)
+//   - moon-words           → "Read the <word>." (long oo, fixed 8, content wave 5)
 //
 // All gated by the browser parser (PR #132 widened it to dispatch on
 // the read-line template; the sight-words "Find the word:" template was
@@ -2270,7 +2285,7 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 // hybridMode problem-type gate (digraphs-sh AND digraphs-th tiers) —
 // Kyle's sh spec §6.1 + Dave addendum §Q7d, and Kyle's th spec §6.2 +
 // Dave th-addendum §3e/§3f. Three of the seven sh-tier words (`shoe`,
-// `sheep`, `shark`) carry a long / r-controlled vowel OUTSIDE Marian's
+// `sheep`, `shark`) carry a long / r-controlled vowel OUTSIDE the
 // formal short-vowel phonics tiers. Two of the seven th-tier words
 // (`thick`, `cloth`) carry a different structural complication —
 // `thick` is a double-digraph (`th` target onset + `ck` not-yet-taught
@@ -2300,14 +2315,14 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 // stock is rich enough that long-vowel inclusions are never necessary,
 // so the hybridMode pattern must NOT be misapplied to ch. The ch-tier
 // directive instead carries the c-says-/k/ orthographic-trap framing
-// (Dave §1c, non-obvious finding #2): Marian already knows `c` says
+// (Dave §1c, non-obvious finding #2): the child already knows `c` says
 // /k/, so `ch` saying /tʃ/ requires explicit naming.
 //
 // digraphs-th tier — voiceless /θ/ ONLY, plus a mandatory articulation
 // scaffold. The th-tier directive (digraphs-th-voiceless block in
 // WORD_SONG_TRACK_GUIDE below) carries TWO teaching points neither sh
 // nor ch needed: (1) the tongue-between-teeth articulation cue — /θ/
-// has NO L1 anchor for a Tagalog-L1 learner and the /θ/→/t/
+// is often missing from a young learner's first language and the /θ/→/t/
 // substitution is the most systematic of the three digraphs, so Emma
 // must explicitly name "put your tongue between your teeth and blow"
 // (Dave th-addendum §1a/§1b/§5b, Recommendation 4); (2) the voiced/θ/
@@ -2356,13 +2371,14 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 const WORD_SONG_TRACK_GUIDE = `Track: Word Song.
 
 The user message names a focus skill node. The planner emits content
-matching that node. Nineteen first-class content modes today:
+matching that node. Twenty-one first-class content modes today:
 
-  - letter-names: "Tap the letter <NAME>." problems. Marian sees a
+  - letter-names: "Tap the letter <NAME>." problems. The child sees a
     trio of LETTER GLYPHS (the alphabet, uppercase + lowercase — no
     pictures) and taps the one named in the read line. This is the
-    FIRST literacy tier in tree order, REVIEW MODE by design: Marian's
-    alphabet is mastered with a minor residual b/d/p/q confusion. The
+    FIRST literacy tier in tree order, REVIEW MODE by design: the tier
+    treats the alphabet as mostly known, with residual b/d/p/q
+    confusion as the trap it probes. The
     chip is the letter itself rendered as text; no picture-pack assets
     apply. Wire shape and utterance ids are IDENTICAL to blending-cv
     (utterance-only "word." namespace, 8 problems × 5 slots); only the
@@ -2370,15 +2386,14 @@ matching that node. Nineteen first-class content modes today:
     not picture) differ. See the LETTER-NAMES SESSION COMPOSITION
     RULES block below.
   - letter-sounds: "Which letter says <SOUND>?" problems (see the
-    LETTER-SOUNDS UTTERANCE TEMPLATE for every slot). Marian hears
+    LETTER-SOUNDS UTTERANCE TEMPLATE for every slot). The child hears
     Emma voice an isolated short-vowel or consonant phoneme and taps
     the LETTER GLYPH that maps to that sound (no pictures). This is
     the SECOND literacy tier in tree order (between letter-names and
-    blending-cv): phoneme → grapheme mapping. Marian's consonant sounds
-    are mastered and her short /a/ sound is mastered (per CLAUDE.md
-    current-levels table); the lift of this tier is the short-vowel
-    ladder /ɒ/ → /ʌ/ → /ɪ/ → /ɛ/ (per design/research/phonics-sequence-
-    marian.md §Q1, locked 2026-04-26). The chip is the letter itself
+    blending-cv): phoneme → grapheme mapping. The consonant sounds and
+    the short /a/ sound are the known review anchors; the lift of this
+    tier is the short-vowel ladder /ɒ/ → /ʌ/ → /ɪ/ → /ɛ/ (the locked
+    vowel order). The chip is the letter itself
     rendered as text; no picture-pack assets apply. Wire shape and
     utterance ids match every other word-song tier (utterance-only
     "word." namespace, 8 problems × 5 slots). The read-line template,
@@ -2386,47 +2401,47 @@ matching that node. Nineteen first-class content modes today:
     isolated-phoneme utterance shape diverge from cvc-words — see the
     LETTER-SOUNDS SESSION COMPOSITION RULES block below and the
     LETTER-SOUNDS UTTERANCE TEMPLATE block below.
-  - blending-cv: "Tap the <word>." problems. Marian hears the word
+  - blending-cv: "Tap the <word>." problems. The child hears the word
     spoken and taps the matching picture chip from a trio. This is the
     earlier-tier content (matching pictures to spoken words).
   - cvc-words: "Read the <word>." problems with SHORT-A target words.
-    Marian sees the printed word and decodes it aloud, then the picture
+    The child sees the printed word and decodes it aloud, then the picture
     chip confirms. This is the next-tier content (decoding printed
     words). The wire shape and utterance ids are IDENTICAL to
     blending-cv; only the read-line template differs.
   - cvc-words-short-o: "Read the <word>." problems with SHORT-O target
     words. Same wire shape and templates as cvc-words; only the word
     pool differs (short-o instead of short-a). This is the next-vowel
-    sibling tier — Marian arrives here after she's mastered short-a.
+    sibling tier — the child arrives here after mastering short-a.
   - cvc-words-short-u: "Read the <word>." problems with SHORT-U target
     words. Same wire shape and templates as cvc-words; only the word
     pool differs (short-u instead of short-a/short-o). The third
-    vowel-tier sibling — Marian arrives here after she's mastered
+    vowel-tier sibling — the child arrives here after mastering
     short-o.
   - cvc-words-short-i: "Read the <word>." problems with SHORT-I target
     words. Same wire shape and templates as cvc-words; only the word
     pool differs (short-i instead of short-a/short-o/short-u). The
-    fourth vowel-tier sibling — Marian arrives here after she's
-    mastered short-u.
+    fourth vowel-tier sibling — the child arrives here after
+    mastering short-u.
   - cvc-words-short-e: "Read the <word>." problems with SHORT-E target
     words. Same wire shape and templates as cvc-words; only the word
     pool differs (short-e instead of short-a/short-o/short-u/short-i).
     The fifth and FINAL single-vowel tier in the o → u → i → e
-    canonical arc — Marian arrives here after she's mastered short-i.
+    canonical arc — the child arrives here after mastering short-i.
   - digraphs-sh: "Read the <word>." problems with sh-DIGRAPH target
     words — all begin with the consonant digraph "sh" (the /ʃ/ sound,
     two letters making one sound). Same wire shape and templates as
-    cvc-words. This is the FIRST digraph tier — Marian arrives here
-    after she's mastered short-e. See the HYBRIDMODE PROBLEM-TYPE GATE
+    cvc-words. This is the FIRST digraph tier — the child arrives here
+    after mastering short-e. See the HYBRIDMODE PROBLEM-TYPE GATE
     block below: three of the seven words are chip-tap recognition only.
   - digraphs-ch: "Read the <word>." problems with ch-DIGRAPH target
     words — all begin with the consonant digraph "ch" (the /tʃ/ sound,
     two letters making one sound). Same wire shape and templates as
-    cvc-words. This is the SECOND digraph tier — Marian arrives here
-    after she's mastered digraphs-sh. Unlike digraphs-sh, ALL 7 ch-words
+    cvc-words. This is the SECOND digraph tier — the child arrives here
+    after mastering digraphs-sh. Unlike digraphs-sh, ALL 7 ch-words
     are fully decodable short-vowel words — there is NO hybridMode gate
     for the ch tier. The ch tier has one teaching point sh did not: the
-    c-says-/k/ orthographic trap (Marian already knows "c" says /k/ from
+    c-says-/k/ orthographic trap (the child already knows "c" says /k/ from
     cat / cup / cap, so "ch" saying /tʃ/ must be named explicitly). See
     the CH-DIGRAPH C-SAYS-/k/ FRAMING block below.
   - digraphs-th-voiceless: "Read the <word>." problems with voiceless
@@ -2434,7 +2449,7 @@ matching that node. Nineteen first-class content modes today:
     voiceless /θ/ sound (the breath sound in "thin" and "bath", NOT the
     voiced sound in "the"). Two letters making one sound. Same wire
     shape and templates as cvc-words. This is the THIRD and final
-    digraph tier — Marian arrives here after she's mastered digraphs-ch.
+    digraph tier — the child arrives here after mastering digraphs-ch.
     Two of the seven th-words (thick, cloth) are hybridMode — see the
     HYBRIDMODE PROBLEM-TYPE GATE block below. The th tier carries TWO
     teaching points sh and ch did not: the tongue-between-teeth
@@ -2442,12 +2457,12 @@ matching that node. Nineteen first-class content modes today:
     the TH-DIGRAPH VOICELESS-/θ/ FRAMING block below.
   - sight-words: "Find the word: <word>." problems with HIGH-FREQUENCY
     SIGHT WORDS (the, a, is, was, said, he, she, ...). This is the FIRST
-    whole-word-RECOGNITION tier — Marian arrives here after she's
-    mastered all three digraph tiers. CRITICAL DISTINCTION from EVERY
+    whole-word-RECOGNITION tier — the child arrives here after
+    mastering all three digraph tiers. CRITICAL DISTINCTION from EVERY
     prior tier: sight words are NOT decoded letter-by-letter. They are
     high-frequency, often phonics-IRREGULAR words ("the", "was", "said")
     that the child must recognise INSTANTLY as whole shapes. Emma speaks
-    the target word; Marian taps the matching WRITTEN word from a trio of
+    the target word; the child taps the matching WRITTEN word from a trio of
     written-word chips (NO picture chips — these words have no picturable
     referent). You MUST NOT instruct sounding-out / decoding for sight
     words: sounding out "was" by letter rules gives the wrong non-word
@@ -2456,12 +2471,12 @@ matching that node. Nineteen first-class content modes today:
   - simple-sentences: "Finish the sentence: <sentence>." problems where
     <sentence> is a 3–4 word sentence with ONE word replaced by the gap
     token "___" (three underscores), e.g. "Finish the sentence: The cat
-    ___ the bag." This is the sentence-COMPLETION (cloze) tier — Marian
-    arrives here after she's mastered sight-words. CRITICAL DISTINCTION
+    ___ the bag." This is the sentence-COMPLETION (cloze) tier — the child
+    arrives here after mastering sight-words. CRITICAL DISTINCTION
     from EVERY prior tier: Emma must NEVER speak the answer word (that defeats the cloze). The answer lives
     in the "correct" line ("Yes! Sat.") and is NEVER in the read line —
     the read line carries the literal "___" gap token at the gap (the
-    audio render speaks "blank" there). Marian reads the gapped
+    audio render speaks "blank" there). The child reads the gapped
     sentence, hears Emma read it (Emma says "blank" at the gap), and taps
     the WRITTEN-WORD chip that fills the gap (written-word chips, same as
     sight-words — NO pictures). You MUST NOT instruct decoding /
@@ -2472,34 +2487,44 @@ matching that node. Nineteen first-class content modes today:
   - duck-words: "Read the <word>." problems with words that END in "ck"
     or "ng" (duck, rock, ring, ...): two letters, one sound, at the end
     of a short-vowel word. Same wire shape and templates as cvc-words,
-    picture chips, but NO blend slot. Marian arrives here after she's
-    mastered simple-sentences. The session is FIXED — see the
+    picture chips, but NO blend slot. The child arrives here after
+    mastering simple-sentences. The session is FIXED — see the
     BIG-WORDS STEPS block below.
   - crab-words: "Read the <word>." problems with words that START with
     two consonants blended together (flag, drum, crab, ...), short vowels
     only. Same wire shape and templates as cvc-words, picture chips, NO
-    blend slot. Marian arrives here after she's mastered duck-words. The
+    blend slot. The child arrives here after mastering duck-words. The
     session is FIXED — see the BIG-WORDS STEPS block below.
   - tent-words: "Read the <word>." problems with words that END with two
     consonants (tent, hand, gift, ...), short vowels only. Same wire shape
-    and templates as cvc-words, picture chips, NO blend slot. Marian
-    arrives here after she's mastered crab-words. The session is FIXED —
+    and templates as cvc-words, picture chips, NO blend slot. The child
+    arrives here after mastering crab-words. The session is FIXED —
     see the BIG-WORDS STEPS block below.
   - cake-words: "Read the <word>." problems with magic-e words
     (consonant, vowel, consonant, e: cake, kite, bone, ...), where the
     vowel says its name. Same wire shape and templates as cvc-words,
-    picture chips, NO blend slot. Marian arrives here after she's mastered
+    picture chips, NO blend slot. The child arrives here after mastering
     tent-words. The session is FIXED — see the BIG-WORDS STEPS block
     below.
   - bee-words: "Read the <word>." problems with the vowel teams ee and ea,
     which say E's name (bee, tree, leaf, ...). Same wire shape and
-    templates as cvc-words, picture chips, NO blend slot. Marian arrives
+    templates as cvc-words, picture chips, NO blend slot. The child arrives
     here after the little stories. The session is FIXED — see the
     BIG-WORDS STEPS block below.
   - car-words: "Read the <word>." problems with ar (car, star, barn, ...).
     Same wire shape and templates as cvc-words, picture chips, NO blend
-    slot. Marian arrives here after she's mastered bee-words. The session
+    slot. The child arrives here after mastering bee-words. The session
     is FIXED — see the BIG-WORDS STEPS block below.
+  - snail-words: "Read the <word>." problems with the vowel teams ai / ay
+    and oa, which say the first letter's name (tray, boat, snail, ...).
+    Same wire shape and templates as cvc-words, picture chips, NO blend
+    slot. The learner arrives here after sheep stories. The session is
+    FIXED — see the BIG-WORDS STEPS block below.
+  - moon-words: "Read the <word>." problems with oo, which says /uː/
+    (moon, spoon, boot, ...). Same wire shape and templates as cvc-words,
+    picture chips, NO blend slot. The learner arrives here after
+    snail-words. The session is FIXED — see the BIG-WORDS STEPS block
+    below.
 
 Pick 8 distinct target items from the focus-node-specific pool below
 (do not invent new entries, do not use a target more than once).
@@ -2530,18 +2555,18 @@ hybridMode word (shoe / sheep / shark), so the repeated decode practice
 lands on a fully-decodable word. For digraphs-ch, all 7 words are fully
 decodable, so any ch-word may be repeated for the 8th slot — but prefer
 a short-i, short-o, short-a, or short-u word (chin, chip, chop, chat,
-chug, chick) over the short-e word (chest), since short-e is Marian's
-emerging vowel. For digraphs-th-voiceless, prefer repeating one of the
+chug, chick) over the short-e word (chest), since short-e is the
+newest vowel (the last in the vowel ladder). For digraphs-th-voiceless, prefer repeating one of the
 5 fully-decodable th-words (thin, path, bath, math, moth) for the 8th
 slot — NOT a hybridMode word (thick / cloth), so the repeated decode
 practice lands on a fully-decodable word. digraphs-sh, digraphs-ch, and
 digraphs-th-voiceless are the only focus nodes where a target may
 legitimately appear twice in a session.
 
-EXCEPTION for duck-words, crab-words, tent-words, cake-words, bee-words
-AND car-words: do NOT pick. Use the 8 pool words below in EXACTLY the
-listed order, one word per problem, each word once (problem 1 = the
-first word, problem 8 = the last).
+EXCEPTION for duck-words, crab-words, tent-words, cake-words, bee-words,
+car-words, snail-words AND moon-words: do NOT pick. Use the 8 pool words
+below in EXACTLY the listed order, one word per problem, each word once
+(problem 1 = the first word, problem 8 = the last).
 
 Pool for letter-names (52 glyphs — 26 uppercase + 26 lowercase). Each
 letter carries its inline confusion-band tag; see the LETTER-NAMES
@@ -2561,7 +2586,7 @@ The full pool (do NOT emit any item not in this list):
     u [DOUBLE-HUMP] v [CLEAN] w [DOUBLE-HUMP] x [CLEAN]
     y [CLEAN] z [CLEAN]
 Bands: CIRCLE-STICK (lowercase b/d/p/q — the load-bearing
-trap class, Marian's residual confusion); DOUBLE-HUMP (M/W/N + m/n/u/w);
+trap class, the common residual confusion); DOUBLE-HUMP (M/W/N + m/n/u/w);
 CIRCLE-FAMILY (O/Q/o); VERTICAL-STICK (I + i/l/j); CLEAN (everything
 else — the visually-distinct pool).
 
@@ -2620,10 +2645,16 @@ ${WORD_SONG_TARGET_WORDS_BEE}
 Pool for car-words (8 words, FIXED ORDER — problem 1 to problem 8):
 ${WORD_SONG_TARGET_WORDS_CAR}
 
+Pool for snail-words (8 words, FIXED ORDER — problem 1 to problem 8):
+${WORD_SONG_TARGET_WORDS_SNAIL}
+
+Pool for moon-words (8 words, FIXED ORDER — problem 1 to problem 8):
+${WORD_SONG_TARGET_WORDS_MOON}
+
 BIG-WORDS STEPS (duck-words, crab-words, tent-words, cake-words,
-bee-words and car-words tiers ONLY; OVERRIDES the pick-and-order rules
-above). These six steps are the same 8 words every session, so emit them
-EXACTLY like this:
+bee-words, car-words, snail-words and moon-words tiers ONLY; OVERRIDES
+the pick-and-order rules above). These eight steps are the same 8 words
+every session, so emit them EXACTLY like this:
 (1) Problems 1 to 8 use the pool words in the listed order, each once.
 (2) Per problem emit exactly these 5 utterances, word lowercase except
     where capitalised at the start of a sentence:
@@ -2689,21 +2720,21 @@ chips on consonant-target problems, but MAY NEVER be the target sound
     on sight): long-a /eɪ/, long-o /oʊ/, long-u /u:/, long-i /aɪ/,
     long-e /i:/, voiced-th /ð/, /ʒ/, /ŋ/, semi-vowels /w/ and /y/,
     /ks/ (the x-grapheme — two-phoneme), /kw/ (the q-grapheme — almost
-    never standalone), /z/ (rare in Marian's CVC corpus, deferred to
+    never standalone), /z/ (rare in the CVC corpus, deferred to
     v2). Per design/word-song/letter-sounds-content.md §1.1.
 
 HYBRIDMODE PROBLEM-TYPE GATE (digraphs-sh AND digraphs-th-voiceless
 tiers): three of the seven sh-words —
 ${WORD_SONG_TARGET_WORDS_DIGRAPHS_SH_HYBRID.join(', ')} — are
 sight-word-hybrids. Their inside vowel is a long or r-controlled vowel
-OUTSIDE the short-vowel phonics tiers Marian has been taught. Two of
+OUTSIDE the short-vowel phonics tiers the child has been taught. Two of
 the seven th-words — ${WORD_SONG_TARGET_WORDS_DIGRAPHS_TH_HYBRID.join(', ')} —
 are also hybridMode, for a different structural reason: thick is a
-double-digraph (the "th" target plus a "ck" ending Marian has not been
+double-digraph (the "th" target plus a "ck" ending the child has not been
 formally taught), and cloth carries a consonant blend at its start
 ("cl") that is beyond the simple-word scope. For ALL of these words
 (sh: shoe, sheep, shark; th: thick, cloth), generate ONLY chip-tap
-recognition problems (Emma says the word, Marian taps the matching
+recognition problems (Emma says the word, the child taps the matching
 picture chip) — the same "Read the <word>." template every digraph word
 uses. You MUST NOT generate any segmentation prompt ("tell me the
 sounds in s-h-e-e-p"), spelling-from-phoneme prompt, or
@@ -2718,16 +2749,16 @@ forward-compatible guidance for when segmentation / spelling problem
 types are introduced for other tiers.)
 
 NO HYBRIDMODE GATE for digraphs-ch: all 7 ch-words (chin, chip, chop,
-chat, chest, chug, chick) use short vowels Marian has formally covered
+chat, chest, chug, chick) use short vowels the child has formally covered
 (short-i, -o, -a, -e, -u). They are all fully decodable — there is no
 ch-tier equivalent of the sh-tier's shoe / sheep / shark hybrids (or
 the th-tier's thick / cloth hybrids) and no per-word problem-type
 suppression for the ch tier.
 
 CH-DIGRAPH C-SAYS-/k/ FRAMING (digraphs-ch tier only): the ch tier has
-one teaching point the sh tier did not. Marian already knows the
-letter "c" says /k/ (from cat, cup, cap). When she meets "ch", her
-existing knowledge generates a competing hypothesis — that "ch" might
+one teaching point the sh tier did not. The child already knows the
+letter "c" says /k/ (from cat, cup, cap). When the child meets "ch",
+that existing knowledge generates a competing hypothesis — that "ch" might
 say /k/. So for digraphs-ch sessions, Emma must name this once and
 clearly. Open the digraphs-ch session's FIRST problem read-flow with
 this concept reminder framing baked into the hint/scaffold copy: "c"
@@ -2736,9 +2767,9 @@ in "cat". Keep it in natural spoken English (this text is read aloud by
 Azure TTS — do NOT write phonetic notation, slashes, or IPA characters
 into utterance text; write "the ch sound" and "the k sound like in
 cat", not "/tʃ/" or "/k/"). For the per-item lines on chop and chip
-specifically, you MAY reference the sh-tier minimal pairs Marian
+specifically, you MAY reference the sh-tier minimal pairs the child
 already knows ("ch-op — that's different from shop"; "ch-ip — that's
-different from ship") since she practiced ship and shop in the sh tier.
+different from ship") since the child practiced ship and shop in the sh tier.
 This framing is informational scaffolding inside the standard "Read the
 <word>." problem flow — it does NOT change the wire shape, the
 utterance ids, or the problem type.
@@ -2747,8 +2778,8 @@ TH-DIGRAPH VOICELESS-/θ/ FRAMING (digraphs-th-voiceless tier only): the
 th tier carries TWO teaching points neither sh nor ch needed.
 
 (1) The tongue-between-teeth articulation cue. The voiceless "th" sound
-is the hardest of the three digraphs for Marian: her first language
-(Tagalog) has no equivalent sound at all, and the natural error is to
+is the hardest of the three digraphs: a young English learner's first
+language may have no equivalent sound at all, and the natural error is to
 say "t" instead (thin becomes "tin", thick becomes "tick"). So Emma
 must name HOW the sound is made, not just THAT it is one sound. Open
 the digraphs-th-voiceless session's FIRST problem read-flow with this
@@ -2765,14 +2796,14 @@ between my teeth").
 "this" (NOT this tier). Emma names this once: the "th" in our words is
 a quiet breath sound; some other "th" words sound different and we will
 learn those later. Do NOT teach the voiced sound here — just flag that
-it exists so Marian is not confused later.
+it exists so the child is not confused later.
 
 Keep ALL of this in natural spoken English. This text is read aloud by
 Azure TTS — do NOT write phonetic notation, slashes, IPA characters, or
 letter-sound spellouts into utterance text. Write "the th sound" and
 "the t sound like in top", never "/θ/" or "/t/" or "th-th-th". For the
 per-item lines on thin and thick specifically, you MAY name the t-word
-that Marian might confuse it with ("thin — not tin"; "thick — not
+that the child might confuse it with ("thin — not tin"; "thick — not
 tick") since the t-contrast is the core discrimination this tier
 teaches. This framing is informational scaffolding inside the standard
 "Read the <word>." problem flow — it does NOT change the wire shape,
@@ -2790,13 +2821,13 @@ sound. So:
 (1) NEVER instruct sounding-out, decoding, segmentation, or
 "what sounds do you hear" for ANY sight word. Do NOT write
 spell-it-out, stretch-the-sounds, or first-letter-sound prompts. The
-child recognises the whole word; she does not decode it. This is the
+child recognises the whole word and does not decode it. This is the
 single most important rule for this tier.
 
 (2) Read-line template (ALL 8 problems): "Find the word: <word>." —
 e.g. "Find the word: the." / "Find the word: was." Use the lowercase
 target word after the colon; one short instruction; ends with a period.
-Emma speaks this aloud and Marian taps the matching WRITTEN-WORD chip
+Emma speaks this aloud and the child taps the matching WRITTEN-WORD chip
 (no picture). Do NOT use "Tap the <word>." or "Read the <word>." for
 sight words — those templates belong to the picture-decoding tiers. Use
 "Find the word:" verbatim for every sight-word read line; do not vary
@@ -2833,16 +2864,16 @@ only ordering easier sight words early and richer ones later, and
 authoring the spoken lines. Place the very-high-frequency anchors (the,
 a, is, was) so the session feels like steady recognition practice.
 
-(8) L2 note: Marian's first language (Tagalog) has no articles and
-distributes grammatical function differently, so words like "the", "a",
-"for", "of" have no direct translation. Do NOT try to define or
+(8) L2 note: a young English learner's first language may have no
+articles or may mark grammar differently, so words like "the", "a",
+"for", "of" may have no direct translation. Do NOT try to define or
 translate them — just have Emma name and celebrate the word. Keep every
 utterance in natural spoken English; no phonetic notation, no slashes,
 no IPA.
 
 SIMPLE-SENTENCES COMPLETION (simple-sentences tier ONLY; OVERRIDES the
 default word-tier read + correct + hint templates — apply these instead).
-The simple-sentences tier is a sentence-COMPLETION (cloze) tier. Marian
+The simple-sentences tier is a sentence-COMPLETION (cloze) tier. The child
 reads a 3–4 word sentence with one word gapped and taps the written-word
 chip that fills the gap. The teaching
 goal is syntactic-slot prediction at the sentence level, NOT phonics
@@ -2854,7 +2885,7 @@ each as "[id] frame → answer". Choose 8 distinct rows and emit each
 chosen row's frame VERBATIM (with the "___" gap token preserved in the
 read line's data form — see template (2)). Do NOT invent sentences, do
 NOT reword a row, do NOT change which word is gapped. Every word in
-every sentence is already in Marian's taught vocabulary precisely
+every sentence is already in the taught vocabulary precisely
 because the pool is curated; an invented sentence risks an untaught word.
 
 (2) Read-line template (ALL 8 problems): "Finish the sentence:
@@ -2873,8 +2904,8 @@ not vary the verb.
 (3) THE ANSWER IS NEVER IN THE READ LINE. This is the single most
 important rule for this tier. The read line gaps the answer (Emma says
 "blank"). The answer appears ONLY in the "correct" line. If you put the
-answer word in the read line, you defeat the cloze — Marian would hear
-the answer before she taps. Re-read every read line you emit and confirm
+answer word in the read line, you defeat the cloze — the child would hear
+the answer before tapping. Re-read every read line you emit and confirm
 the answer word does NOT appear in it.
 
 (4) correct-slot template (simple-sentences ONLY): "Yes! <Word>." —
@@ -2886,11 +2917,11 @@ THE TARGET WORD FROM THIS LINE (the read line gaps it), so the "Yes!
 <Word>." shape is load-bearing — emit it exactly.
 
 (5) hint-slot template (simple-sentences ONLY): "Listen. <full sentence
-spoken WITH the answer>." — Emma reads the COMPLETE sentence so Marian
+spoken WITH the answer>." — Emma reads the COMPLETE sentence so the child
 hears the answer word in its syntactic slot. E.g. for [cat-sat-mat]:
 "Listen. The cat bit the bag." This is the cloze scaffold — hearing the
 target in context is the resolver. (This is the ONE place Emma speaks the
-answer — in the hint, after Marian has already struggled, never in the
+answer — in the hint, after the child has already struggled, never in the
 read.)
 
 (6) giveAnswer-slot template (simple-sentences ONLY): "This one is
@@ -2901,7 +2932,7 @@ completeness).
 
 (8) GENTLE / TRAP SEQUENCING. Problems 1–3 (gentle): pick rows from the
 GENTLE pool list ONLY (Templates A/B — subject+verb / subject+verb+object,
-the safest for Tagalog-L1 SVO learning). Problems 4–8 (trap): pick rows
+the safest for early SVO learning). Problems 4–8 (trap): pick rows
 from the TRAP pool list ONLY (all templates). Do NOT place a TRAP row at
 P1–P3 or a GENTLE row at P4–P8.
 
@@ -2914,13 +2945,14 @@ rows among the 8 problems (the deferrals are precisely the words that
 need sentence context, which this tier supplies). All deferral rows live
 in the TRAP pool, so they land at P4–P8.
 
-(10) L2 note: same as sight-words — Marian's first language (Tagalog) is
-predicate-initial and has no articles, so English SVO word order and the
-function-word glue ("the", "on", "there") are learned, not instinctive.
-The sentence frame gives her the structure; the gap asks her to predict
-one slot. Keep every utterance in natural spoken English; no phonetic
-notation, no slashes, no IPA. The word "blank" (spoken at the gap) is
-within Marian's vocabulary cap.
+(10) L2 note: same as sight-words — a young English learner's first
+language may use a different word order or have no articles, so English
+SVO word order and the function-word glue ("the", "on", "there") are
+learned, not instinctive. The sentence frame gives the child the
+structure; the gap asks the child to predict one slot. Keep every
+utterance in natural spoken English; no phonetic notation, no slashes,
+no IPA. The word "blank" (spoken at the gap) is within the core
+vocabulary cap.
 
 LETTER-NAMES SESSION COMPOSITION RULES (letter-names tier ONLY; apply
 IN ORDER, AFTER the CONFUSION-CLASS BUDGET block immediately below).
@@ -2935,9 +2967,9 @@ to under-probe it OR over-drill it. An 8-problem session has TWO class
 budgets that MUST both be respected):
   · CIRCLE-STICK (b/d/p/q lowercase): AT LEAST 1, AT MOST 2.
     The "at least 1" is the tier's load-bearing assessment anchor —
-    Marian's residual confusion is the literal subject of this tier and
+    residual b/d/p/q confusion is the literal subject of this tier and
     a session of 8 trivial-grade items teaches nothing. The "at most 2"
-    cap prevents over-drilling — Marian's CVC tiers handle b/d residue
+    cap prevents over-drilling — the CVC tiers handle b/d residue
     naturally via word-context; this tier surfaces it once or twice per
     session, not constantly.
   · CLEAN-band (visually distinct, see pool tags above): AT LEAST 4.
@@ -3041,7 +3073,7 @@ words the engine already handles correctly can DEGRADE pronunciation.
 
 NO LETTER-SOUND TEACHING in letter-names utterance text. Do NOT write
 "M says mmm" or "the letter M makes the mmm sound" or any phoneme-
-association content. This tier teaches GLYPH RECOGNITION (does Marian
+association content. This tier teaches GLYPH RECOGNITION (does the child
 map the shape to the spoken letter name?), NOT phoneme association —
 phoneme association is the next-in-order letter-sounds tier's job.
 Cross-tier scaffolding ahead of the curriculum is OUT OF SCOPE.
@@ -3086,10 +3118,10 @@ respected):
     The "at least 2" is the tier's load-bearing assessment anchor —
     the current-target vowel IS the lift of every session and a session
     that emits 0-1 instances of it teaches nothing new. The "at most 3"
-    cap prevents single-vowel drill feel — even when Marian is
-    introducing /ɒ/ she sees only 2-3 /ɒ/ problems, not 5-6.
+    cap prevents single-vowel drill feel — even when /ɒ/ is being
+    introduced, the child sees only 2-3 /ɒ/ problems, not 5-6.
   · MASTERED-VOWEL /æ/ (short-a): AT LEAST 1 of 8 problems, placed in
-    the mid-tier window (P4 or P5). The anchor vowel that gives Marian
+    the mid-tier window (P4 or P5). The anchor vowel that gives the child
     a "you know this one" reset in the session's middle.
 FAILURE MODES BOTH WAYS — a session with ZERO current-target-vowel
 items fails to do the tier's job (the lift never fires); a session
@@ -3102,21 +3134,19 @@ WHICH vowel is in play). The user message names the focus skill node
 (letter-sounds); the current-target vowel for THIS session is named
 explicitly in the user message via a "current-target-vowel=<IPA>"
 hint. If that hint is absent, the planner defaults to /ɒ/ (short-o) —
-Marian's next-vowel-to-master per the locked ladder
+the next vowel to master per the locked ladder
 /æ (mastered) → /ɒ/ → /ʌ/ → /ɪ/ → /ɛ/.
 
 ADJACENT-VOWEL-BAN SELF-CHECK (HARD GATE, NO EXCEPTIONS):
   · If current-target-vowel = /ɪ/ (short-i): the sound /ɛ/ (short-e)
     MAY NOT appear as a target in this session. /ɪ/ and /ɛ/ are the
-    most acoustically similar English short-vowel pair (per
-    phonics-sequence-marian.md §Q1) and Marian's diagnostic showed
-    /ɪ/ as her weakest vowel — introducing /ɛ/ adjacent risks merging
-    the two in her memory.
+    most acoustically similar English short-vowel pair — introducing
+    /ɛ/ adjacent risks merging the two in the child's memory.
   · If current-target-vowel = /ɛ/ (short-e): the sound /ɪ/ (short-i)
     MAY NOT appear as a target in this session.
   · If current-target-vowel = /ɒ/ or /ʌ/: the sounds /ɪ/ and /ɛ/ MAY
     NOT appear as targets either — they are not yet introduced in
-    Marian's ladder when /ɒ/ or /ʌ/ is current-target.
+    the ladder when /ɒ/ or /ʌ/ is current-target.
 NEGATIVE ANCHOR — it is FORBIDDEN to emit BOTH /ɪ/ and /ɛ/ as targets
 in the same 8-problem session, regardless of which one is current-
 target. This is the load-bearing acoustic-similarity ban for this
@@ -3279,7 +3309,7 @@ slots emit BOTH the mnemonic AND the letter-NAME in the same utterance
 (e.g. "Yes A says aaa."). If the vowel mnemonic were the bare single
 letter, the render-time phoneme wrap (case-insensitive, word-bounded)
 would match BOTH the mnemonic "a" AND the letter-name "A" and render
-BOTH as /æ/ — Marian would hear "Yes ahh says ahh" instead of "Yes A
+BOTH as /æ/ — the child would hear "Yes ahh says ahh" instead of "Yes A
 says ahh". The triplet aaa ≠ the single letter-name A, so only the
 triplet is wrapped; the letter-name stays bare prose and Azure speaks
 it as the letter NAME ("ay"). Consonants are immune (mnemonic mmm ≠
@@ -3374,7 +3404,7 @@ problems from the directive's pool and the remaining 5-6 from the
 canonical pool above. The "do not invent new words" rule still
 forbids any word that is in NEITHER pool.
 
-Distractor guidance (Marian sees 3 picture chips per problem; one is the
+Distractor guidance (the child sees 3 picture chips per problem; one is the
 target, two are distractors — but YOU are not authoring the distractors
 here, only the spoken lines):
 ${WORD_SONG_DISTRACTOR_HINTS}
@@ -3390,10 +3420,10 @@ gum, tub for short-u; pin, wig, bib, fig, sip for short-i; pen, web,
 net, jet, gem, egg for short-e; sheep, shark, shed, shop for
 digraphs-sh; chop, chat, chug, chest for digraphs-ch; path, moth,
 thick, cloth for digraphs-th-voiceless) in problems 4-8. For
-digraphs-ch, place chest (Marian's emerging short-e vowel) toward the
+digraphs-ch, place chest (short-e, the newest vowel) toward the
 later problems — it is the conservatively-weighted entry in the ch
 pool. For digraphs-th-voiceless, introduce the two word-initial th
-words (thin, thick) before the word-final th words — Marian meets "th"
+words (thin, thick) before the word-final th words — the child meets "th"
 at the START of a word first, then sees it at the END. thin is the
 clean word-initial decode anchor (place it early); thick is hybridMode
 (place it in the trap window, problems 4-8). Spread the 3 word-final
@@ -3410,7 +3440,7 @@ all other slots are content-mode-agnostic:
       target; lowercase b for a lowercase target). Do NOT spell out
       the letter-name phonetically (no "em", "kyoo", "double-yoo").
       Azure renders "the letter M" as "the letter em" natively — see
-      the NO SSML / NO PHONEME WRAPPING rule above. The chip Marian
+      the NO SSML / NO PHONEME WRAPPING rule above. The chip the child
       taps shows the SAME case as the glyph in the read line; chip
       case discipline is the screen's responsibility, but the
       directive's read-line + correct utterance MUST be internally
@@ -3436,6 +3466,8 @@ all other slots are content-mode-agnostic:
     - cake-words: "Read the <word>." e.g. "Read the cake."
     - bee-words: "Read the <word>." e.g. "Read the bee."
     - car-words: "Read the <word>." e.g. "Read the car."
+    - snail-words: "Read the <word>." e.g. "Read the tray."
+    - moon-words: "Read the <word>." e.g. "Read the moon."
     - sight-words: "Find the word: <word>." e.g. "Find the word: the."
       (whole-word recognition — see SIGHT-WORDS RECOGNITION block above;
       NOT a decoding "Read"/"Tap" template).
@@ -3453,8 +3485,9 @@ all other slots are content-mode-agnostic:
   cvc-words-short-o / cvc-words-short-u / cvc-words-short-i /
   cvc-words-short-e / digraphs-sh / digraphs-ch /
   digraphs-th-voiceless / duck-words / crab-words / tent-words /
-  cake-words / bee-words / car-words, "Find the word:" for sight-words,
-  "Finish the sentence:" for simple-sentences.
+  cake-words / bee-words / car-words / snail-words / moon-words, "Find
+  the word:" for sight-words, "Finish the sentence:" for
+  simple-sentences.
   Do not mix templates within a single plan.
 - correct (letter-names tier): "Yes! That's the letter <NAME>." e.g.
   "Yes! That's the letter M." — uses the SAME case-preserved
@@ -3521,7 +3554,7 @@ all other slots are content-mode-agnostic:
   "Look. The." Whole-word only; do NOT hint by sounding out letters.
 - hint (simple-sentences tier): "Listen. <full sentence WITH the answer
   word spoken in place of the gap>." e.g. for [cat-sat-mat]: "Listen.
-  The cat bit the bag." Emma reads the COMPLETE sentence so Marian hears
+  The cat bit the bag." Emma reads the COMPLETE sentence so the child hears
   the answer in its slot — the cloze scaffold. This is the ONE place the
   answer is spoken (in the hint, after a struggle), NEVER in the read.
   See the SIMPLE-SENTENCES COMPLETION block above.
@@ -3539,12 +3572,12 @@ BLEND slot (cvc-word tiers ONLY — ticket 86ca8t8xx): for EVERY problem
 on a cvc-words / cvc-words-short-o / cvc-words-short-u /
 cvc-words-short-i / cvc-words-short-e session, ALSO emit a 6th utterance
 with slot id "word.p<N>.blend". This is the phoneme-blend prompt Emma
-sounds out on the 2nd wrong tap so Marian re-decodes the word herself.
+sounds out on the 2nd wrong tap so the child re-decodes the word unaided.
 DO NOT emit a blend slot on ANY other tier (blending-cv, letter-names,
 letter-sounds, digraphs-sh, digraphs-ch, digraphs-th-voiceless,
 sight-words, simple-sentences, duck-words, crab-words, tent-words,
-cake-words, bee-words, car-words) — those carry exactly the 5 slots
-above.
+cake-words, bee-words, car-words, snail-words, moon-words) — those carry
+exactly the 5 slots above.
   Text shape — the target word segmented grapheme-by-grapheme, then the
   whole word, using ASCII-7 punctuation ONLY (space-hyphen-space between
   graphemes, space-three-dots-space before the whole word). NEVER use an

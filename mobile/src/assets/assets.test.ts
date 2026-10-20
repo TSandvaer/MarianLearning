@@ -9,6 +9,7 @@ import { SCENE_PICTURES } from '@marian/core/wordSong/sceneRegistry'
 import { LITTLE_STORIES } from '@marian/core/wordSong/littleStories'
 import { NOVEL_PROBE_WORDS } from '@marian/core/wordSong/novelProbeWords'
 import { BIG_WORDS_STEPS } from '@marian/core/wordSong/bigWordsSteps'
+import { AVATAR_IDS } from '@marian/core/learners'
 import { existsSync, readdirSync } from 'fs'
 import { join } from 'path'
 import {
@@ -28,6 +29,7 @@ import { WEB_ASSET_MODULES } from './registry'
 
 const WEB_ASSETS = join(__dirname, '..', '..', '..', 'public', 'assets')
 const SCENES = join(__dirname, '..', '..', 'assets', 'scenes')
+const AVATARS = join(__dirname, '..', '..', 'assets', 'avatars')
 
 describe('native asset registry', () => {
   it('has every Emma pose, the logo and the th mouth', () => {
@@ -60,7 +62,9 @@ describe('native asset registry', () => {
   })
 
   it("has each wave-3 little story's own scene, so none falls back to the answer's picture", () => {
-    const wave3 = LITTLE_STORIES.filter((s) => s.node !== 'sheep-stories')
+    const wave3 = LITTLE_STORIES.filter((s) =>
+      ['fox-stories', 'hen-stories', 'bug-stories'].includes(s.node),
+    )
     expect(wave3).toHaveLength(24)
     for (const { id } of wave3) {
       const key = `/native/scenes/story-${id}.webp`
@@ -132,6 +136,26 @@ describe('native asset registry', () => {
       expect([id, storySceneAsset(id) !== undefined]).toEqual([id, true])
   })
 
+  // Content wave 5 (content-wave-5.md § 10.1, AC 4): the 16 snail and moon
+  // words draw as pictures (Thomas's picks of 2026-10-19; a missing one
+  // would draw its problem as written words, the shipped fallback, § 11).
+  it('has a picture for every snail-words and moon-words word (AC 4)', () => {
+    const keys = (['snail-words', 'moon-words'] as const).flatMap((step) =>
+      BIG_WORDS_STEPS[step].map((r) => r.word),
+    )
+    expect(keys).toHaveLength(16)
+    expect(keys.filter((key) => pictureAsset(key) === undefined)).toEqual([])
+  })
+
+  // Content wave 5 § 10.2: the 8 goat-story scenes (Thomas's picks of
+  // 2026-10-19; a missing one would reveal the answer's picture, § 11).
+  it("has each goat story's own scene (content wave 5 § 10.2)", () => {
+    const goat = LITTLE_STORIES.filter((s) => s.node === 'goat-stories')
+    expect(goat).toHaveLength(8)
+    for (const { id } of goat)
+      expect([id, storySceneAsset(id) !== undefined]).toEqual([id, true])
+  })
+
   it("has the Hub bakes: idle Emma's shadow and a muted copy of every 256 px path art", () => {
     expect(emmaIdleShadowAsset()).toBeDefined()
     for (const id of PATH_ART_IDS) {
@@ -156,6 +180,24 @@ describe('native asset registry', () => {
     expect(locked.sort()).toEqual(
       steps.map((node) => `/native/path/${node}-256-locked.webp`).sort(),
     )
+  })
+
+  it('has one clay avatar per AvatarId (learner-profiles.md § 9, T2)', () => {
+    for (const id of AVATAR_IDS) {
+      expect([id, existsSync(join(AVATARS, `avatar-${id}.webp`))]).toEqual([
+        id,
+        true,
+      ])
+    }
+    const registered = Object.keys(WEB_ASSET_MODULES).filter((k) =>
+      k.startsWith('/native/avatars/'),
+    )
+    expect(registered.sort()).toEqual(
+      AVATAR_IDS.map((id) => `/native/avatars/avatar-${id}.webp`).sort(),
+    )
+    // Each its own file: 8 different modules.
+    const modules = registered.map((k) => WEB_ASSET_MODULES[k])
+    expect(new Set(modules.map((m) => JSON.stringify(m))).size).toBe(8)
   })
 
   it('every registry entry is a web asset that still exists', () => {
@@ -185,6 +227,8 @@ describe('native asset registry', () => {
       // The little stories' scenes have no web source (native only; the
       // test above checks each file).
       if (key.startsWith('/native/scenes/story-')) continue
+      // Nor have the avatars (the test above checks each file).
+      if (key.startsWith('/native/avatars/')) continue
       const webPath = key.startsWith('/native/') ? source(key) : key
       expect(webPath.startsWith('/assets/')).toBe(true)
       expect([webPath, existsSync(join(WEB_ASSETS, '..', webPath))]).toEqual([
