@@ -7,9 +7,10 @@
 // No planner call, no TTS, no credits, and no choice made here: `api/` can
 // import nothing from core but the import-free `wire/` modules.
 //
-// Why copy blocks instead of rendering a composed `payload.plan`: that path
-// reuses canon audio keyed by `renderElevenLabsText(text, undefined)`, while
-// letter-sounds and simple-sentence lines are keyed with their tier
+// Why copy blocks instead of rendering a composed `payload.plan` (a path
+// closed 2026-10-20): that path reused canon audio keyed by
+// `renderElevenLabsText(text, undefined)`, while letter-sounds and
+// simple-sentence lines are keyed with their tier
 // (`getCanonAudioIndex`). They would miss the canon and render live through
 // ElevenLabs: credits, and possibly the wrong phonemes.
 //

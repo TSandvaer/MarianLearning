@@ -2,7 +2,8 @@
  * @vitest-environment node
  *
  * Integration test for the Vercel function. Exercises the request-shape
- * branches and the new (ticket 86c9gr385) session-start → TTS-merge path.
+ * branches, the track/canon session-start paths, and the closed
+ * client-supplied `payload.plan` path.
  *
  * The TTS module is dependency-injected in `_session.ts`; here we mock it
  * by stubbing the named export the function transitively imports. We use
@@ -261,12 +262,17 @@ describe('stub path (no plan in payload)', () => {
   })
 })
 
-describe('TTS-merge path (session-start with plan)', () => {
-  it('renders TTS and returns the SessionStartResponse', async () => {
-    const fakePlan = {
-      utterances: [{ id: 'p1', text: 'Two plus three.' }],
-    }
-    mockedRender.mockResolvedValueOnce({
+describe('client-supplied plan path is closed (session-start with payload.plan)', () => {
+  // The plan path piped a client-built plan straight into
+  // `renderSessionAudio`: no rate limiter, no canon, no caps, and the
+  // origin check is spoofable outside a browser. No shipped client sends
+  // `payload.plan` (web: track-based since #111; native: track-based since
+  // its first session request in #528), so it is rejected outright.
+  const fakePlan = { utterances: [{ id: 'p1', text: 'Two plus three.' }] }
+
+  beforeEach(() => {
+    // Were the path still open, it would render and answer 200.
+    mockedRender.mockResolvedValue({
       ok: true,
       kind: 'session-start',
       plan: fakePlan,
@@ -278,75 +284,86 @@ describe('TTS-merge path (session-start with plan)', () => {
         },
       ],
     })
+  })
 
+  it('rejects a plan-only payload with 400 invalid-body and renders no TTS', async () => {
     const res = await handler(
-      makeRequest({
+      makeRequest({ kind: 'session-start', payload: { plan: fakePlan } }),
+      { getCanonEntry: noCanon },
+    )
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'invalid-body' })
+    expect(mockedRender).not.toHaveBeenCalled()
+  })
+
+  it('rejects the plan before the limiter, so a saturated limiter changes nothing', async () => {
+    // The old path skipped the limiter: a saturated limiter still let a
+    // plan through to TTS. Now it is a 400 either way, and never a render.
+    const rateLimiter = createRateLimiter({ limit: 1, windowMs: 60_000 })
+    rateLimiter.check('203.0.113.2', 1000)
+    const req = new Request('https://example.test/api/claude', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-forwarded-for': '203.0.113.2',
+      },
+      body: JSON.stringify({
         kind: 'session-start',
         payload: { plan: fakePlan },
       }),
-    )
-    expect(res.status).toBe(200)
-    const body = (await res.json()) as {
-      kind: string
-      utterances: { id: string; audio: { mime: string } }[]
-    }
-    expect(body.kind).toBe('session-start')
-    expect(body.utterances).toHaveLength(1)
-    expect(body.utterances[0]!.audio.mime).toBe('audio/mpeg')
-    expect(mockedRender).toHaveBeenCalledOnce()
-    // The plan reaches the function via JSON.stringify → JSON.parse, so
-    // structural equality, not identity.
-    expect(mockedRender.mock.calls[0]![0]).toEqual(fakePlan)
+    })
+    const res = await handler(req, {
+      rateLimiter,
+      now: () => 2000,
+      getCanonEntry: noCanon,
+    })
+    expect(res.status).toBe(400)
+    expect(mockedRender).not.toHaveBeenCalled()
   })
 
-  it('returns 502 tts-failed when the TTS render throws', async () => {
-    // Suppress the new console.error log (asserted by its own test below)
-    // so this existing assertion isn't noisy in test output.
+  it('rejects a payload carrying both a plan and a track; neither the planner nor TTS runs', async () => {
+    const anthropicClient = makeStubAnthropicClient(STUB_MATH_PLAN_BODY)
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'friend',
+          plan: fakePlan,
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache: createSessionCache({ ttlMs: 60_000, now: () => 1000 }),
+        getCanonEntry: noCanon,
+      },
+    )
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'invalid-body' })
+    expect(mockedRender).not.toHaveBeenCalled()
+    expect(anthropicClient.messages.create).not.toHaveBeenCalled()
+  })
+
+  it('logs the underlying error to console.error on the tts-failed path (ticket 86c9gwxah — so vercel logs is non-empty)', async () => {
+    // Moved from the plan path to the track path, the only one that still
+    // renders live TTS. PII / secrets discipline: the log line carries
+    // exactly { message, stack } — no body, payload or key.
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
       mockedRender.mockRejectedValueOnce(new Error('socket reset'))
       const res = await handler(
         makeRequest({
           kind: 'session-start',
-          payload: { plan: { utterances: [{ id: 'a', text: 't' }] } },
+          payload: { track: 'math', level: 1, childName: 'Marian' },
         }),
+        {
+          anthropicClient: makeStubAnthropicClient(STUB_MATH_PLAN_BODY),
+          sessionCache: createSessionCache({ ttlMs: 60_000, now: () => 1000 }),
+          getCanonEntry: noCanon,
+        },
       )
       expect(res.status).toBe(502)
-      const body = (await res.json()) as { error: string; message?: string }
-      expect(body.error).toBe('tts-failed')
-      expect(body.message).toContain('socket reset')
-    } finally {
-      errorSpy.mockRestore()
-    }
-  })
-
-  it('logs the underlying error to console.error on the tts-failed path (ticket 86c9gwxah — so vercel logs is non-empty)', async () => {
-    // Background: the 86c9gwvn0 P0 investigation had to reason from the
-    // 502 response-message shape because this catch path was silent. The
-    // structural fix is to log message + stack so future failures of
-    // this shape are diagnosable from `vercel logs` directly.
-    //
-    // PII / secrets discipline: the log line must NOT carry the request
-    // body, the payload, or the Azure key. Asserting on the call shape
-    // (exactly { message, stack }) keeps that contract enforced — if
-    // someone widens the log surface, this test fails and the PR review
-    // surfaces it.
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    try {
-      const thrown = new Error('socket reset')
-      mockedRender.mockRejectedValueOnce(thrown)
-
-      const res = await handler(
-        makeRequest({
-          kind: 'session-start',
-          payload: { plan: { utterances: [{ id: 'a', text: 't' }] } },
-        }),
-      )
-      expect(res.status).toBe(502)
-
-      // Logged exactly once, with a stable label and a structured payload
-      // carrying message + stack. No third positional arg — no payload /
-      // body / headers / key surface.
       expect(errorSpy).toHaveBeenCalledTimes(1)
       const [label, detail, ...rest] = errorSpy.mock.calls[0]!
       expect(label).toBe('[api/claude] tts-failed')
@@ -355,7 +372,6 @@ describe('TTS-merge path (session-start with plan)', () => {
         message: 'socket reset',
         stack: expect.stringContaining('Error: socket reset'),
       })
-      // Belt-and-braces: nothing else snuck in.
       expect(Object.keys(detail as object).sort()).toEqual(['message', 'stack'])
     } finally {
       errorSpy.mockRestore()
@@ -623,50 +639,6 @@ describe('Rate limiting on track-based session-start (ticket 86c9jdh39)', () => 
     // Crucially: the Anthropic SDK was NOT called. Limiter must gate
     // before any cost is incurred.
     expect(anthropicClient.messages.create).not.toHaveBeenCalled()
-  })
-
-  it('does NOT rate-limit the legacy plan-attached path', async () => {
-    // The plan-attached path costs nothing on Anthropic (it only renders
-    // TTS), so we deliberately skip the limiter for it. This test pins
-    // that contract — a saturated limiter should NOT block a v1 client.
-    const rateLimiter = createRateLimiter({ limit: 1, windowMs: 60_000 })
-    rateLimiter.check('203.0.113.2', 1000)
-
-    const fakePlan = { utterances: [{ id: 'p1', text: 'Hi.' }] }
-    mockedRender.mockResolvedValueOnce({
-      ok: true,
-      kind: 'session-start',
-      plan: fakePlan,
-      utterances: [
-        {
-          id: 'p1',
-          text: 'Hi.',
-          audio: { kind: 'inline', base64: 'AAEC', mime: 'audio/mpeg' },
-        },
-      ],
-    })
-
-    const req = new Request('https://example.test/api/claude', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-forwarded-for': '203.0.113.2',
-      },
-      body: JSON.stringify({
-        kind: 'session-start',
-        payload: { plan: fakePlan },
-      }),
-    })
-
-    const res = await handler(req, {
-      rateLimiter,
-      sessionCache,
-      now: () => 2000,
-      getCanonEntry: noCanon,
-    })
-
-    expect(res.status).toBe(200)
-    expect(mockedRender).toHaveBeenCalled()
   })
 })
 

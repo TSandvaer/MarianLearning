@@ -77,7 +77,6 @@ import {
   type ClaudeStubResponse,
   type SessionStartResponse,
 } from './_types.js'
-import { renderSessionAudio } from './_session.js'
 import {
   deriveCurrentTargetVowel,
   generateSessionStartResponse,
@@ -197,9 +196,9 @@ function jsonResponse(
   return new Response(JSON.stringify(body), { status, headers })
 }
 
-/** Pull a session plan out of the payload, if one was provided. The plan
- *  is opaque here — `_session.extractUtteranceTexts` is the single point
- *  that knows how to find utterance text inside a plan. */
+/** Pull a client-supplied session plan out of the payload, if one was
+ *  provided. Used only to reject it: the server never renders a plan it
+ *  did not build or bake itself. */
 function extractPlan(payload: unknown): unknown | null {
   if (typeof payload !== 'object' || payload === null) return null
   const p = payload as Record<string, unknown>
@@ -761,53 +760,31 @@ export async function handler(
   }
 
   // session-start branches:
-  //   1. payload.plan present  → render TTS for the supplied plan
-  //      (legacy v1 client path; preserved unchanged for backward compat).
-  //   2. payload.track present → call Haiku to generate a plan, then
-  //      render TTS (added ticket 86c9jdh39 — replaces the prior stub
-  //      that produced silence on Math + WordSong in production).
+  //   1. payload.plan present  → 400 invalid-body. The client-supplied
+  //      plan path is closed (see the rejection below).
+  //   2. payload.track present → canon first, else Haiku generates a plan
+  //      and TTS renders it (ticket 86c9jdh39), behind the rate limiter.
   //   3. neither present       → legacy stub (200 with stub: true).
-  //
-  // Order matters: plan-attached requests bypass the rate limiter
-  // entirely (no Claude call, just TTS — same cost surface as v1). Only
-  // the new track-based path goes through the limiter, since that's the
-  // one that costs Anthropic credits.
   if (body.kind === 'session-start') {
-    const plan = extractPlan(body.payload)
-    if (plan !== null) {
-      try {
-        const rendered = await renderSessionAudio(plan)
-        return jsonResponse(rendered, 200, headers)
-      } catch (err) {
-        // Surface the failure in `vercel logs` so future tts-failed shapes
-        // can be root-caused from stack traces instead of from the
-        // response message alone (see ticket 86c9gwxah; the 86c9gwvn0 P0
-        // investigation had to reason from message shape because this
-        // catch path was silent). Log message + stack ONLY — never the
-        // request body, payload, or any provider headers; the underlying
-        // _tts module is responsible for never embedding the Azure key
-        // in the error it throws, and we deliberately don't widen the
-        // log surface here in case that contract ever slips.
-        const message = err instanceof Error ? err.message : String(err)
-        const stack = err instanceof Error ? err.stack : undefined
-        console.error('[api/claude] tts-failed', { message, stack })
-
-        // Don't leak provider internals — `tts-failed` is the stable
-        // code; the browser falls back to a degraded session per
-        // "Claude is the brain, not the mouth" / graceful-degradation
-        // policy in CLAUDE.md.
-        return jsonResponse(
-          {
-            error: 'tts-failed',
-            message:
-              err instanceof Error && err.message
-                ? `tts pipeline failed: ${err.message}`
-                : 'tts pipeline failed',
-          },
-          502,
-          headers,
-        )
-      }
+    // The client-supplied plan path is closed (2026-10-20; supersedes the
+    // plan part of #487). It piped an opaque, client-built plan straight
+    // into `renderSessionAudio`: no rate limiter, no canon lookup, no cap
+    // on utterances or text, and the origin check is spoofable outside a
+    // browser, so anyone could spend paid TTS. No shipped client sends it:
+    // the web has posted the track-based payload since #111 and the native
+    // app since its first session request (#528). Reject it, with or
+    // without a track beside it, rather than fall through to the stub.
+    if (extractPlan(body.payload) !== null) {
+      return jsonResponse(
+        {
+          error: 'invalid-body',
+          message:
+            'The client-supplied `plan` is no longer accepted. ' +
+            'Send a track-based payload: { track, level, childName }.',
+        },
+        400,
+        headers,
+      )
     }
 
     // Track-based branch: try the pre-baked canon first; fall through
