@@ -16,6 +16,9 @@ export const PICKER_RETURN_ROUTES: ReadonlySet<Route> = new Set<Route>([
   'hub',
   'map',
   'session-end',
+  // A chooser like the Hub (play-place § 1.4); a game writes nothing, so
+  // `play-game` can wait, as Math, Word Song and `game` do.
+  'play-place',
 ])
 
 export function opensPickerOnReturn(

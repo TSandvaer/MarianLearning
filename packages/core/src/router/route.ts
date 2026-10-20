@@ -68,5 +68,17 @@ export type Route =
    * routes here.
    */
   | 'game'
+  /**
+   * Native only: the Play place (`design/native/play-place.md` § 1.3), the
+   * shared place for the games outside the path. Reached from the Hub's
+   * Play disc; Home returns to the Hub. Not `play` (see `game` above).
+   */
+  | 'play-place'
+  /**
+   * Native only: a Play-place game (`design/native/play-place.md` § 1.7),
+   * Raft crossing or Letter critters. Reached from a Play place tile; it
+   * always returns to the Play place. The game id lives in App state.
+   */
+  | 'play-game'
 
 export const FIRST_ROUTE: Route = 'splash'

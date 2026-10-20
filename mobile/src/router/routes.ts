@@ -40,6 +40,12 @@ export { FIRST_ROUTE, type Route }
  * - peek → map                    the closer's end, or the back button
  * - map → game → map              native only: a world's play door, and the
  *                                 round's end or Back (mini-game spec § 1.3)
+ * - hub → play-place → hub        native only: the Hub's Play disc, and the
+ *                                 Play place's Home (play-place spec § 1.4)
+ * - play-place → play-game → play-place
+ *                                 native only: a tile, and a game's Back or
+ *                                 natural stop
+ * - play-place → picker           native only: the return rule
  * - parent-settings → hub         `handleParentSettingsExit`
  * - reward → hub                  the web renders no screen for `reward`
  *                                 (a legacy route); the shell gives its
@@ -49,7 +55,7 @@ export const ROUTE_EXITS: Readonly<Record<Route, readonly Route[]>> = {
   splash: ['picker', 'greet', 'hub'],
   picker: ['greet', 'hub'],
   greet: ['math', 'picker'],
-  hub: ['math', 'literacy', 'map', 'parent-settings', 'picker'],
+  hub: ['math', 'literacy', 'map', 'parent-settings', 'picker', 'play-place'],
   math: ['session-end', 'hub', 'map'],
   literacy: ['session-end', 'hub', 'map'],
   'session-end': ['hub', 'map', 'math', 'literacy', 'picker'],
@@ -58,6 +64,8 @@ export const ROUTE_EXITS: Readonly<Record<Route, readonly Route[]>> = {
   map: ['hub', 'peek', 'math', 'literacy', 'picker', 'game'],
   peek: ['map'],
   game: ['map'],
+  'play-place': ['hub', 'play-game', 'picker'],
+  'play-game': ['play-place'],
 }
 
 /** Every route, in `ROUTE_EXITS` order. */
@@ -77,6 +85,8 @@ export const ROUTE_LABELS: Readonly<Record<Route, string>> = {
   peek: 'Peek',
   picker: 'Who is playing',
   game: 'Mini-game',
+  'play-place': 'Play place',
+  'play-game': 'Play game',
 }
 
 /**
