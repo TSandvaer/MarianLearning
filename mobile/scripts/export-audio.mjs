@@ -12,19 +12,29 @@
  * - `assets/audio/path/*.mp3`    `public/assets/audio/path/*.mp3` (Emma's
  *                                Path + guidance lines)
  * - `assets/audio/sfx/*.mp3`     `public/assets/sfx-*.mp3`
+ * - `assets/audio/blend/<word>.mp3` every Word Song blend clip
+ *                                (`word.p*.blend` in `public/canon/word-song/**`),
+ *                                decoded from the canon; registered as
+ *                                `/native/blend/<word>.mp3` (play-place spec
+ *                                § 3.4: the letter critters play them with no
+ *                                network call)
  * - `src/audio/audioRegistry.ts` web URL path → `require()`d native module
  *
  * The files are copied byte for byte: the web's voice-QA page is the ear
  * gate for every clip, so the native app must play the same bytes.
  * `src/audio/audioRegistry.test.ts` fails when a copy drifts from its web
  * original or a manifest line has no copy, i.e. whenever a web re-render
- * lands without a re-run of this script.
+ * lands without a re-run of this script. The blend clips are decoded
+ * exactly as `export-assets.mjs` decodes them to measure `BLEND_MARKS`, so
+ * the marks are the bundled bytes' (the test checks length and hash).
  */
 import {
   copyFileSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -65,6 +75,43 @@ for (const [webDir, urlPrefix, filter, subdir] of GROUPS) {
     ])
   }
   console.log(`${subdir}: ${files.length} files`)
+}
+
+// Word Song blend clips, one per distinct text, named by its word.
+{
+  const canonRoot = join(repoRoot, 'public', 'canon', 'word-song')
+  const files = []
+  const walk = (dir) => {
+    for (const name of readdirSync(dir).sort()) {
+      const p = join(dir, name)
+      if (statSync(p).isDirectory()) walk(p)
+      else if (name.endsWith('.json')) files.push(p)
+    }
+  }
+  walk(canonRoot)
+  const clips = new Map() // word -> { text, mp3 }
+  for (const file of files) {
+    const json = JSON.parse(readFileSync(file, 'utf8'))
+    for (const u of json.utterances ?? []) {
+      if (!/^word\.p\d+\.blend$/.test(u.id) || !u.audio?.base64) continue
+      const mp3 = Buffer.from(u.audio.base64, 'base64')
+      const word = u.text.split('...').pop().trim()
+      const prev = clips.get(word)
+      if (prev && (prev.text !== u.text || !prev.mp3.equals(mp3))) {
+        throw new Error(`blend word "${word}" has two different clips`)
+      }
+      clips.set(word, { text: u.text, mp3 })
+    }
+  }
+  const dest = join(out, 'blend')
+  rmSync(dest, { recursive: true, force: true })
+  mkdirSync(dest, { recursive: true })
+  for (const word of [...clips.keys()].sort()) {
+    const file = `${word}.mp3`
+    writeFileSync(join(dest, file), clips.get(word).mp3)
+    entries.push([`/native/blend/${file}`, `../../assets/audio/blend/${file}`])
+  }
+  console.log(`blend: ${clips.size} files`)
 }
 
 entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))

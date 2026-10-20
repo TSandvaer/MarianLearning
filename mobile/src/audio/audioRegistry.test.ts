@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import {
@@ -10,12 +11,20 @@ import {
 } from '@marian/core/emmasPath/guidanceLines'
 import { HUB_LINES } from '@marian/core/hub/hubLines'
 import { WEB_AUDIO_MODULES } from './audioRegistry'
+import { BLEND_MARKS } from './blendMarks.generated'
 import { GREET_LINE_SOURCES } from './greetAudio'
 import { SFX_SOURCES } from './sfx'
 
 const mobileRoot = resolve(__dirname, '..', '..')
 const webPublic = resolve(mobileRoot, '..', 'public')
 const registryPaths = Object.keys(WEB_AUDIO_MODULES)
+/**
+ * The bundled blend clips (play-place spec § 3.4, K1) are decoded from the
+ * canon, not copied from `public/`: the web-comparison tests leave them out
+ * and N15 below covers them.
+ */
+const BLEND_PREFIX = '/native/blend/'
+const webPaths = registryPaths.filter((p) => !p.startsWith(BLEND_PREFIX))
 
 /** The registry's `require()` target for a web path, read from source. */
 const registrySource = readFileSync(join(__dirname, 'audioRegistry.ts'), 'utf8')
@@ -76,15 +85,43 @@ describe('bundled audio registry (npm run export-audio)', () => {
         .filter((f) => /^sfx-.*\.mp3$/.test(f))
         .map((f) => `/assets/${f}`),
     ].sort()
-    expect([...registryPaths].sort()).toEqual(web)
+    expect([...webPaths].sort()).toEqual(web)
   })
 
   it('every native copy is byte-identical to its web original (re-run export-audio after a re-render)', () => {
-    const drifted = registryPaths.filter((webPath) => {
+    const drifted = webPaths.filter((webPath) => {
       const web = readFileSync(join(webPublic, webPath))
       const native = readFileSync(nativeFileFor(webPath))
       return !web.equals(native)
     })
     expect(drifted).toEqual([])
+  })
+})
+
+describe('bundled blend clips (play-place spec § 3.4, N15)', () => {
+  const word = (text: string) => text.split('...').pop()!.trim()
+
+  it('bundles every BLEND_MARKS clip as /native/blend/<word>.mp3, with its measured bytes and hash', () => {
+    const texts = Object.keys(BLEND_MARKS)
+    expect(texts).toHaveLength(46)
+    const wrong = texts.filter((text) => {
+      const webPath = `${BLEND_PREFIX}${word(text)}.mp3`
+      if (!registryPaths.includes(webPath)) return true
+      const mp3 = readFileSync(nativeFileFor(webPath))
+      const sha256 = createHash('sha256').update(mp3).digest('hex').slice(0, 16)
+      const entry = BLEND_MARKS[text]!
+      return mp3.length !== entry.bytes || sha256 !== entry.sha256
+    })
+    expect(wrong).toEqual([])
+  })
+
+  it('bundles no other blend clip', () => {
+    const words = Object.keys(BLEND_MARKS).map(word)
+    expect(
+      registryPaths.filter((p) => p.startsWith(BLEND_PREFIX)).sort(),
+    ).toEqual(words.map((w) => `${BLEND_PREFIX}${w}.mp3`).sort())
+    expect(
+      readdirSync(join(mobileRoot, 'assets', 'audio', 'blend')).sort(),
+    ).toEqual(words.map((w) => `${w}.mp3`).sort())
   })
 })

@@ -59,14 +59,16 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'picker-who': 1,
       // The first mini-game, Fill the flower bed (mini-game spec § 3.1).
       game: 30,
+      // The Play place and its two games (play-place spec § 4.1).
+      play: 18,
     })
-    expect(GUIDANCE_LINES).toHaveLength(336)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(336)
+    expect(GUIDANCE_LINES).toHaveLength(354)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(354)
     // Bee, car, snail and moon words' leads are duck words' text (content
-    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories': 336 ids,
-    // 331 texts, 336 files.
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(331)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(336)
+    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories': 354 ids,
+    // 349 texts, 354 files.
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(349)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(354)
   })
 
   it('AC8: both replay sets, one line per STAGE_SPOKEN_NAMES step, with the exact texts (map-tap-to-play § 6, T1 approved 2026-10-17)', () => {
@@ -391,7 +393,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(336)
+    ).toHaveLength(354)
   })
 
   it('repeats no Emma’s Path line', () => {
@@ -531,7 +533,7 @@ describe('the mini-game lines (mini-game spec § 3)', () => {
       hash = Math.imul(hash, 0x01000193) >>> 0
     }
     expect([shipped.length, hash.toString(16)]).toEqual([45725, '12763e65'])
-    expect(GUIDANCE_LINES.slice(306)).toEqual(game)
+    expect(GUIDANCE_LINES.slice(306, 336)).toEqual(game)
   })
 
   it('C4: has the exact texts of § 3.1, no render input and the path src', () => {
@@ -567,5 +569,100 @@ describe('the mini-game lines (mini-game spec § 3)', () => {
       [],
     )
     expect(others.filter((l) => l.id.startsWith('guide.game.'))).toEqual([])
+  })
+})
+
+/** Play-place spec § 4.1, row by row: the 18 lines of the Play place. */
+function expectedPlayLines(): { id: string; text: string; input?: string }[] {
+  return [
+    { id: 'guide.play.open', text: 'What shall we play?' },
+    { id: 'guide.play.raft.open', text: 'The raft can carry ten!' },
+    ...NUMBER.map((n, i) => ({
+      id: `guide.play.raft.total.${i + 1}`,
+      text: `${Cap(n)}!`,
+      input: `${Cap(n)},`,
+    })),
+    { id: 'guide.play.raft.go', text: 'Ten! Off we go!' },
+    { id: 'guide.play.raft.splash', text: 'Too heavy! Splash!' },
+    { id: 'guide.play.raft.silly', text: 'Hee hee! Silly animals!' },
+    { id: 'guide.play.raft.close', text: 'What a party on the island!' },
+    {
+      id: 'guide.play.critters.open',
+      text: 'Join the letters! Hear them sing!',
+    },
+    {
+      id: 'guide.play.critters.funny.1',
+      text: 'Hee hee! What a funny song!',
+    },
+    { id: 'guide.play.critters.funny.2', text: 'Ha ha! Silly sounds!' },
+  ]
+}
+
+describe('the Play place lines (play-place spec § 4)', () => {
+  const play = GUIDANCE_LINES.filter((l) => l.kind === 'play')
+
+  it('C7: leaves the 336 shipped lines unchanged and appends the 18 play lines', () => {
+    // FNV-1a over the JSON of id, kind, world, text, input and src, in
+    // order, of the 336 lines on main at a8abb91b, before the play lines.
+    const shipped = JSON.stringify(
+      GUIDANCE_LINES.slice(0, 336).map(
+        ({ id, kind, world, text, input, src }) => [
+          id,
+          kind,
+          world,
+          text,
+          input ?? null,
+          src,
+        ],
+      ),
+    )
+    let hash = 0x811c9dc5
+    for (let i = 0; i < shipped.length; i++) {
+      hash ^= shipped.charCodeAt(i)
+      hash = Math.imul(hash, 0x01000193) >>> 0
+    }
+    expect([shipped.length, hash.toString(16)]).toEqual([50199, '9a6b2645'])
+    expect(GUIDANCE_LINES.slice(336)).toEqual(play)
+  })
+
+  it('C7: has the exact texts of § 4.1, world-free, the path src, inputs only on the totals', () => {
+    expect(play).toEqual(
+      expectedPlayLines().map(({ id, text, input }) => ({
+        id,
+        kind: 'play',
+        world: null,
+        text,
+        ...(input === undefined ? {} : { input }),
+        src: `/assets/audio/path/${id.replace(/\./g, '-')}.mp3`,
+      })),
+    )
+    expect(play.filter((l) => l.input !== undefined).map((l) => l.id)).toEqual(
+      NUMBER.map((_, i) => `guide.play.raft.total.${i + 1}`),
+    )
+    // About 250 Lily characters (T3); the inputs are as long as the texts.
+    expect(play.reduce((n, l) => n + l.text.length, 0)).toBe(250)
+    expect(play.reduce((n, l) => n + (l.input ?? l.text).length, 0)).toBe(250)
+  })
+
+  it('C7: the 18 play lines are rendered in Lily (none awaits its render)', () => {
+    expect(
+      play.filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id)),
+    ).toEqual([])
+  })
+
+  it('C8: no play line says again, next, more, round, win, fast or "not a word"', () => {
+    expect(play).toHaveLength(18)
+    for (const l of play) {
+      expect(l.text).not.toMatch(/\b(again|next|more|round|win|fast)\b/i)
+      expect(l.text).not.toMatch(/not a word/i)
+    }
+  })
+
+  it('C8: no line outside guide.play.* is a play line', () => {
+    expect(
+      GUIDANCE_LINES.filter(
+        (l) => (l.kind === 'play') !== l.id.startsWith('guide.play.'),
+      ),
+    ).toEqual([])
   })
 })

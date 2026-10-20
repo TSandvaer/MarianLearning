@@ -55,7 +55,7 @@ export function fakeSfx(): WordSongSfx &
 }
 
 export function fakeTap() {
-  const calls: { uri: string; from: number; to: number | null }[] = []
+  const calls: { uri: string | number; from: number; to: number | null }[] = []
   let onEnd: (() => void) | undefined
   const player: TapClipPlayer & { cuts: number } = {
     cuts: 0,

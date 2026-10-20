@@ -83,3 +83,24 @@ it('release stops and frees the player (no auto-resume)', async () => {
   expect(last().released).toBe(true)
   expect(last().removed).toBe(true)
 })
+
+it('plays a bundled clip (a require()d module) as it is (play-place spec § 3.4, K2)', async () => {
+  const { tap } = setup()
+  const onEnd = jest.fn()
+  const bundled = 42
+  tap.play(bundled, 855, 1244, onEnd)
+  await flush()
+  const p = last()
+  expect(p.source).toBe(42)
+  expect(p.calls).toEqual(['seekTo(0.855)', 'play'])
+  p.emit({ playing: true, currentTime: 1.25 })
+  expect(onEnd).toHaveBeenCalledTimes(1)
+  // The same module again reuses its player; a uri string gets its own.
+  tap.play(bundled, 0, 380)
+  await flush()
+  expect(fakePlayers).toHaveLength(1)
+  tap.play('file:///blend.mp3', 0, 380)
+  await flush()
+  expect(fakePlayers).toHaveLength(2)
+  expect(last().source).toEqual({ uri: 'file:///blend.mp3' })
+})

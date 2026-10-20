@@ -64,6 +64,7 @@ export type GuidanceLineKind =
   | 'story-word'
   | 'picker-who'
   | 'game'
+  | 'play'
 
 export interface GuidanceLine {
   /** Dotted id, e.g. `guide.hub.suggest.math`. */
@@ -300,6 +301,29 @@ function buildLines(): GuidanceLine[] {
     ),
   )
   add(BED_CLOSE_ID, 'game', 'Ten every time! What a garden!', 'math')
+  // The Play place and its two games (design/native/play-place.md § 4.1;
+  // T3, the texts, approved for rendering 2026-10-20 and judged at the ear
+  // test). World-free. The totals are one word, so Lily gets "Seven," (the
+  // one-word rule, § 4.3). No line names a game outside the Play place, and
+  // none invites another round (C8).
+  add(PLAY_OPEN_ID, 'play', 'What shall we play?')
+  add(RAFT_OPEN_ID, 'play', 'The raft can carry ten!')
+  NUMBER_WORDS.forEach((n, i) =>
+    add(
+      raftTotalId(i + 1),
+      'play',
+      `${capitalize(n)}!`,
+      null,
+      `${capitalize(n)},`,
+    ),
+  )
+  add(RAFT_GO_ID, 'play', 'Ten! Off we go!')
+  add(RAFT_SPLASH_ID, 'play', 'Too heavy! Splash!')
+  add(RAFT_SILLY_ID, 'play', 'Hee hee! Silly animals!')
+  add(RAFT_CLOSE_ID, 'play', 'What a party on the island!')
+  add(CRITTERS_OPEN_ID, 'play', 'Join the letters! Hear them sing!')
+  add(crittersFunnyId(1), 'play', 'Hee hee! What a funny song!')
+  add(crittersFunnyId(2), 'play', 'Ha ha! Silly sounds!')
   return lines
 }
 
@@ -383,6 +407,15 @@ const BED_OPEN_ID = 'guide.game.bed.open'
 const bedAskId = (given: number) => `guide.game.bed.ask.${given}`
 const bedYesId = (given: number) => `guide.game.bed.yes.${given}`
 const BED_CLOSE_ID = 'guide.game.bed.close'
+const PLAY_OPEN_ID = 'guide.play.open'
+const RAFT_OPEN_ID = 'guide.play.raft.open'
+const raftTotalId = (total: number) => `guide.play.raft.total.${total}`
+const RAFT_GO_ID = 'guide.play.raft.go'
+const RAFT_SPLASH_ID = 'guide.play.raft.splash'
+const RAFT_SILLY_ID = 'guide.play.raft.silly'
+const RAFT_CLOSE_ID = 'guide.play.raft.close'
+const CRITTERS_OPEN_ID = 'guide.play.critters.open'
+const crittersFunnyId = (n: 1 | 2) => `guide.play.critters.funny.${n}`
 
 /** Every guidance line: Hub, then session end, then in session. */
 export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
@@ -394,9 +427,20 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: none.
+ * Now: the Play place's 18 lines (play-place spec § 4.1).
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
+  PLAY_OPEN_ID,
+  RAFT_OPEN_ID,
+  ...NUMBER_WORDS.map((_, i) => raftTotalId(i + 1)),
+  RAFT_GO_ID,
+  RAFT_SPLASH_ID,
+  RAFT_SILLY_ID,
+  RAFT_CLOSE_ID,
+  CRITTERS_OPEN_ID,
+  crittersFunnyId(1),
+  crittersFunnyId(2),
+]
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 
