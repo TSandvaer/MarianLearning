@@ -60,6 +60,8 @@ const MATH = [
   'div-share',
   'hundreds',
   'hundreds-addsub',
+  'hundreds-zeros',
+  'add-two-digit',
 ] as const
 
 function pastDayISO(daysAgo: number): string {

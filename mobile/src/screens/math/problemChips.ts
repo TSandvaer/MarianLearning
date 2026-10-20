@@ -6,17 +6,26 @@
  * distractor rules, and a ceiling from that step's problems only. Without
  * `problemNodes` every problem is `focusNode`'s, exactly as before. A
  * missing number (content wave 1 § 1.6) takes the arithmetic chips of its
- * bond, around the missing part.
+ * bond, around the missing part. An adding-big-numbers sum (content wave 5
+ * § 3.6) takes its own chips, `addTwoDigitDistractors`, shuffled with the
+ * arithmetic LCG; `buildChipOrder` (the web's copy) is not touched.
  */
 import {
   ANSWER_RANGE_MAX_TO_20,
   chipMaxAnswerForCorrects,
 } from '@marian/core/math/distractors'
-import { multiplyChipCeilingFor } from '@marian/core/math/extendedDistractors'
-import type { ExtendedMathProblem } from '@marian/core/math/extendedProblems'
+import {
+  addTwoDigitDistractors,
+  addTwoDigitOfferedClass,
+  multiplyChipCeilingFor,
+} from '@marian/core/math/extendedDistractors'
+import {
+  isPlaceValueArithmetic,
+  type ExtendedMathProblem,
+} from '@marian/core/math/extendedProblems'
 import type { MathProblem } from '@marian/core/math/sessionPlans'
 import type { SkillNode } from '@marian/core/progress'
-import { buildChipOrder } from './chipOrder'
+import { buildChipOrder, lcg } from './chipOrder'
 import {
   buildExtendedChipOrder,
   type MathOfferedClass,
@@ -54,16 +63,33 @@ export function arithmeticChipCeiling(
     : fromAnswers
 }
 
-/** The chips of `problems[problemIndex]`. */
+/**
+ * The chips of `problems[problemIndex]`. `planFocusNode` is the session's
+ * step: with the problem's `problemNodes` entry it decides whether a sum
+ * draws the trays (and takes their chips), as Math's stage does.
+ */
 export function problemChips(
   problems: readonly ExtendedMathProblem[],
   problemIndex: number,
   focusNode: SkillNode | undefined,
   problemNodes?: readonly (SkillNode | null | undefined)[],
+  planFocusNode?: SkillNode,
 ): ProblemChips {
   const p = problems[problemIndex]
   const nodeOf = (i: number) => problemNodes?.[i] ?? focusNode
   const node = nodeOf(problemIndex)
+  if (
+    isPlaceValueArithmetic(p, problemNodes?.[problemIndex] ?? planFocusNode)
+  ) {
+    // `buildChipOrder`'s seed and Fisher–Yates, unchanged.
+    const values = [p.correct, ...addTwoDigitDistractors(p.correct, p.index)]
+    const rng = lcg((p.index * 31 + p.correct * 17 + 1) >>> 0)
+    for (let i = values.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1))
+      ;[values[i], values[j]] = [values[j]!, values[i]!]
+    }
+    return { values, offeredClass: addTwoDigitOfferedClass(p.index) }
+  }
   const sameStep = problems.filter((_, j) => nodeOf(j) === node)
   // The adding steps' answers on screen: the sums and the missing parts.
   const addingCorrects = () =>

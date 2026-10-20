@@ -48,6 +48,8 @@ const MATH = [
   'div-share',
   'hundreds',
   'hundreds-addsub',
+  'hundreds-zeros',
+  'add-two-digit',
 ] as const
 
 /** Mastered before `current`, practicing at it, locked after. */
