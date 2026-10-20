@@ -1,6 +1,6 @@
 # Learner profiles (native)
 
-**Status:** spec only. Thomas, 2026-10-19: "we need to think about this app as multi-user not only Marian"; asked whether that means separate learner profiles in the app: "Yes, design profiles" (`team/DECISIONS.md` 2026-10-19, PR #613). Thomas approved T1–T8 and Dave's EXTRA 2 by popup on 2026-10-19 (§ 13). Dave checked D1–D7 on 2026-10-19: D2, D3, D4 and D6 confirmed; D1, D5 and D7 changed, plus 2 extra items, all applied (§ 14). Kevin checked K1–K12 on 2026-10-19: K1, K4, K5, K8, K10 and K12 confirmed; K2, K3, K6, K7, K9 and K11 changed, plus 3 blocking issues (X1–X3), all applied (§ 15). Thomas approved T9 and the learner-neutral planner prompt (T10) by popup on 2026-10-19 (§ 13). Nothing is open for Thomas before the build.
+**Status:** spec only. Thomas, 2026-10-19: "we need to think about this app as multi-user not only Marian"; asked whether that means separate learner profiles in the app: "Yes, design profiles" (`team/DECISIONS.md` 2026-10-19, PR #613). Thomas approved T1–T8 and Dave's EXTRA 2 by popup on 2026-10-19 (§ 13). Dave checked D1–D7 on 2026-10-19: D2, D3, D4 and D6 confirmed; D1, D5 and D7 changed, plus 2 extra items, all applied (§ 14). Kevin checked K1–K12 on 2026-10-19: K1, K4, K5, K8, K10 and K12 confirmed; K2, K3, K6, K7, K9 and K11 changed, plus 3 blocking issues (X1–X3), all applied (§ 15). Thomas approved T9 and the learner-neutral planner prompt (T10) by popup on 2026-10-19 (§ 13). Nothing is open for Thomas before the build. Phase 3 (name audio, PR C) is specified in § 16, with T11–T13 open for Thomas and K13–K19 for Kevin.
 
 **Scope:** `@marian/core` (a new `learners` module, storage keys, cloud keying, routing), the native app (a "Who is playing?" screen, a Hub badge, Parent Settings, Session End's exit), one new Emma line, 8 avatar pictures. The server is unchanged until phase 3 (§ 12). The web is frozen and stays single-learner (§ 4.4).
 
@@ -226,14 +226,7 @@ export const MAX_LEARNERS = 4 // the add buttons' cap (T1); the guard has no upp
 export const LEARNER_NAME_MAX = 24 // types.ts:466
 
 export type AvatarId =
-  | 'fox'
-  | 'lion'
-  | 'frog'
-  | 'turtle'
-  | 'penguin'
-  | 'owl'
-  | 'cat'
-  | 'bear'
+  'fox' | 'lion' | 'frog' | 'turtle' | 'penguin' | 'owl' | 'cat' | 'bear'
 
 /** Reserved for the planned Danish version. Only 'en' exists; nothing reads it yet. */
 export type LearnerLanguage = 'en'
@@ -428,7 +421,7 @@ Phase 1–2: the name is on the picker tile as text only. Emma says no name anyw
 - **Avatars:** animals, not people. No gender, skin or appearance coding. Colours avoid red (never a red X), and the cat is grey, not pink (D7). The child picks their own with the parent (T3, D7).
 - **Adult gate unchanged:** add, rename, move, remove and restore sit behind the 3 s press (`Hub.tsx:65-66`).
 - **Honest parent copy:** the Remove alert says what does not come back (§ 3.5).
-- **Privacy:** names stay on the device and in the learner's own cloud record (which already carries `childName` today, `api/progress.ts:23-27`). No name goes into session requests (P7). The learner ID is never sent.
+- **Privacy:** names stay on the device and in the learner's own cloud record (which already carries `childName` today, `api/progress.ts:23-27`). No name goes into session requests (P7). The learner ID is never sent. Phase 3 sends the spoken name to the name-audio endpoint and on to ElevenLabs, once per render (§ 16.4).
 
 ## 9. Assets
 
@@ -511,7 +504,7 @@ Phase 1–2: the name is on the picker tile as text only. Emma says no name anyw
 
 1. **PR A, Kevin (data first):** core, migration, keys, scoped store and bound I/O, the carrier with both stamps and the refusal, the ID-carrying sync listener, start docs, `setLearnerStart`, the per-learner review baseline, the 12 fallbacks, routing helpers, the `'friend'` name with its 12 test flips, and the Maestro re-baseline. ACs 1–26. **With one learner it changes nothing visible** except a fresh install's start (land 1, T7), so it can ship alone. Install it on both devices before PR B, so the migration has run on each before a second learner exists. This is recommended for a clean order; compat does not need it (§ 4.7).
 2. **PR B, Devon (screens), after A merges** (it imports A's names, § 4.1): picker, badge, return rule, App's switch, Session End's handover, Parent Settings (keyed sections, Where to start, the naming step), copy, the line and the avatars. ACs 27–38, then 39–42 on the devices. Needs T9 for its 3 new lines. The ear test for the line and the contact sheet for the avatars are Thomas's.
-3. **PR C, phase 3 (Kevin server + Devon UI), after B is on the devices (T4 approved):** name clips. A small name-render endpoint, Parent Settings preview and retake, the picker tap. Its own ACs in its own spec section, written before PR C starts.
+3. **PR C, phase 3 (Kevin server + Devon UI), after B is on the devices (T4 approved):** name clips. A small name-render endpoint, Parent Settings preview and retake, the picker tap. Its own ACs in its own spec section, written before PR C starts: § 16, ACs 43–66.
 
 **Moved by this fold:** into PR A, the 3 native fallback sites (`ParentSettings.tsx:91`, `sessionEndWrite.ts:117`, `:194`; one-line swaps, so every fallback changes in one PR), the 12 native test flips, the Maestro re-baseline, `keys?()` in native's sqlite adapter, the listener change at `native.ts:85`, and the core halves of D1 and X2 (`setLearnerStart`, `boundLearner`). Into PR B: the X2 keying, Where to start's row and alert, D5's naming step, the quiet-remount clear and Session End's handover. Nothing moved out of PR A or out of PR B.
 
@@ -519,7 +512,7 @@ Reviewers: Devon reviews A, Kevin reviews B (`feedback_pr_review_routing`).
 
 ## 13. Thomas decides (T1…)
 
-Thomas approved T1–T8 and Dave's EXTRA 2 by popup on 2026-10-19. T9 is open.
+Thomas approved T1–T8 and Dave's EXTRA 2 by popup on 2026-10-19. T9 is open. Phase 3's T11–T13 are in § 16.9.
 
 - **T1. Up to 4 learners per device.** 4 keeps every picker tile at least 103 × 130 pt on the smallest phone (§ 1.2). **Approved (Thomas, 2026-10-19).**
 - **T2. The 8 avatars and their colours:** fox orange, lion yellow, frog green, turtle teal, penguin blue, owl purple, cat grey, bear brown. Clay animals in the Hub's look, no red. Spend: about $0.80 at wave 4's average of $2.43 for 25 images (`content-wave-4.md:483`), cap $1.50 with retakes. The generator's `--dry-run` prints the real number before any call. The look is judged on the contact sheet. **Approved (Thomas, 2026-10-19), with the cat grey (Dave D7; was pink), about $0.80, cap $1.50, judged on the contact sheet.**
@@ -560,7 +553,7 @@ Thomas approved T1–T8 and Dave's EXTRA 2 by popup on 2026-10-19. T9 is open.
 
 ## 15. Kevin confirms (K1…)
 
-**Kevin checked K1–K12 on 2026-10-19 (read-only, against main 910fa5f6, nothing run): K1, K4, K5, K8, K10 and K12 confirmed; K2, K3, K6, K7, K9 and K11 changed; plus 3 blocking issues, X1–X3.** All are applied above.
+**Kevin checked K1–K12 on 2026-10-19 (read-only, against main 910fa5f6, nothing run): K1, K4, K5, K8, K10 and K12 confirmed; K2, K3, K6, K7, K9 and K11 changed; plus 3 blocking issues, X1–X3.** All are applied above. Phase 3's server items, K13–K19, are in § 16.8.
 
 - **X1. Blocking: the migration could overwrite Marian's doc.** `loadProgress()` returns `null` for invalid JSON, an unknown version or a guard failure, not only for no key (`storage.ts:36-43`), so a present but unreadable doc was treated as a fresh install and overwritten with a floor doc. Now "fresh install" is decided from the raw key, and nothing writes a progress key that holds anything (§ 4.3 step 3, step 5). Applied in P3, § 4.3, AC 2. Was: step 2 `loadProgress()` and step 4 writing when it returned `null`.
 - **X2. Blocking: Parent Settings would write one learner's doc over another's.** The screen reads the doc once and saves from that copy (`ParentSettings.tsx:89-103`; `parentSettingsDeps.ts:78`), and Push now reads the sync ID at call time (`parentSettingsDeps.ts:83-87`). Now the sections are keyed by the selected learner and their deps come from `boundLearner(entry)` (§ 3.1, § 4.4). Applied in § 3.1, § 4.1, § 4.4, § 10, AC 34. Was: "Every section below re-reads", with no mechanism.
@@ -577,3 +570,219 @@ Thomas approved T1–T8 and Dave's EXTRA 2 by popup on 2026-10-19. T9 is open.
 - **K10.** The phase 3 name-clip endpoint: input limited to § 3.2's set and 24 characters, a rate limit per sync ID, Lily characters counted, a retry when offline. **Confirmed (Kevin, 2026-10-19),** with the clip stored under `Paths.document`, not `Paths.cache` (§ 9).
 - **K11. Changed by Kevin.** A single `setItem` is one SQLite write, so a half-written list is unlikely, but the recovery was weaker than it needs to be: the native backend can list keys (`getAllKeysSync()`, § Today). Core's seam gains `keys?()`, and a rebuild scans the suffixed progress keys and recreates those learners. A list with `schemaVersion` above 1 is built in memory and never written back (the #597 lesson, applied to the list). Still no second copy. Applied in § 4.1, § 4.3, § 4.7 rule 6, AC 21, 22. Was: learners 2–4 back only by Add from a code.
 - **K12.** `ensureLearnerList` runs before the QA step and the debug seed in `bootNative` (`native.ts:82`, `:100-109`). **Confirmed (Kevin, 2026-10-19),** plus: it never throws, and the listener at `native.ts:85` becomes the ID-carrying one (§ 4.3, § 4.4). Applied in AC 5.
+
+## 16. Phase 3: name audio (PR C)
+
+**Status:** spec for PR C, written before it starts (§ 12 item 3). T4 approved (Thomas, 2026-10-19): "yes, phase 3, Lily, on the picker tap only, with the parent preview and retake". Thomas said on 2026-10-20 to start after build 16. The server design is Kevin's (K13–K19, § 16.8). T11–T13 are open for Thomas (§ 16.9).
+
+**Fixed by earlier sections:** a tap says "\<Name\>!" and the caption is the name (§ 1.3); the route changes 200 ms after the clip ends, at most 1.5 s after the tap (§ 1.4); no network means no clip until Parent Settings is next open and online (§ 7); the clip lives under `Paths.document`, not `Paths.cache` (§ 9, K10); the name is said only on the picker, never in praise or teaching (D6); session requests keep `'friend'` (P7). No clip is the shipped, silent pick, not an error (§ 6.3).
+
+### 16.1 When a clip is made
+
+A clip is made **only while Parent Settings is open, and only on a device with 2+ learners.** With 1 learner the picker never shows (P1), so a clip would never play. No child screen ever asks for a clip: the picker, Hub, Greet and every other route make no name-audio request. That keeps the new billing surface behind the 3 s adult gate.
+
+The **spoken text** of a learner is their "sounds like" spelling if set (§ 16.2), else their name. A learner **needs a clip** when they are named and have no stored clip whose spoken text equals today's spoken text, or whose voice key differs from the server's (§ 16.4).
+
+| Trigger                                                                                                        | Which learners                       | Plays when ready                          |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ----------------------------------------- |
+| A name saved: Add a learner's [Add], step 0's naming (§ 3.2), Name on keyboard Done, Add from a code's success | the learner(s) named                 | yes, once, if that learner's card is open |
+| "Sounds like" saved (keyboard Done) or cleared                                                                 | that learner                         | yes, once, as above                       |
+| [Retake]                                                                                                       | that learner                         | yes, once, as above                       |
+| [Try again] after a failure                                                                                    | that learner                         | yes, once, as above                       |
+| Parent Settings opens, or the second learner is added                                                          | every learner who needs a clip       | no                                        |
+| Back online while Parent Settings is open                                                                      | every learner who still needs a clip | no                                        |
+
+- **The save never waits.** The name, the list and the sheet close as in phase 2; the render runs after.
+- **One render at a time,** in learner order, so a visit never fans out requests. A newer trigger for the same learner replaces a queued one.
+- **Done aborts** every render in flight or queued, as it aborts Push now and Restore (`CloudBackupSection.tsx:14-16`). An aborted render writes nothing. The next visit picks it up.
+- **The upgrade:** Marian's clip is made on the first Parent Settings visit after the second learner is added, with no sound in that visit unless the parent taps Play.
+
+### 16.2 Parent flow: the Name sound row
+
+The selected-learner card (§ 3.1) gains one row under Name, shown only with 2+ learners and a named learner:
+
+```
+| MARIAN                                     |
+| Name         [Marian____________]          |
+| Name sound   [▶ Play]  [Retake]            |
+| Sounds like  [__________________]          |
+|              Only if Emma says the name    |
+|              wrong. Spell it as it sounds, |
+|              like Mah-ree-ahn. The picture |
+|              keeps the real name.          |
+| Picture      (fox)(lion)(frog)(turtle)     |
+```
+
+- **[▶ Play]** plays the stored clip once, at the app's volume. A second tap while it plays restarts it. This is the one place Parent Settings plays a sound (T4); nothing in Parent Settings plays on its own except a render the parent just asked for (§ 16.1).
+- **[Retake]** asks for a new take of the same spoken text. The new clip replaces the old one **only on success**; on failure the old one stays and plays. A retake of the same text may come back sounding the same: the code notes that a seed "did not vary eleven_v4 takes of one input; input variants do" (`api/_tts_elevenlabs.ts:205-208`). How a retake varies is K18. **"Sounds like" is the real fix for a wrong name**, so the helper text sits right under it.
+- **Sounds like:** optional, one line, saves on keyboard Done.
+  - The same character set as Name: letters, digits, spaces, `'`, `.`, `-`, 1–24 characters after trimming: the planner sanitiser's set, `/[^\p{L}\p{N}\s'.-]/u` (`api/_planner.ts:1182`). Hyphens and spaces split syllables ("Mah-ree-ahn"). Slashes, brackets and markup can't be typed, so neither can the canon's IPA form `/…/` (K15). Single IPA letters such as `ə` are Unicode letters and pass; they are harmless to cost, and parents don't write them.
+  - It changes only what Emma says. The tile, the caption and every parent string keep the written name.
+  - Cleared (empty + Done): the spoken text goes back to the name, and a new clip is made.
+  - **Renaming a learner clears it,** because it spelled the old name. The field shows empty after the rename.
+  - It stays on this device (§ 16.4).
+- **Status line** under the row, replacing the buttons while there is no playable clip (strings in § 16.6):
+
+| State                                                              | The row shows                                                                      |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| Making the clip                                                    | "Making the sound…" and a spinner; buttons hidden                                  |
+| A current clip                                                     | [▶ Play] [Retake]                                                                  |
+| Offline, no current clip                                           | the offline line; no polling (it renders when back online, § 16.1)                 |
+| The request failed (server error, timeout)                         | the failure line and [Try again]                                                   |
+| This name's limit reached (T11)                                    | the limit line; [Retake] hidden until the limit resets; a current clip still plays |
+| The server's overall limit reached (T12)                           | the paused line; no buttons but [▶ Play] if a clip exists                          |
+| A stale clip (renamed, or sounds-like changed) + any failure state | the failure state's line; the stale clip is never played, here or on the picker    |
+
+The failed and paused lines tell the parent that picking that learner stays silent until a clip exists. Nothing about a failure reaches the child.
+
+### 16.3 Child flow: the tap
+
+With a current clip for the tapped learner (spoken text matches, § 16.1):
+
+1. **Tap:** "Who is playing?" stops if it is still playing. The disc pulses as today (§ 1.4). **The clip plays instead of the chime:** the 0.57 s chime (`pickerAudio.ts:7-10`) over Emma saying the name would blur the one word the tap is for.
+2. **Caption:** Emma's bubble shows "\<Name\>!", the written name, never the sounds-like spelling, as one word walk (§ 1.3).
+3. **Route:** 200 ms after the clip ends. At 1.5 s after the tap, if the clip is still playing, it fades out over 80 ms and the route changes (§ 1.4). The server keeps clips to 1.3 s (K18), so this cut should not happen.
+4. Further taps are ignored until the route changes (§ 1.4). The other tiles do not dim.
+
+With **no current clip** (none made, a stale one, an unreadable file, or the player fails to load it): the phase 2 pick exactly, the chime and the route 400 ms after the tap (`PICK_ROUTE_DELAY_MS`, `pickerTiming.ts:17`). No error, no log the child can see.
+
+- **Reduce Motion** changes the pulse only (§ 1.4), never the clip.
+- **Clip loading:** the picker reads every learner's clip from disk when it mounts, so a tap never waits on a read. A tap before a load finished counts as no clip.
+- **Nowhere else (D6):** the Hub badge, Greet, Session End, praise, teaching and every Emma line stay as they are. Only the picker imports the name-clip player (AC 60).
+
+### 16.4 Storage and re-render rules
+
+**On disk:** `Paths.document/name-audio/<learnerId>.mp3` and a sidecar `Paths.document/name-audio/<learnerId>.json`:
+
+```ts
+interface NameAudioRecord {
+  soundsLike: string | null // the parent's spelling; null = say the name
+  clip: {
+    spoken: string // the spoken text this clip says (soundsLike ?? name)
+    voice: string // the server's voice key at render time (K18)
+    language: string // the learner's language at render time ('en', § 5.2)
+    renderedAtISO: string
+  } | null
+}
+```
+
+The sidecar keeps the learner list (§ 4.1) unchanged, so nothing in PR A's list guard or migration moves. Whether the record instead becomes an optional field on `LearnerEntry` is K19. `Paths.document` survives OS purges and app updates; it goes with an app delete.
+
+**A clip plays** when the file loads and `clip.spoken` equals the learner's spoken text. A voice or language mismatch still plays the old clip (the right name, the old voice) and queues a new one (§ 16.1).
+
+| Event                                          | What happens to the clip                                                                                                                                                                                                                                                         |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rename                                         | "Sounds like" cleared; the old clip is stale and never plays again; a new clip is made (§ 16.1). The old file is replaced only when the new one arrives, and deleted if the learner ends up unnamed.                                                                             |
+| Remove (§ 3.5)                                 | the mp3 and the sidecar are deleted with the 7 keys. The Remove alert does not change: a clip is remade from the name at no effort to the parent.                                                                                                                                |
+| Restore from a code (§ 3.4)                    | no change: the list name stays (§ 4.5), so the spoken text stays.                                                                                                                                                                                                                |
+| Add from a code (§ 3.3)                        | a name save for the new learner: a clip is made.                                                                                                                                                                                                                                 |
+| Second device                                  | clips and "sounds like" are per device, like names and pictures after an add (§ 4.6). Neither goes in the progress doc or the cloud. Each device makes its own clip on its own Parent Settings visit, so a parent who set "sounds like" on the iPad sets it again on the iPhone. |
+| Down to 1 learner                              | clips are kept, unplayed, and no new ones are made (§ 16.1). If a learner is added again they are ready.                                                                                                                                                                         |
+| List rebuild (K11)                             | learners 2–4 keep their ids, so their clips reattach. Learner 1 gets a new id, so their clip is an orphan and is remade.                                                                                                                                                         |
+| Orphans                                        | on each Parent Settings open, files whose `<learnerId>` is not in the list are deleted.                                                                                                                                                                                          |
+| App deleted and reinstalled                    | clips are gone with `Paths.document`; they are remade on the first visit with 2+ learners.                                                                                                                                                                                       |
+| A newer voice (the server's voice key changes) | the old clip plays until the new one arrives on the next visit online.                                                                                                                                                                                                           |
+
+**Privacy (amends § 8).** To make a clip, the spoken text is sent to our server and on to ElevenLabs, once per render. This is new: until phase 3, names stayed on the device and in the learner's own cloud record. It is what T4 approved (Lily can only say a name she is sent). The request carries no learner id, picture or progress; the server keeps no record that ties a name to a device beyond what the cost guard needs (K15, K17). Session requests keep `'friend'` (P7). The parent is told in the row's footnote (§ 16.6).
+
+### 16.5 Edge cases
+
+- **Offline at save:** the offline line; the pick stays silent; the clip is made on the next visit online (§ 7).
+- **Online but the server refuses** (limit, 4xx, 5xx, timeout): the matching line (§ 16.2). The app never retries on its own within a visit except on coming back online; [Try again] is the parent's.
+- **Two quick saves** (rename, then rename again): the newer spoken text replaces the queued render; a response for an older spoken text is discarded.
+- **The learner card changes mid-render** (another learner's row tapped): the render finishes and stores for its own learner, without auto-play.
+- **A name the voice can't say well** (an uncommon name, a name from another language): preview, retake, then "sounds like". If none works, the parent can leave it: the stale or missing clip means a silent pick, the phase 2 behaviour.
+- **An unnamed learner:** no row, no clip, a silent pick.
+- **Mute** (`EXPO_PUBLIC_MUTE`, debug) and the device's silent switch: the clip follows the same rules as every other Emma line.
+- **A Danish learner later (§ 5.2):** the request carries the learner's `language`, only `'en'` exists, and the sidecar records it, so a language change re-renders. Nothing here assumes English beyond today's voice.
+
+### 16.6 Copy
+
+Native strings, in `mobile/src/screens/parentSettings/learnerCopy.ts` with the phase 2 learner strings. Strings with a name are functions of the name (the `startAlertTitle` pattern), never built by joining fragments, so a Danish version can reorder words. `{name}` is `displayName(name)` (`learnerCopy.ts:21`).
+
+**Row and field:**
+
+| Key                 | English                                                                                                                                                           | Where                    |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `nameSound`         | Name sound                                                                                                                                                        | row label                |
+| `play`              | Play                                                                                                                                                              | button                   |
+| `retake`            | Retake                                                                                                                                                            | button                   |
+| `tryAgain`          | Try again                                                                                                                                                         | button, after a failure  |
+| `soundsLike`        | Sounds like                                                                                                                                                       | field label              |
+| `soundsLikeHint`    | Type it the way it sounds                                                                                                                                         | field placeholder        |
+| `soundsLikeHelp`    | Only if Emma says the name wrong. Spell it as it sounds, like Mah-ree-ahn. The picture keeps the real name.                                                       | under the field          |
+| `soundsLikeInvalid` | Use letters, spaces, hyphens and apostrophes, up to 24.                                                                                                           | under the field, invalid |
+| `nameSoundFootnote` | Emma says this name once, when {name} taps their picture, and nowhere else. To make the sound, the name or its sounds-like spelling is sent to our voice service. | under the row            |
+
+**Status lines:**
+
+| Key         | English                                                                              | State (§ 16.2)          |
+| ----------- | ------------------------------------------------------------------------------------ | ----------------------- |
+| `making`    | Making the sound…                                                                    | rendering               |
+| `offline`   | Needs the internet. The sound is made the next time you open Parent settings online. | offline                 |
+| `failed`    | Couldn't make the sound. Picking {name} stays silent until it works.                 | request failed          |
+| `nameLimit` | No more retakes for {name} today. Try again tomorrow.                                | this name's limit (T11) |
+| `paused`    | Name sounds are paused for now. Picking {name} stays silent until they are back.     | overall limit (T12)     |
+
+`{name}` in the footnote and status lines is the written name. There is no new child-facing string: the bubble shows the learner's own name (§ 16.3), and no new Emma line is baked.
+
+### 16.7 Acceptance criteria
+
+**Core and server (vitest, PR C):**
+
+43. **Spoken text and staleness:** spoken text = `soundsLike ?? name`. A record whose `clip.spoken` equals it is current; after a rename it is stale; an unnamed learner needs no clip. A voice-key or language mismatch with a matching `spoken` is playable and needs a clip.
+44. **Sounds-like validation:** trimmed, 1–24 characters, § 3.2's set; rejects `/`, `<`, `[` and `:`; an empty string after trimming clears the field instead of saving; an accented name ("Zoë") passes.
+45. **Server input:** text outside the set, over 24 characters, or empty → 400, and the ElevenLabs stub sees no call. A `language` other than `'en'` → 400.
+46. **Server cost guard (K15):** past the per-sync-ID limit → 429, no ElevenLabs call. Past the overall limit → 429 even with a fresh v4 UUID on every request. The limit store unreachable → the endpoint refuses (fails closed), no ElevenLabs call. The kill switch set → refuses, no call.
+47. **Server render:** the ElevenLabs request carries Lily's voice and model as the canon does (`api/_tts_elevenlabs.ts:27`, `:30`), the text "\<spoken\>!", and no tier, phoneme or IPA rendering of client text.
+48. **Server privacy:** no log line contains the spoken text (log spy).
+49. Session requests still send `childName: 'friend'` with clips present (P7; AC 24 unchanged).
+
+**Native (jest, PR C):**
+
+50. With 2+ learners, each § 16.1 save trigger sends one render for that learner; the name is in the list before the response arrives. With 1 learner: no request and no Name sound row.
+51. Opening Parent Settings online makes one render per learner who needs a clip, one at a time, none for current clips, and plays nothing.
+52. A parent-triggered render auto-plays once when it arrives, only if that learner's card is still open.
+53. Play plays the stored file. Retake replaces the file and sidecar on success only; a failed retake keeps the old clip playable.
+54. Offline: the offline line, no request; coming back online with the screen open makes the queued renders. The picker, Hub, Greet, Map, Session End, Math and Word Song make zero name-audio requests (fetch spy across a full pick-to-session run).
+55. Done aborts in-flight and queued renders; nothing is written after Done.
+56. **Picker with a current clip:** no chime; "Who is playing?" stopped; the clip plays; the bubble shows "\<Name\>!" with the written name; the route changes 200 ms after the clip ends. A clip still playing at 1.5 s is faded and the route changes at 1.5 s. A second tap is ignored.
+57. **Picker without a current clip** (none, stale, unreadable file, player load error): the chime and the route at 400 ms, as AC 27.
+58. Rename clears "sounds like" and the stale clip never plays. Remove deletes the mp3 and the sidecar. An orphan file is deleted on the next Parent Settings open.
+59. Clips and sidecars are written under `Paths.document/name-audio/`, never under `Paths.cache`.
+60. **D6:** only `PickerScreen` (and Parent Settings' preview) import the name-clip player (source scan).
+61. Every string in § 16.6 renders as written, with the selected learner's name.
+
+**Device** (Thomas's iPad and iPhone, PR C on both, 2+ learners):
+
+62. The first Parent Settings visit online makes both clips; Play sounds right; a picker tap says the name and lands on the learner's Hub.
+63. Airplane mode: rename a learner → the offline line; the picker is silent for them; back online, reopen Parent Settings → the new clip.
+64. "Sounds like": type a spelling, hear the change on Play and on the picker; the tile and bubble still show the real name.
+65. Clips survive an app relaunch and an app update.
+66. Thomas's ear on each learner's clip (Predict-Before-Soak applies: CLAUDE.md § Predict-Before-Soak).
+
+**Build order inside PR C:** Kevin's server first (K13–K19, ACs 45–48), shipped in a release before Devon's UI reaches a device, because the native build calls the deployed server (`EXPO_PUBLIC_API_BASE`). Then Devon's UI (ACs 43–44, 49–61; whichever of 43–44 Kevin places in core he owns). Devon reviews Kevin's, Kevin reviews Devon's (`feedback_pr_review_routing`). T11–T13 are needed before the UI ships.
+
+### 16.8 Kevin designs (K13…)
+
+The server is Kevin's. These are the constraints from the UX, and the facts I found; the design is his to propose before PR C's server work starts.
+
+- **K13. Endpoint shape.** A small endpoint that takes one spoken text and returns one MP3 plus a voice key (§ 16.4). Whether it is its own file (recommended: it then leaves `/api/claude`'s canon, cache and planner limiter untouched) or a `kind` on `/api/claude`, the request body, and whether audio returns as bytes or base64 are Kevin's call. Inputs the client has: the spoken text, the learner's `language` (`'en'`), the learner's sync ID (§ 4.6). It must not need the learner id (never sent, § 4.1).
+- **K14. Auth.** Treat the endpoint as public. Native ships its shared secret in the bundle (`EXPO_PUBLIC_PROGRESS_API_SECRET`, read in `mobile/src/platform/buildEnv.ts`), and `/api/progress` says its bearer secret is "visible in the bundle" and "non-trivial for casual abuse, NOT secure against pentest" (`api/progress.ts:16-21`). `/api/claude` has origin checks and a per-IP limiter and no bearer check (`api/claude.ts:153-177`, `api/_rateLimit.ts`). Whether the endpoint takes the bearer secret anyway is Kevin's call; the cost guard (K15) must hold when the secret is known.
+- **K15. The cost guard.** This is a new on-demand ElevenLabs billing surface, and an unauthenticated TTS path is a known risk: PR #487 removed `payload.plan` because it rendered "a client-controlled utterance array straight through `renderSessionAudio` with no rate limiter, no canon lookup, and no utterance-count/text-length cap". Required, in this order of importance:
+  1. **An overall cap** (per day and per month, T12) that bounds spend whatever the callers. The per-sync-ID cap alone does not: the server accepts any v4 UUID (`api/progress.ts:182-184`), so a caller can mint a new one per request.
+  2. **A per-sync-ID cap per name** (T11) and a per-IP rate limit.
+  3. **Input limits:** one text per request; § 3.2's set; 1–24 characters after trimming (25 with the "!"); no SSML, IPA, slashes or markup passed to the voice, and the name path never goes through `renderElevenLabsText`'s tier rules on client text.
+  4. **Durable counting:** the in-memory limiter resets on a cold start and is per instance (`api/_rateLimit.ts:12-21`), so the caps live in KV (Upstash, as `/api/progress` uses, `api/_progressStore.ts`). If KV can't be read, the endpoint refuses (fails closed).
+  5. **A kill switch** (an env var) that turns name renders off with no deploy of the app; the app shows the paused line (§ 16.6).
+  6. Characters counted per render in a log line without the text (AC 48), so a spike is visible.
+- **K16. Concurrency.** ElevenLabs Starter allows 3 concurrent requests (project memory `project_elevenlabs_lily_bakeoff`, not re-checked against the dashboard). Name renders share them with live session renders. How the endpoint avoids starving a session (one name render at a time server-wide, say) is Kevin's call. The client sends one at a time per device (§ 16.1).
+- **K17. Caching.** A server cache of (spoken text, voice) would save repeat spend (a second device, a reinstall) but makes [Retake] return the same take, and it stores children's names server-side. Kevin decides whether to cache; if he does, Retake bypasses it, and the cache holds no device or sync ID beside the name.
+- **K18. Lily settings and the clip.** The same voice and model as the canon (`ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL_ID`, `api/_tts_elevenlabs.ts:27`, `:30`), the same output format, so the name sounds like Emma. The text is "\<spoken\>!" to match the caption. Leading and trailing silence trimmed; at most 1.3 s, so the route lands within 1.5 s (§ 1.4). How a Retake gets a different take, given that a seed did not vary eleven_v4 takes and input variants do (`api/_tts_elevenlabs.ts:205-208`). The voice key the client stores (§ 16.4): what it encodes, so a voice or model change marks clips for a re-render.
+- **K19. The client record.** § 16.4's sidecar file per learner, or an optional `LearnerEntry` field? I chose the sidecar so the list (§ 4.1, § 4.7 rule 6) stays as PR A shipped it. Kevin confirms, and places the spoken-text and staleness rule (AC 43) in core or in native.
+
+### 16.9 Thomas decides (T11…)
+
+- **T11. Renders per name per day.** Saves, sounds-like changes, retakes and Try again all count. I recommend **5 per learner per day**: enough for a name, two retakes and two spellings. Past it, the limit line (§ 16.6) and Retake hidden until the next day.
+- **T12. The overall cap.** A ceiling on every name render on the server, per day and per month, so a leaked path can't run up the ElevenLabs bill. Each render is at most 25 characters (T4: "about 6–25 characters each"). I recommend **100 renders a day and 1,000 a month, at most 25,000 characters a month**. I have not checked that against the Starter plan's monthly characters or the live canon path's share; Kevin reads both from the ElevenLabs dashboard before Thomas picks the number.
+- **T13. The new parent strings** in § 16.6, as written (T6 and T9 approved the earlier ones).
