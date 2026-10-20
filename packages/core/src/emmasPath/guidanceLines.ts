@@ -427,20 +427,9 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: the Play place's 18 lines (play-place spec § 4.1).
+ * Now: none.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
-  PLAY_OPEN_ID,
-  RAFT_OPEN_ID,
-  ...NUMBER_WORDS.map((_, i) => raftTotalId(i + 1)),
-  RAFT_GO_ID,
-  RAFT_SPLASH_ID,
-  RAFT_SILLY_ID,
-  RAFT_CLOSE_ID,
-  CRITTERS_OPEN_ID,
-  crittersFunnyId(1),
-  crittersFunnyId(2),
-]
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 
