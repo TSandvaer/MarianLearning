@@ -101,6 +101,12 @@
  * that Map, quiet, with the handoff it had (so its Home goes where it went
  * before). A game writes nothing and never reaches Session End.
  *
+ * The Play place (native spec `design/native/play-place.md` § 1.4): the
+ * Hub's Play disc opens `play-place` (the Hub's frames, so Emma stays put)
+ * with its open line; a tile opens `play-game` with that game in App
+ * state; a game's Back or natural stop returns to the place, silent; Home
+ * returns to the Hub. Nothing there writes or calls the network.
+ *
  * `@marian/core` is wired to the device before this module loads
  * (`./platform/boot.ts`, imported first by `index.ts`).
  */
@@ -114,6 +120,7 @@ import {
   prefetchTrackFor,
 } from '@marian/core/hub/hubSuggestion'
 import type { GameId } from '@marian/core/games/miniGames'
+import type { PlayGameId } from '@marian/core/games/playPlace'
 import type { ExtendedMathProblem } from '@marian/core/math/extendedProblems'
 import { pickStaticSessionPlan } from '@marian/core/math/sessionPlans'
 import { pickStaticWordSongPlan } from '@marian/core/wordSong/wordSessionPlans'
@@ -167,6 +174,7 @@ import {
 import { mapScreenLayout } from './layout/mapScreenLayout'
 import { parentSettingsLayout } from './layout/parentSettingsLayout'
 import { wordSongLayout } from './layout/wordSongLayout'
+import { playPlaceLayout } from './layout/playPlaceLayout'
 import { layoutForRoute } from './layout/routeLayout'
 import { sessionEndLayout } from './layout/sessionEndLayout'
 import { pickerLayout } from './layout/pickerLayout'
@@ -188,6 +196,8 @@ import {
 } from './screens/greet/Greet'
 import { Hub } from './screens/hub/Hub'
 import { GameScreen } from './screens/game/GameScreen'
+import { PlayGameScreen } from './screens/play/PlayGameScreen'
+import { PlayPlace } from './screens/play/PlayPlace'
 import { clearHubUnmountMark } from './screens/hub/hubAudio'
 import { MapScreen, type MapEntry } from './screens/map/MapScreen'
 import type { MapDebugLog } from './screens/map/mapTapLog'
@@ -381,6 +391,11 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
   const [game, setGame] = useState<{ id: GameId; map: MapEntry } | null>(null)
   const gameRef = useRef<{ id: GameId; map: MapEntry } | null>(null)
   const [gamePose, setGamePose] = useState<EmmaPose>('idle')
+  // The Play place (play-place § 1.4): the game on screen, and whether the
+  // place opens quiet (back from a game) or with its line (from the Hub).
+  const [playGame, setPlayGame] = useState<PlayGameId | null>(null)
+  const [playQuiet, setPlayQuiet] = useState(false)
+  const [playPose, setPlayPose] = useState<EmmaPose>('idle')
   // Where the session on screen was started (map-tap-to-play § 4); set by
   // each way into a session, kept through Session End's "Again".
   const originRef = useRef<SessionOrigin>('hub')
@@ -415,6 +430,7 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
         gameRef.current = null
         setGame(null)
       }
+      if (from === 'play-game') setPlayGame(null)
       // Word Song's session likewise (a request in flight is aborted: it
       // must not outlive the screen).
       if (from === 'session-end' || !WORD_SONG_AUDIO_ROUTES.has(next)) {
@@ -688,6 +704,28 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
     setMapEntry({ ...current.map, quietReturn: true })
     navigate('map')
   }, [navigate])
+  // Play-place spec § 1.4: the Hub's Play disc opens the place with its
+  // line; a tile opens a game; a game's Back or natural stop returns to
+  // the place, silent; Home goes to the Hub. Nothing here writes.
+  const onHubPlay = useCallback(() => {
+    setPlayQuiet(false)
+    navigate('play-place')
+  }, [navigate])
+  const onPlayHome = useCallback(() => navigate('hub'), [navigate])
+  const onPlayPick = useCallback(
+    (id: PlayGameId) => {
+      if (routeRef.current !== 'play-place') return
+      setPlayGame(id)
+      setPlayPose('idle')
+      navigate('play-game')
+    },
+    [navigate],
+  )
+  const onPlayGameExit = useCallback(() => {
+    if (routeRef.current !== 'play-game') return
+    setPlayQuiet(true)
+    navigate('play-place')
+  }, [navigate])
   const onPeekProblemKind = useCallback(
     (kind: ExtendedMathProblem['kind']) =>
       setReportedKind({ plan: peekRef.current?.plan ?? null, kind }),
@@ -783,6 +821,10 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
       ? sessionEndLayout(viewport)
       : null
   const hub = route === 'hub' ? hubLayout(viewport) : null
+  // The Play place keeps the Hub's frames; a game wears the Math frame.
+  const place = route === 'play-place' ? playPlaceLayout(viewport) : null
+  const playFrame =
+    route === 'play-game' && playGame !== null ? mathLayout(viewport) : null
   // The map needs its handoff; without one, the placeholder (no write).
   const map =
     route === 'map' && mapEntry !== null ? mapScreenLayout(viewport) : null
@@ -802,6 +844,8 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
     wordSong ??
     peekWord ??
     gameLayout ??
+    playFrame ??
+    place?.hub ??
     end ??
     hub ??
     map ??
@@ -891,6 +935,21 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
               onExit={onGameExit}
               onPoseChange={setGamePose}
             />
+          ) : playFrame && playGame ? (
+            <PlayGameScreen
+              key={`play-${playGame}`}
+              layout={playFrame}
+              game={playGame}
+              onExit={onPlayGameExit}
+              onPoseChange={setPlayPose}
+            />
+          ) : place ? (
+            <PlayPlace
+              layout={place}
+              quiet={playQuiet}
+              onHome={onPlayHome}
+              onPickGame={onPlayPick}
+            />
           ) : wordSong ? (
             <WordSong
               layout={wordSong}
@@ -918,6 +977,7 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
               onParentLongPress={onHubParent}
               learnerBadge={several ? activeLearner() : null}
               onLearnerBadge={onHubBadge}
+              onOpenPlay={onHubPlay}
             />
           ) : map && mapEntry ? (
             <MapScreen
@@ -976,11 +1036,13 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
                     ? peekPose
                     : route === 'game'
                       ? gamePose
-                      : wordSong
-                        ? wordSongPose
-                        : end
-                          ? sessionEndPose
-                          : 'idle'
+                      : route === 'play-game'
+                        ? playPose
+                        : wordSong
+                          ? wordSongPose
+                          : end
+                            ? sessionEndPose
+                            : 'idle'
               }
               // The web's Session End Emma is a still image (no breath). On
               // the picker she breathes as on Greet (learner profiles § 1.4).
@@ -994,7 +1056,9 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
               entrance={
                 route === 'hub' || route === 'picker' ? 'fade' : 'slide'
               }
-              shadow={route === 'hub' || picker !== null}
+              shadow={
+                route === 'hub' || route === 'play-place' || picker !== null
+              }
             />
           )}
         </>
