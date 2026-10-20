@@ -22,10 +22,12 @@ import {
 export interface TapClipPlayer {
   /**
    * Play `uri` from `fromMs` to `toMs` (null: to its end). Cuts a sound in
-   * flight. `onEnd` runs once when this sound stops for any reason.
+   * flight. `onEnd` runs once when this sound stops for any reason. A
+   * number is a bundled clip (a `require()`d module, play-place spec § 3.4)
+   * and goes to the player as it is.
    */
   play(
-    uri: string,
+    uri: string | number,
     fromMs: number,
     toMs: number | null,
     onEnd?: () => void,
@@ -39,7 +41,7 @@ export interface TapClipPlayer {
 
 export function createTapClipPlayer(engine: AudioEngine): TapClipPlayer {
   let player: PlayerLike | null = null
-  let playerUri: string | null = null
+  let playerUri: string | number | null = null
   let sub: PlayerSubscription | null = null
   let onEndCurrent: (() => void) | null = null
   let token = 0
@@ -68,7 +70,7 @@ export function createTapClipPlayer(engine: AudioEngine): TapClipPlayer {
       cut()
       if (player === null || playerUri !== uri) {
         if (player) disposePlayer(player)
-        player = engine.createPlayer({ uri })
+        player = engine.createPlayer(typeof uri === 'number' ? uri : { uri })
         playerUri = uri
       }
       const p = player
