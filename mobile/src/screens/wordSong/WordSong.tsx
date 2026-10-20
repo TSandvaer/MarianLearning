@@ -1424,9 +1424,7 @@ export function WordSong({
           ? playWholeBlend(problem, prompt.text, marks)
           : speak(prompt.text, {
               onWordTick: (i) => {
-                // A 'sounds' prompt (real blending's stop 2) has no steps.
-                const next =
-                  prompt.kind === 'blend' ? prompt.steps[i] : undefined
+                const next = prompt.steps[i]
                 if (next !== undefined) setLit(next)
               },
             }).then(() => setLit(null))
