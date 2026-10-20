@@ -62,11 +62,20 @@ const BACK_SHADOW =
 const BACK_SHADOW_PRESSED =
   'inset 0 4px 0 rgba(255, 255, 255, 0.3), 0 2px 0 #7d4a26, 0 4px 8px rgba(60, 30, 10, 0.28)'
 
-function BackButton({ size, onPress }: { size: number; onPress: () => void }) {
+/** The lesson's clay back disc (also the Play-place games', § 1.7). */
+export function BackButton({
+  size,
+  onPress,
+  testID,
+}: {
+  size: number
+  onPress: () => void
+  testID?: string
+}) {
   const { idPrefix } = useContext(World)
   return (
     <Pressable
-      testID={`${idPrefix}-back-to-hub`}
+      testID={testID ?? `${idPrefix}-back-to-hub`}
       accessibilityRole="button"
       accessibilityLabel="Back"
       onPress={onPress}
