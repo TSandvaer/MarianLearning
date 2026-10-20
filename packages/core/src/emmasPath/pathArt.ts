@@ -79,6 +79,7 @@ const PATH_ART_SET: Readonly<Record<PathArtId, true>> = {
   'letter-names': true,
   'letter-sounds': true,
   'blending-cv': true,
+  'sounding-out': true,
   'cvc-words': true,
   'cvc-words-short-o': true,
   'cvc-words-short-u': true,

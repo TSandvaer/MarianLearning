@@ -319,6 +319,11 @@ const WAVE_3_STORY_WORDS: ReadonlySet<string> = new Set(
  */
 const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {
   'mult-mix': "Let's play all the groups!",
+  // Word Song land 2 (real blending § 4, § 11; Thomas approved T1–T5):
+  // blending sounds' new format gets a lead too; sounding out's lights the
+  // letters left to right (crab words' cue, Decision 5).
+  'blending-cv': 'The sounds make a word!',
+  'sounding-out': 'Tap the letters. Hear the sounds!',
   // Number Garden land 4 (content wave 2 § 2.4, § 6.2; Thomas 2026-10-17).
   'div-share': "Let's share the flowers!",
   // Number Garden land 5 (content wave 3 § 5.1; Thomas approved T2).

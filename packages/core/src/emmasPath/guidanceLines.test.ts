@@ -41,15 +41,16 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'session-review': 1,
       'session-warmup': 1,
       'session-knew': 1,
-      'session-peek-open': 41,
-      'session-peek-close': 41,
+      'session-peek-open': 42,
+      'session-peek-close': 42,
       // Content wave 4: more and less; bee, car (duck words' text) and sheep
-      // stories. Content wave 5: zeros, adding big numbers; snail and moon
-      // words (duck words' text) and goat stories (sheep stories' text).
-      'session-intro': 19,
+      // stories. Real blending: blending sounds and sounding out. Content
+      // wave 5: zeros, adding big numbers; snail and moon words (duck words'
+      // text) and goat stories (sheep stories' text).
+      'session-intro': 21,
       'session-hiding': 1,
-      'session-replay-open': 43,
-      'session-replay-close': 43,
+      'session-replay-open': 44,
+      'session-replay-close': 44,
       // Content wave 3 § 5.1: "Read the story." and the 54 word clips;
       // content wave 4 § 8.1: 17 more; content wave 5 § 9.1: 16 more.
       'story-read': 1,
@@ -59,18 +60,18 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       // The first mini-game, Fill the flower bed (mini-game spec § 3.1).
       game: 30,
     })
-    expect(GUIDANCE_LINES).toHaveLength(330)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(330)
+    expect(GUIDANCE_LINES).toHaveLength(336)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(336)
     // Bee, car, snail and moon words' leads are duck words' text (content
-    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories': 330 ids,
-    // 325 texts, 330 files.
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(325)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(330)
+    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories': 336 ids,
+    // 331 texts, 336 files.
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(331)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(336)
   })
 
   it('AC8: both replay sets, one line per STAGE_SPOKEN_NAMES step, with the exact texts (map-tap-to-play § 6, T1 approved 2026-10-17)', () => {
     const steps = Object.keys(STAGE_SPOKEN_NAMES) as SkillNode[]
-    expect(steps).toHaveLength(43)
+    expect(steps).toHaveLength(44)
     expect([...MATH_TREE, ...LITERACY_TREE].sort()).toEqual([...steps].sort())
     for (const node of steps) {
       const name = STAGE_SPOKEN_NAMES[node]
@@ -102,11 +103,12 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     const chars = (ls: typeof open) => ls.reduce((n, l) => n + l.text.length, 0)
     // Content wave 3 adds the story steps' 3 × 29 and 3 × 21, and
     // hundreds' 26 and 18; content wave 4 more and less's 31 and 23, and
-    // bee, car and sheep's 27, 27, 31 and 19, 19, 23 (§ 8.1); content wave
-    // 5 zeros' 23 and 15, adding big numbers' 36 and 28, snail, moon and
-    // goat's 29, 28, 30 and 21, 20, 22 (§ 9.1).
-    expect(chars(open)).toBe(1291)
-    expect(chars(close)).toBe(947)
+    // bee, car and sheep's 27, 27, 31 and 19, 19, 23 (§ 8.1); real
+    // blending sounding out's 30 and 22 (§ 11); content wave 5 zeros' 23
+    // and 15, adding big numbers' 36 and 28, snail, moon and goat's 29, 28,
+    // 30 and 21, 20, 22 (§ 9.1).
+    expect(chars(open)).toBe(1321)
+    expect(chars(close)).toBe(969)
     expect(guidanceLine('guide.session.replay-close.number-recog')?.text).toBe(
       'You know numbers!',
     )
@@ -116,7 +118,8 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     expect(Math.max(...[...open, ...close].map((l) => l.text.length))).toBe(45)
     // Rendered in Lily, the story steps' 6 and hundreds' pair too (content
     // wave 3 § 5.1), more and less's pair, content wave 4's land-8 6
-    // (§ 8.1), and content wave 5's Number Garden pairs and land-9 6 (§ 9.1).
+    // (§ 8.1), real blending's sounding-out pair (§ 11) and content wave
+    // 5's Number Garden pairs and land-9 6 (§ 9.1).
     expect(
       [...open, ...close].filter((l) =>
         GUIDANCE_LINES_AWAITING_RENDER.includes(l.id),
@@ -388,7 +391,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(330)
+    ).toHaveLength(336)
   })
 
   it('repeats no Emma’s Path line', () => {
@@ -497,18 +500,30 @@ describe('the mini-game lines (mini-game spec § 3)', () => {
     // The fingerprint (FNV-1a over the JSON of id, kind, world, text, input
     // and src, in order) of the 300 lines on main at 4724665f, taken before
     // the game lines were added (299 at ae6472c5: 45621, b78acc53; 289 at
-    // 8b0935b8: 43921, 77d72c5f; 258 at c86d551e: 39492, eea1867e).
+    // 8b0935b8: 43921, 77d72c5f; 258 at c86d551e: 39492, eea1867e). Real
+    // blending's 6 session lines (§ 11) sit among them; the fingerprint is
+    // of the other 300.
+    const realBlending = new Set([
+      'guide.session.intro.blending-cv',
+      'guide.session.intro.sounding-out',
+      'guide.session.peek-open.sounding-out',
+      'guide.session.peek-close.sounding-out',
+      'guide.session.replay-open.sounding-out',
+      'guide.session.replay-close.sounding-out',
+    ])
+    const before = GUIDANCE_LINES.slice(0, 306)
+    expect(before.filter((l) => realBlending.has(l.id))).toHaveLength(6)
     const shipped = JSON.stringify(
-      GUIDANCE_LINES.slice(0, 300).map(
-        ({ id, kind, world, text, input, src }) => [
+      before
+        .filter((l) => !realBlending.has(l.id))
+        .map(({ id, kind, world, text, input, src }) => [
           id,
           kind,
           world,
           text,
           input ?? null,
           src,
-        ],
-      ),
+        ]),
     )
     let hash = 0x811c9dc5
     for (let i = 0; i < shipped.length; i++) {
@@ -516,7 +531,7 @@ describe('the mini-game lines (mini-game spec § 3)', () => {
       hash = Math.imul(hash, 0x01000193) >>> 0
     }
     expect([shipped.length, hash.toString(16)]).toEqual([45725, '12763e65'])
-    expect(GUIDANCE_LINES.slice(300)).toEqual(game)
+    expect(GUIDANCE_LINES.slice(306)).toEqual(game)
   })
 
   it('C4: has the exact texts of § 3.1, no render input and the path src', () => {

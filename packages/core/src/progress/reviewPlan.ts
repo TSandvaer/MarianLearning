@@ -104,15 +104,36 @@ export function reviewBaseline(): ReadonlySet<SkillNode> {
 }
 
 /**
+ * Sounding out was never played: no good day and no secure day for it.
+ * Real blending's migration (`storage.ts`, T4) fills it `'mastered'` for a
+ * learner past land 2, so it is then treated like a baseline step (D2):
+ * never reviewed and never a warm-up source, as "Remember this one?" would
+ * be false (Dave, 2026-10-19). Both lists are add-only and outlive the
+ * history trim, so a learner who plays it keeps it in rotation.
+ */
+function soundingOutUnplayed(p: Progress): boolean {
+  return (
+    (p.goodDays?.['sounding-out']?.length ?? 0) === 0 &&
+    (p.secureDays?.['sounding-out']?.length ?? 0) === 0
+  )
+}
+
+/**
  * The steps a review draws from: mastered and not baseline, in tree order
- * (so the last is the most recently mastered). `[]` for a complete world,
- * which has no sleeping flower.
+ * (so the last is the most recently mastered); sounding out only once
+ * played. `[]` for a complete world, which has no sleeping flower.
  */
 export function reviewPool(p: Progress, world: MasteryTrack): SkillNode[] {
   const tree = treeOf(world)
   if (tree.every((n) => p.skillLevels[n] === 'mastered')) return []
   const base = reviewBaseline()
-  return tree.filter((n) => p.skillLevels[n] === 'mastered' && !base.has(n))
+  const unplayed = soundingOutUnplayed(p)
+  return tree.filter(
+    (n) =>
+      p.skillLevels[n] === 'mastered' &&
+      !base.has(n) &&
+      !(n === 'sounding-out' && unplayed),
+  )
 }
 
 /**

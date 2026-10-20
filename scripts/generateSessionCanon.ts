@@ -342,6 +342,9 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'letter-names',
   'letter-sounds',
   'blending-cv',
+  // Real blending (design/native/real-blending.md § 6): land 2's 2nd stop.
+  // Written by scripts/spliceRealBlendingCanon.ts with blending-cv's file.
+  'sounding-out',
   'cvc-words',
   'cvc-words-short-o',
   'cvc-words-short-u',
@@ -414,6 +417,10 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
  * - bee-words, car-words, sheep-stories (content wave 4 § 8.1): written by
  *   `scripts/spliceContentWave4Canon.ts`, never Haiku-baked; rendered the
  *   same way.
+ * - blending-cv, sounding-out (real blending § 6, Decision 4): written by
+ *   `scripts/spliceRealBlendingCanon.ts` from the binding tables, never
+ *   Haiku-baked. blending-cv was a bake target: a `--force` bake would have
+ *   overwritten its spliced file with Haiku's "Tap the <word>." plan.
  * - snail-words, moon-words, goat-stories (content wave 5 § 9.1): written
  *   by `scripts/spliceContentWave5Canon.ts`, never Haiku-baked; rendered
  *   the same way.
@@ -440,6 +447,8 @@ export const PENDING_CANON_NODES: ReadonlySet<string> = new Set([
   'bee-words',
   'car-words',
   'sheep-stories',
+  'blending-cv',
+  'sounding-out',
   'snail-words',
   'moon-words',
   'goat-stories',

@@ -622,7 +622,7 @@
         'other',
       ]
 
-      // Canon files — 17 math + 27 word-song. Iterated in alphabetical
+      // Canon files — 17 math + 28 word-song. Iterated in alphabetical
       // (group, file-stem) order so the dedup canonical-member choice is
       // deterministic across runs. A stem whose file is not baked yet
       // (404) is skipped with a console note, so a new step can be listed
@@ -641,9 +641,11 @@
       // theirs (#607), and content wave 5's hundreds-zeros (zeros) and
       // add-two-digit (adding big numbers) add 31 + 26 with their render
       // (#621) and snail-words + moon-words + goat-stories add 94 with
-      // theirs (#617). A line awaiting its render (empty audio) is not
-      // counted.
-      const EXPECTED_CANON_UNIQUE = 1332
+      // theirs (#617; 1332). Real blending (design/native/real-blending.md
+      // § 13) retires blending-cv's 8 "Tap the <word>." clips and its Lily
+      // render adds its 18 new texts (1342). A line awaiting its render
+      // (empty audio) is not counted.
+      const EXPECTED_CANON_UNIQUE = 1342
       const CANON_FILES = [
         // math/level-1
         ['math', 'add-to-10'],
@@ -690,6 +692,7 @@
         ['word-song', 'sight-words'],
         ['word-song', 'simple-sentences'],
         ['word-song', 'snail-words'],
+        ['word-song', 'sounding-out'],
         ['word-song', 'tent-words'],
       ]
 
@@ -828,6 +831,10 @@
               'Here is your path! You are on blending sounds.',
             ],
             [
+              'path-open-sounding-out.mp3',
+              'Here is your path! You are on sounding out.',
+            ],
+            [
               'path-open-cvc-words.mp3',
               'Here is your path! You are on cat words.',
             ],
@@ -944,6 +951,7 @@
             ['path-stop-letter-names.mp3', 'Letter names.'],
             ['path-stop-letter-sounds.mp3', 'Letter sounds.'],
             ['path-stop-blending-cv.mp3', 'Blending sounds.'],
+            ['path-stop-sounding-out.mp3', 'Sounding out.'],
             ['path-stop-cvc-words.mp3', 'Cat words.'],
             ['path-stop-cvc-words-short-o.mp3', 'Dog words.'],
             ['path-stop-cvc-words-short-u.mp3', 'Sun words.'],
@@ -1065,8 +1073,12 @@
               'Blending sounds! First, letter sounds. Then this!',
             ],
             [
+              'path-locked-next-sounding-out.mp3',
+              'Sounding out! First, blending sounds. Then this!',
+            ],
+            [
               'path-locked-next-cvc-words.mp3',
-              'Cat words! First, blending sounds. Then this!',
+              'Cat words! First, sounding out. Then this!',
             ],
             [
               'path-locked-next-cvc-words-short-o.mp3',
@@ -1220,6 +1232,10 @@
               'end-bud-blending-cv.mp3',
               'Look! A new flower for blending sounds!',
             ],
+            [
+              'end-bud-sounding-out.mp3',
+              'Look! A new flower for sounding out!',
+            ],
             ['end-bud-cvc-words.mp3', 'Look! A new flower for cat words!'],
             [
               'end-bud-cvc-words-short-o.mp3',
@@ -1345,8 +1361,12 @@
               'You learned letter sounds! Now you can do blending sounds!',
             ],
             [
+              'end-unlock-sounding-out.mp3',
+              'You learned blending sounds! Now you can do sounding out!',
+            ],
+            [
               'end-unlock-cvc-words.mp3',
-              'You learned blending sounds! Now you can do cat words!',
+              'You learned sounding out! Now you can do cat words!',
             ],
             [
               'end-unlock-cvc-words-short-o.mp3',
@@ -1604,6 +1624,10 @@
           'guide-session-peek-open-blending-cv.mp3',
           "Let's look at blending sounds!",
         ],
+        [
+          'guide-session-peek-open-sounding-out.mp3',
+          "Let's look at sounding out!",
+        ],
         ['guide-session-peek-open-cvc-words.mp3', "Let's look at cat words!"],
         [
           'guide-session-peek-open-cvc-words-short-o.mp3',
@@ -1745,6 +1769,10 @@
           'Blending sounds is for later. You will learn it!',
         ],
         [
+          'guide-session-peek-close-sounding-out.mp3',
+          'Sounding out is for later. You will learn it!',
+        ],
+        [
           'guide-session-peek-close-cvc-words.mp3',
           'Cat words are for later. You will learn it!',
         ],
@@ -1835,6 +1863,11 @@
         [
           'guide-session-peek-close-goat-stories.mp3',
           'Goat stories are for later. You will learn it!',
+        ],
+        ['guide-session-intro-blending-cv.mp3', 'The sounds make a word!'],
+        [
+          'guide-session-intro-sounding-out.mp3',
+          'Tap the letters. Hear the sounds!',
         ],
         ['guide-session-intro-duck-words.mp3', 'Two letters, one sound!'],
         ['guide-session-intro-crab-words.mp3', 'Read all the letters!'],
@@ -1944,6 +1977,10 @@
         [
           'guide-session-replay-open-blending-cv.mp3',
           "Let's play blending sounds again!",
+        ],
+        [
+          'guide-session-replay-open-sounding-out.mp3',
+          "Let's play sounding out again!",
         ],
         [
           'guide-session-replay-open-cvc-words.mp3',
@@ -2095,6 +2132,10 @@
         [
           'guide-session-replay-close-blending-cv.mp3',
           'You know blending sounds!',
+        ],
+        [
+          'guide-session-replay-close-sounding-out.mp3',
+          'You know sounding out!',
         ],
         ['guide-session-replay-close-cvc-words.mp3', 'You know cat words!'],
         [

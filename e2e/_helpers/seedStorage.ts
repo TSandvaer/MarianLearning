@@ -165,6 +165,9 @@ const DEFAULT_SKILL_LEVELS = {
   'letter-names': 'mastered',
   'letter-sounds': 'practicing',
   'blending-cv': 'practicing',
+  // Real blending § 9: land 2's 2nd stop. `buildSeedProgress` fills it
+  // 'mastered' behind a mastered blending-cv, as the load rule does.
+  'sounding-out': 'locked',
   'cvc-words': 'intro',
   'cvc-words-short-o': 'locked',
   'cvc-words-short-u': 'locked',
@@ -250,6 +253,20 @@ function cloneSeedHistoryEntry(
  * threshold, focus-node levels).
  */
 export function buildSeedProgress(opts: SeedProgressOptions = {}): unknown {
+  const skillLevels: Record<string, string> = {
+    ...DEFAULT_SKILL_LEVELS,
+    ...(opts.skillLevelOverrides ?? {}),
+  }
+  // Real blending § 9 (T4): a seed with blending sounds mastered that
+  // doesn't name sounding out has done land 2, as the load rule says.
+  // Without it the specs that seed `blending-cv: 'mastered'` would store
+  // 'locked' behind it and trap the picker.
+  if (
+    skillLevels['blending-cv'] === 'mastered' &&
+    !('sounding-out' in (opts.skillLevelOverrides ?? {}))
+  ) {
+    skillLevels['sounding-out'] = 'mastered'
+  }
   return {
     schemaVersion: 1,
     profile: {
@@ -257,10 +274,7 @@ export function buildSeedProgress(opts: SeedProgressOptions = {}): unknown {
       character: 'melody',
       lastPlayedISO: opts.lastPlayedISO ?? null,
     },
-    skillLevels: {
-      ...DEFAULT_SKILL_LEVELS,
-      ...(opts.skillLevelOverrides ?? {}),
-    },
+    skillLevels,
     mathFactsLeitner: {
       items: [],
     },

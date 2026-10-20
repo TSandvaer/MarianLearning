@@ -70,6 +70,30 @@ export function chipFaceFor(contentType?: WordSongContentType): ChipFace {
   }
 }
 
+/**
+ * Does the type play the problem's blend clip ("c - a - t ... cat"): the
+ * 2nd wrong's sound-out, letter taps, the marks? `cvc-word`, and real
+ * blending's two stops (`design/native/real-blending.md` § 8).
+ */
+export function usesBlendClip(contentType?: WordSongContentType): boolean {
+  return (
+    contentType === 'cvc-word' ||
+    contentType === 'listen-blend' ||
+    contentType === 'sound-out'
+  )
+}
+
+/**
+ * Is the picture card's picture left out until the problem is solved? Real
+ * blending's two stops show the letters only: the learner joins the sounds
+ * before seeing the word's picture (§ 3, T5).
+ */
+export function hidesPictureUntilAnswer(
+  contentType?: WordSongContentType,
+): boolean {
+  return contentType === 'listen-blend' || contentType === 'sound-out'
+}
+
 /** The chip's accessible name (web `aria-label`). */
 export function chipLabel(face: ChipFace, word: string): string {
   if (face === 'letter' || face === 'letter-sound') return `Letter ${word}`
@@ -168,18 +192,26 @@ export function isCleanWin(
 // ── The second wrong tap: blend or hint ────────────────────────────────
 
 /**
- * What the 2nd wrong tap plays (ticket 86c9qa6n3): on a `cvc-word` problem
- * with a baked `blend` line, the sound-out ("c - a - t ... cat") with the
- * letter highlight per token (`steps`, see `buildBlendHighlightSteps`);
- * otherwise the `hint` line (graceful skip, never a silent beat).
+ * What the 2nd wrong tap plays (ticket 86c9qa6n3): on a `cvc-word` or
+ * `listen-blend` problem with a baked `blend` line, the sound-out ("c - a -
+ * t ... cat") with the letter highlight per token (`steps`, see
+ * `buildBlendHighlightSteps`); on a `sound-out` problem, `sounds`: the same
+ * clip, which the native stage cuts before the word so the learner still
+ * does the join (real blending § 4); otherwise the `hint` line (graceful
+ * skip, never a silent beat).
  */
 export type SecondWrongPrompt =
   | { kind: 'blend'; text: string; steps: readonly (number | undefined)[] }
+  | { kind: 'sounds'; text: string }
   | { kind: 'hint'; text: string }
 
 export function secondWrongPrompt(problem: WordSongProblem): SecondWrongPrompt {
-  const blend =
-    problem.contentType === 'cvc-word' ? problem.utterances.blend : undefined
+  const blend = usesBlendClip(problem.contentType)
+    ? problem.utterances.blend
+    : undefined
+  if (blend !== undefined && problem.contentType === 'sound-out') {
+    return { kind: 'sounds', text: blend }
+  }
   if (blend !== undefined) {
     return {
       kind: 'blend',

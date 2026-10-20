@@ -245,6 +245,7 @@ export function buildCloudProgressBlob(opts: {
     'letter-names': 'mastered',
     'letter-sounds': 'practicing',
     'blending-cv': 'practicing',
+    'sounding-out': 'locked',
     'cvc-words': 'intro',
     'cvc-words-short-o': 'locked',
     'cvc-words-short-u': 'locked',

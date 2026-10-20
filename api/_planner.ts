@@ -190,6 +190,12 @@ export const VALID_WORD_SONG_FOCUS_NODES: readonly string[] = [
   'letter-names',
   'letter-sounds',
   'blending-cv',
+  // Real blending (design/native/real-blending.md § 8, § 13 row 14): land 2's
+  // 2nd stop. Served from its committed canon every session (written by
+  // scripts/spliceRealBlendingCanon.ts, never Haiku-baked), so it is NOT in
+  // WORD_SONG_FIRST_CLASS_FOCUS_NODES, as the story steps: a canon miss falls
+  // back to the blending-cv stub.
+  'sounding-out',
   'cvc-words',
   'cvc-words-short-o',
   'cvc-words-short-u',
@@ -1660,7 +1666,7 @@ Session-End utterances (REQUIRED — append to the same flat utterances array):
 After the per-problem utterances (8 × 7 = 56 for MATH, 8 × 5 = 40 for WORD-SONG — or 8 × 6 = 48 on the cvc-word tier, which adds the optional "blend" slot per problem), append the following Session-End utterances. The Session-End screen looks them up by exact id at runtime and degrades gracefully on a miss, but every id below MUST be emitted so the celebration never falls back to silent captions.
 
   - "session.end.opener" — text: "You did it!"
-  - "session.end.recap.focus" — text: "You worked on <spoken-focus-name> today!" where <spoken-focus-name> is a short, warm, CHILD-FACING phrase for the focus skill node named in the user message. Spell any numbers out as words and drop curriculum jargon — Emma is speaking to an 8-year-old, not a parent. Use exactly these phrases per focus node: add-to-10 -> "adding to ten"; add-to-20 -> "adding to twenty"; sub-to-10 -> "taking away to ten"; sub-to-20 -> "taking away to twenty"; number-recog -> "your numbers"; two-digit-addsub-no-regroup / two-digit-addsub-with-regroup -> "bigger numbers"; skip-counting -> "skip counting"; mult-2-5-10 / mult-3-4 / mult-6-9 / mult-mix -> "counting in groups"; div-share -> "sharing"; hundreds -> "hundreds"; hundreds-addsub -> "more and less"; hundreds-zeros -> "zeros"; add-two-digit -> "adding big numbers"; letter-names -> "your letters"; letter-sounds -> "letter sounds"; blending-cv -> "blending sounds"; any cvc-words* tier, any digraphs* tier, sight-words, duck-words, crab-words, tent-words, cake-words, bee-words, car-words, snail-words and moon-words -> "reading words"; simple-sentences -> "reading sentences"; fox-stories, hen-stories, bug-stories, sheep-stories and goat-stories -> "reading stories". Exactly one line; never use digits; one exclamation mark.
+  - "session.end.recap.focus" — text: "You worked on <spoken-focus-name> today!" where <spoken-focus-name> is a short, warm, CHILD-FACING phrase for the focus skill node named in the user message. Spell any numbers out as words and drop curriculum jargon — Emma is speaking to an 8-year-old, not a parent. Use exactly these phrases per focus node: add-to-10 -> "adding to ten"; add-to-20 -> "adding to twenty"; sub-to-10 -> "taking away to ten"; sub-to-20 -> "taking away to twenty"; number-recog -> "your numbers"; two-digit-addsub-no-regroup / two-digit-addsub-with-regroup -> "bigger numbers"; skip-counting -> "skip counting"; mult-2-5-10 / mult-3-4 / mult-6-9 / mult-mix -> "counting in groups"; div-share -> "sharing"; hundreds -> "hundreds"; hundreds-addsub -> "more and less"; hundreds-zeros -> "zeros"; add-two-digit -> "adding big numbers"; letter-names -> "your letters"; letter-sounds -> "letter sounds"; blending-cv -> "blending sounds"; sounding-out -> "sounding out"; any cvc-words* tier, any digraphs* tier, sight-words, duck-words, crab-words, tent-words, cake-words, bee-words, car-words, snail-words and moon-words -> "reading words"; simple-sentences -> "reading sentences"; fox-stories, hen-stories, bug-stories, sheep-stories and goat-stories -> "reading stories". Exactly one line; never use digits; one exclamation mark.
   - "session.end.recap.1" through "session.end.recap.11" — one entry per N in 1..11. The N=1 line is "You earned one star!"; for N >= 2 the line is "You earned <number-word> stars!" with the number spelled out (one, two, three, four, five, six, seven, eight, nine, ten, eleven). Never use digits; never use "stars" with N=1.
   - "session.end.streak.3" through "session.end.streak.8" — one entry per N in 3..8. Each line is "<number-word> in a row! Wow!" with the number spelled out (three, four, five, six, seven, eight). Capitalise the leading word.
   - "session.end.goodbye" — text: "See you soon."

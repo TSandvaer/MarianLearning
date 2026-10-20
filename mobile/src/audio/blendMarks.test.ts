@@ -2,6 +2,10 @@
  * The generated blend marks match the baked canon clip for clip (spec
  * § 5 acceptance: an entry for each of the 40 blend utterances, `bytes` =
  * the canon MP3's length, 4 segments in order), and the timing helpers.
+ *
+ * Real blending (`design/native/real-blending.md` § 7, § 11) adds 6 blends
+ * (mat, bat, can, cap, dad, jam): 46, measured by `npm run export-assets`
+ * after their Lily render; fewer than 6 new entries would mean a retake.
  */
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
@@ -54,8 +58,8 @@ function canonBlends(): Map<string, { bytes: number; sha256: string }> {
 describe('the generated marks', () => {
   const canon = canonBlends()
 
-  it('cover the 40 canon blend clips: same length, same content', () => {
-    expect(canon.size).toBe(40)
+  it('cover the 46 canon blend clips: same length, same content', () => {
+    expect(canon.size).toBe(46)
     expect(Object.keys(BLEND_MARKS).sort()).toEqual([...canon.keys()].sort())
     for (const [text, clip] of canon) {
       const { bytes, sha256 } = BLEND_MARKS[text]!

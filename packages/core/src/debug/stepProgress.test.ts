@@ -55,22 +55,22 @@ const treeOf = (w: MasteryTrack): readonly SkillNode[] =>
   w === 'math' ? MATH_TREE : LITERACY_TREE
 
 describe('the step list', () => {
-  it('covers every step of both trees, once, in tree order (17 + 26)', () => {
-    expect(CASES).toHaveLength(43)
+  it('covers every step of both trees, once, in tree order (17 + 27)', () => {
+    expect(CASES).toHaveLength(44)
     expect(QA_STEPS.map((s) => s.node)).toEqual([
       ...MATH_TREE,
       ...LITERACY_TREE,
     ])
     expect(QA_STEPS.filter((s) => s.world === 'math')).toHaveLength(17)
-    expect(QA_STEPS.filter((s) => s.world === 'word-song')).toHaveLength(26)
+    expect(QA_STEPS.filter((s) => s.world === 'word-song')).toHaveLength(27)
   })
 
   it('gives each step a distinct readable name and its position', () => {
-    expect(new Set(QA_STEPS.map((s) => s.name)).size).toBe(43)
+    expect(new Set(QA_STEPS.map((s) => s.name)).size).toBe(44)
     expect(QA_STEPS.find((s) => s.node === 'cvc-words-short-o')).toEqual({
       node: 'cvc-words-short-o',
       world: 'word-song',
-      position: 5,
+      position: 6,
       name: 'Dog words',
       land: 3,
     })
@@ -103,30 +103,38 @@ describe('the step list', () => {
     })
     // Content wave 3 § 1: the story steps, land 7.
     expect(QA_STEPS.find((s) => s.node === 'bug-stories')).toMatchObject({
-      position: 20,
+      position: 21,
       land: 7,
     })
     // Content wave 4 § 1: bee words, car words, sheep stories, land 8.
+    // Real blending's sounding out (land 2) moves every later Word Song
+    // step one along.
+    expect(QA_STEPS.find((s) => s.node === 'sounding-out')).toMatchObject({
+      position: 4,
+      name: 'Sounding out',
+      land: 2,
+    })
     expect(QA_STEPS.find((s) => s.node === 'sheep-stories')).toMatchObject({
-      position: 23,
+      position: 24,
       name: 'Sheep stories',
       land: 8,
     })
-    // Content wave 5 § 1: snail words, moon words, goat stories, land 9.
+    // Content wave 5 § 1: snail words, moon words, goat stories, land 9
+    // (one along for sounding out too).
     expect(QA_STEPS.find((s) => s.node === 'snail-words')).toMatchObject({
-      position: 24,
+      position: 25,
       name: 'Snail words',
       land: 9,
     })
     expect(QA_STEPS.find((s) => s.node === 'goat-stories')).toMatchObject({
-      position: 26,
+      position: 27,
       name: 'Goat stories',
       land: 9,
     })
   })
 
-  it('isStepNode accepts the 43 steps and nothing else', () => {
-    expect(QA_STEPS.filter((s) => isStepNode(s.node))).toHaveLength(43)
+  it('isStepNode accepts the 44 steps and nothing else', () => {
+    expect(QA_STEPS.filter((s) => isStepNode(s.node))).toHaveLength(44)
     expect(
       ['', 'digraphs', 'two-digit-addsub', 'banana'].filter(isStepNode),
     ).toEqual([])

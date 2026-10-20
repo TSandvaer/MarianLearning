@@ -282,3 +282,29 @@ describe('buildSeedProgress — cvcGraduationSessionFired latch (ticket 86caa6k1
     expect('cvcGraduationSessionFired' in progress).toBe(true)
   })
 })
+
+describe('buildSeedProgress — sounding out mirrors the load rule (real blending § 9, AC 10)', () => {
+  type Levels = { skillLevels: Record<string, string> }
+
+  it("blending sounds mastered and no override → sounding out 'mastered'", () => {
+    const doc = buildSeedProgress({
+      skillLevelOverrides: { 'blending-cv': 'mastered' },
+    }) as Levels
+    expect(doc.skillLevels['sounding-out']).toBe('mastered')
+  })
+
+  it("no override → sounding out 'locked', as the schema floor", () => {
+    const doc = buildSeedProgress() as Levels
+    expect(doc.skillLevels['sounding-out']).toBe('locked')
+  })
+
+  it('an explicit override wins', () => {
+    const doc = buildSeedProgress({
+      skillLevelOverrides: {
+        'blending-cv': 'mastered',
+        'sounding-out': 'practicing',
+      },
+    }) as Levels
+    expect(doc.skillLevels['sounding-out']).toBe('practicing')
+  })
+})

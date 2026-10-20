@@ -151,6 +151,7 @@ const WORD_SONG_NODES: ReadonlyArray<string> = [
   'letter-names',
   'letter-sounds',
   'blending-cv',
+  'sounding-out',
   'cvc-words',
   'cvc-words-short-o',
   'cvc-words-short-u',

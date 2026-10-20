@@ -1300,7 +1300,9 @@ export function WordSong({
             }
           : {
               onWordTick: (i) => {
-                const next = prompt.steps[i]
+                // A 'sounds' prompt (real blending's stop 2) has no steps.
+                const next =
+                  prompt.kind === 'blend' ? prompt.steps[i] : undefined
                 if (next !== undefined) setLit(next)
               },
             }

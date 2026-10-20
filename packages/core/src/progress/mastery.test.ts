@@ -149,7 +149,8 @@ describe('nextNode', () => {
   })
 
   it('returns the next literacy node', () => {
-    expect(nextNode('word-song', 'blending-cv')).toBe('cvc-words')
+    expect(nextNode('word-song', 'blending-cv')).toBe('sounding-out')
+    expect(nextNode('word-song', 'sounding-out')).toBe('cvc-words')
   })
 
   it('returns null for the last node in a track', () => {
@@ -335,7 +336,7 @@ describe('applyMasteryRule — defaults (7/8 on 3 good days, cross-day, autoProm
     expect(result.skillLevels['add-to-10']).toBe('mastered')
     expect(result.skillLevels['add-to-20']).toBe('intro')
     expect(result.skillLevels['blending-cv']).toBe('mastered')
-    expect(result.skillLevels['cvc-words']).toBe('intro')
+    expect(result.skillLevels['sounding-out']).toBe('intro')
   })
 
   it('does not mutate the input progress', () => {

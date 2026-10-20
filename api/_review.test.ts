@@ -433,10 +433,12 @@ describe('Map peek (payload.peek, fast-track-native § 6.2)', () => {
                   extendedKinds: true,
                   problemCount: 3,
                 }).problems
-              : // As the native app reads it (the stories are native only).
+              : // As the native app reads it (the stories and real blending's
+                // two reads are native only).
                 wordSongSessionPlanFromServer(plan, {
                   problemCount: 3,
                   littleStories: true,
+                  blendReads: true,
                 }).problems
           if (problems.length !== 3) failed.push(`${track}/${node} parse`)
         } catch (err) {
@@ -656,10 +658,12 @@ describe('Map replay (payload.replay, map-tap-to-play § 3)', () => {
                   extendedKinds: true,
                   problemCount: 8,
                 }).problems
-              : // As the native app reads it (the stories are native only).
+              : // As the native app reads it (the stories and real blending's
+                // two reads are native only).
                 wordSongSessionPlanFromServer(plan, {
                   problemCount: 8,
                   littleStories: true,
+                  blendReads: true,
                 }).problems
           if (problems.length !== 8) failed.push(`${track}/${node} parse`)
         } catch (err) {

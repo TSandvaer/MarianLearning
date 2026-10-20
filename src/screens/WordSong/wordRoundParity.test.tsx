@@ -48,11 +48,19 @@ const CANON_DIR = resolve(process.cwd(), 'public/canon/word-song/level-1')
  * Every baked Word Song plan the web plays, as the app rehydrates it. The
  * little stories (content wave 3 § 4) are native only: the frozen web
  * parses without `littleStories`, so their plans throw there by design.
+ * So are real blending's two stops (`design/native/real-blending.md` § 8):
+ * the web parses without `blendReads` and plays its silent static plan.
  */
+const NATIVE_ONLY = new Set(['blending-cv.json', 'sounding-out.json'])
 const PLANS: { file: string; plan: WordSongSessionPlan }[] = readdirSync(
   CANON_DIR,
 )
-  .filter((f) => f.endsWith('.json') && !f.endsWith('-stories.json'))
+  .filter(
+    (f) =>
+      f.endsWith('.json') &&
+      !f.endsWith('-stories.json') &&
+      !NATIVE_ONLY.has(f),
+  )
   .sort()
   .map((file) => {
     const json = JSON.parse(readFileSync(resolve(CANON_DIR, file), 'utf8'))

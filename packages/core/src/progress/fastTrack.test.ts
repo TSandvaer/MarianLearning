@@ -196,12 +196,12 @@ describe('AC3 the fast track at the defaults (88% / 3)', () => {
     expect(loadProgress()).toEqual(p)
   })
 
-  it('Word Song: secure Monday + Tuesday master blending-cv and open cvc-words', () => {
+  it('Word Song: secure Monday + Tuesday master blending-cv and open sounding-out (real blending § 1)', () => {
     saveProgress(progressAtStep('blending-cv'))
     play('blending-cv', MON, ALL)
     const p = play('blending-cv', TUE, ALL)
     expect(p.skillLevels['blending-cv']).toBe('mastered')
-    expect(p.skillLevels['cvc-words']).toBe('intro')
+    expect(p.skillLevels['sounding-out']).toBe('intro')
     expect(p.pendingPromotion).toBe('blending-cv')
     expect(p.goodDays?.['blending-cv']).toEqual([key(MON), key(TUE)])
   })

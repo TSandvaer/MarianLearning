@@ -69,12 +69,15 @@ export interface PathLine {
  * caption unchanged (content wave 5 § 9.1). Two waves needed that take by
  * ear (hen and bug stories in #599, car words in #607; `team/DECISIONS.md`),
  * so it is the first take for a new step. Shipped lines are not listed:
- * their committed MP3s stay as they are.
+ * their committed MP3s stay as they are. Real blending § 11: sounding out's
+ * line is new, and cat words' changes text ("First, sounding out.").
  */
 export const THEN_THIS_INPUT_STEPS: ReadonlySet<SkillNode> = new Set<SkillNode>(
   [
     'hundreds-zeros',
     'add-two-digit',
+    'sounding-out',
+    'cvc-words',
     'snail-words',
     'moon-words',
     'goat-stories',
