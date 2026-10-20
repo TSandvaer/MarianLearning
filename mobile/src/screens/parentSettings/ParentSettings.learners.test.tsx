@@ -28,6 +28,7 @@ import {
   defaultProgress,
   type Progress,
 } from '@marian/core/progress'
+import { landsOf } from '@marian/core/progress/lands'
 import {
   act,
   fireEvent,
@@ -320,12 +321,18 @@ describe('AC 35: adding a learner', () => {
     expect(
       screen.getByTestId('ps-add-picture-lion').props.accessibilityState,
     ).toMatchObject({ selected: true })
-    // The lands: Number Garden 1–5, Word Song 1–8, land 1 by default.
-    for (let n = 1; n <= 5; n++)
+    // The lands: every land of both worlds, read from the tree so a new
+    // land doesn't break this; land 1 by default.
+    const mathLands = landsOf('math').length
+    const wordSongLands = landsOf('word-song').length
+    for (let n = 1; n <= mathLands; n++)
       expect(screen.getByTestId(`ps-add-land-math-${n}`)).toBeOnTheScreen()
-    for (let n = 1; n <= 8; n++)
+    for (let n = 1; n <= wordSongLands; n++)
       expect(screen.getByTestId(`ps-add-land-word-song-${n}`)).toBeOnTheScreen()
-    expect(screen.queryByTestId('ps-add-land-math-6')).toBeNull()
+    expect(screen.queryByTestId(`ps-add-land-math-${mathLands + 1}`)).toBeNull()
+    expect(
+      screen.queryByTestId(`ps-add-land-word-song-${wordSongLands + 1}`),
+    ).toBeNull()
     expect(
       screen.getByTestId('ps-add-land-math-1').props.accessibilityState,
     ).toMatchObject({ selected: true })

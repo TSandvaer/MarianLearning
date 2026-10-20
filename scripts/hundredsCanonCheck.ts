@@ -207,6 +207,7 @@ function asProblem(spec: HundredsSpec, index: number): HundredsProblem {
         tens: spec.tens,
         ones: spec.ones,
         spokenOrder: spec.order,
+        form: 'places',
         correct: hundredsAnswer(spec),
         utterances,
       }

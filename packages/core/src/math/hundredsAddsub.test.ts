@@ -189,13 +189,11 @@ describe('the more-and-less read template (§ 2.6, AC 1)', () => {
 
   it.each([
     ['not a change word', 'Two hundred and thirty-five. What is fifty more?'],
-    [
-      'a zero in the answer',
-      'Three hundred and forty-two. What is forty less?',
-    ],
+    // A zero in the start or the answer parses since zeros (content wave 5
+    // § 2.6); more and less keeps none by its canon lint
+    // (`hundredsAddsubCanonCheck.ts`).
     ['a regroup', 'Three hundred and twenty-four. What is thirty less?'],
     ['past 999', 'Eight hundred and twelve. What is two hundred more?'],
-    ['a zero in the start', 'Two hundred and four. What is ten more?'],
     [
       'an answer under 100',
       'Two hundred and thirty-five. What is two hundred less?',

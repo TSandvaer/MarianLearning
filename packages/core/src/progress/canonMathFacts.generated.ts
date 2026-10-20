@@ -118,4 +118,15 @@ export const CANON_MATH_FACTS: Readonly<
   'div-share': [null, null, null, null, null, null, null, null],
   hundreds: [null, null, null, null, null, null, null, null],
   'hundreds-addsub': [null, null, null, null, null, null, null, null],
+  'hundreds-zeros': [null, null, null, null, null, null, null, null],
+  'add-two-digit': [
+    { a: 34, b: 25, op: '+' },
+    { a: 42, b: 36, op: '+' },
+    { a: 28, b: 35, op: '+' },
+    { a: 47, b: 26, op: '+' },
+    { a: 39, b: 44, op: '+' },
+    { a: 56, b: 28, op: '+' },
+    { a: 29, b: 33, op: '+' },
+    { a: 65, b: 27, op: '+' },
+  ],
 }

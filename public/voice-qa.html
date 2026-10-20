@@ -622,7 +622,7 @@
         'other',
       ]
 
-      // Canon files — 15 math + 27 word-song. Iterated in alphabetical
+      // Canon files — 17 math + 27 word-song. Iterated in alphabetical
       // (group, file-stem) order so the dedup canonical-member choice is
       // deterministic across runs. A stem whose file is not baked yet
       // (404) is skipped with a console note, so a new step can be listed
@@ -638,17 +638,21 @@
       // files add 85 with theirs (#599), hundreds adds 32 with its (#603),
       // and content wave 4's hundreds-addsub (more and less) adds 39 with
       // its (#608), bee-words + car-words + sheep-stories add 88 with
-      // theirs (#607), and content wave 5's snail-words + moon-words +
-      // goat-stories add 94 with theirs (#617). A line awaiting its render
-      // (empty audio) is not counted.
-      const EXPECTED_CANON_UNIQUE = 1275
+      // theirs (#607), and content wave 5's hundreds-zeros (zeros) and
+      // add-two-digit (adding big numbers) add 31 + 26 with their render
+      // (#621) and snail-words + moon-words + goat-stories add 94 with
+      // theirs (#617). A line awaiting its render (empty audio) is not
+      // counted.
+      const EXPECTED_CANON_UNIQUE = 1332
       const CANON_FILES = [
         // math/level-1
         ['math', 'add-to-10'],
         ['math', 'add-to-20'],
+        ['math', 'add-two-digit'],
         ['math', 'div-share'],
         ['math', 'hundreds'],
         ['math', 'hundreds-addsub'],
+        ['math', 'hundreds-zeros'],
         ['math', 'mult-2-5-10'],
         ['math', 'mult-3-4'],
         ['math', 'mult-6-9'],
@@ -802,6 +806,14 @@
               'path-open-hundreds-addsub.mp3',
               'Here is your path! You are on more and less.',
             ],
+            [
+              'path-open-hundreds-zeros.mp3',
+              'Here is your path! You are on zeros.',
+            ],
+            [
+              'path-open-add-two-digit.mp3',
+              'Here is your path! You are on adding big numbers.',
+            ],
             ['path-open-done.mp3', 'You did all of it! Look at your flowers!'],
             [
               'path-open-letter-names.mp3',
@@ -927,6 +939,8 @@
             ['path-stop-div-share.mp3', 'Sharing.'],
             ['path-stop-hundreds.mp3', 'Hundreds.'],
             ['path-stop-hundreds-addsub.mp3', 'More and less.'],
+            ['path-stop-hundreds-zeros.mp3', 'Zeros.'],
+            ['path-stop-add-two-digit.mp3', 'Adding big numbers.'],
             ['path-stop-letter-names.mp3', 'Letter names.'],
             ['path-stop-letter-sounds.mp3', 'Letter sounds.'],
             ['path-stop-blending-cv.mp3', 'Blending sounds.'],
@@ -963,6 +977,7 @@
             ['path-land-math-3.mp3', 'Land 3: Big numbers.'],
             ['path-land-math-4.mp3', 'Land 4: Groups.'],
             ['path-land-math-5.mp3', 'Land 5: Hundreds.'],
+            ['path-land-math-6.mp3', 'Land 6: Bigger numbers.'],
             ['path-land-word-song-1.mp3', 'Land 1: Letters.'],
             ['path-land-word-song-2.mp3', 'Land 2: Blending.'],
             ['path-land-word-song-3.mp3', 'Land 3: Words.'],
@@ -1032,6 +1047,14 @@
             [
               'path-locked-next-hundreds-addsub.mp3',
               'More and less! First, hundreds. Then this!',
+            ],
+            [
+              'path-locked-next-hundreds-zeros.mp3',
+              'Zeros! First, more and less. Then this!',
+            ],
+            [
+              'path-locked-next-add-two-digit.mp3',
+              'Adding big numbers! First, zeros. Then this!',
             ],
             [
               'path-locked-next-letter-sounds.mp3',
@@ -1180,6 +1203,11 @@
               'end-bud-hundreds-addsub.mp3',
               'Look! A new flower for more and less!',
             ],
+            ['end-bud-hundreds-zeros.mp3', 'Look! A new flower for zeros!'],
+            [
+              'end-bud-add-two-digit.mp3',
+              'Look! A new flower for adding big numbers!',
+            ],
             [
               'end-bud-letter-names.mp3',
               'Look! A new flower for letter names!',
@@ -1301,6 +1329,14 @@
               'You learned hundreds! Now you can do more and less!',
             ],
             [
+              'end-unlock-hundreds-zeros.mp3',
+              'You learned more and less! Now you can do zeros!',
+            ],
+            [
+              'end-unlock-add-two-digit.mp3',
+              'You learned zeros! Now you can do adding big numbers!',
+            ],
+            [
               'end-unlock-letter-sounds.mp3',
               'You learned letter names! Now you can do letter sounds!',
             ],
@@ -1412,6 +1448,7 @@
             ['end-land-math-3.mp3', 'A new land! Land 3: Big numbers!'],
             ['end-land-math-4.mp3', 'A new land! Land 4: Groups!'],
             ['end-land-math-5.mp3', 'A new land! Land 5: Hundreds!'],
+            ['end-land-math-6.mp3', 'A new land! Land 6: Bigger numbers!'],
             ['end-land-word-song-2.mp3', 'A new land! Land 2: Blending!'],
             ['end-land-word-song-3.mp3', 'A new land! Land 3: Words!'],
             ['end-land-word-song-4.mp3', 'A new land! Land 4: Sound pairs!'],
@@ -1438,6 +1475,7 @@
             ['end-land-math-3-no-number.mp3', 'A new land: Big numbers!'],
             ['end-land-math-4-no-number.mp3', 'A new land: Groups!'],
             ['end-land-math-5-no-number.mp3', 'A new land: Hundreds!'],
+            ['end-land-math-6-no-number.mp3', 'A new land: Bigger numbers!'],
             ['end-land-word-song-2-no-number.mp3', 'A new land: Blending!'],
             ['end-land-word-song-3-no-number.mp3', 'A new land: Words!'],
             ['end-land-word-song-4-no-number.mp3', 'A new land: Sound pairs!'],
@@ -1552,6 +1590,11 @@
         [
           'guide-session-peek-open-hundreds-addsub.mp3',
           "Let's look at more and less!",
+        ],
+        ['guide-session-peek-open-hundreds-zeros.mp3', "Let's look at zeros!"],
+        [
+          'guide-session-peek-open-add-two-digit.mp3',
+          "Let's look at adding big numbers!",
         ],
         [
           'guide-session-peek-open-letter-sounds.mp3',
@@ -1686,6 +1729,14 @@
           'More and less are for later. You will learn it!',
         ],
         [
+          'guide-session-peek-close-hundreds-zeros.mp3',
+          'Zeros are for later. You will learn it!',
+        ],
+        [
+          'guide-session-peek-close-add-two-digit.mp3',
+          'Adding big numbers is for later. You will learn it!',
+        ],
+        [
           'guide-session-peek-close-letter-sounds.mp3',
           'Letter sounds are for later. You will learn it!',
         ],
@@ -1811,6 +1862,8 @@
         ['guide-session-intro-div-share.mp3', "Let's share the flowers!"],
         ['guide-session-intro-hundreds.mp3', 'Hundreds, tens and ones!'],
         ['guide-session-intro-hundreds-addsub.mp3', 'More and less!'],
+        ['guide-session-intro-hundreds-zeros.mp3', 'No tens? Zero tens!'],
+        ['guide-session-intro-add-two-digit.mp3', 'Tens and ones!'],
         ['guide-session-hiding.mp3', 'Some flowers are hiding!'],
         [
           'guide-session-replay-open-number-recog.mp3',
@@ -1871,6 +1924,14 @@
         [
           'guide-session-replay-open-hundreds-addsub.mp3',
           "Let's play more and less again!",
+        ],
+        [
+          'guide-session-replay-open-hundreds-zeros.mp3',
+          "Let's play zeros again!",
+        ],
+        [
+          'guide-session-replay-open-add-two-digit.mp3',
+          "Let's play adding big numbers again!",
         ],
         [
           'guide-session-replay-open-letter-names.mp3',
@@ -2017,6 +2078,11 @@
         [
           'guide-session-replay-close-hundreds-addsub.mp3',
           'You know more and less!',
+        ],
+        ['guide-session-replay-close-hundreds-zeros.mp3', 'You know zeros!'],
+        [
+          'guide-session-replay-close-add-two-digit.mp3',
+          'You know adding big numbers!',
         ],
         [
           'guide-session-replay-close-letter-names.mp3',
