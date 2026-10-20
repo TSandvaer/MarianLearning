@@ -12,6 +12,7 @@ import {
   type HubLayout,
 } from './hubLayout'
 import { safeRect, type Rect, type Viewport } from './layout'
+import { hubBadge } from './pickerLayout'
 
 const NO_INSETS = { top: 0, bottom: 0, left: 0, right: 0 }
 
@@ -185,4 +186,58 @@ describe('W · tablet portrait = the web stage', () => {
     expect(l.garden.origin.x + l.garden.origin.width / 2).toBeCloseTo(417, 5)
     expect(l.emma.y).toBeCloseTo(24 - 6 * u, 5)
   })
+})
+
+/**
+ * The Play disc (play-place § 1.2, AC N1): the mirror of the learner
+ * badge's corner, 56 pt on phones and 96 pt on tablets, clear of both
+ * cards (with their crown and side room), the bubble and the badge.
+ */
+describe('the Play disc (play-place § 1.2, N1)', () => {
+  const intersects = (a: Rect, b: Rect) =>
+    a.x < right(b) && b.x < right(a) && a.y < bottom(b) && b.y < bottom(a)
+  const withRoom = (card: Rect, s: number): Rect => ({
+    x: card.x - CARD_ROOM_SIDE * s,
+    y: card.y - CARD_ROOM_TOP * s,
+    width: card.width + 2 * CARD_ROOM_SIDE * s,
+    height: card.height + (CARD_ROOM_TOP + CARD_ROOM_BOTTOM) * s,
+  })
+  /** The bubble's box: its reserved slot, or (W) three caption lines. */
+  const bubbleBox = (l: HubLayout): Rect => ({
+    x: l.bubble.x,
+    y: l.bubble.y,
+    width: l.bubble.width,
+    height:
+      l.bubble.slotHeight ??
+      3 * l.bubble.lineHeight + 2 * l.bubble.padding.vertical,
+  })
+
+  it.each([
+    ['P 375×667', vp(375, 667), { x: 303, y: 8, width: 56, height: 56 }],
+    ['L 667×375', vp(667, 375), { x: 222, y: 8, width: 56, height: 56 }],
+    [
+      'W 820×1180 (t24 b20)',
+      vp(820, 1180, { top: 24, bottom: 20 }),
+      { x: 700, y: 38, width: 96, height: 96 },
+    ],
+    [
+      'TL 1180×820 (b20)',
+      vp(1180, 820, { bottom: 20 }),
+      { x: 272, y: 14, width: 96, height: 96 },
+    ],
+  ])(
+    '%s: at § 1.2’s rect, apart from cards, bubble and badge',
+    (_n, v, want) => {
+      const l = hubLayout(v)
+      expect(l.play.x).toBeCloseTo(want.x, 1)
+      expect(l.play.y).toBeCloseTo(want.y, 1)
+      expect(l.play.width).toBe(want.width)
+      expect(l.play.height).toBe(want.height)
+      for (const card of l.cards) {
+        expect(intersects(l.play, withRoom(card, l.s))).toBe(false)
+      }
+      expect(intersects(l.play, bubbleBox(l))).toBe(false)
+      expect(intersects(l.play, hubBadge(l).hit)).toBe(false)
+    },
+  )
 })

@@ -1,5 +1,6 @@
 import { ROUTES } from '../router/routes'
 import { greetLayout } from './greetLayout'
+import { hubLayout } from './hubLayout'
 import {
   isTablet,
   mathLayout,
@@ -88,4 +89,18 @@ describe('form factors', () => {
     expect(emma.x).toBeLessThan(safe.x + safe.width / 2)
     expect(emma.y).toBeLessThan(safe.y + safe.height / 3)
   })
+})
+
+describe('the Play place routes (play-place §§ 1.3, 1.7, N3)', () => {
+  it.each(Object.entries(VIEWPORTS))(
+    '%s: play-game wears the lesson Math frame, play-place the Hub frames',
+    (_name, viewport) => {
+      expect(layoutForRoute('play-game', viewport)).toEqual(
+        mathLayout(viewport),
+      )
+      expect(layoutForRoute('play-place', viewport)).toEqual(
+        hubLayout(viewport),
+      )
+    },
+  )
 })

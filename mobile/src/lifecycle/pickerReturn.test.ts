@@ -11,14 +11,14 @@ import {
 
 const TEN_MIN = 600_000
 
-it('is 10 minutes, on Greet, the Hub, the Map and Session End only', () => {
+it('is 10 minutes, on Greet, the Hub, the Map, Session End and the Play place only', () => {
   expect(PICKER_AFTER_HIDDEN_MS).toBe(TEN_MIN)
   expect([...PICKER_RETURN_ROUTES].sort()).toEqual(
-    ['greet', 'hub', 'map', 'session-end'].sort(),
+    ['greet', 'hub', 'map', 'session-end', 'play-place'].sort(),
   )
 })
 
-it.each(['greet', 'hub', 'map', 'session-end'] as Route[])(
+it.each(['greet', 'hub', 'map', 'session-end', 'play-place'] as Route[])(
   '%s: 10 min with 2+ learners opens the picker; 9 min 59 s or 1 learner does not',
   (route) => {
     expect(opensPickerOnReturn(route, TEN_MIN, 2)).toBe(true)
@@ -28,9 +28,13 @@ it.each(['greet', 'hub', 'map', 'session-end'] as Route[])(
   },
 )
 
-it.each(['math', 'literacy', 'peek', 'parent-settings', 'picker'] as Route[])(
-  '%s: never interrupted',
-  (route) => {
-    expect(opensPickerOnReturn(route, 10 * TEN_MIN, 4)).toBe(false)
-  },
-)
+it.each([
+  'math',
+  'literacy',
+  'peek',
+  'parent-settings',
+  'picker',
+  'play-game',
+] as Route[])('%s: never interrupted', (route) => {
+  expect(opensPickerOnReturn(route, 10 * TEN_MIN, 4)).toBe(false)
+})

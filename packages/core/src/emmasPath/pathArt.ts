@@ -52,6 +52,10 @@ export type UiArtId =
   | 'ui-arch-closed'
   /** The play door's clay piece (mini-game spec § 1.2.1, T6). */
   | 'ui-flower-bed'
+  /** The Hub's Play disc and the Play place's two tiles (play-place § 5.2). */
+  | 'ui-play'
+  | 'ui-raft'
+  | 'ui-critters'
 
 export type PathArtId = SkillNode | LandArtId | UiArtId
 
@@ -129,6 +133,9 @@ const PATH_ART_SET: Readonly<Record<PathArtId, true>> = {
   'ui-arch-open': true,
   'ui-arch-closed': true,
   'ui-flower-bed': true,
+  'ui-play': true,
+  'ui-raft': true,
+  'ui-critters': true,
 }
 
 /** Every art piece, in manifest order. */

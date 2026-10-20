@@ -4,6 +4,7 @@
  * clay Home button, the world title and the caption slab; natively, the
  * play door (mini-game spec § 1.2).
  */
+import type { PathArtId } from '@marian/core/emmasPath/pathArt'
 import type { PathLine } from '@marian/core/emmasPath/pathLines'
 import type { GameId } from '@marian/core/games/miniGames'
 import type { MasteryTrack } from '@marian/core/progress'
@@ -33,11 +34,48 @@ export function HomeButton({
   rect,
   k,
   onPress,
+  testID = 'map-home',
 }: {
   rect: Rect
   /** Web px → pt (1 on tablets, 7/12 on phones). */
   k: number
   onPress: () => void
+  testID?: string
+}) {
+  return (
+    <ClayDisc
+      rect={rect}
+      k={k}
+      onPress={onPress}
+      testID={testID}
+      label="Home"
+      art="ui-house"
+      look="wood"
+    />
+  )
+}
+
+/**
+ * A round clay disc button with a piece of path art at 68 × k, Home's
+ * shape, ledge and press: wood (Home), or the Hub bubble's cream over its
+ * `#e3c6a6` ledge (the Hub's Play disc, play-place § 1.2). No idle motion.
+ */
+export function ClayDisc({
+  rect,
+  k,
+  onPress,
+  testID,
+  label,
+  art,
+  look,
+}: {
+  rect: Rect
+  k: number
+  onPress: () => void
+  testID: string
+  label: string
+  art: PathArtId
+  look: 'wood' | 'cream'
 }) {
   const [down, setDown] = useState(false)
   const sink = useSharedValue(0)
@@ -47,11 +85,13 @@ export function HomeButton({
   const pressed = useAnimatedStyle(() => ({
     transform: [{ translateY: sink.get() }],
   }))
+  const ledge = look === 'wood' ? '#7d4a26' : '#e3c6a6'
+  const shine = look === 'wood' ? 0.3 : 1
   return (
     <Pressable
-      testID="map-home"
+      testID={testID}
       accessibilityRole="button"
-      accessibilityLabel="Home"
+      accessibilityLabel={label}
       onPressIn={() => setDown(true)}
       onPressOut={() => setDown(false)}
       onPress={onPress}
@@ -62,15 +102,15 @@ export function HomeButton({
     >
       <Animated.View
         style={[
-          styles.home,
+          look === 'wood' ? styles.home : styles.cream,
           {
             borderRadius: rect.width / 2,
-            boxShadow: `inset 0 ${5 * k}px 0 rgba(255,255,255,0.3), 0 ${8 * k}px 0 #7d4a26, 0 ${12 * k}px ${16 * k}px rgba(60,30,10,0.3)`,
+            boxShadow: `inset 0 ${5 * k}px 0 rgba(255,255,255,${shine}), 0 ${8 * k}px 0 ${ledge}, 0 ${12 * k}px ${16 * k}px rgba(60,30,10,0.3)`,
           },
           pressed,
         ]}
       >
-        <PathImage id="ui-house" px={Math.round(68 * k)} />
+        <PathImage id={art} px={Math.round(68 * k)} testID={`${testID}-art`} />
       </Animated.View>
     </Pressable>
   )
@@ -206,6 +246,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#c98a55',
     experimental_backgroundImage:
       'radial-gradient(circle at 40% 32%, #e7b07a 0%, #c98a55 55%, #a86c3c 100%)',
+  },
+  // The Hub bubble's cream (hub-native § 6).
+  cream: {
+    ...FILL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff8ee',
   },
   titleBox: { alignItems: 'center', justifyContent: 'center' },
   title: { fontFamily: fonts.bold, textAlign: 'center' },

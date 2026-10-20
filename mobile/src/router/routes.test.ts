@@ -7,7 +7,7 @@ describe('route shell', () => {
   })
 
   it('has a label and an exit for every route', () => {
-    expect(ROUTES).toHaveLength(12)
+    expect(ROUTES).toHaveLength(14)
     for (const route of ROUTES) {
       expect(ROUTE_LABELS[route]).toBeTruthy()
       expect(ROUTE_EXITS[route].length).toBeGreaterThan(0)
@@ -77,6 +77,24 @@ describe('route shell', () => {
     expect(
       ROUTES.filter((r) => r !== 'map' && ROUTE_EXITS[r].includes('game')),
     ).toEqual([])
+  })
+
+  it('the Play place (play-place § 1.4, N3): only the Hub opens it, and a game only returns to it', () => {
+    expect(ROUTE_EXITS.hub).toContain('play-place')
+    expect(ROUTE_EXITS['play-place']).toEqual(['hub', 'play-game', 'picker'])
+    expect(ROUTE_EXITS['play-game']).toEqual(['play-place'])
+    expect(
+      ROUTES.filter(
+        (r) => r !== 'hub' && ROUTE_EXITS[r].includes('play-place'),
+      ).filter((r) => r !== 'play-game'),
+    ).toEqual([])
+    expect(
+      ROUTES.filter(
+        (r) => r !== 'play-place' && ROUTE_EXITS[r].includes('play-game'),
+      ),
+    ).toEqual([])
+    expect(ROUTE_LABELS['play-place']).toBe('Play place')
+    expect(ROUTE_LABELS['play-game']).toBe('Play game')
   })
 
   it('ignores a jump that is not an exit', () => {

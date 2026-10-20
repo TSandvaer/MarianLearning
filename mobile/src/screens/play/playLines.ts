@@ -1,0 +1,95 @@
+/**
+ * The Play place's words (play-place spec `design/native/play-place.md`
+ * § 4): every spoken line is a core `GUIDANCE_LINES` row of kind `'play'`
+ * (`guide.play.*`, Lily, `/assets/audio/path/guide-play-*.mp3`), played
+ * through one manifest line player (`play`) with word ticks for the bubble
+ * and the ribbon. The player never rejects; without a clip it walks the
+ * caption at 165 wpm, so nothing waits on audio. The labels nobody speaks
+ * (VoiceOver only, § 4.2) sit here too, so a language version swaps rows,
+ * not screens.
+ */
+import { GUIDANCE_LINES } from '@marian/core/emmasPath/guidanceLines'
+import type { PlayGameId, RaftWeight } from '@marian/core/games/playPlace'
+import {
+  createManifestLinePlayer,
+  type ManifestLine,
+  type ManifestLinePlayer,
+} from '../../audio/manifestLines'
+
+export type PlayLineId =
+  | 'guide.play.open'
+  | 'guide.play.raft.open'
+  | `guide.play.raft.total.${RaftWeight}`
+  | 'guide.play.raft.go'
+  | 'guide.play.raft.splash'
+  | 'guide.play.raft.silly'
+  | 'guide.play.raft.close'
+  | 'guide.play.critters.open'
+  | 'guide.play.critters.funny.1'
+  | 'guide.play.critters.funny.2'
+
+export const PLAY_LINE_MANIFEST: Readonly<Record<PlayLineId, ManifestLine>> =
+  Object.fromEntries(
+    GUIDANCE_LINES.filter((l) => l.kind === 'play').map((l) => [
+      l.id,
+      { src: l.src, text: l.text },
+    ]),
+  ) as Record<PlayLineId, ManifestLine>
+
+export type PlayLinePlayer = ManifestLinePlayer<PlayLineId>
+
+export function createPlayLinePlayer(): PlayLinePlayer {
+  return createManifestLinePlayer<PlayLineId>('play', PLAY_LINE_MANIFEST)
+}
+
+/** The raft's running total, "<N>!" (t 1-9). */
+export const raftTotalLine = (t: number) =>
+  `guide.play.raft.total.${t}` as PlayLineId
+
+/** The two giggle lines, alternating (§ 3.3). */
+export const crittersFunnyLine = (n: 1 | 2) =>
+  `guide.play.critters.funny.${n}` as PlayLineId
+
+/** § 4.2: the labels nobody speaks. */
+export const PLAY_LABELS = {
+  hubPlay: 'Play',
+  home: 'Home',
+  back: 'Back',
+  raft: 'Raft',
+  log: 'Log',
+} as const
+
+/** § 4.2: each tile's label, per game. */
+export const PLAY_TILE_LABELS: Readonly<Record<PlayGameId, string>> = {
+  raft: 'Raft crossing',
+  critters: 'Letter critters',
+}
+
+/** The number words the labels use ("Dog, seven"; "Raft, seven"). */
+const NUMBER_WORDS = [
+  'zero',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+] as const
+
+const capitalised = (word: string) => word[0]!.toUpperCase() + word.slice(1)
+
+/** A raft animal: "<Animal>, <weight>" ("Dog, seven"). */
+export const animalLabel = (animal: string, weight: number) =>
+  `${capitalised(animal)}, ${NUMBER_WORDS[weight]}`
+
+/** The raft: "Raft, <total>". */
+export const raftLabel = (total: number) =>
+  `${PLAY_LABELS.raft}, ${NUMBER_WORDS[total]}`
+
+/** A critter: "Letter <x>"; seated, "Letter <x>, on the log". */
+export const critterLabel = (letter: string, seated: boolean) =>
+  seated ? `Letter ${letter}, on the log` : `Letter ${letter}`
