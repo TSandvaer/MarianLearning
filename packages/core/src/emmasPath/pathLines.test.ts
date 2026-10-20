@@ -19,26 +19,26 @@ import {
  *  and "fox", "hen", "bug", "stories", "hundreds" (content wave 3 T1,
  *  Thomas 2026-10-17), and "more", "less", "bee", "car", "sheep" (content
  *  wave 4 T1, Thomas 2026-10-18), "sounding", "out" (real blending T1,
- *  Thomas 2026-10-19), and "snail", "moon", "goat" (content wave 5 T1,
- *  Thomas 2026-10-19). */
+ *  Thomas 2026-10-19), and "zeros", "bigger" (content wave 5 T1, Thomas
+ *  2026-10-19: "zeros", "adding big numbers", land 6 "Bigger numbers"), and
+ *  "snail", "moon", "goat" (content wave 5 T1, Thomas 2026-10-19). */
 const SPEC_VOCAB = new Set(
   `here is your path you are on did all of it look at flowers flower a new for
   learned now can do land first then this not yet numbers adding taking away to
   ten twenty big making tens skip counting groups two three four five and letter
   letters names sounds blending words reading sentences cat dog sun pig bed ship
   chick thumb star sound pairs the duck crab sharing tent cake fox hen bug
-  stories hundreds more less bee car sheep sounding out snail moon goat`.split(
-    /\s+/,
-  ),
+  stories hundreds more less bee car sheep sounding out zeros bigger snail moon
+  goat`.split(/\s+/),
 )
 const NUMERALS = new Set(['1', '2', '3', '4', '5', '6', '7', '8', '9'])
 
 describe('STAGE_SPOKEN_NAMES (spec §4.3)', () => {
-  it('gives all 42 stages a name and no two the same', () => {
+  it('gives all 44 stages a name and no two the same', () => {
     const nodes = [...MATH_TREE, ...LITERACY_TREE]
-    expect(nodes).toHaveLength(42)
+    expect(nodes).toHaveLength(44)
     const names = nodes.map((n) => STAGE_SPOKEN_NAMES[n])
-    expect(new Set(names).size).toBe(42)
+    expect(new Set(names).size).toBe(44)
   })
 })
 
@@ -64,26 +64,28 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
     const counts: Record<string, number> = {}
     for (const l of PATH_LINES) counts[l.kind] = (counts[l.kind] ?? 0) + 1
     expect(counts).toEqual({
-      open: 42,
+      open: 44,
       'open-done': 2,
-      stop: 42,
-      land: 14,
-      'locked-next': 40,
+      stop: 44,
+      land: 15,
+      'locked-next': 42,
       // Content wave 4: + 13 (more and less's stop after 14 earlier Number
       // Garden steps) and + 19 + 20 + 21 (land 8's stops after 20, 21, 22
-      // earlier Word Song steps). Content wave 5: + 22 + 23 + 24 (land 9's
-      // stops after 23, 24, 25 earlier Word Song steps). Real blending: + 25
-      // (sounding out's stop after 3 earlier steps, and one more earlier
-      // step for each of the 23 after it).
-      'locked-later': 416,
+      // earlier Word Song steps). Content wave 5: + 14 + 15 (zeros' and
+      // adding big numbers' stops after 15 and 16 earlier steps), + 22 + 23
+      // + 24 (land 9's stops after 23, 24, 25 earlier Word Song steps). Real
+      // blending: + 25 (sounding out's stop after 3 earlier steps, and one
+      // more earlier step for each of the 23 after it).
+      'locked-later': 445,
       // Content wave 4: + 20 (land 8's gate, closed from 20 steps). Content
-      // wave 5: + 23 (land 9's gate, closed from 23 steps). Real blending:
-      // + 7 (lands 3–9, each closed from one more step).
-      'gate-locked': 131,
-      'end-bud': 42,
-      'end-unlock': 40,
-      'end-land': 12,
-      'end-land-no-number': 12,
+      // wave 5: + 16 (Number Garden land 6's gate, closed from 16 steps),
+      // + 23 (land 9's gate, closed from 23 steps). Real blending: + 7
+      // (Word Song lands 3–9, each closed from one more step).
+      'gate-locked': 147,
+      'end-bud': 44,
+      'end-unlock': 42,
+      'end-land': 13,
+      'end-land-no-number': 13,
     })
     expect(new Set(PATH_LINES.map((l) => l.id)).size).toBe(PATH_LINES.length)
   })
@@ -195,11 +197,11 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
     // + 10 (tent words, cake words) = 174, the spec's + 15. Content wave
     // 3: + 18 (the three story steps, land 7) + 8 (hundreds, land 5) =
     // 200, § 5.1's + 26. Content wave 4: + 5 (more and less) and + 18 (bee
-    // words, car words, sheep stories, land 8) = 223. Content wave 5: + 18
-    // (snail words, moon words, goat stories, land 9) = 241. Real blending:
-    // + 5 (sounding out) = 246.
-    expect(BAKED_PATH_LINES).toHaveLength(246)
-    expect(new Set(BAKED_PATH_LINES.map((l) => l.text)).size).toBe(245)
+    // words, car words, sheep stories, land 8) = 223. Content wave 5: + 13
+    // (zeros, adding big numbers, land 6) + 18 (snail words, moon words,
+    // goat stories, land 9) = 254. Real blending: + 5 (sounding out) = 259.
+    expect(BAKED_PATH_LINES).toHaveLength(259)
+    expect(new Set(BAKED_PATH_LINES.map((l) => l.text)).size).toBe(258)
   })
 
   it('has a bundled MP3 for every baked line but the ones awaiting their render', () => {
@@ -211,9 +213,10 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
     expect(missing.sort()).toEqual([...PATH_LINES_AWAITING_RENDER].sort())
     // Content wave 2's tent and cake lines (§ 6.2), content wave 3's 18
     // story lines and hundreds' 8 (§ 5.1) and content wave 4's more and
-    // less 5 and 18 Word Song lines (§ 8.1) and content wave 5's 18 Word
-    // Song lines (§ 9.1) are rendered in Lily, and so are real blending's 5
-    // sounding-out lines and the 2 cat-words lines whose text changed (§ 11).
+    // less 5 and 18 Word Song lines (§ 8.1) and content wave 5's 13 Number
+    // Garden and 18 Word Song lines (§ 9.1) are rendered in Lily, and so are
+    // real blending's 5 sounding-out lines and the 2 cat-words lines whose
+    // text changed (§ 11).
     expect(PATH_LINES_AWAITING_RENDER).toEqual([])
   })
 

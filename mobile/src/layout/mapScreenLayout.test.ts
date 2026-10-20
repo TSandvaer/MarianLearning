@@ -21,7 +21,9 @@ import {
   type SkillLevels,
   type SkillNode,
 } from '@marian/core/progress'
-import type { Viewport } from './layout'
+import { resolve } from 'node:path'
+import { fontMeasure } from '../../test/fontAdvances'
+import type { Rect, Viewport } from './layout'
 import {
   focusBox,
   hitSlopFor,
@@ -143,17 +145,21 @@ describe('mapPathScale: the § 1 sizes table', () => {
   })
 
   // Content wave 3 added Number Garden land 5 (`content-wave-3.md` § 1):
-  // L scrolls further (369 → 448 pt, measured 2026-10-18).
-  it('Number Garden scrolls less in L (448 pt content)', () => {
-    expect(Math.round(worst(vp(667, 375), 'math').scroll!)).toBe(448)
+  // L scrolls further (369 → 448 pt, measured 2026-10-18). Content wave 5
+  // added land 6 (`content-wave-5.md` § 1 predicted 527 pt; measured
+  // 2026-10-19: 527).
+  it('Number Garden scrolls less in L (527 pt content)', () => {
+    expect(Math.round(worst(vp(667, 375), 'math').scroll!)).toBe(527)
   })
 
   // Content wave 3 § 1 ("Map fit, not measured"): Number Garden's 5 lands
   // were predicted to fit the portrait forms. Measured 2026-10-18: no
   // portrait form scrolls, the sizes are the Word Song table's or larger,
   // and the current stop's worst overhang is +0.8 pt at 820×1180 (the bar
-  // is 14).
-  it('Number Garden: 5 lands fit every portrait form; the current stop ends ≤ 14 pt below the pane', () => {
+  // is 14). Content wave 5 § 1 (T6) added land 6 = PORTRAIT_FIT_LANDS and
+  // predicted 13.6 pt at 820×1180 (Word Song's 6-land figure); measured
+  // 2026-10-19: 13.6, inside the bar, so Number Garden still fits.
+  it('Number Garden: 6 lands fit every portrait form; the current stop ends ≤ 14 pt below the pane', () => {
     const overhangs: Record<string, number> = {}
     for (const [name, v] of TABLE) {
       const layout = mapScreenLayout(v)
@@ -161,7 +167,7 @@ describe('mapPathScale: the § 1 sizes table', () => {
       let worstPt = -Infinity
       for (let cur = 0; cur < MATH_TREE.length; cur++) {
         const model = buildMapModel(seed(MATH_TREE, cur), 'math')
-        expect(model.lands).toHaveLength(5)
+        expect(model.lands).toHaveLength(6)
         const k = mapPathScale(layout.pane, model, [], layout.landscape)
         expect(k.scrolls).toBe(false)
         const geo = layoutMap(model, k.virtualW, k.virtualH)
@@ -173,7 +179,7 @@ describe('mapPathScale: the § 1 sizes table', () => {
     expect(Object.keys(overhangs)).toHaveLength(4)
     for (const pt of Object.values(overhangs))
       expect(pt).toBeLessThanOrEqual(14)
-    expect(overhangs['820×1180 (t24 b20)']).toBe(0.8)
+    expect(overhangs['820×1180 (t24 b20)']).toBe(13.6)
   })
 
   // Content wave 5 (T6): with 9 lands, 1133×744 joins the scrolled forms.
@@ -401,4 +407,61 @@ describe('hit areas (§ 1)', () => {
       expect(hitSlopFor(worst(v, 'word-song').stop)).toBeLessThanOrEqual(2.2)
     }
   })
+})
+
+/** Fredoka 700, the map title's face (`fonts.bold`). */
+const titleWidth = fontMeasure(
+  resolve(
+    __dirname,
+    '../..',
+    'node_modules/@expo-google-fonts/fredoka/700Bold/Fredoka_700Bold.ttf',
+  ),
+)
+
+const overlaps = (a: Rect, b: Rect) =>
+  a.x < b.x + b.width &&
+  b.x < a.x + a.width &&
+  a.y < b.y + b.height &&
+  b.y < a.y + a.height
+
+describe('mapScreenLayout: the play door (mini-game spec § 1.2, N1)', () => {
+  const CASES: [string, Viewport, Rect][] = [
+    ['P 375×667', vp(375, 667), { x: 303, y: 8, width: 56, height: 56 }],
+    ['L 667×375', vp(667, 375), { x: 16, y: 80, width: 56, height: 56 }],
+    [
+      'W 820×1180 (t24 b20)',
+      vp(820, 1180, 24, 20),
+      { x: 700, y: 38, width: 96, height: 96 },
+    ],
+    [
+      'TL 1180×820 (b20)',
+      vp(1180, 820, 0, 20),
+      { x: 144, y: 14, width: 96, height: 96 },
+    ],
+  ]
+
+  it.each(CASES)('%s: the door is at § 1.2’s rect', (_, v, rect) => {
+    expect(mapScreenLayout(v).door).toEqual(rect)
+  })
+
+  it.each(CASES)(
+    '%s: the door touches neither Home, the title text nor the pane',
+    (_, v) => {
+      const l = mapScreenLayout(v)
+      expect(overlaps(l.door, l.home)).toBe(false)
+      expect(overlaps(l.door, l.pane)).toBe(false)
+      expect(overlaps(l.door, l.caption.slot)).toBe(false)
+      if (l.title !== null) {
+        // The title text, centred in its rect (P, W) or its column (TL).
+        const w = titleWidth('Number Garden', l.title.fontSize)
+        const text = {
+          x: l.title.x + (l.title.width - w) / 2,
+          y: l.title.y,
+          width: w,
+          height: l.title.height,
+        }
+        expect(overlaps(l.door, text)).toBe(false)
+      }
+    },
+  )
 })

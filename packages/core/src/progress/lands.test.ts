@@ -7,12 +7,12 @@ import type { SkillNode } from './types'
 const ALL_NODES = Object.keys(defaultProgress().skillLevels) as SkillNode[]
 
 describe('LANDS', () => {
-  it('Number Garden has 5 lands and Word Song has 9, numbered 1..n', () => {
-    expect(landsOf('math').map((l) => l.number)).toEqual([1, 2, 3, 4, 5])
+  it('Number Garden has 6 lands and Word Song has 9, numbered 1..n', () => {
+    expect(landsOf('math').map((l) => l.number)).toEqual([1, 2, 3, 4, 5, 6])
     expect(landsOf('word-song').map((l) => l.number)).toEqual([
       1, 2, 3, 4, 5, 6, 7, 8, 9,
     ])
-    expect(LANDS).toHaveLength(14)
+    expect(LANDS).toHaveLength(15)
   })
 
   it('names the lands per the 2026-10-04 decision', () => {
@@ -22,6 +22,8 @@ describe('LANDS', () => {
       'Big numbers',
       'Groups',
       'Hundreds',
+      // Content wave 5 (design/native/content-wave-5.md § 1, K2, T1).
+      'Bigger numbers',
     ])
     expect(landsOf('word-song').map((l) => l.name)).toEqual([
       'Letters',

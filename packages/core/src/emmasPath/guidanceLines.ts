@@ -62,6 +62,8 @@ export type GuidanceLineKind =
   | 'session-replay-close'
   | 'story-read'
   | 'story-word'
+  | 'picker-who'
+  | 'game'
 
 export interface GuidanceLine {
   /** Dotted id, e.g. `guide.hub.suggest.math`. */
@@ -88,6 +90,19 @@ const WORLD_NAMES: Record<World, string> = {
 const OTHER: Record<World, World> = { math: 'word-song', 'word-song': 'math' }
 const WORLDS: readonly World[] = ['math', 'word-song']
 const COUNT_WORDS = ['One', 'Two', 'Three'] as const
+/** One to nine, lower case (the games' number words). */
+const NUMBER_WORDS = [
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+] as const
+const capitalize = (w: string) => `${w.charAt(0).toUpperCase()}${w.slice(1)}`
 const SCORE_WORDS: Record<number, string> = { 7: 'Seven', 8: 'Eight' }
 
 function buildLines(): GuidanceLine[] {
@@ -259,6 +274,32 @@ function buildLines(): GuidanceLine[] {
       WAVE_3_STORY_WORDS.has(word) ? undefined : `${cap},`,
     )
   }
+  // Learner profiles § 1.3 (T5, approved by Thomas 2026-10-19): the
+  // picker's question, on a device with 2 or more learners. No name in it
+  // (P7).
+  add(PICKER_WHO_ID, 'picker-who', 'Who is playing?')
+  // The side mini-games (design/native/mini-game-flower-bed.md § 3.1; T3,
+  // the texts, judged at the ear test). The shared lines are world-free: B
+  // and C reuse "Hmm... try again?" and the guided "This one is <n>.". Fill
+  // the flower bed's lines say each bond to ten whole. No line invites a
+  // round, and no line outside `guide.game.*` names a game.
+  add(GAME_AGAIN_ID, 'game', 'Hmm... try again?')
+  NUMBER_WORDS.forEach((n, i) =>
+    add(gameThisIsId(i + 1), 'game', `This one is ${n}.`),
+  )
+  add(BED_OPEN_ID, 'game', 'Ten flowers in every bed!', 'math')
+  NUMBER_WORDS.forEach((n, i) =>
+    add(bedAskId(i + 1), 'game', `${capitalize(n)} and what make ten?`, 'math'),
+  )
+  NUMBER_WORDS.forEach((n, i) =>
+    add(
+      bedYesId(i + 1),
+      'game',
+      `Yes! ${capitalize(n)} and ${NUMBER_WORDS[8 - i]} make ten!`,
+      'math',
+    ),
+  )
+  add(BED_CLOSE_ID, 'game', 'Ten every time! What a garden!', 'math')
   return lines
 }
 
@@ -290,6 +331,11 @@ const SESSION_INTRO_TEXTS: Readonly<Partial<Record<SkillNode, string>>> = {
   // Number Garden land 5's 2nd stop (content wave 4 § 2.4, § 8.1; Thomas
   // approved T2). Its pill pulses on "More" only (D1).
   'hundreds-addsub': 'More and less!',
+  // Number Garden land 5's 3rd stop and land 6 (content wave 5 § 2.4,
+  // § 3.4, § 9.1; Thomas approved T2; Dave D2, D4): the empty tens tray
+  // pulses on each "tens"; the two trays pulse on "Tens" and "ones".
+  'hundreds-zeros': 'No tens? Zero tens!',
+  'add-two-digit': 'Tens and ones!',
   // Word Song land 6 (content wave 1 § 3.3, § 4.3).
   'duck-words': 'Two letters, one sound!',
   'crab-words': 'Read all the letters!',
@@ -329,7 +375,14 @@ const peekCloseId = (n: SkillNode) => `guide.session.peek-close.${n}`
 const replayOpenId = (n: SkillNode) => `guide.session.replay-open.${n}`
 const replayCloseId = (n: SkillNode) => `guide.session.replay-close.${n}`
 const STORY_READ_ID = 'guide.story.read'
+const PICKER_WHO_ID = 'guide.picker.who'
 const storyWordId = (word: string) => `guide.story.word.${word}`
+const GAME_AGAIN_ID = 'guide.game.again'
+const gameThisIsId = (n: number) => `guide.game.this-is.${n}`
+const BED_OPEN_ID = 'guide.game.bed.open'
+const bedAskId = (given: number) => `guide.game.bed.ask.${given}`
+const bedYesId = (given: number) => `guide.game.bed.yes.${given}`
+const BED_CLOSE_ID = 'guide.game.bed.close'
 
 /** Every guidance line: Hub, then session end, then in session. */
 export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
@@ -365,6 +418,11 @@ export function storyReadLine(): GuidanceLine {
 /** A story word's own clip ("Fox."), or undefined for a word without one. */
 export function storyWordLine(word: string): GuidanceLine | undefined {
   return BY_ID.get(storyWordId(word))
+}
+
+/** "Who is playing?" (learner profiles § 1.3): the picker's line. */
+export function pickerWhoLine(): GuidanceLine {
+  return BY_ID.get(PICKER_WHO_ID)!
 }
 
 /** "Some flowers are hiding!" (§ 6.1): before a round's first missing number. */

@@ -76,8 +76,6 @@ import {
   DIVIDE_TOTAL_MAX,
   EXTENDED_ANSWER_MAX,
   MISSING_ADDEND_TOTAL_MAX,
-  PLACE_DIGIT_MAX,
-  PLACE_DIGIT_MIN,
   PLACE_PARTS,
   placeDigits,
   TWO_DIGIT_CHIP_MAX,
@@ -86,6 +84,7 @@ import {
   type MoreCount,
   type MoreDirection,
   type PlacePart,
+  type PlaceValueForm,
 } from './extendedProblems'
 import {
   type MathProblem,
@@ -456,8 +455,8 @@ function arithmeticProblem(
 
 /** One problem of an extended plan, dispatched on the read line's template.
  *  The templates are disjoint ("Tap the", comma list + "What is next?",
- *  "and what make", "plates", "What number is it?", "more?" / "less?",
- *  "times",
+ *  "and what make", "plates", "What number is it?" / "Find", "more?" /
+ *  "less?", "times",
  *  "plus" / "minus" / "take away"), so the order only decides which error a
  *  near-miss gets. */
 function extendedProblemFromRead(
@@ -525,7 +524,7 @@ function extendedProblemFromRead(
       `flowers, <W> plates. How many on each plate?"; hundreds "<W> ` +
       `<place>, <W> <place> and <W> <place>. What number is it?" or "<W>. ` +
       `What is ten more?" / "What is one hundred more?"; more and less ` +
-      `"<W>. What is <change> more?" / "… less?")`,
+      `"<W>. What is <change> more?" / "… less?"; zeros "Find <W>.")`,
   )
 }
 
@@ -764,16 +763,26 @@ function matchDivideRead(
 }
 
 /** Extract the digits and the number from a place-value `read` line
- *  (content wave 3 § 3.6).
+ *  (content wave 3 § 3.6, content wave 5 § 2.6).
  *
- *  Template (canon): `"<D> <place>, <D> <place> and <D> <place>. What
- *  number is it?"`, where each place (hundreds, tens, ones) comes once, in
- *  any order, e.g. `"Two hundreds, three tens and four ones. What number is
- *  it?"` → 2, 3, 4, correct 234, or P5's `"Three hundreds, six ones and two
- *  tens. …"` (spoken order hundreds, ones, tens) → 326. Every digit is
- *  {@link PLACE_DIGIT_MIN}..{@link PLACE_DIGIT_MAX} (D8: no zero, no one).
+ *  Templates (canon):
+ *
+ *  - places: `"<D> <place>, <D> <place> and <D> <place>. What number is
+ *    it?"`, where each place (hundreds, tens, ones) comes once, in any
+ *    order, e.g. `"Two hundreds, three tens and four ones. What number is
+ *    it?"` → 2, 3, 4, correct 234, or hundreds' P5 `"Three hundreds, six
+ *    ones and two tens. …"` (spoken order hundreds, ones, tens) → 326. A
+ *    digit is two … nine with the plural place, "no" (0) with the plural
+ *    tens or ones ("no tens"), or "one" with the singular "hundred" ("One
+ *    hundred, no tens and eight ones." → 108). Rejected: "one" with tens
+ *    or ones ("one ten"), "no hundreds" (below 100), a place named twice.
+ *  - name: `"Find <number>."`, the number in British words, 100..999, e.g.
+ *    `"Find one hundred and ninety."` → 1, 9, 0, `form: 'name'`, the places
+ *    in place order.
+ *
  *  Case-insensitive; throws on any drift. Disjoint from every other
- *  template (none ends "What number is it?").
+ *  template (none ends "What number is it?" or starts "Find"). Hundreds'
+ *  own digits 2..9 are its canon lint's rule, not the parser's.
  *
  *  Opt-in kind: only `mathSessionPlanFromServer(plan, { extendedKinds: true
  *  })` reads this template. */
@@ -782,34 +791,71 @@ export function parsePlaceValueRead(read: string): {
   tens: number
   ones: number
   spokenOrder: PlacePart[]
+  form: PlaceValueForm
   correct: number
 } {
   const placeValue = matchPlaceValueRead(read)
   if (placeValue) return placeValue
   throw new PlanFromServerError(
     `math read line "${read}" did not match the place-value read template ` +
-      `"<W> <place>, <W> <place> and <W> <place>. What number is it?"`,
+      `"<W> <place>, <W> <place> and <W> <place>. What number is it?" or ` +
+      `"Find <W>."`,
   )
 }
 
-/** {@link parsePlaceValueRead}'s template: `null` on a miss; throws on an
- *  unknown number word, a place named twice or a digit outside 2..9. */
+/** A place word of a places read: its place, and whether it is the
+ *  singular "hundred" (only after "one"). */
+const PLACE_WORDS: Readonly<
+  Record<string, { place: PlacePart; singular: boolean }>
+> = {
+  hundreds: { place: 'hundreds', singular: false },
+  hundred: { place: 'hundreds', singular: true },
+  tens: { place: 'tens', singular: false },
+  ones: { place: 'ones', singular: false },
+}
+
+/** {@link parsePlaceValueRead}'s templates: `null` on a miss; throws on an
+ *  unknown number word, a place named twice, a digit the place can't take
+ *  or a name below 100. */
 function matchPlaceValueRead(read: string): {
   hundreds: number
   tens: number
   ones: number
   spokenOrder: PlacePart[]
+  form: PlaceValueForm
   correct: number
 } | null {
+  const name = read.match(/^\s*find\s+([a-z][a-z -]*?)\s*\.\s*$/i)
+  if (name) {
+    const n = wordToNumber(name[1]!.toLowerCase().replace(/\s+/g, ' '))
+    if (n === undefined) {
+      throw new PlanFromServerError(
+        `math read line "${read}" had unrecognised number word(s)`,
+      )
+    }
+    if (n < 100 || n > EXTENDED_ANSWER_MAX) {
+      throw new PlanFromServerError(
+        `math read line "${read}" names ${n}; a name read is 100-` +
+          `${EXTENDED_ANSWER_MAX}`,
+      )
+    }
+    return {
+      ...placeDigits(n),
+      spokenOrder: [...PLACE_PARTS],
+      form: 'name',
+      correct: n,
+    }
+  }
   const match = read.match(
-    /^\s*([a-z]+)\s+(hundreds|tens|ones),\s+([a-z]+)\s+(hundreds|tens|ones)\s+and\s+([a-z]+)\s+(hundreds|tens|ones)\s*\.\s*what\s+number\s+is\s+it\s*\?\s*$/i,
+    /^\s*([a-z]+)\s+(hundreds|hundred|tens|ones),\s+([a-z]+)\s+(hundreds|hundred|tens|ones)\s+and\s+([a-z]+)\s+(hundreds|hundred|tens|ones)\s*\.\s*what\s+number\s+is\s+it\s*\?\s*$/i,
   )
   if (!match) return null
   const digits: Partial<Record<PlacePart, number>> = {}
   const spokenOrder: PlacePart[] = []
   for (const k of [1, 3, 5]) {
-    const digit = wordToNumber(match[k]!.toLowerCase())
-    const place = match[k + 1]!.toLowerCase() as PlacePart
+    const word = match[k]!.toLowerCase()
+    const digit = word === 'no' ? 0 : wordToNumber(word)
+    const { place, singular } = PLACE_WORDS[match[k + 1]!.toLowerCase()]!
     if (digit === undefined) {
       throw new PlanFromServerError(
         `math read line "${read}" had unrecognised number word(s)`,
@@ -820,10 +866,19 @@ function matchPlaceValueRead(read: string): {
         `math read line "${read}" names the ${place} twice`,
       )
     }
-    if (digit < PLACE_DIGIT_MIN || digit > PLACE_DIGIT_MAX) {
+    // "one hundred" (singular), "no tens", "two … nine <places>": a 1 only
+    // in the hundreds, a 0 only in the tens or ones ("no", never "zero").
+    const fits =
+      digit === 1
+        ? place === 'hundreds' && singular
+        : !singular &&
+          (digit === 0
+            ? word === 'no' && place !== 'hundreds'
+            : digit >= 2 && digit <= 9)
+    if (!fits) {
       throw new PlanFromServerError(
-        `math read line "${read}" has ${digit} ${place}; hundreds builds ` +
-          `every place from ${PLACE_DIGIT_MIN} to ${PLACE_DIGIT_MAX}`,
+        `math read line "${read}" says "${word} ${match[k + 1]}"; a place ` +
+          `is "no tens" / "no ones", "one hundred" or two … nine of it`,
       )
     }
     digits[place] = digit
@@ -839,6 +894,7 @@ function matchPlaceValueRead(read: string): {
     tens,
     ones,
     spokenOrder,
+    form: 'places',
     correct: 100 * hundreds + 10 * tens + ones,
   }
 }
@@ -849,7 +905,8 @@ const MORE_TENS: readonly string[] = ['ten', 'twenty', 'thirty', 'forty']
 const MORE_HUNDREDS: readonly string[] = ['one', 'two', 'three', 'four']
 
 /** Extract the start, the change and the answer from a "more" / "less"
- *  `read` line (content wave 3 § 3.6, content wave 4 § 2.6).
+ *  `read` line (content wave 3 § 3.6, content wave 4 § 2.6, content wave 5
+ *  § 2.6).
  *
  *  Template (canon): `"<number>. What is <change> more?"` or `"… less?"`,
  *  the number in British words and `<change>` one of ten, twenty, thirty,
@@ -857,9 +914,12 @@ const MORE_HUNDREDS: readonly string[] = ['one', 'two', 'three', 'four']
  *  `"Two hundred and forty-three. What is ten more?"` → start 243, step
  *  10, count 1, 'more', correct 253, or `"Seven hundred and sixty-five.
  *  What is thirty less?"` → 765, 10, 3, 'less', 735. Valid when the start
- *  and the answer have three digits and no zero: the changed digit stays
- *  in 1..9 (no regrouping) and the answer is in 100..
- *  {@link EXTENDED_ANSWER_MAX}. Case-insensitive; throws on any drift.
+ *  and the answer have three digits (a zero may sit in either, content
+ *  wave 5: "Four hundred and sixteen. What is ten less?" → 406): the
+ *  changed digit stays in 0..9 (no regrouping), the hundreds digit at
+ *  least 1, and the answer is in 100..{@link EXTENDED_ANSWER_MAX}. Hundreds'
+ *  and more and less's no-zero rule is their canon lints'.
+ *  Case-insensitive; throws on any drift.
  *  Disjoint from every other template (none ends "more?" or "less?").
  *
  *  Opt-in kind: only `mathSessionPlanFromServer(plan, { extendedKinds: true
@@ -881,7 +941,7 @@ export function parseMoreRead(read: string): {
 
 /** {@link parseMoreRead}'s template: `null` on a miss (a change word not in
  *  the list included); throws on an unknown number or a start the change
- *  can't take without a zero or a regroup. */
+ *  can't take without a regroup or going below 100. */
 function matchMoreRead(read: string): {
   start: number
   step: 10 | 100
@@ -907,20 +967,19 @@ function matchMoreRead(read: string): {
   const sign = direction === 'less' ? -1 : 1
   const correct = start + sign * count * step
   const d = placeDigits(start)
-  // The changed digit must stay a digit 1..9: no zero, no regrouping.
+  // The changed digit must stay a digit (0..9, the hundreds 1..9): no
+  // regrouping, never below 100.
   const digit = (step === 10 ? d.tens : d.hundreds) + sign * count
   if (
     start < 100 ||
-    d.tens === 0 ||
-    d.ones === 0 ||
-    digit < 1 ||
+    digit < (step === 100 ? 1 : 0) ||
     digit > 9 ||
     correct > EXTENDED_ANSWER_MAX
   ) {
     throw new PlanFromServerError(
       `math read line "${read}" asks for ${count * step} ${direction} than ` +
-        `${start}; the start and the answer need three digits with no ` +
-        `zero and no regrouping`,
+        `${start}; the start and the answer need three digits and no ` +
+        `regrouping`,
     )
   }
   return { start, step, count, direction, correct }

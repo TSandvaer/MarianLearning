@@ -45,12 +45,22 @@ export const LANDS: readonly Land[] = [
   },
   // Content wave 3 (design/native/content-wave-3.md § 1, K6): a new land,
   // since Groups is full. Content wave 4 § 1 (K1): step 15, more and
-  // less, is its 2nd stop.
+  // less, is its 2nd stop; content wave 5 § 1 (K1): step 16, zeros, its
+  // 3rd.
   {
     world: 'math',
     number: 5,
     name: 'Hundreds',
-    nodes: ['hundreds', 'hundreds-addsub'],
+    nodes: ['hundreds', 'hundreds-addsub', 'hundreds-zeros'],
+  },
+  // Content wave 5 (design/native/content-wave-5.md § 1, K2): adding big
+  // numbers opens a new land; "Bigger numbers" is the two-digit steps'
+  // recap phrase, and follows land 3 "Big numbers".
+  {
+    world: 'math',
+    number: 6,
+    name: 'Bigger numbers',
+    nodes: ['add-two-digit'],
   },
   {
     world: 'word-song',

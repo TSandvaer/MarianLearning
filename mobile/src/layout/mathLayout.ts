@@ -32,10 +32,13 @@
  */
 import {
   isMoreAndLess,
+  isPlaceValueArithmetic,
   moreChange,
+  type ExtendedMathProblem,
   type MoreCount,
   type MoreDirection,
 } from '@marian/core/math/extendedProblems'
+import type { SkillNode } from '@marian/core/progress'
 import { flowerRowFontSizeRem } from '@marian/core/math/flowerRowFit'
 import {
   isLandscape,
@@ -662,6 +665,20 @@ export type MathLayoutKind =
   | 'divide'
   | 'place-value'
   | 'more'
+
+/**
+ * The frame a problem takes: its kind, but an adding-big-numbers sum (an
+ * arithmetic problem of a `PLACE_VALUE_ARITHMETIC_NODES` step, its step
+ * `node`) takes the place-value frame, since it draws the trays (content
+ * wave 5 § 3.3). Math reports it to App; App uses it before the report.
+ */
+export function mathLayoutKind(
+  problem: ExtendedMathProblem | undefined,
+  node: SkillNode | null | undefined,
+): MathLayoutKind {
+  if (problem === undefined) return 'arithmetic'
+  return isPlaceValueArithmetic(problem, node) ? 'place-value' : problem.kind
+}
 
 export interface ExtendedMathLayout extends MathLayout {
   /** The chips' row (Math's) or the right-edge column (Word Song's L). */
@@ -1381,6 +1398,12 @@ export function shareGeometry(
 //   P and TP add the number-tag row on top when the plan has a "more".
 // - u: the largest whole number ≤ 10 (tablet ≤ 20) that fits the problem
 //   rect.
+//
+// Adding big numbers (`content-wave-5.md` § 3.3) draws two trays, tens and
+// ones, under today's equation: width (1.3 T − 0.3 + 1) u + (1.3 C − 0.3 +
+// 1) u + g (T the answers' rods, C the cube columns before the bundle),
+// height 11u + the tag row, and u fits the problem rect less the equation
+// line and the equation-to-visual gap.
 
 /** A flat's side, a rod's length (in u). */
 export const PV_TEN = 10
@@ -1402,7 +1425,8 @@ export const PV_TABLET_U_MAX = 20
 type Place = 'hundreds' | 'tens' | 'ones'
 const PLACES: readonly Place[] = ['hundreds', 'tens', 'ones']
 
-/** What the hundreds layout reads of a problem (core's `HundredsProblem`). */
+/** What the hundreds layout reads of a problem (core's `HundredsProblem`),
+ *  and of adding big numbers' sums (content wave 5 § 3.6): two trays. */
 export type PlaceValueLayoutProblem =
   | {
       kind: 'place-value'
@@ -1412,6 +1436,16 @@ export type PlaceValueLayoutProblem =
       correct: number
     }
   | MoreLayoutProblem
+  | SumLayoutProblem
+
+/** What the layout reads of an adding-big-numbers problem (core's
+ *  `ArithmeticProblem` on a `PLACE_VALUE_ARITHMETIC_NODES` step). */
+export interface SumLayoutProblem {
+  kind: 'arithmetic'
+  addendA: number
+  addendB: number
+  correct: number
+}
 
 /** What the layout reads of core's `MoreProblem`. */
 export interface MoreLayoutProblem {
@@ -1437,14 +1471,23 @@ const digitsOf = (n: number): Record<Place, number> => ({
   ones: n % 10,
 })
 
-/** The digits a problem shows first (a "more" problem: its start). */
+/** The digits a problem shows first (a "more" problem: its start; a sum:
+ *  its first number). */
 export function startDigits(p: PlaceValueLayoutProblem): Record<Place, number> {
-  return p.kind === 'more'
-    ? digitsOf(p.start)
-    : { hundreds: p.hundreds, tens: p.tens, ones: p.ones }
+  if (p.kind === 'more') return digitsOf(p.start)
+  if (p.kind === 'arithmetic') return digitsOf(p.addendA)
+  return { hundreds: p.hundreds, tens: p.tens, ones: p.ones }
 }
 
+/** A sum's ones before the bundle: both numbers' cubes (content wave 5
+ *  § 3.2; P6 shows 14). */
+export const sumOnes = (p: SumLayoutProblem): number =>
+  (p.addendA % 10) + (p.addendB % 10)
+
 export interface PlaceValueMetrics {
+  /** The trays drawn, left to right: hundreds, tens, ones; adding big
+   *  numbers' two, tens and ones (content wave 5 § 3.2). */
+  places: readonly Place[]
   u: number
   /** The plan's largest counts shown at any point. */
   maxFlats: number
@@ -1499,11 +1542,20 @@ export function smallPillWidth(text: string, font: number, height: number) {
   return Math.max(height, Math.ceil(fredokaBoldWidth(text, font)) + 12)
 }
 
-/** Hundreds' sizes for a plan of hundreds problems (§ 3.3). */
+/** Hundreds' sizes for a plan of hundreds problems (§ 3.3); a plan of
+ *  sums only takes adding big numbers' two trays ({@link sumTrayMetrics}). */
 export function placeValueMetrics(
-  layout: Pick<MathLayout, 'tablet' | 'form' | 'problem'>,
+  layout: Pick<
+    MathLayout,
+    'tablet' | 'form' | 'problem' | 'equationLineHeight' | 'problemGap'
+  >,
   problems: readonly PlaceValueLayoutProblem[],
 ): PlaceValueMetrics {
+  const sums = problems.filter(
+    (p): p is SumLayoutProblem => p.kind === 'arithmetic',
+  )
+  if (sums.length > 0 && sums.length === problems.length)
+    return sumTrayMetrics(layout, sums)
   const tablet = layout.tablet
   const side: 'top' | 'left' =
     layout.form === 'phone-landscape' || layout.form === 'tablet-landscape'
@@ -1577,6 +1629,7 @@ export function placeValueMetrics(
   while (u > 2 && !fits(u)) u -= 1
   const size = sizeFor(u)
   return {
+    places: PLACES,
     u,
     maxFlats,
     maxRods,
@@ -1613,6 +1666,108 @@ export function placeValueMetrics(
   }
 }
 
+/**
+ * Adding big numbers' sizes (content wave 5 § 3.3): two trays, tens and
+ * ones, under the equation. The tens tray holds the answers' rods (so the
+ * new ten always has a slot), the ones tray the cubes before the bundle
+ * (P6's 14: three columns). The block is the trays and their tags; the
+ * equation line and the gap above it are Math's, and u fits what they
+ * leave of the problem rect.
+ */
+export function sumTrayMetrics(
+  layout: Pick<
+    MathLayout,
+    'tablet' | 'form' | 'problem' | 'equationLineHeight' | 'problemGap'
+  >,
+  problems: readonly SumLayoutProblem[],
+): PlaceValueMetrics {
+  const tablet = layout.tablet
+  let maxRods = 1
+  let maxCubes = 1
+  for (const p of problems) {
+    maxRods = Math.max(maxRods, Math.floor(p.correct / 10) % 10)
+    maxCubes = Math.max(maxCubes, sumOnes(p), p.correct % 10)
+  }
+  const cubeColumns = Math.ceil(maxCubes / PV_CUBE_COLUMN)
+  const trayGap = tablet ? 16 : 12
+  const tagHeight = tablet ? 32 : 28
+  const tagFont = tablet ? 24 : 20
+  const tagGap = tablet ? 10 : 8
+  const pad = 2 * PV_TRAY_PAD
+  const widthsIn = {
+    hundreds: 0,
+    tens: (1 + PV_ROD_GAP) * maxRods - PV_ROD_GAP + pad,
+    ones: (1 + PV_ROD_GAP) * cubeColumns - PV_ROD_GAP + pad,
+  }
+  const tagRow = tagHeight + tagGap
+  const room = {
+    width: layout.problem.width,
+    height:
+      layout.problem.height - layout.equationLineHeight - layout.problemGap,
+  }
+  const sizeFor = (u: number) => {
+    const traysWidth = (widthsIn.tens + widthsIn.ones) * u + trayGap
+    const trayHeight = (PV_TEN + pad) * u
+    return {
+      traysWidth,
+      trayHeight,
+      width: traysWidth,
+      height: trayHeight + tagRow,
+    }
+  }
+  const fits = (u: number) => {
+    const sz = sizeFor(u)
+    return sz.width <= room.width && sz.height <= room.height
+  }
+  const top = tablet ? PV_TABLET_U_MAX : PV_PHONE_U_MAX
+  let u = top
+  while (u > 2 && !fits(u)) u -= 1
+  const size = sizeFor(u)
+  const pillHeight = tablet ? 24 : 20
+  return {
+    places: ['tens', 'ones'],
+    u,
+    maxFlats: 0,
+    maxRods,
+    maxCubes,
+    cubeColumns,
+    trayGap,
+    trayRadius: tablet ? 16 : 12,
+    trayWidths: {
+      hundreds: 0,
+      tens: widthsIn.tens * u,
+      ones: widthsIn.ones * u,
+    },
+    trayHeight: size.trayHeight,
+    traysWidth: size.traysWidth,
+    tagHeight,
+    tagFont,
+    tagGap,
+    numberTag: false,
+    numberTagSide: 'top',
+    numberTagWidth: 0,
+    pillHeight,
+    pillFont: tablet ? 17 : 14,
+    pillWidth: 0,
+    pillGap: 6,
+    numberColumn: 0,
+    block: { width: size.width, height: size.height },
+    drop: tablet ? 24 : 16,
+    addedRise: 40,
+    liftRise: tablet ? 32 : 24,
+    gridLine: 1,
+    outline: 1.5,
+    fits: (n: number) => n <= top && fits(n),
+  }
+}
+
+/** Adding big numbers' bundle (content wave 5 § 3.5): the carried rod
+ *  rises this far before it arcs to the tens tray. */
+export const SUM_CARRY_RISE = 12
+export const SUM_CARRY_RISE_TABLET = 16
+/** The gather: the second column's cubes move this far apart. */
+export const SUM_GATHER_STAGGER_MS = 40
+
 export interface PlaceValueRect {
   x: number
   y: number
@@ -1640,11 +1795,49 @@ export interface PlaceValueGeometry {
     direction: MoreDirection
     blocks: readonly { index: number; rect: PlaceValueRect; delay: number }[]
   } | null
+  /** Adding big numbers (content wave 5 § 3.2, § 3.5): the second
+   *  number's blocks in drop order (its rods, then its cubes continuing the
+   *  first's columns), `BUILD_STAGGER_MS` apart, and the bundle; `null` for
+   *  the hundreds kinds. */
+  sum: SumGeometry | null
   /** Each tray's tag centre (under it). */
   tags: Record<Place, SharePoint>
   /** A "more" problem's number tag centre and its pill's; else `null`. */
   numberTag: SharePoint | null
   numberPill: SharePoint | null
+}
+
+/** A moving block of adding big numbers: its place, its index there, where
+ *  it is and where it goes. */
+export interface SumBlock {
+  place: 'tens' | 'ones'
+  index: number
+  rect: PlaceValueRect
+  delay: number
+}
+
+export interface SumGeometry {
+  /** The second number's rods then cubes, in drop order. */
+  drop: readonly SumBlock[]
+  /** The new ten, or `null` when the ones make none (P1, P2). */
+  bundle: {
+    /** Cubes 0–9 and where each stands in the one column 10u tall (the
+     *  first column's stay; the second column's slide up and left,
+     *  `SUM_GATHER_STAGGER_MS` apart). */
+    column: readonly {
+      index: number
+      from: PlaceValueRect
+      to: PlaceValueRect
+      delay: number
+    }[]
+    /** The fused rod: the column's place, then the next free rod slot. */
+    rod: { index: number; from: PlaceValueRect; to: PlaceValueRect }
+    /** The cubes left over (index 10 on), sliding into the first column. */
+    left: readonly { index: number; from: PlaceValueRect; to: PlaceValueRect }[]
+  } | null
+  /** The rods and cubes the trays end with (the answer's digits). */
+  endRods: number
+  endCubes: number
 }
 
 /** Where everything of one problem sits in a stage `width` wide. */
@@ -1665,8 +1858,14 @@ export function placeValueGeometry(
   const trays = {} as Record<Place, PlaceValueRect>
   let x = traysX
   for (const p of PLACES) {
-    trays[p] = { x, y: trayTop, width: m.trayWidths[p], height: m.trayHeight }
-    x += m.trayWidths[p] + m.trayGap
+    const drawn = m.places.includes(p)
+    trays[p] = {
+      x,
+      y: trayTop,
+      width: drawn ? m.trayWidths[p] : 0,
+      height: m.trayHeight,
+    }
+    if (drawn) x += m.trayWidths[p] + m.trayGap
   }
   const bottom = trayTop + m.trayHeight - pad
   const flat = (k: number): PlaceValueRect => ({
@@ -1694,7 +1893,58 @@ export function placeValueGeometry(
   const range = (n: number) => Array.from({ length: n }, (_, k) => k)
   let added: PlaceValueGeometry['added'] = null
   let change: PlaceValueGeometry['change'] = null
-  if (problem.kind === 'more' && isMoreAndLess(problem)) {
+  let sum: SumGeometry | null = null
+  if (problem.kind === 'arithmetic') {
+    const b = digitsOf(problem.addendB)
+    const drop: SumBlock[] = [
+      ...range(b.tens).map((k) => ({
+        place: 'tens' as const,
+        index: d.tens + k,
+        rect: rod(d.tens + k),
+      })),
+      ...range(b.ones).map((k) => ({
+        place: 'ones' as const,
+        index: d.ones + k,
+        rect: cube(d.ones + k),
+      })),
+    ].map((blk, k) => ({ ...blk, delay: k * PV_CHANGE_STAGGER_MS }))
+    const ones = d.ones + b.ones
+    const ten = PV_TEN
+    // The one column: cube k stands at row k of the first column.
+    const columnAt = (k: number): PlaceValueRect => ({
+      ...cube(0),
+      y: bottom - u * (k + 1),
+    })
+    sum = {
+      drop,
+      bundle:
+        ones < ten
+          ? null
+          : {
+              column: range(ten).map((k) => ({
+                index: k,
+                from: cube(k),
+                to: columnAt(k),
+                delay:
+                  k < PV_CUBE_COLUMN
+                    ? 0
+                    : (k - PV_CUBE_COLUMN) * SUM_GATHER_STAGGER_MS,
+              })),
+              rod: {
+                index: d.tens + b.tens,
+                from: { ...cube(0), y: bottom - ten * u, height: ten * u },
+                to: rod(d.tens + b.tens),
+              },
+              left: range(ones - ten).map((k) => ({
+                index: ten + k,
+                from: cube(ten + k),
+                to: cube(k),
+              })),
+            },
+      endRods: Math.floor(problem.correct / 10) % 10,
+      endCubes: problem.correct % 10,
+    }
+  } else if (problem.kind === 'more' && isMoreAndLess(problem)) {
     const place: Place = problem.step === 100 ? 'hundreds' : 'tens'
     const at = place === 'hundreds' ? flat : rod
     const indices =
@@ -1755,6 +2005,7 @@ export function placeValueGeometry(
     cubes: range(d.ones).map(cube),
     added,
     change,
+    sum,
     tags,
     numberTag,
     numberPill,

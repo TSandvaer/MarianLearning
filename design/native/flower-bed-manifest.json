@@ -1,0 +1,21 @@
+[
+  {
+    "word": "ui-flower-bed",
+    "tier": "game-art",
+    "batch": 16,
+    "style": "clay",
+    "subject": "A small raised flower bed: a low rectangular wooden planter in warm caramel-brown wood with a thick rounded rim, filled to the top with dark-brown soil, with ten pink five-petal flowers with yellow centres and short green leaves planted in two straight rows of five, seen from the front and a little above.",
+    "avoid": [
+      "anything red",
+      "a door, a gate, a fence or a sign",
+      "a wooden egg crate seen from the top, eggs or compartments",
+      "a round flower pot or terracotta",
+      "a light-brown clay tray with a row of dark holes",
+      "an empty hole or a missing flower",
+      "a person, a watering can or a spade",
+      "a face on anything",
+      "a coloured circle, badge or background behind it"
+    ],
+    "distinctFrom": ["add-to-20", "add-to-10", "ui-bud-open", "ui-house"]
+  }
+]

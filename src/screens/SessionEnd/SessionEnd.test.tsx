@@ -1030,16 +1030,16 @@ describe('SessionEnd', () => {
       const base = defaultProgress()
       saveProgress({
         ...base,
-        skillLevels: { ...base.skillLevels, 'hundreds-addsub': 'practicing' },
+        skillLevels: { ...base.skillLevels, 'add-two-digit': 'practicing' },
         history: [
-          { dateISO: day(2), skillFocus: ['hundreds-addsub'], successRate: 1 },
-          { dateISO: day(1), skillFocus: ['hundreds-addsub'], successRate: 1 },
+          { dateISO: day(2), skillFocus: ['add-two-digit'], successRate: 1 },
+          { dateISO: day(1), skillFocus: ['add-two-digit'], successRate: 1 },
         ],
       })
       renderEnd({
         ...MATH_PAYLOAD,
         totalCorrect: 8,
-        sessionFocus: { node: 'hundreds-addsub', mode: 'forward' },
+        sessionFocus: { node: 'add-two-digit', mode: 'forward' },
       })
       expect(screen.getByTestId('session-end')).toHaveAttribute(
         'data-day',

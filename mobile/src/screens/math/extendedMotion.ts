@@ -25,6 +25,8 @@ export const FADE_MS = 200
 /** The "?" fades out before the answer springs in. */
 export const GAP_OUT_MS = 100
 export const SPRING = { stiffness: 260, damping: 20, mass: 1 }
+/** A missing number's bloom (`MissingNumber`, the flower bed): 1 → 1.15 → 1. */
+export const BLOOM_SPRING = { stiffness: 300, damping: 14, mass: 1 }
 
 export const EASE_IN_OUT = Easing.bezier(0.42, 0, 0.58, 1)
 export const EASE_OUT = Easing.bezier(0, 0, 0.58, 1)

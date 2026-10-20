@@ -21,9 +21,10 @@ const fileFor = (id: PathArtId, size: number) =>
 const ids = new Set<PathArtId>(PATH_ART_IDS)
 
 describe('PATH_ART manifest', () => {
-  it('lists 42 stages + 14 lands + 8 UI pieces, no duplicates', () => {
-    expect(ALL_NODES).toHaveLength(42)
-    expect(PATH_ART_IDS).toHaveLength(42 + 14 + 8)
+  it('lists 44 stages + 15 lands + 9 UI pieces, no duplicates', () => {
+    expect(ALL_NODES).toHaveLength(44)
+    // The 9th UI piece is the play door's ui-flower-bed (mini-game § 1.2.1).
+    expect(PATH_ART_IDS).toHaveLength(44 + 15 + 9)
     expect(ids.size).toBe(PATH_ART_IDS.length)
   })
 
@@ -38,7 +39,7 @@ describe('PATH_ART manifest', () => {
 
   it('has a file at every size for every land', () => {
     const landIds = LANDS.map(landArtId)
-    expect(new Set(landIds).size).toBe(14)
+    expect(new Set(landIds).size).toBe(15)
     const found = landIds.flatMap((id) =>
       PATH_ART_SIZES.filter(
         (size) => ids.has(id) && existsSync(fileFor(id, size)),
@@ -51,7 +52,7 @@ describe('PATH_ART manifest', () => {
     const expected = PATH_ART_IDS.flatMap((id) =>
       PATH_ART_SIZES.map((size) => `${id}-${size}.webp`),
     ).sort()
-    expect(expected).toHaveLength(64 * PATH_ART_SIZES.length)
+    expect(expected).toHaveLength(68 * PATH_ART_SIZES.length)
     expect(readdirSync(join(PUBLIC, PATH_ART_DIR)).sort()).toEqual(expected)
   })
 })

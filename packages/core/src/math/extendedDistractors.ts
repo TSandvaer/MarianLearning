@@ -17,6 +17,8 @@
  * | divide     | `pickDistractors(c, i, 10)`     | `pickDistractors(c, i, 10)` (off by one)   | `'off-by-one'`   |
  * | hundreds   | hundreds digit ± 2 and ± 4      | see {@link hundredsDistractors}            | see below        |
  * | more/less  | changing digit ± 2 and ± 4      | wrong place or wrong op; digit swap        | see below        |
+ * | zeros      | hundreds digit ± 2 and ± 4      | zero left out; digit swap; wrong place     | see below        |
+ * | big sums   | the answer ± 20                 | the answer − 10; ± 1 (sign by position)    | `'forgotten-carry'` |
  *
  * Sharing (content wave 2 § 2.6, K5, D4): `pickDistractors` unchanged with
  * M = 10, so no far "99" chip and no plate-count trap.
@@ -31,6 +33,15 @@
  * changing place's digit ± 2 and ± 4), then a first trap, `'wrong-place'`
  * (adding: the change made in the next place down) or `'wrong-op'`
  * (taking away: she added), and the digit swap.
+ *
+ * Zeros (content wave 5 § 2.6): `'gentle'` (P1–P3), then on a number with
+ * an empty place `'zero-drop'` (the number with its zero left out, 108 →
+ * 18, the one chip allowed below 100) and the digit swap; one ten or
+ * hundred more or less takes hundreds' `'wrong-place'`, signed.
+ *
+ * Adding big numbers (content wave 5 § 3.6, {@link addTwoDigitDistractors})
+ * is arithmetic: its chips are the answer's tens digit ± 2 on P1–P3, then
+ * the forgotten carry and an off-by-one.
  */
 
 import { GENTLE_RAMP_THROUGH, pickDistractors } from './distractors'
@@ -40,6 +51,7 @@ import {
   PLACE_PARTS,
   placeDigits,
   TWO_DIGIT_CHIP_MAX,
+  zeroPlaces,
   type DivideProblem,
   type HundredsProblem,
   type MoreProblem,
@@ -61,6 +73,10 @@ export const SKIP_COUNT_CHIP_MAX = TWO_DIGIT_CHIP_MAX
 /** Hundreds: every chip is a three-digit number (§ 3.6). */
 export const HUNDREDS_CHIP_MIN = 100
 export const HUNDREDS_CHIP_MAX = EXTENDED_ANSWER_MAX
+/** Zeros' zero-drop chip (content wave 5 § 2.6): two digits, the only chip
+ *  below {@link HUNDREDS_CHIP_MIN}. */
+export const ZERO_DROP_CHIP_MIN = 10
+export const ZERO_DROP_CHIP_MAX = TWO_DIGIT_CHIP_MAX
 
 /** The trap a problem's chips offer on P4–P8 (`null` on the gentle P1–P3,
  *  but hundreds names its gentle chips `'gentle'`, § 3.6). Recorded as
@@ -72,14 +88,16 @@ export type ExtendedOfferedClass =
   | 'wrong-op'
   | HundredsOfferedClass
 
-/** Hundreds' chip classes (content wave 3 § 3.6), and more and less's
- *  `'wrong-op'` (content wave 4 § 2.6). */
+/** Hundreds' chip classes (content wave 3 § 3.6), more and less's
+ *  `'wrong-op'` (content wave 4 § 2.6) and zeros' `'zero-drop'` (content
+ *  wave 5 § 2.6). */
 export type HundredsOfferedClass =
   | 'gentle'
   | 'digit-swap'
   | 'spoken-order'
   | 'wrong-place'
   | 'wrong-op'
+  | 'zero-drop'
 
 /** The kinds this module picks chips for. */
 export type ExtendedChipProblem =
@@ -207,19 +225,22 @@ export function multiplyDistractors(
 }
 
 /** The class of a hundreds problem's chips (§ 3.6): `'wrong-place'` for
- *  ten / one hundred more; for a place-value read `'gentle'` on P1–P3, then
- *  `'digit-swap'` when it names the places in place order, else
- *  `'spoken-order'`. More and less (content wave 4 § 2.6): `'gentle'` on
- *  P1–P3, then its first trap's ({@link moreAndLessTrap}). */
+ *  one ten / one hundred more (or less, content wave 5 § 2.6); for a
+ *  place-value read `'gentle'` on P1–P3, then `'zero-drop'` when the number
+ *  has an empty place (zeros), `'digit-swap'` when it names the places in
+ *  place order, else `'spoken-order'`. More and less (content wave 4
+ *  § 2.6): `'gentle'` on P1–P3, then its first trap's
+ *  ({@link moreAndLessTrap}). */
 export function hundredsOfferedClass(
   problem: HundredsProblem,
 ): HundredsOfferedClass {
   if (problem.kind === 'more') {
-    if (!isMoreAndLess(problem)) return 'wrong-place'
+    if (problem.count === 1) return 'wrong-place'
     if (problem.index <= GENTLE_RAMP_THROUGH) return 'gentle'
     return moreAndLessTrap(problem).offered
   }
   if (problem.index <= GENTLE_RAMP_THROUGH) return 'gentle'
+  if (zeroPlaces(problem).length > 0) return 'zero-drop'
   return problem.spokenOrder.every((p, i) => p === PLACE_PARTS[i])
     ? 'digit-swap'
     : 'spoken-order'
@@ -276,8 +297,14 @@ export function moreAndLessTrap(problem: MoreProblem): {
  * that changes (P2's 354 → 374, 394); on P4–P8 the first trap
  * ({@link moreAndLessTrap}) and the digit swap.
  *
+ * Zeros (content wave 5 § 2.6, § 2.7): `'zero-drop'`, the number with its
+ * zero left out (108 → 18, 190 → 19) and the digit swap (180, 109); a
+ * count-1 "less" takes `'wrong-place'` signed by its direction (416 − 10:
+ * 415, 316).
+ *
  * Repair (off canon): a value equal to the answer or the other value, or
- * outside 100..999, takes the next of the gentle values.
+ * outside 100..999 (the zero-drop value: 10..99), takes the next of the
+ * gentle values.
  */
 export function hundredsDistractors(
   problem: HundredsProblem,
@@ -293,20 +320,31 @@ export function hundredsDistractors(
   const down = (tensChange ? d.tens : d.hundreds) > 5 ? -1 : 1
   const gentle = [2, 4].map((k) => correct + gentleUnit * k * down)
   const swapped = number(d.hundreds, d.ones, d.tens)
+  // The number with its zero digits left out (108 → 18), if two digits.
+  const dropped = Number(String(correct).replace(/0/g, '') || '0')
+  const zeroDrop =
+    dropped >= ZERO_DROP_CHIP_MIN && dropped <= ZERO_DROP_CHIP_MAX
+      ? dropped
+      : null
   let wanted: number[]
   switch (hundredsOfferedClass(problem)) {
     case 'wrong-op':
     case 'wrong-place': {
-      if (problem.kind === 'more' && isMoreAndLess(problem)) {
+      if (problem.kind === 'more' && problem.count > 1) {
         wanted = [moreAndLessTrap(problem).value, swapped]
         break
       }
       const start = problem.kind === 'more' ? problem.start : correct
+      const sign =
+        problem.kind === 'more' && problem.direction === 'less' ? -1 : 1
       wanted = [1, 10, 100]
         .filter((k) => k !== (problem.kind === 'more' ? problem.step : 0))
-        .map((k) => start + k)
+        .map((k) => start + sign * k)
       break
     }
+    case 'zero-drop':
+      wanted = zeroDrop === null ? [swapped] : [zeroDrop, swapped]
+      break
     case 'digit-swap':
       wanted = [swapped, number(d.hundreds, d.tens + tensStep, d.ones)]
       break
@@ -327,13 +365,74 @@ export function hundredsDistractors(
     if (
       v !== correct &&
       !out.includes(v) &&
-      v >= HUNDREDS_CHIP_MIN &&
-      v <= HUNDREDS_CHIP_MAX
+      ((v >= HUNDREDS_CHIP_MIN && v <= HUNDREDS_CHIP_MAX) || v === zeroDrop)
     ) {
       out.push(v)
     }
   }
   return sortPair(out[0]!, out[1]!)
+}
+
+/** Adding big numbers' chip range (content wave 5 § 3.6): 1..99. */
+export const ADD_TWO_DIGIT_CHIP_MIN = 1
+export const ADD_TWO_DIGIT_CHIP_MAX = TWO_DIGIT_CHIP_MAX
+
+/**
+ * Adding big numbers (content wave 5 § 3.6, § 3.7), an arithmetic step
+ * whose chips are its own (`problemChips` calls this for its problems and
+ * shuffles with the arithmetic LCG; `buildChipOrder`, the web's copy, is
+ * untouched):
+ *
+ * - P1–P3: the answer ± 20 (its tens digit ± 2): 59 → 39, 79.
+ * - P4–P8: the forgotten carry, the answer − 10 (the lost new ten), and an
+ *   off-by-one, + 1 on even positions and − 1 on odd ones, so the answer
+ *   is not always the biggest chip (73 → 63, 74; 83 → 73, 82). Not
+ *   `forgottenCarryDistractors`, whose slip is always − 1.
+ *
+ * Every chip is in 1..99 with no zero digit, apart from the answer and the
+ * other chip; a value that isn't takes the next of the answer ∓ 1, ± 2,
+ * ± 10, ± 20 (off canon only).
+ */
+export function addTwoDigitDistractors(
+  correct: number,
+  index: number,
+): [number, number] {
+  const sign = index % 2 === 0 ? 1 : -1
+  const wanted =
+    index <= GENTLE_RAMP_THROUGH
+      ? [correct - 20, correct + 20]
+      : [correct - 10, correct + sign]
+  const out: number[] = []
+  for (const v of [
+    ...wanted,
+    correct - sign,
+    correct + 2,
+    correct - 2,
+    correct + 10,
+    correct - 10,
+    correct + 20,
+    correct - 20,
+  ]) {
+    if (out.length === 2) break
+    if (
+      v !== correct &&
+      !out.includes(v) &&
+      v >= ADD_TWO_DIGIT_CHIP_MIN &&
+      v <= ADD_TWO_DIGIT_CHIP_MAX &&
+      !String(v).includes('0')
+    ) {
+      out.push(v)
+    }
+  }
+  return sortPair(out[0]!, out[1]!)
+}
+
+/** The class adding big numbers' chips offer (§ 3.6): `null` on P1–P3 (the
+ *  arithmetic tiers' convention), `'forgotten-carry'` on P4–P8. */
+export function addTwoDigitOfferedClass(
+  index: number,
+): 'forgotten-carry' | null {
+  return index <= GENTLE_RAMP_THROUGH ? null : 'forgotten-carry'
 }
 
 /** The class a problem's chips offer: `null` on P1–P3; on P4–P8

@@ -61,6 +61,8 @@ const MATH = [
   'div-share',
   'hundreds',
   'hundreds-addsub',
+  'hundreds-zeros',
+  'add-two-digit',
 ] as const
 
 function mathLevels(current: number): Record<string, string> {

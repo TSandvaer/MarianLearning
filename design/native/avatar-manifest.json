@@ -1,0 +1,206 @@
+[
+  {
+    "word": "avatar-fox",
+    "tier": "avatars",
+    "batch": 15,
+    "style": "clay",
+    "subject": "A chubby baby fox sitting and facing the viewer, full body, with a big round head, pointed ears, round dark eyes and a closed smile: warm orange fur (orange, not red) with a cream face, chest and tail tip, dark brown paws, and its bushy tail curled round in front.",
+    "avoid": [
+      "anything red",
+      "a dog",
+      "a cat",
+      "a tongue or an open mouth",
+      "eyelashes, a bow, a collar or clothes",
+      "a coloured circle, badge or background behind it"
+    ],
+    "distinctFrom": [
+      "avatar-lion",
+      "avatar-frog",
+      "avatar-turtle",
+      "avatar-penguin",
+      "avatar-owl",
+      "avatar-cat",
+      "avatar-bear"
+    ]
+  },
+  {
+    "word": "avatar-lion",
+    "tier": "avatars",
+    "batch": 15,
+    "style": "clay",
+    "subject": "A chubby baby lion sitting and facing the viewer, full body, with a big round head, round dark eyes and a closed smile: golden-yellow fur with a cream muzzle and tummy, a round fluffy caramel-brown mane all around its face, and a tail with a brown tuft.",
+    "avoid": [
+      "anything red",
+      "an orange or red mane",
+      "a tiger with stripes",
+      "a bear",
+      "a sun",
+      "a tongue or an open mouth",
+      "eyelashes, a crown, a bow, a collar or clothes",
+      "a coloured circle, badge or background behind it"
+    ],
+    "distinctFrom": [
+      "avatar-fox",
+      "avatar-frog",
+      "avatar-turtle",
+      "avatar-penguin",
+      "avatar-owl",
+      "avatar-cat",
+      "avatar-bear"
+    ]
+  },
+  {
+    "word": "avatar-frog",
+    "tier": "avatars",
+    "batch": 15,
+    "style": "clay",
+    "subject": "A chubby frog sitting and facing the viewer, full body, with a round body, two big round eyes on top of its head, a wide closed smile and folded legs: bright leaf-green skin with a pale yellow-green tummy.",
+    "avoid": [
+      "anything red",
+      "a red or pink mouth or tongue",
+      "a bumpy toad",
+      "a turtle",
+      "a crown",
+      "a lily pad or water",
+      "eyelashes, a bow or clothes",
+      "a coloured circle, badge or background behind it"
+    ],
+    "distinctFrom": [
+      "avatar-fox",
+      "avatar-lion",
+      "avatar-turtle",
+      "avatar-penguin",
+      "avatar-owl",
+      "avatar-cat",
+      "avatar-bear"
+    ]
+  },
+  {
+    "word": "avatar-turtle",
+    "tier": "avatars",
+    "batch": 15,
+    "style": "clay",
+    "subject": "A chubby baby turtle standing, seen from the front three-quarter so its shell shows, with its head up, round dark eyes and a closed smile: soft green skin and a round domed shell in warm olive and tan with rounded plate shapes.",
+    "avoid": [
+      "anything red",
+      "a frog",
+      "a snail",
+      "a tongue or an open mouth",
+      "water, sand or a beach",
+      "eyelashes, a bow or clothes",
+      "a coloured circle, badge or background behind it"
+    ],
+    "distinctFrom": [
+      "avatar-fox",
+      "avatar-lion",
+      "avatar-frog",
+      "avatar-penguin",
+      "avatar-owl",
+      "avatar-cat",
+      "avatar-bear"
+    ]
+  },
+  {
+    "word": "avatar-penguin",
+    "tier": "avatars",
+    "batch": 15,
+    "style": "clay",
+    "subject": "A chubby baby penguin standing and facing the viewer, full body, with a round body, round dark eyes, a small orange beak and a closed smile: a dark navy-black head and back, a white face and tummy, short flippers at its sides and orange feet.",
+    "avoid": [
+      "anything red",
+      "an owl",
+      "a bird with its wings spread",
+      "a bow tie, scarf or hat",
+      "ice or snow",
+      "eyelashes, a bow or clothes",
+      "a coloured circle, badge or background behind it"
+    ],
+    "distinctFrom": [
+      "avatar-fox",
+      "avatar-lion",
+      "avatar-frog",
+      "avatar-turtle",
+      "avatar-owl",
+      "avatar-cat",
+      "avatar-bear"
+    ]
+  },
+  {
+    "word": "avatar-owl",
+    "tier": "avatars",
+    "batch": 15,
+    "style": "clay",
+    "subject": "A chubby baby owl standing and facing the viewer, full body, with a round body, two small ear tufts, big round eyes in a pale cream face, a small yellow-orange beak and folded wings: warm caramel-brown feathers and a cream speckled tummy.",
+    "avoid": [
+      "anything red",
+      "purple feathers",
+      "a penguin",
+      "a cat",
+      "glasses or a graduation cap",
+      "a branch or a tree",
+      "eyelashes, a bow or clothes",
+      "a coloured circle, badge or background behind it"
+    ],
+    "distinctFrom": [
+      "avatar-fox",
+      "avatar-lion",
+      "avatar-frog",
+      "avatar-turtle",
+      "avatar-penguin",
+      "avatar-cat",
+      "avatar-bear"
+    ]
+  },
+  {
+    "word": "avatar-cat",
+    "tier": "avatars",
+    "batch": 15,
+    "style": "clay",
+    "subject": "A chubby grey kitten sitting and facing the viewer, full body, with a big round head, pointed ears, round dark eyes, a small dark nose, whiskers and a closed smile: soft grey fur with darker grey stripes, a white muzzle, chest and paws, and a long grey tail curled round.",
+    "avoid": [
+      "anything red",
+      "an orange, ginger or pink cat",
+      "a fox",
+      "a lion",
+      "a tongue or an open mouth",
+      "eyelashes, a bow, a bell, a collar or clothes",
+      "a coloured circle, badge or background behind it"
+    ],
+    "distinctFrom": [
+      "avatar-fox",
+      "avatar-lion",
+      "avatar-frog",
+      "avatar-turtle",
+      "avatar-penguin",
+      "avatar-owl",
+      "avatar-bear"
+    ]
+  },
+  {
+    "word": "avatar-bear",
+    "tier": "avatars",
+    "batch": 15,
+    "style": "clay",
+    "subject": "A chubby bear cub sitting and facing the viewer, full body, with a big round head, small round ears, round dark eyes and a closed smile: warm honey-brown fur with a cream muzzle, tummy and paw pads.",
+    "avoid": [
+      "anything red",
+      "a teddy bear with stitches",
+      "a lion",
+      "a dog",
+      "a panda",
+      "a honey pot or any object",
+      "a tongue or an open mouth",
+      "eyelashes, a bow or clothes",
+      "a coloured circle, badge or background behind it"
+    ],
+    "distinctFrom": [
+      "avatar-fox",
+      "avatar-lion",
+      "avatar-frog",
+      "avatar-turtle",
+      "avatar-penguin",
+      "avatar-owl",
+      "avatar-cat"
+    ]
+  }
+]

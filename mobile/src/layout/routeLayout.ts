@@ -15,7 +15,9 @@ export function layoutForRoute(route: Route, viewport: Viewport): ScreenLayout {
   switch (route) {
     case 'greet':
       return greetLayout(viewport)
+    // A mini-game wears the lesson's Math frame (mini-game spec § 1.4).
     case 'math':
+    case 'game':
       return mathLayout(viewport)
     case 'literacy':
       return wordSongLayout(viewport)

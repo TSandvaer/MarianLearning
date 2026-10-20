@@ -41,7 +41,7 @@ import {
  */
 
 describe('activeCombos — coverage matches the curriculum', () => {
-  it('produces 42 combos: 15 math nodes × level 1 + 27 word-song nodes × level 1 (mult-mix spliced; duck-words + crab-words, content wave 1; div-share, tent-words + cake-words spliced, content wave 2; the three story steps and hundreds spliced, content wave 3; hundreds-addsub, bee-words, car-words and sheep-stories spliced, content wave 4; blending-cv and sounding-out spliced, real blending; snail-words, moon-words and goat-stories spliced, content wave 5)', () => {
+  it('produces 44 combos: 17 math nodes × level 1 + 27 word-song nodes × level 1 (mult-mix spliced; duck-words + crab-words, content wave 1; div-share, tent-words + cake-words spliced, content wave 2; the three story steps and hundreds spliced, content wave 3; hundreds-addsub, bee-words, car-words and sheep-stories spliced, content wave 4; blending-cv and sounding-out spliced, real blending; hundreds-zeros and add-two-digit, snail-words, moon-words and goat-stories spliced, content wave 5)', () => {
     // Step 2 of the planner-parser contract added cvc-words alongside
     // blending-cv as a first-class word-song content mode. Ticket
     // 86c9m3ae3 added `cvc-words-short-o` as the next-vowel sibling
@@ -90,16 +90,19 @@ describe('activeCombos — coverage matches the curriculum', () => {
     // a splice, and `bee-words`, `car-words` and `sheep-stories` (land 8;
     // design/native/content-wave-4.md § 3, § 4, § 6), written by
     // scripts/spliceContentWave4Canon.ts. Content wave 5 added
-    // `snail-words`, `moon-words` and `goat-stories` (land 9;
-    // design/native/content-wave-5.md § 4, § 5, § 7), written by
-    // scripts/spliceContentWave5Canon.ts. Real blending added
-    // `sounding-out` (land 2; design/native/real-blending.md § 6), written
-    // with blending-cv's file by scripts/spliceRealBlendingCanon.ts.
+    // `hundreds-zeros` (zeros, land 5) and `add-two-digit` (adding big
+    // numbers, land 6; design/native/content-wave-5.md § 2.7, § 3.7),
+    // written by scripts/spliceContentWave5MathCanon.ts, and `snail-words`,
+    // `moon-words` and `goat-stories` (land 9; design/native/content-wave-5.md
+    // § 4, § 5, § 7), written by scripts/spliceContentWave5Canon.ts. Real
+    // blending added `sounding-out` (land 2; design/native/real-blending.md
+    // § 6), written with blending-cv's file by
+    // scripts/spliceRealBlendingCanon.ts.
     const combos = activeCombos()
-    expect(combos).toHaveLength(42)
+    expect(combos).toHaveLength(44)
     const mathCount = combos.filter((c) => c.track === 'math').length
     const wordSongCount = combos.filter((c) => c.track === 'word-song').length
-    expect(mathCount).toBe(15)
+    expect(mathCount).toBe(17)
     expect(wordSongCount).toBe(27)
   })
 
