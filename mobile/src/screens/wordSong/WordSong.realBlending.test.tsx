@@ -684,3 +684,239 @@ describe('Reduce Motion (AC 17)', () => {
     expect(s.timings).not.toContainEqual([1.2, 200])
   })
 })
+
+describe("sounding out's letter-tap cue (Thomas, 2026-10-20)", () => {
+  /** The hand (hidden from VoiceOver, so the default query skips it). */
+  const cue = () =>
+    screen.queryByTestId('word-story-tap-cue', { includeHiddenElements: true })
+  /** Letter 0's frame in the row, as the device reports it. */
+  async function measureLetter0() {
+    await fireEvent(screen.getByTestId('word-song-letter-cell-0'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 56, height: 80 } },
+    })
+  }
+  /** Letter `k`'s window in `word`'s clip (the letter-tap path). */
+  const letterTap = (word: string, k: number) => {
+    const text = `${word.split('').join(' - ')} ... ${word}`
+    return {
+      uri: canonClips(text)!.uri,
+      from: segs(text)[k]![0] - 30,
+      to: segs(text)[k]![1] + 80,
+    }
+  }
+
+  /** Stop 2, not mastered: the lead, 400 ms, "What is it?" to its end; t = 0. */
+  async function toReadEnd(extra: Parameters<typeof renderWordSong>[0] = {}) {
+    const plan = forward('sounding-out')
+    const guide = fakeGuide()
+    const h = await renderWordSong({
+      plan,
+      clipFor: canonClips,
+      sessionIntro: STOP_2_INTRO,
+      sessionGuide: guide.player,
+      ...extra,
+    })
+    await measureLetter0()
+    await endGuide(guide.lines[0]!)
+    await advance(400)
+    expect(last(h).text).toBe('What is it?')
+    await say(last(h))
+    return { h, word: plan.problems[0]!.target.word }
+  }
+
+  /** From t = 0 through + 2,400: no hand, no tap clip. */
+  async function expectNoCue(h: Harness) {
+    const taps = h.tap.calls.length
+    for (const step of [600, 400, 1_400]) {
+      await advance(step)
+      expect(cue()).toBeNull()
+    }
+    expect(h.tap.calls).toHaveLength(taps)
+  }
+
+  it('the hand at + 600 after the read, letter 0 fires through the tap path at + 1,000, the hand gone at + 2,400', async () => {
+    const { h, word } = await toReadEnd()
+    await advance(599)
+    expect(cue()).toBeNull()
+    await advance(1)
+    expect(cue()).not.toBeNull()
+    await advance(399)
+    expect(h.tap.calls).toHaveLength(0)
+    expect(lit()).toEqual([])
+    await advance(1)
+    // Her tap's own sound and light (StoryTapCue's fire, mirrored).
+    expect(h.tap.calls).toEqual([letterTap(word, 0)])
+    expect(lit()).toEqual([0])
+    // Not a move: nothing said, the chips still open.
+    expect(h.voice.texts()).toEqual(['What is it?'])
+    expect(allClosed()).toBe(false)
+    await advance(1_399)
+    expect(cue()).not.toBeNull()
+    await advance(1)
+    expect(cue()).toBeNull()
+    expect(h.tap.calls).toHaveLength(1)
+  })
+
+  it('her letter tap with the hand up: her letter plays, no fire, the hand gone 200 ms later', async () => {
+    const { h, word } = await toReadEnd()
+    await advance(800)
+    expect(cue()).not.toBeNull()
+    await fireEvent.press(screen.getByTestId('word-song-letter-2'))
+    await flush()
+    expect(h.tap.calls).toEqual([letterTap(word, 2)])
+    await advance(199)
+    expect(cue()).not.toBeNull()
+    await advance(1)
+    expect(cue()).toBeNull()
+    await advance(1_400)
+    expect(h.tap.calls).toEqual([letterTap(word, 2)])
+  })
+
+  it('her letter tap before the hand: it never shows, and none comes later in the mount', async () => {
+    const { h, word } = await toReadEnd()
+    await advance(300)
+    await fireEvent.press(screen.getByTestId('word-song-letter-1'))
+    await flush()
+    for (const step of [300, 400, 1_400]) {
+      await advance(step)
+      expect(cue()).toBeNull()
+    }
+    expect(h.tap.calls).toEqual([letterTap(word, 1)])
+    await fireEvent.press(chip(word))
+    await flush()
+    await say(last(h))
+    await advance(ADVANCE_AFTER_CORRECT_MS)
+    await measureLetter0()
+    await say(last(h))
+    await expectNoCue(h)
+  })
+
+  it('a chip tap with the hand up: her line starts and the hand goes at once', async () => {
+    const { h, word } = await toReadEnd()
+    await advance(700)
+    expect(cue()).not.toBeNull()
+    await fireEvent.press(chip(wrongOf(word)))
+    await flush()
+    expect(last(h).text).toBe('Hmm... try again?')
+    expect(cue()).toBeNull()
+    await advance(1_700)
+    expect(cue()).toBeNull()
+    expect(h.tap.calls).toHaveLength(0)
+  })
+
+  it('once per mount: no hand on P2', async () => {
+    const { h, word } = await toReadEnd()
+    await advance(2_400)
+    expect(cue()).toBeNull()
+    await fireEvent.press(chip(word))
+    await flush()
+    await say(last(h))
+    await advance(ADVANCE_AFTER_CORRECT_MS)
+    await measureLetter0()
+    expect(last(h).text).toBe('What is it?')
+    await say(last(h))
+    await expectNoCue(h)
+  })
+
+  it('letter 0 not measured by + 600: skipped and spent', async () => {
+    const plan = forward('sounding-out')
+    const guide = fakeGuide()
+    const h = await renderWordSong({
+      plan,
+      clipFor: canonClips,
+      sessionIntro: STOP_2_INTRO,
+      sessionGuide: guide.player,
+    })
+    await endGuide(guide.lines[0]!)
+    await advance(400)
+    await say(last(h))
+    await advance(600)
+    expect(cue()).toBeNull()
+    await measureLetter0()
+    for (const step of [400, 1_400]) {
+      await advance(step)
+      expect(cue()).toBeNull()
+    }
+    expect(h.tap.calls).toHaveLength(0)
+  })
+
+  it('Reduce Motion: the hand still shows at + 600 (fades only, no press) and letter 0 still fires at + 1,000', async () => {
+    jest.spyOn(Reanimated, 'useReducedMotion').mockReturnValue(true)
+    const timing = jest.spyOn(Reanimated, 'withTiming')
+    const { h, word } = await toReadEnd()
+    await advance(600)
+    expect(cue()).not.toBeNull()
+    await advance(400)
+    expect(h.tap.calls).toEqual([letterTap(word, 0)])
+    expect(
+      timing.mock.calls.map(([to, c]) => [to, c?.duration]),
+    ).not.toContainEqual([0.9, 100])
+    await advance(1_400)
+    expect(cue()).toBeNull()
+  })
+
+  it('a mastered step (no lead), a review and a Map replay: no hand', async () => {
+    const plan = forward('sounding-out')
+    const cases: Parameters<typeof renderWordSong>[0][] = [
+      { plan, sessionIntro: null },
+      { plan, review: true, sessionIntro: STOP_2_INTRO },
+      { plan, peek: 'sounding-out', replay: true, sessionIntro: STOP_2_INTRO },
+    ]
+    for (const props of cases) {
+      const guide = fakeGuide()
+      const h = await renderWordSong({
+        clipFor: canonClips,
+        sessionGuide: guide.player,
+        ...props,
+      })
+      if (guide.lines[0] !== undefined) {
+        await endGuide(guide.lines[0])
+        await advance(400)
+      }
+      await measureLetter0()
+      expect(last(h).text).toBe('What is it?')
+      await say(last(h))
+      await expectNoCue(h)
+      await h.unmount()
+    }
+  })
+
+  it('a peek: the hand on its first problem', async () => {
+    const plan = forward('sounding-out')
+    const guide = fakeGuide()
+    const h = await renderWordSong({
+      plan: { ...plan, problems: plan.problems.slice(0, 3) },
+      clipFor: canonClips,
+      peek: 'sounding-out',
+      sessionGuide: guide.player,
+    })
+    await endGuide(guide.lines[0]!)
+    await advance(400)
+    await measureLetter0()
+    expect(last(h).text).toBe('What is it?')
+    await say(last(h))
+    await advance(600)
+    expect(cue()).not.toBeNull()
+  })
+
+  it('stop 1, blending sounds: no hand after its sounds', async () => {
+    const plan = forward('blending-cv')
+    const guide = fakeGuide()
+    const h = await renderWordSong({
+      plan,
+      clipFor: canonClips,
+      sessionIntro: STOP_1_INTRO,
+      sessionGuide: guide.player,
+    })
+    await measureLetter0()
+    await endGuide(guide.lines[0]!)
+    await advance(400)
+    expect(last(h).text).toBe('Listen.')
+    await say(last(h))
+    const text = `${plan.problems[0]!.target.word.split('').join(' - ')} ... ${plan.problems[0]!.target.word}`
+    await advance(300)
+    await say(last(h), { ms: [cut(text)] })
+    expect(allClosed()).toBe(false)
+    await expectNoCue(h)
+  })
+})

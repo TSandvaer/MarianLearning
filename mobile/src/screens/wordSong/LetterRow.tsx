@@ -21,10 +21,15 @@
  *   spotlight, so a tap on it lights nothing while it is quiet.
  * - If the row is wider than `maxWidth`, F steps down 4 pt at a time, never
  *   below 0.8 F.
+ * - Sounding out's letter-tap cue (Thomas, 2026-10-20): the story word-tap
+ *   cue's hand (`./StoryTapCue.tsx`), the row's last child (above every
+ *   cell, outside letter 0's pulse), its fingertip 2 pt above the
+ *   bottom-centre of letter 0's spotlight box, placed from cell 0's
+ *   measured frame.
  */
 import { letterHighlighted } from '@marian/core/wordSong/wordRound'
 import { useEffect, useState } from 'react'
-import { Pressable, StyleSheet, View } from 'react-native'
+import { type LayoutRectangle, Pressable, StyleSheet, View } from 'react-native'
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -37,6 +42,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import { colors, fonts } from '../../theme'
 import { END_PULSE_MS } from './introSpotlight'
+import { StoryTapCue } from './StoryTapCue'
 
 const SPOTLIGHT = '#FFB7C5'
 const INK = '#3B3B3B'
@@ -58,6 +64,7 @@ function Cell({
   quiet,
   fadeOutMs,
   onPress,
+  onLayout,
 }: {
   letter: string
   index: number
@@ -72,6 +79,8 @@ function Cell({
   quiet: boolean
   fadeOutMs: number
   onPress: () => void
+  /** The cell's frame in the row (cell 0's places the tap cue's hand). */
+  onLayout?: (frame: LayoutRectangle) => void
 }) {
   const reducedMotion = useReducedMotion()
   const enter = useSharedValue(reducedMotion ? 1 : 0)
@@ -135,8 +144,11 @@ function Cell({
   return (
     <Animated.View
       testID={
-        endPulseDelayMs !== null ? 'word-song-letter-end-pulse' : undefined
+        endPulseDelayMs !== null
+          ? 'word-song-letter-end-pulse'
+          : `word-song-letter-cell-${index}`
       }
+      onLayout={onLayout && ((e) => onLayout(e.nativeEvent.layout))}
       style={cellStyle}
     >
       <Pressable
@@ -199,6 +211,14 @@ export interface LetterRowProps {
   endPulse?: readonly (number | null)[] | null
   /** The quiet cell (the magic e), or `null` / unset for none. */
   quiet?: number | null
+  /** The letter-tap cue's hand over letter 0 (sounding out). */
+  tapCue?: boolean
+  /** Her tap: the hand fades out. */
+  tapCueLeaving?: boolean
+  /** The hand's size S (`storyTapCueSize`). */
+  tapCueSize?: number
+  /** Letter 0 has been measured: the hand can be placed. */
+  onTapCueReady?: () => void
   onLetterPress: (index: number) => void
 }
 
@@ -211,11 +231,17 @@ export function LetterRow({
   spotlight = null,
   endPulse = null,
   quiet = null,
+  tapCue = false,
+  tapCueLeaving = false,
+  tapCueSize = 48,
+  onTapCueReady,
   onLetterPress,
 }: LetterRowProps) {
   // The step-down belongs to one F: a rotation (a new F) starts over.
   const [fit, setFit] = useState({ base: font0, font: font0 })
   const font = fit.base === font0 ? fit.font : font0
+  /** Cell 0's frame in the row (null until measured). */
+  const [cell0, setCell0] = useState<LayoutRectangle | null>(null)
   const letters = word.split('')
   return (
     <View
@@ -249,8 +275,25 @@ export function LetterRow({
           quiet={quiet === i}
           fadeOutMs={lit === null ? 200 : 120}
           onPress={() => onLetterPress(i)}
+          onLayout={
+            i === 0
+              ? (frame) => {
+                  setCell0(frame)
+                  onTapCueReady?.()
+                }
+              : undefined
+          }
         />
       ))}
+      {tapCue && cell0 !== null && (
+        // The spotlight box (F + 8) is centred in the cell (F + 16).
+        <StoryTapCue
+          x={cell0.x + cell0.width / 2}
+          y={cell0.y + (cell0.height + font + 8) / 2 - 2}
+          size={tapCueSize}
+          leaving={tapCueLeaving}
+        />
+      )}
     </View>
   )
 }

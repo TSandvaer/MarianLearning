@@ -572,7 +572,10 @@ export function WordSong({
    * a peek; never in a review or a Map replay. Read from the session's
    * props, not fixed at mount: App mounts the screen while the session
    * start is in flight (no intro yet) and the intro comes with the plan
-   * (Thomas's device check, 2026-10-17: no hand after a QA jump).
+   * (Thomas's device check, 2026-10-17: no hand after a QA jump). The same
+   * cue, on the same rules, taps letter 0 of the mount's first sounding-out
+   * problem as its read ends (Thomas, 2026-10-20: "its not intuitive that
+   * you can tap the letters").
    */
   const storyCueOn = !review && (isPeek ? !replay : sessionIntro !== null)
   /** What the card draws: the hand up, or leaving after her tap. */
@@ -583,8 +586,8 @@ export function WordSong({
   )
   /** At most once per mount: spent by its run, her tap, or a skip. */
   const storyCueSpentRef = useRef(false)
-  /** The card's word 0 is measured (the hand can be placed). */
-  const storyWord0MeasuredRef = useRef(false)
+  /** The cue's target (word 0, letter 0) is measured: the hand can be placed. */
+  const tapCueTargetMeasuredRef = useRef(false)
   /** The cue's eligibility line went to Metro (debug, once per mount). */
   const storyCueLoggedRef = useRef(false)
 
@@ -925,6 +928,56 @@ export function WordSong({
     })
   }
 
+  /**
+   * The word-tap cue's run (PR #599) from its t = 0: the hand at + 600,
+   * `fire` (the target's tap path, never holding a beat) at + 1,000, the
+   * hand gone at + 2,400. Skipped (and spent) when off, in the background,
+   * with no target, or when the target is not measured by + 600.
+   */
+  const runTapCue = (stale: () => boolean, fire: (() => void) | null) => {
+    const skip = (why: string) => logCue(`skipped:${why}`)
+    if (storyCueSpentRef.current) {
+      skip('spent')
+      return
+    }
+    storyCueSpentRef.current = true
+    if (!storyCueOn || visibility.getIsHidden()) {
+      skip(storyCueOn ? 'hidden' : 'off')
+      return
+    }
+    if (fire === null) {
+      skip('no-word0')
+      return
+    }
+    logCue('started')
+    storyCuePhaseRef.current = 'pending'
+    storyCueTimerRef.current = setTimeout(() => {
+      storyCueTimerRef.current = null
+      if (stale() || storyCuePhaseRef.current !== 'pending') return
+      if (!tapCueTargetMeasuredRef.current) {
+        logCue(`skipped:unmeasured@${STORY_TAP_CUE_DELAY_MS}`)
+        storyCuePhaseRef.current = 'idle'
+        return
+      }
+      logCue('shown')
+      storyCuePhaseRef.current = 'shown'
+      setStoryCue('run')
+      storyCueTimerRef.current = setTimeout(() => {
+        storyCueTimerRef.current = null
+        if (stale() || storyCuePhaseRef.current !== 'shown') return
+        logCue('fired')
+        fire()
+        storyCueTimerRef.current = setTimeout(() => {
+          storyCueTimerRef.current = null
+          if (storyCuePhaseRef.current !== 'shown') return
+          logCue('done')
+          storyCuePhaseRef.current = 'idle'
+          setStoryCue(null)
+        }, STORY_TAP_CUE_TOTAL_MS - STORY_TAP_CUE_FIRE_MS)
+      }, STORY_TAP_CUE_FIRE_MS)
+    }, STORY_TAP_CUE_DELAY_MS)
+  }
+
   // ── The read-aloud (+ the silent beat) ───────────────────────────────
 
   useEffect(() => {
@@ -979,55 +1032,13 @@ export function WordSong({
     const beatOpts = isStoryCard
       ? { holdMs: STORY_TAP_HOLD_MS, capMs: STORY_BEAT_CEILING_MS }
       : {}
-    /**
-     * The word-tap cue (PR #599), from the mount's first story beat: the
-     * hand at + 600, word 0 through the tap path at + 1,000 (never holding
-     * the beat), the hand gone at + 2,400. Skipped (and spent) when word 0
-     * is not measured by + 600.
-     */
+    /** The word-tap cue (PR #599), from the mount's first story beat. */
     const startStoryCue = () => {
-      const skip = (why: string) => logCue(`skipped:${why}`)
-      if (storyCueSpentRef.current) {
-        skip('spent')
-        return
-      }
-      storyCueSpentRef.current = true
-      if (!storyCueOn || visibility.getIsHidden()) {
-        skip(storyCueOn ? 'hidden' : 'off')
-        return
-      }
       const word0 = storyCells(problem.story ?? problem.utterances.hint)[0]
-      if (word0 === undefined) {
-        skip('no-word0')
-        return
-      }
-      logCue('started')
-      storyCuePhaseRef.current = 'pending'
-      storyCueTimerRef.current = setTimeout(() => {
-        storyCueTimerRef.current = null
-        if (stale() || storyCuePhaseRef.current !== 'pending') return
-        if (!storyWord0MeasuredRef.current) {
-          logCue(`skipped:unmeasured@${STORY_TAP_CUE_DELAY_MS}`)
-          storyCuePhaseRef.current = 'idle'
-          return
-        }
-        logCue('shown')
-        storyCuePhaseRef.current = 'shown'
-        setStoryCue('run')
-        storyCueTimerRef.current = setTimeout(() => {
-          storyCueTimerRef.current = null
-          if (stale() || storyCuePhaseRef.current !== 'shown') return
-          logCue('fired')
-          playStoryWord(word0, { cue: true })
-          storyCueTimerRef.current = setTimeout(() => {
-            storyCueTimerRef.current = null
-            if (storyCuePhaseRef.current !== 'shown') return
-            logCue('done')
-            storyCuePhaseRef.current = 'idle'
-            setStoryCue(null)
-          }, STORY_TAP_CUE_TOTAL_MS - STORY_TAP_CUE_FIRE_MS)
-        }, STORY_TAP_CUE_FIRE_MS)
-      }, STORY_TAP_CUE_DELAY_MS)
+      runTapCue(
+        stale,
+        word0 === undefined ? null : () => playStoryWord(word0, { cue: true }),
+      )
     }
     const startBeat = () => {
       const b = startSilentBeat(
@@ -1144,11 +1155,13 @@ export function WordSong({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- web parity: re-run on problem / readiness only
   }, [problemIndex, audioReady])
 
-  // Debug: the word-tap cue's eligibility, once per mount, when a story
-  // session is ready (App's first snapshot has no intro yet).
+  // Debug: the word-tap cue's eligibility, once per mount, when a story or
+  // sounding-out session is ready (App's first snapshot has no intro yet).
   useEffect(() => {
     if (audioReady === false || storyCueLoggedRef.current) return
-    if (!plan.problems.some((p) => p.contentType === 'little-story')) return
+    const cued = (p: WordSongProblem) =>
+      p.contentType === 'little-story' || p.contentType === 'sound-out'
+    if (!plan.problems.some(cued)) return
     storyCueLoggedRef.current = true
     debugLogRef.current?.(
       `[story-cue] eligible=${storyCueOn} review=${review} peek=${isPeek} replay=${replay} intro=${sessionIntro} warmups=${warmups}`,
@@ -1187,11 +1200,23 @@ export function WordSong({
     }, ms)
   }, [])
 
+  /** Sounding out's problem: the letter-tap cue's target is its letters. */
+  const isSoundOut = () =>
+    plan.problems[problemIndexRef.current]!.contentType === 'sound-out'
+
   // (Plain functions: they read the in-flight line count, a ref.)
-  const onLetterPress = (i: number) => {
+  /**
+   * Letter `i` plays its own sound and lights. Her tap holds a beat and, on
+   * sounding out, ends the letter-tap cue; the cue's own tap (`cue`) does
+   * neither.
+   */
+  const playLetter = (i: number, { cue }: { cue: boolean }) => {
     // Inert once solved, and while Emma speaks.
     if (resolvedRef.current || linesInFlight.current > 0) return
-    beatRef.current?.letterTapped()
+    if (!cue) {
+      beatRef.current?.letterTapped()
+      if (isSoundOut()) fadeStoryCue()
+    }
     const token = ++tapTokenRef.current
     const problem = plan.problems[problemIndexRef.current]!
     const { uri, marks } = blendOf(problem, clipForRef.current)
@@ -1205,6 +1230,19 @@ export function WordSong({
       lightFor(i, TAP_LIGHT_MIN_MS, token)
     }
   }
+
+  const onLetterPress = (i: number) => playLetter(i, { cue: false })
+
+  // Sounding out's letter-tap cue: from the read's end ("What is it?").
+  useEffect(() => {
+    if (!readAloudPlayed || !isSoundOut()) return
+    const my = problemIndex
+    runTapCue(
+      () => unmounted.current || problemIndexRef.current !== my,
+      () => playLetter(0, { cue: true }),
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per read end
+  }, [readAloudPlayed])
 
   /** Picture, glyph and scene taps: after the read, until solved, not over Emma. */
   const tapsOpen = readAloudPlayed && !problemState.resolved && !speaking
@@ -1222,6 +1260,7 @@ export function WordSong({
   const onPicturePress = () => {
     if (!readAloudPlayedRef.current || resolvedRef.current) return
     if (linesInFlight.current > 0) return
+    if (isSoundOut()) fadeStoryCue()
     const problem = plan.problems[problemIndexRef.current]!
     const { uri, marks } = blendOf(problem, clipForRef.current)
     if (uri === undefined || marks === null) {
@@ -1292,7 +1331,7 @@ export function WordSong({
       setStoryPulses({})
       setStoryCardH(null)
       stopStoryCue()
-      storyWord0MeasuredRef.current = false
+      tapCueTargetMeasuredRef.current = false
       clearCaption()
       return
     }
@@ -1891,6 +1930,11 @@ export function WordSong({
               resolved={problemState.resolved}
               showThCue={showThCorner}
               tapsOpen={tapsOpen}
+              tapCue={isStory ? null : storyCue}
+              onTapCueReady={() => {
+                if (!tapCueTargetMeasuredRef.current) logCue('letter0-measured')
+                tapCueTargetMeasuredRef.current = true
+              }}
               onLetterPress={onLetterPress}
               onPicturePress={onPicturePress}
               onReplayRead={onReplayRead}
@@ -1911,8 +1955,8 @@ export function WordSong({
                 tapCueLeaving={storyCue === 'leave'}
                 tapCueSize={storyTapCueSize(layout.tablet)}
                 onTapCueReady={() => {
-                  if (!storyWord0MeasuredRef.current) logCue('word0-measured')
-                  storyWord0MeasuredRef.current = true
+                  if (!tapCueTargetMeasuredRef.current) logCue('word0-measured')
+                  tapCueTargetMeasuredRef.current = true
                 }}
               />
             )}
