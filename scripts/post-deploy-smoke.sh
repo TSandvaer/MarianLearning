@@ -163,29 +163,29 @@ if [[ "$LAST_CODE" != "400" ]]; then
   record_failure
 fi
 
-# --- 4. POST kind=session-start with a tiny plan → Azure TTS round-trip ----
+# --- 4. POST kind=session-start (math add-to-10) → canon audio round-trip --
 #
-# Catches the entire failure class that motivated ticket 86c9gvgjk: any
-# auth/region misconfig (AZURE_SPEECH_KEY missing or wrong, AZURE_SPEECH_REGION
-# pointing at the wrong region for the F0 resource, etc.) surfaces here as
-# a 502 tts-failed instead of green. The previous WSS pipeline used to time
-# out at 8000ms here; the Azure path should answer in <2s wall.
+# A track-based request for the math level-1 default step, which the baked
+# canon serves (public/canon/math/level-1/add-to-10.json): free, no
+# Anthropic call, no live TTS, no rate-limit slot. Proves the function
+# boots, resolves canon and returns playable inline MP3s. It used to post a
+# client-supplied `payload.plan` for a live TTS round-trip; that path is
+# closed (a 400 now, asserted in check 5), so live TTS has no smoke check.
 #
-# Set TTS_SMOKE_SKIP=1 to skip just this check (e.g. against a preview that
-# is intentionally configured without the Azure vars).
+# Set TTS_SMOKE_SKIP=1 to skip just this check.
 if [[ "${TTS_SMOKE_SKIP:-}" == "1" ]]; then
-  echo "smoke: POST session-start (Azure TTS) — SKIPPED (TTS_SMOKE_SKIP=1)"
+  echo "smoke: POST session-start (canon audio) — SKIPPED (TTS_SMOKE_SKIP=1)"
 else
-  echo "smoke: POST session-start (Azure TTS round-trip)"
-  fetch_with_id "post-tts-session-start" POST \
-    '{"kind":"session-start","payload":{"plan":{"utterances":[{"id":"smoke.0","text":"Hello Marian."}]}}}'
+  echo "smoke: POST session-start (canon audio round-trip)"
+  fetch_with_id "post-canon-session-start" POST \
+    '{"kind":"session-start","payload":{"track":"math","level":1,"childName":"friend","progress":{"focusNode":"add-to-10"}}}'
   if [[ "$LAST_BODY" == *"FUNCTION_INVOCATION_FAILED"* ]]; then
     echo "  FAIL: response contains FUNCTION_INVOCATION_FAILED" >&2
     echo "  body: $LAST_BODY" >&2
     record_failure
   fi
   if [[ "$LAST_CODE" != "200" ]]; then
-    echo "  FAIL: expected 200 (Azure TTS happy path), got $LAST_CODE" >&2
+    echo "  FAIL: expected 200 (canon hit), got $LAST_CODE" >&2
     echo "  body: $LAST_BODY" >&2
     record_failure
   else
@@ -213,8 +213,7 @@ else
       fi
       # Validate base64: non-empty, base64 charset, decodes to non-empty
       # bytes whose first 2 bytes look like an MP3 frame header (0xFF 0xFB
-      # for MPEG-1 Layer III, mono, 24kHz/48kbps — what the Azure output
-      # format header asks for).
+      # for MPEG-1 Layer III).
       if [[ -z "$first_b64" ]]; then
         echo "  FAIL: utterances[0].audio.base64 is empty" >&2
         record_failure
@@ -224,8 +223,7 @@ else
           record_failure
         else
           # Decode the first ~6 bytes and check the MP3 sync word. Accept
-          # both 0xFFFB (MPEG-1 L3) and 0xFFF3 (MPEG-2 L3) — Azure may
-          # emit either depending on bitrate negotiation.
+          # both 0xFFFB (MPEG-1 L3) and 0xFFF3 (MPEG-2 L3).
           first_two_hex=$(printf '%s' "$first_b64" | head -c 16 \
             | base64 -d 2>/dev/null | od -An -N2 -tx1 | tr -d ' \n' || true)
           if [[ -z "$first_two_hex" ]]; then
@@ -253,6 +251,19 @@ else
       fi
     fi
   fi
+fi
+
+# --- 5. POST kind=session-start with a client-supplied plan → 400 --------
+#
+# The client-supplied plan path rendered TTS for any posted text with no
+# rate limit. It is closed; a 200 here means it is open again.
+echo "smoke: POST session-start with payload.plan (must be rejected)"
+fetch_with_id "post-plan-rejected" POST \
+  '{"kind":"session-start","payload":{"plan":{"utterances":[{"id":"smoke.0","text":"Hello."}]}}}'
+if [[ "$LAST_CODE" != "400" ]]; then
+  echo "  FAIL: expected 400 (invalid-body), got $LAST_CODE" >&2
+  echo "  body: $LAST_BODY" >&2
+  record_failure
 fi
 
 if [[ "$fail" -ne 0 ]]; then

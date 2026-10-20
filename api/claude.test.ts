@@ -2,7 +2,8 @@
  * @vitest-environment node
  *
  * Integration test for the Vercel function. Exercises the request-shape
- * branches and the new (ticket 86c9gr385) session-start → TTS-merge path.
+ * branches, the track/canon session-start paths, and the closed
+ * client-supplied `payload.plan` path.
  *
  * The TTS module is dependency-injected in `_session.ts`; here we mock it
  * by stubbing the named export the function transitively imports. We use
