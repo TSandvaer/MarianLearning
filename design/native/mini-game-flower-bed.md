@@ -1,5 +1,7 @@
 # Fill the flower bed: the first side mini-game (native build spec)
 
+> **Superseded 2026-10-20** by `design/native/flower-bed-into-add-to-10.md`: Thomas moved the bed into adding to ten's missing-number problems, and the door, the route and the game screen are retired. § 2.2 (the bed's look) and § 2.4's hop stay the reference for the drawing and the motion.
+
 **Ask (Thomas, 2026-10-19, verbatim):** "I have some thought about adding some mini games for casual fun on the side of the 'Numbers garden' and 'Word song' paths."
 
 **Decided by popup (Thomas, 2026-10-19):** **T1:** build concept A, "Fill the flower bed", first. **T2:** the play door lives on each world's Map, not on the Hub.
