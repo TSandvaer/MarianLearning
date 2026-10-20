@@ -8,6 +8,7 @@
 import { setDayOffsetSource, setKeyValueStore } from '@marian/core'
 import type { LearnerEntry } from '@marian/core/learners'
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
+import { avatarAsset } from '../../assets'
 import { hubLayout, type HubLayout } from '../../layout/hubLayout'
 import type { Rect } from '../../layout/layout'
 import { badgeExclusion, hubBadge } from '../../layout/pickerLayout'
@@ -122,6 +123,14 @@ it.each([
     })
   },
 )
+
+it('§ 9: the badge’s disc carries the playing learner’s clay sticker', async () => {
+  await mount(P, { learnerBadge: SAM })
+  const sticker = screen.getByTestId('hub-learner-badge-avatar-sticker')
+  expect(avatarAsset('owl')).toBeDefined()
+  // expo-image normalises `source` to a list.
+  expect([sticker.props.source].flat()).toEqual([avatarAsset('owl')])
+})
 
 it('AC 30: a tap chimes, stops Emma’s line and opens the picker, with no confirm', async () => {
   const h = await mount(P, { learnerBadge: SAM })

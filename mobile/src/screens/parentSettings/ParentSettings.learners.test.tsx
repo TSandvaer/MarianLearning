@@ -37,6 +37,7 @@ import {
 } from '@testing-library/react-native'
 import { Alert, type AlertButton } from 'react-native'
 import { flushPromises, PHONE } from '../../../test/parentSettingsHarness'
+import { avatarAsset } from '../../assets'
 import { ParentSettings } from './ParentSettings'
 
 const MARIAN_ID = '5f3c2a10-8b1e-4c2d-9a7f-1e2d3c4b5a69'
@@ -182,6 +183,19 @@ describe('AC 34: selecting a learner', () => {
     expect(screen.getByTestId(`ps-learner-playing-${SAM_ID}`)).toBeOnTheScreen()
     expect(switchValue('showLevelToMarian')).toBe(false)
     expect(screen.getByTestId('ps-learner-name').props.value).toBe('Sam')
+  })
+
+  it('§ 9: each learner row’s disc carries its clay sticker, learner 1 the fox (T3)', async () => {
+    device([MARIAN, SAM])
+    await mount()
+    for (const l of [MARIAN, SAM]) {
+      const disc = within(screen.getByTestId(`ps-learner-avatar-${l.id}`))
+      const sticker = disc.getByTestId(`ps-learner-avatar-${l.id}-sticker`)
+      expect(avatarAsset(l.avatarId)).toBeDefined()
+      // expo-image normalises `source` to a list.
+      expect([sticker.props.source].flat()).toEqual([avatarAsset(l.avatarId)])
+    }
+    expect(MARIAN.avatarId).toBe('fox')
   })
 
   it('X2: a toggle after the row tap changes only B’s keys', async () => {

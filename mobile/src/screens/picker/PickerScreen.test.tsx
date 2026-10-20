@@ -14,6 +14,7 @@ import {
   within,
 } from '@testing-library/react-native'
 import { fakePlayers, flush, resetFakePlayers } from '../../../test/fakeAudio'
+import { avatarAsset } from '../../assets'
 import { audioEngine, type LineCallbacks } from '../../audio'
 import { pickerLayout } from '../../layout/pickerLayout'
 import { AVATAR_COLORS } from './avatars'
@@ -128,6 +129,18 @@ describe('AC 27: the tiles and a pick', () => {
     }
   })
 
+  it('§ 9: each tile’s disc carries its clay sticker, learner 1 the fox (T3)', async () => {
+    await mount()
+    for (const l of [MARIAN, SAM, ANA]) {
+      const disc = within(screen.getByTestId(`picker-avatar-${l.id}`))
+      const sticker = disc.getByTestId(`picker-avatar-${l.id}-sticker`)
+      expect(avatarAsset(l.avatarId)).toBeDefined()
+      // expo-image normalises `source` to a list.
+      expect([sticker.props.source].flat()).toEqual([avatarAsset(l.avatarId)])
+    }
+    expect(MARIAN.avatarId).toBe('fox')
+  })
+
   it('a tap: the chime and the chosen tile at once, the route 400 ms later; a second tap in that window is ignored', async () => {
     const h = await mount()
     await fireEvent.press(screen.getByTestId(`picker-tile-${SAM.id}`))
@@ -231,7 +244,11 @@ describe('AC 38: a tile is a picture and a name, nothing else', () => {
         .queryAllByTestId(/.*/)
         .map((el) => String(el.props.testID))
       expect(ids.sort()).toEqual(
-        [`picker-avatar-${l.id}`, `picker-name-${l.id}`].sort(),
+        [
+          `picker-avatar-${l.id}`,
+          `picker-avatar-${l.id}-sticker`,
+          `picker-name-${l.id}`,
+        ].sort(),
       )
       const texts = within(screen.getByTestId(`picker-tile-${l.id}`))
         .queryAllByText(/./)

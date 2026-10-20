@@ -1,8 +1,10 @@
 /**
  * A learner's picture (learner profiles § 1.2, § 9): their fixed colour
- * disc, with the clay animal inside at 90% of it once the picture is
- * bundled (`avatarAsset`). Until then, the disc alone. Used on the picker
- * tiles, the Hub badge and Parent Settings.
+ * disc, with the clay animal sticker inside at 90% of it (`avatarAsset`,
+ * the 8 bundled `/native/avatars/avatar-<id>.webp`). An id with no bundled
+ * sticker shows the disc alone. Used on the picker tiles, the Hub badge
+ * and Parent Settings; the sticker's test id is the disc's plus
+ * `-sticker`.
  */
 import type { AvatarId } from '@marian/core/learners'
 import { Image } from 'expo-image'
@@ -22,9 +24,10 @@ export interface AvatarDiscProps {
 export function AvatarDisc({ avatarId, size, testID, style }: AvatarDiscProps) {
   const source = avatarAsset(avatarId)
   const animal = size * ANIMAL_OF_DISC
+  const discID = testID ?? `avatar-disc-${avatarId}`
   return (
     <View
-      testID={testID ?? `avatar-disc-${avatarId}`}
+      testID={discID}
       style={[
         styles.disc,
         {
@@ -38,7 +41,7 @@ export function AvatarDisc({ avatarId, size, testID, style }: AvatarDiscProps) {
     >
       {source !== undefined && (
         <Image
-          testID={`avatar-image-${avatarId}`}
+          testID={`${discID}-sticker`}
           source={source}
           contentFit="contain"
           style={{ width: animal, height: animal }}
