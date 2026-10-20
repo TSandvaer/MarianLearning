@@ -24,6 +24,12 @@
  * leaves out the badge's rect (plus 8 pt), so a hold on the badge never
  * opens Parent Settings.
  *
+ * With a Play-place game open for the playing learner (play-place § 1.2,
+ * decided once at mount), a still cream clay disc holding `ui-play` sits
+ * in the corner opposite the badge (in Emma's column on L): a tap plinks,
+ * stops Emma's line and opens the Play place. Nothing announces it, and
+ * Emma's 3 s press leaves out its rect (plus 8 pt) as it does the badge's.
+ *
  * Not ported (§ 7): the parent-gate corner, PromotionCelebration, the
  * first-tap gate, cross-tab storage sync, keyboard focus.
  */
@@ -48,21 +54,28 @@ import {
   type SessionHistoryV2,
   type SkillTreeId,
 } from '@marian/core/sessionEnd/sessionHistory'
+import { openPlayGames } from '@marian/core/games/playPlace'
 import type { LearnerEntry } from '@marian/core/learners'
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, StyleSheet, type GestureResponderEvent } from 'react-native'
+import {
+  Pressable,
+  StyleSheet,
+  View,
+  type GestureResponderEvent,
+} from 'react-native'
 import Animated, {
   FadeIn,
   FadeOut,
   useReducedMotion,
 } from 'react-native-reanimated'
-import type { HubLayout } from '../../layout/hubLayout'
+import { playExclusion, type HubLayout } from '../../layout/hubLayout'
 import {
   badgeExclusion,
   containsPoint,
   hubBadge,
 } from '../../layout/pickerLayout'
 import { FILL } from '../../theme'
+import { ClayDisc } from '../map/mapChrome'
 import { AvatarDisc } from '../picker/AvatarDisc'
 import { playPickChime } from '../picker/pickerAudio'
 import { HUB_ENTER_MS, HUB_EXIT_MS, HubBackdrop } from './HubBackdrop'
@@ -94,6 +107,8 @@ export interface HubProps {
   learnerBadge?: LearnerEntry | null
   /** A badge tap: App opens "Who is playing?". */
   onLearnerBadge?: () => void
+  /** The Play disc's tap: App opens the Play place (play-place § 1.2). */
+  onOpenPlay?: () => void
   /** Test seams. */
   player?: GuidancePlayer
   /** The progress clock (the visit's "today"). */
@@ -107,6 +122,8 @@ export interface HubProps {
 interface Mount {
   visit: HubVisit
   history: SessionHistoryV2
+  /** A Play-place game is open for this learner: the Play disc shows. */
+  playOpen: boolean
 }
 
 function safe<T>(read: () => T, fallback: T): T {
@@ -132,7 +149,7 @@ function readMount(clock: () => Date, wallClock: () => number): Mount {
     seenWake: readFlowerWake(),
     suppressed: isRapidRemount(wallClock()),
   })
-  return { visit, history }
+  return { visit, history, playOpen: openPlayGames(progress).length > 0 }
 }
 
 export function Hub({
@@ -142,6 +159,7 @@ export function Hub({
   onParentLongPress,
   learnerBadge = null,
   onLearnerBadge,
+  onOpenPlay,
   player: playerProp,
   clock = progressNow,
   wallClock = Date.now,
@@ -152,7 +170,9 @@ export function Hub({
   const [player] = useState<GuidancePlayer>(
     () => playerProp ?? guidancePlayer(),
   )
-  const [{ visit, history }] = useState(() => readMount(clock, wallClock))
+  const [{ visit, history, playOpen }] = useState(() =>
+    readMount(clock, wallClock),
+  )
   const [line, setLine] = useState({ index: 0, revealed: 0 })
   const stopLines = useRef<() => void>(() => player.cancelActive())
   const leavingRef = useRef(false)
@@ -220,6 +240,14 @@ export function Hub({
     onOpenMap(world)
   }
 
+  const openPlay = () => {
+    if (leavingRef.current) return
+    leavingRef.current = true
+    plink()
+    stopLines.current()
+    onOpenPlay?.()
+  }
+
   const switchLearner = () => {
     if (leavingRef.current || onLearnerBadge === undefined) return
     leavingRef.current = true
@@ -228,7 +256,8 @@ export function Hub({
     onLearnerBadge()
   }
 
-  // Emma's 3 s press ignores a hold that began on (or next to) the badge.
+  // Emma's 3 s press ignores a hold that began on (or next to) the badge
+  // or the Play disc.
   const pressInAt = useRef<{ x: number; y: number } | null>(null)
   const onEmmaPressIn = (e?: GestureResponderEvent) => {
     const at = e?.nativeEvent
@@ -240,6 +269,13 @@ export function Hub({
       learnerBadge !== null &&
       at !== null &&
       containsPoint(badgeExclusion(layout), at.x, at.y)
+    ) {
+      return
+    }
+    if (
+      playOpen &&
+      at !== null &&
+      containsPoint(playExclusion(layout), at.x, at.y)
     ) {
       return
     }
@@ -304,6 +340,20 @@ export function Hub({
             onOpenMap={() => openMap(model.world)}
           />
         ))}
+        {/* Above Emma's long-press target in z, as the badge (§ 1.2). */}
+        {playOpen && (
+          <View style={styles.play} pointerEvents="box-none">
+            <ClayDisc
+              rect={layout.play}
+              k={layout.play.width / 96}
+              onPress={openPlay}
+              testID="hub-play"
+              label="Play"
+              art="ui-play"
+              look="cream"
+            />
+          </View>
+        )}
         {/* Above Emma's long-press target in z (on L it sits over the
             transparent corner of her frame). A hold does nothing. */}
         {badge !== null && learnerBadge !== null && (
@@ -341,6 +391,7 @@ export function Hub({
 const styles = StyleSheet.create({
   foreground: { ...FILL, zIndex: 2, pointerEvents: 'box-none' },
   abs: { position: 'absolute' },
+  play: { ...FILL, zIndex: 3 },
   badge: {
     position: 'absolute',
     zIndex: 3,

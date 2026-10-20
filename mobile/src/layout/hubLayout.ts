@@ -46,6 +46,9 @@ export const BUBBLE_LINES = 3
 export const EMMA_BUBBLE_GAP = 12
 /** The map button's hit area is never smaller than this (pt). */
 export const MAP_MIN_HIT = 56
+/** The Play disc (play-place § 1.2): the Map Home's 56 / 96 pt. */
+export const PLAY_PHONE = 56
+export const PLAY_TABLET = 96
 
 export interface HubBubbleLayout {
   /** Top-left of the bubble; it grows down from here at a fixed width. */
@@ -78,6 +81,11 @@ export interface HubLayout extends ScreenLayout {
    * the screen (W: the web stage's coordinates; P / L: x / 820, y / 1180).
    */
   garden: { width: number; height: number; origin: Rect; scale: number }
+  /**
+   * The Play disc (play-place § 1.2): the top corner opposite the learner
+   * badge (P, W), or the top-right of Emma's column (L).
+   */
+  play: Rect
 }
 
 interface Caption {
@@ -206,6 +214,12 @@ function stageLayout(v: Viewport, safe: Rect): HubLayout {
     cards: [at(24, 470, CARD_W, CARD_H), at(418, 470, CARD_W, CARD_H)],
     s: u,
     garden: { width: v.width, height: v.height, origin: stage, scale: u },
+    play: {
+      x: safe.x + safe.width - 24 - PLAY_TABLET,
+      y: safe.y + 14,
+      width: PLAY_TABLET,
+      height: PLAY_TABLET,
+    },
   }
 }
 
@@ -251,6 +265,12 @@ function portraitLayout(v: Viewport, safe: Rect): HubLayout {
       origin: fullScreen(v),
       scale: s,
     },
+    play: {
+      x: safe.x + safe.width - 16 - PLAY_PHONE,
+      y: safe.y + 8,
+      width: PLAY_PHONE,
+      height: PLAY_PHONE,
+    },
   }
 }
 
@@ -283,6 +303,9 @@ function landscapeLayout(v: Viewport, safe: Rect, tablet: boolean): HubLayout {
     width: E,
     height: E,
   }
+  // The column's top-right: the right card's crown and bob would sit
+  // under the screen's top-right corner (play-place § 1.2).
+  const play = tablet ? PLAY_TABLET : PLAY_PHONE
   return {
     form: 'L',
     landscape: true,
@@ -304,6 +327,12 @@ function landscapeLayout(v: Viewport, safe: Rect, tablet: boolean): HubLayout {
       origin: fullScreen(v),
       scale: s,
     },
+    play: {
+      x: colX + colW - play,
+      y: safe.y + (tablet ? 14 : 8),
+      width: play,
+      height: play,
+    },
   }
 }
 
@@ -316,6 +345,17 @@ export function hubLayout(v: Viewport): HubLayout {
   const tablet = isTablet(v)
   if (isLandscape(v)) return landscapeLayout(v, safe, tablet)
   return tablet ? stageLayout(v, safe) : portraitLayout(v, safe)
+}
+
+/** The rect Emma's 3 s press ignores: the Play disc plus 8 pt (§ 1.2). */
+export function playExclusion(hub: HubLayout): Rect {
+  const { play } = hub
+  return {
+    x: play.x - 8,
+    y: play.y - 8,
+    width: play.width + 16,
+    height: play.height + 16,
+  }
 }
 
 /** The map button's hit slop on each side, so its hit area is ≥ 56×56. */
