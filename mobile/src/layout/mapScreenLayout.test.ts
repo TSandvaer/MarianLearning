@@ -21,7 +21,9 @@ import {
   type SkillLevels,
   type SkillNode,
 } from '@marian/core/progress'
-import type { Viewport } from './layout'
+import { resolve } from 'node:path'
+import { fontMeasure } from '../../test/fontAdvances'
+import type { Rect, Viewport } from './layout'
 import {
   focusBox,
   hitSlopFor,
@@ -405,4 +407,61 @@ describe('hit areas (§ 1)', () => {
       expect(hitSlopFor(worst(v, 'word-song').stop)).toBeLessThanOrEqual(2.2)
     }
   })
+})
+
+/** Fredoka 700, the map title's face (`fonts.bold`). */
+const titleWidth = fontMeasure(
+  resolve(
+    __dirname,
+    '../..',
+    'node_modules/@expo-google-fonts/fredoka/700Bold/Fredoka_700Bold.ttf',
+  ),
+)
+
+const overlaps = (a: Rect, b: Rect) =>
+  a.x < b.x + b.width &&
+  b.x < a.x + a.width &&
+  a.y < b.y + b.height &&
+  b.y < a.y + a.height
+
+describe('mapScreenLayout: the play door (mini-game spec § 1.2, N1)', () => {
+  const CASES: [string, Viewport, Rect][] = [
+    ['P 375×667', vp(375, 667), { x: 303, y: 8, width: 56, height: 56 }],
+    ['L 667×375', vp(667, 375), { x: 16, y: 80, width: 56, height: 56 }],
+    [
+      'W 820×1180 (t24 b20)',
+      vp(820, 1180, 24, 20),
+      { x: 700, y: 38, width: 96, height: 96 },
+    ],
+    [
+      'TL 1180×820 (b20)',
+      vp(1180, 820, 0, 20),
+      { x: 144, y: 14, width: 96, height: 96 },
+    ],
+  ]
+
+  it.each(CASES)('%s: the door is at § 1.2’s rect', (_, v, rect) => {
+    expect(mapScreenLayout(v).door).toEqual(rect)
+  })
+
+  it.each(CASES)(
+    '%s: the door touches neither Home, the title text nor the pane',
+    (_, v) => {
+      const l = mapScreenLayout(v)
+      expect(overlaps(l.door, l.home)).toBe(false)
+      expect(overlaps(l.door, l.pane)).toBe(false)
+      expect(overlaps(l.door, l.caption.slot)).toBe(false)
+      if (l.title !== null) {
+        // The title text, centred in its rect (P, W) or its column (TL).
+        const w = titleWidth('Number Garden', l.title.fontSize)
+        const text = {
+          x: l.title.x + (l.title.width - w) / 2,
+          y: l.title.y,
+          width: w,
+          height: l.title.height,
+        }
+        expect(overlaps(l.door, text)).toBe(false)
+      }
+    },
+  )
 })

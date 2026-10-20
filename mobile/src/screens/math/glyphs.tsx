@@ -7,6 +7,7 @@
  */
 import Svg, { Circle, Path, Rect } from 'react-native-svg'
 import { colors } from '../../theme'
+import { FRAME_COLUMNS, FRAME_ROWS } from './tenFrame'
 
 /** Web `SparkleGlyph`: a gold four-point star, 1em square. */
 export function SparkleGlyph({ size }: { size: number }) {
@@ -176,9 +177,6 @@ export function DotCardCell({ pips, size }: { pips: number; size: number }) {
     </Svg>
   )
 }
-
-const FRAME_COLUMNS = [17, 41, 65, 89, 113]
-const FRAME_ROWS = [18, 42]
 
 /** Web `TenFrameCell`: 5 × 2 slots, top row first; 130×60 units at 170×80. */
 export function TenFrameCell({

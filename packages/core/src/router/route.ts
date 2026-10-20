@@ -60,5 +60,13 @@ export type Route =
    * to Greet or the Hub. The web never routes here.
    */
   | 'picker'
+  /**
+   * Native only: a side mini-game (`design/native/mini-game-flower-bed.md`
+   * § 1.3). Reached from a world's Map door; it always returns to that
+   * Map. The world and the game live in App state, as a peek's do. Not
+   * `play`: that already names the Map's current-stop start. The web never
+   * routes here.
+   */
+  | 'game'
 
 export const FIRST_ROUTE: Route = 'splash'

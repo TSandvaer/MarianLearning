@@ -63,6 +63,7 @@ export type GuidanceLineKind =
   | 'story-read'
   | 'story-word'
   | 'picker-who'
+  | 'game'
 
 export interface GuidanceLine {
   /** Dotted id, e.g. `guide.hub.suggest.math`. */
@@ -89,6 +90,19 @@ const WORLD_NAMES: Record<World, string> = {
 const OTHER: Record<World, World> = { math: 'word-song', 'word-song': 'math' }
 const WORLDS: readonly World[] = ['math', 'word-song']
 const COUNT_WORDS = ['One', 'Two', 'Three'] as const
+/** One to nine, lower case (the games' number words). */
+const NUMBER_WORDS = [
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+] as const
+const capitalize = (w: string) => `${w.charAt(0).toUpperCase()}${w.slice(1)}`
 const SCORE_WORDS: Record<number, string> = { 7: 'Seven', 8: 'Eight' }
 
 function buildLines(): GuidanceLine[] {
@@ -264,6 +278,28 @@ function buildLines(): GuidanceLine[] {
   // picker's question, on a device with 2 or more learners. No name in it
   // (P7).
   add(PICKER_WHO_ID, 'picker-who', 'Who is playing?')
+  // The side mini-games (design/native/mini-game-flower-bed.md § 3.1; T3,
+  // the texts, judged at the ear test). The shared lines are world-free: B
+  // and C reuse "Hmm... try again?" and the guided "This one is <n>.". Fill
+  // the flower bed's lines say each bond to ten whole. No line invites a
+  // round, and no line outside `guide.game.*` names a game.
+  add(GAME_AGAIN_ID, 'game', 'Hmm... try again?')
+  NUMBER_WORDS.forEach((n, i) =>
+    add(gameThisIsId(i + 1), 'game', `This one is ${n}.`),
+  )
+  add(BED_OPEN_ID, 'game', 'Ten flowers in every bed!', 'math')
+  NUMBER_WORDS.forEach((n, i) =>
+    add(bedAskId(i + 1), 'game', `${capitalize(n)} and what make ten?`, 'math'),
+  )
+  NUMBER_WORDS.forEach((n, i) =>
+    add(
+      bedYesId(i + 1),
+      'game',
+      `Yes! ${capitalize(n)} and ${NUMBER_WORDS[8 - i]} make ten!`,
+      'math',
+    ),
+  )
+  add(BED_CLOSE_ID, 'game', 'Ten every time! What a garden!', 'math')
   return lines
 }
 
@@ -336,6 +372,12 @@ const replayCloseId = (n: SkillNode) => `guide.session.replay-close.${n}`
 const STORY_READ_ID = 'guide.story.read'
 const PICKER_WHO_ID = 'guide.picker.who'
 const storyWordId = (word: string) => `guide.story.word.${word}`
+const GAME_AGAIN_ID = 'guide.game.again'
+const gameThisIsId = (n: number) => `guide.game.this-is.${n}`
+const BED_OPEN_ID = 'guide.game.bed.open'
+const bedAskId = (given: number) => `guide.game.bed.ask.${given}`
+const bedYesId = (given: number) => `guide.game.bed.yes.${given}`
+const BED_CLOSE_ID = 'guide.game.bed.close'
 
 /** Every guidance line: Hub, then session end, then in session. */
 export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
