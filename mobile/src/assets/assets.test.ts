@@ -9,6 +9,7 @@ import { SCENE_PICTURES } from '@marian/core/wordSong/sceneRegistry'
 import { LITTLE_STORIES } from '@marian/core/wordSong/littleStories'
 import { NOVEL_PROBE_WORDS } from '@marian/core/wordSong/novelProbeWords'
 import { BIG_WORDS_STEPS } from '@marian/core/wordSong/bigWordsSteps'
+import { AVATAR_IDS } from '@marian/core/learners'
 import { existsSync, readdirSync } from 'fs'
 import { join } from 'path'
 import {
@@ -28,6 +29,7 @@ import { WEB_ASSET_MODULES } from './registry'
 
 const WEB_ASSETS = join(__dirname, '..', '..', '..', 'public', 'assets')
 const SCENES = join(__dirname, '..', '..', 'assets', 'scenes')
+const AVATARS = join(__dirname, '..', '..', 'assets', 'avatars')
 
 describe('native asset registry', () => {
   it('has every Emma pose, the logo and the th mouth', () => {
@@ -180,6 +182,24 @@ describe('native asset registry', () => {
     )
   })
 
+  it('has one clay avatar per AvatarId (learner-profiles.md § 9, T2)', () => {
+    for (const id of AVATAR_IDS) {
+      expect([id, existsSync(join(AVATARS, `avatar-${id}.webp`))]).toEqual([
+        id,
+        true,
+      ])
+    }
+    const registered = Object.keys(WEB_ASSET_MODULES).filter((k) =>
+      k.startsWith('/native/avatars/'),
+    )
+    expect(registered.sort()).toEqual(
+      AVATAR_IDS.map((id) => `/native/avatars/avatar-${id}.webp`).sort(),
+    )
+    // Each its own file: 8 different modules.
+    const modules = registered.map((k) => WEB_ASSET_MODULES[k])
+    expect(new Set(modules.map((m) => JSON.stringify(m))).size).toBe(8)
+  })
+
   it('every registry entry is a web asset that still exists', () => {
     // Native-only bakes (`/native/...`) come from a web asset that exists.
     const source = (key: string) =>
@@ -207,6 +227,8 @@ describe('native asset registry', () => {
       // The little stories' scenes have no web source (native only; the
       // test above checks each file).
       if (key.startsWith('/native/scenes/story-')) continue
+      // Nor have the avatars (the test above checks each file).
+      if (key.startsWith('/native/avatars/')) continue
       const webPath = key.startsWith('/native/') ? source(key) : key
       expect(webPath.startsWith('/assets/')).toBe(true)
       expect([webPath, existsSync(join(WEB_ASSETS, '..', webPath))]).toEqual([
