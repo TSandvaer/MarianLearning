@@ -189,6 +189,7 @@ export const WEB_AUDIO_MODULES: Readonly<Record<string, number>> = {
   '/assets/audio/path/guide-hub-suggest-word-song.mp3': require('../../assets/audio/path/guide-hub-suggest-word-song.mp3'),
   '/assets/audio/path/guide-hub-woke-one.mp3': require('../../assets/audio/path/guide-hub-woke-one.mp3'),
   '/assets/audio/path/guide-hub-woke.mp3': require('../../assets/audio/path/guide-hub-woke.mp3'),
+  '/assets/audio/path/guide-picker-who.mp3': require('../../assets/audio/path/guide-picker-who.mp3'),
   '/assets/audio/path/guide-session-hiding.mp3': require('../../assets/audio/path/guide-session-hiding.mp3'),
   '/assets/audio/path/guide-session-intro-add-two-digit.mp3': require('../../assets/audio/path/guide-session-intro-add-two-digit.mp3'),
   '/assets/audio/path/guide-session-intro-bee-words.mp3': require('../../assets/audio/path/guide-session-intro-bee-words.mp3'),

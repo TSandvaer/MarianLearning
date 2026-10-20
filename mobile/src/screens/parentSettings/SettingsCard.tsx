@@ -12,6 +12,7 @@ import {
   SESSION_MODE_ROW_COPY,
   TOGGLE_ROW_COPY,
 } from '@marian/core/parentSettings/copy'
+import type { ToggleSettingKey } from '@marian/core/parentSettings/parentSettingsModel'
 import {
   SESSION_MODE_OPTIONS,
   SETTINGS_ROWS,
@@ -34,7 +35,8 @@ import {
 import { Fragment } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { Card, PsButton, RowDivider, SegmentedRow, SwitchRow } from './controls'
-import { defaultsFootnote, NATIVE_COPY } from './nativeCopy'
+import type { LearnerSettingsCopy } from './learnerCopy'
+import { defaultsFootnote } from './nativeCopy'
 import { BODY_FONT_MAX, emerald, RADIUS, type } from './psTheme'
 
 /** Generated from core's defaults (§ 7), not the web's stale string. */
@@ -46,6 +48,34 @@ export interface SettingsCardProps {
   compact: boolean
   onPatch: (patch: ParentSettingsPatch) => void
   onConfirmPromotion: () => void
+  /** The selected learner's strings (learner profiles § 3.6). */
+  copy: LearnerSettingsCopy
+}
+
+/** A toggle row's label and description for the selected learner. */
+function toggleCopy(
+  id: ToggleSettingKey,
+  copy: LearnerSettingsCopy,
+): { label: string; description: string } {
+  switch (id) {
+    case 'autoPromote':
+      return {
+        label: TOGGLE_ROW_COPY.autoPromote.label,
+        description: copy.autoPromoteDescription,
+      }
+    case 'showLevelToMarian':
+      return {
+        label: copy.showLevelLabel,
+        description: copy.showLevelDescription,
+      }
+    case 'crossVowelMixingEnabled':
+      return {
+        label: TOGGLE_ROW_COPY.crossVowelMixingEnabled.label,
+        description: copy.crossVowelDescription,
+      }
+    default:
+      return TOGGLE_ROW_COPY[id]
+  }
 }
 
 /** Segment option values must be strings: a preset is keyed by its id. */
@@ -76,6 +106,7 @@ export function SettingsCard({
   compact,
   onPatch,
   onConfirmPromotion,
+  copy,
 }: SettingsCardProps) {
   return (
     <>
@@ -85,14 +116,14 @@ export function SettingsCard({
             {PENDING_PROMOTION_COPY.heading}
           </Text>
           <Text maxFontSizeMultiplier={BODY_FONT_MAX} style={styles.bannerText}>
-            {PENDING_PROMOTION_COPY.before}
+            {copy.pendingBefore}
             <Text
               testID="parent-settings-pending-promotion-label"
               style={styles.bannerNode}
             >
               {labelForSkillNode(pendingNode)}
             </Text>
-            {PENDING_PROMOTION_COPY.after}
+            {copy.pendingAfter}
           </Text>
           <View style={styles.bannerButton}>
             <PsButton
@@ -113,8 +144,8 @@ export function SettingsCard({
             {row.kind === 'toggle' ? (
               <SwitchRow
                 id={row.id}
-                label={TOGGLE_ROW_COPY[row.id].label}
-                description={TOGGLE_ROW_COPY[row.id].description}
+                label={toggleCopy(row.id, copy).label}
+                description={toggleCopy(row.id, copy).description}
                 value={settings[row.id]}
                 onChange={(v) => onPatch(togglePatch(row.id, v))}
                 compact={compact}
@@ -123,7 +154,7 @@ export function SettingsCard({
               <SegmentedRow
                 id={row.id}
                 label={SESSION_MODE_ROW_COPY.label}
-                description={SESSION_MODE_ROW_COPY.description}
+                description={copy.sessionModeDescription}
                 value={settings.sessionModePicker}
                 options={SESSION_MODE_OPTIONS}
                 onChange={(v) => onPatch({ sessionModePicker: v })}
@@ -134,7 +165,7 @@ export function SettingsCard({
               <SegmentedRow
                 id={row.id}
                 label={MASTERY_ROW_LABELS[row.track]}
-                description={NATIVE_COPY.masteryDescription}
+                description={copy.masteryDescription}
                 value={selectedPresetId(
                   settings.masteryThreshold[row.track],
                   row.track,

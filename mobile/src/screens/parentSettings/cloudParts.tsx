@@ -7,6 +7,7 @@ import { CLOUD_BACKUP_COPY } from '@marian/core/parentSettings/copy'
 import type { LayoutChangeEvent } from 'react-native'
 import { Platform, StyleSheet, Text, TextInput, View } from 'react-native'
 import { PsButton, StatusSlot, type StatusLine } from './controls'
+import { LEARNERS_COPY } from './learnerCopy'
 import {
   amber700,
   BODY_FONT_MAX,
@@ -71,14 +72,14 @@ export function DeviceIdBlock({
       {compact ? (
         <>
           <View style={styles.labelRow}>
-            <FieldLabel text={CLOUD_BACKUP_COPY.deviceIdLabel} />
+            <FieldLabel text={LEARNERS_COPY.backupCode} />
             {copy}
           </View>
           <View style={styles.below}>{box}</View>
         </>
       ) : (
         <>
-          <FieldLabel text={CLOUD_BACKUP_COPY.deviceIdLabel} />
+          <FieldLabel text={LEARNERS_COPY.backupCode} />
           <View style={[styles.inlineRow, styles.below]}>
             {box}
             {copy}
@@ -166,7 +167,7 @@ export function RestoreBlock({
   const field = (
     <TextInput
       testID="parent-settings-cloud-restore-input"
-      accessibilityLabel={CLOUD_BACKUP_COPY.restoreLabel}
+      accessibilityLabel={LEARNERS_COPY.restoreFromCode}
       value={input}
       onChangeText={onChangeInput}
       onSubmitEditing={onSubmit}
@@ -210,7 +211,7 @@ export function RestoreBlock({
   )
   return (
     <View testID="parent-settings-cloud-restore" onLayout={onLayout}>
-      <FieldLabel text={CLOUD_BACKUP_COPY.restoreLabel} />
+      <FieldLabel text={LEARNERS_COPY.restoreFromCode} />
       {compact ? (
         <>
           <View style={styles.below}>{field}</View>

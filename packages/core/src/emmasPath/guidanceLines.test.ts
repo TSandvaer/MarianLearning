@@ -9,6 +9,7 @@ import {
   GUIDANCE_LINES_AWAITING_RENDER,
   guidanceLine,
   peekLines,
+  pickerWhoLine,
   replayLines,
   sessionIntroLine,
 } from './guidanceLines'
@@ -53,16 +54,18 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       // content wave 4 § 8.1: 17 more; content wave 5 § 9.1: 16 more.
       'story-read': 1,
       'story-word': 87,
+      // Learner profiles § 1.3 (T5): the picker's "Who is playing?".
+      'picker-who': 1,
       // The first mini-game, Fill the flower bed (mini-game spec § 3.1).
       game: 30,
     })
-    expect(GUIDANCE_LINES).toHaveLength(329)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(329)
+    expect(GUIDANCE_LINES).toHaveLength(330)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(330)
     // Bee, car, snail and moon words' leads are duck words' text (content
-    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories': 329 ids,
-    // 324 texts, 329 files.
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(324)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(329)
+    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories': 330 ids,
+    // 325 texts, 330 files.
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(325)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(330)
   })
 
   it('AC8: both replay sets, one line per STAGE_SPOKEN_NAMES step, with the exact texts (map-tap-to-play § 6, T1 approved 2026-10-17)', () => {
@@ -263,6 +266,19 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       )
   })
 
+  it('has the picker line (learner profiles § 1.3, T5), rendered in Lily', () => {
+    expect(pickerWhoLine()).toEqual({
+      id: 'guide.picker.who',
+      kind: 'picker-who',
+      world: null,
+      text: 'Who is playing?',
+      src: '/assets/audio/path/guide-picker-who.mp3',
+    })
+    // 15 characters of Lily (T5).
+    expect(pickerWhoLine().text).toHaveLength(15)
+    expect(GUIDANCE_LINES_AWAITING_RENDER).toEqual([])
+  })
+
   it('names the step in the peek opener and closer (Thomas 2026-10-15), with the path lines’ spoken names and their verb', () => {
     expect(peekLines('sub-to-10')).toMatchObject({
       open: {
@@ -372,7 +388,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(329)
+    ).toHaveLength(330)
   })
 
   it('repeats no Emma’s Path line', () => {
@@ -477,13 +493,13 @@ function expectedGameLines(): {
 describe('the mini-game lines (mini-game spec § 3)', () => {
   const game = GUIDANCE_LINES.filter((l) => l.kind === 'game')
 
-  it('C4: leaves the 299 shipped lines unchanged and appends the 30 game lines', () => {
+  it('C4: leaves the 300 shipped lines unchanged and appends the 30 game lines', () => {
     // The fingerprint (FNV-1a over the JSON of id, kind, world, text, input
-    // and src, in order) of the 299 lines on main at ae6472c5, taken before
-    // the game lines were added (289 at 8b0935b8: 43921, 77d72c5f; 258 at
-    // c86d551e: 39492, eea1867e).
+    // and src, in order) of the 300 lines on main at 4724665f, taken before
+    // the game lines were added (299 at ae6472c5: 45621, b78acc53; 289 at
+    // 8b0935b8: 43921, 77d72c5f; 258 at c86d551e: 39492, eea1867e).
     const shipped = JSON.stringify(
-      GUIDANCE_LINES.slice(0, 299).map(
+      GUIDANCE_LINES.slice(0, 300).map(
         ({ id, kind, world, text, input, src }) => [
           id,
           kind,
@@ -499,8 +515,8 @@ describe('the mini-game lines (mini-game spec § 3)', () => {
       hash ^= shipped.charCodeAt(i)
       hash = Math.imul(hash, 0x01000193) >>> 0
     }
-    expect([shipped.length, hash.toString(16)]).toEqual([45621, 'b78acc53'])
-    expect(GUIDANCE_LINES.slice(299)).toEqual(game)
+    expect([shipped.length, hash.toString(16)]).toEqual([45725, '12763e65'])
+    expect(GUIDANCE_LINES.slice(300)).toEqual(game)
   })
 
   it('C4: has the exact texts of § 3.1, no render input and the path src', () => {
