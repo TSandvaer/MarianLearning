@@ -15,7 +15,8 @@ import { SESSION_HISTORY_KEY } from '@marian/core/sessionEnd/sessionHistory'
 import { loadStardust } from '@marian/core/shared/stardust'
 import { WARM_CAP_MS } from '@marian/core/splash/splashTiming'
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
-import type { ReactTestInstance } from 'react-test-renderer'
+
+type ReactTestInstance = ReturnType<typeof screen.getByTestId>
 import { AppState } from 'react-native'
 import { fakePlayers, flush, resetFakePlayers } from '../test/fakeAudio'
 import App from './App'

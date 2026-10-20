@@ -10,7 +10,8 @@ import type { EmmaPose } from '@marian/core/character/emmaPose'
 import type { PlayGameId } from '@marian/core/games/playPlace'
 import type { Progress } from '@marian/core/progress'
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
-import type { ReactTestInstance } from 'react-test-renderer'
+
+type ReactTestInstance = ReturnType<typeof screen.getByTestId>
 import type { Sfx } from '../src/audio'
 import type { TapClipPlayer } from '../src/audio/tapClip'
 import type { Viewport } from '../src/layout/layout'
