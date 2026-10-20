@@ -8,8 +8,11 @@
  *
  * Built on React Native's responder system with Reanimated shared values:
  * the app has no gesture-handler dependency, and the responder events are
- * all a one-finger drag needs. Drop points are in screen points (the app's
- * root fills the window, so `pageX` / `pageY` are layout coordinates).
+ * all a one-finger drag needs. Every touch move reaches the responder,
+ * whichever finger moved, so the piece follows only the touch that took it
+ * (by `identifier`) and its drag ends when that touch lifts. Drop points
+ * are in screen points (the app's root fills the window, so `pageX` /
+ * `pageY` are layout coordinates).
  *
  * VoiceOver: the piece is a button; "activate" runs `onTap`, so a drag is
  * never the only way (§ 2.6, § 3.8).
@@ -80,6 +83,7 @@ export function DragPiece({
 }: DragPieceProps) {
   const [me] = useState(() => Symbol(testID))
   const start = useRef<Point | null>(null)
+  const finger = useRef<string | null>(null)
   const dragging = useRef(false)
   const dx = useSharedValue(0)
   const dy = useSharedValue(0)
@@ -93,6 +97,7 @@ export function DragPiece({
   const release = () => {
     const was = dragging.current
     start.current = null
+    finger.current = null
     dragging.current = false
     if (dragLock.held === me) dragLock.held = null
     return was
@@ -118,13 +123,17 @@ export function DragPiece({
     [me],
   )
 
-  const at = (e: GestureResponderEvent): Point => ({
-    x: e.nativeEvent.pageX,
-    y: e.nativeEvent.pageY,
-  })
+  // The drag's own finger among the touches that changed, else null.
+  const at = (e: GestureResponderEvent): Point | null => {
+    const t = e.nativeEvent.changedTouches.find(
+      (c) => c.identifier === finger.current,
+    )
+    return t ? { x: t.pageX, y: t.pageY } : null
+  }
 
   const onGrant = (e: GestureResponderEvent) => {
     dragLock.held = me
+    finger.current = e.nativeEvent.identifier
     start.current = at(e)
     dragging.current = false
   }
@@ -132,6 +141,7 @@ export function DragPiece({
     const from = start.current
     if (from === null || dragLock.held !== me) return
     const p = at(e)
+    if (p === null) return
     const mx = p.x - from.x
     const my = p.y - from.y
     if (!dragging.current) {
@@ -145,9 +155,11 @@ export function DragPiece({
     dx.set(mx)
     dy.set(my)
   }
-  const onRelease = (e: GestureResponderEvent) => {
+  // A touch lifted (`onResponderEnd`), or the last one did (release).
+  const onEnd = (e: GestureResponderEvent) => {
     if (start.current === null || dragLock.held !== me) return
     const p = at(e)
+    if (p === null) return
     const was = release()
     if (!was) {
       onTap()
@@ -195,7 +207,8 @@ export function DragPiece({
       onResponderTerminationRequest={() => false}
       onResponderGrant={onGrant}
       onResponderMove={onMove}
-      onResponderRelease={onRelease}
+      onResponderEnd={onEnd}
+      onResponderRelease={onEnd}
       onResponderTerminate={onTerminate}
       style={[
         styles.piece,

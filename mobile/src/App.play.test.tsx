@@ -151,9 +151,10 @@ function snapshot() {
   }
 }
 
-const touch = (x: number, y: number) => ({
-  nativeEvent: { pageX: x, pageY: y, touches: [{}] },
-})
+const touch = (x: number, y: number) => {
+  const t = { identifier: '1', pageX: x, pageY: y }
+  return { nativeEvent: { ...t, changedTouches: [t], touches: [t] } }
+}
 async function send(el: ReactTestInstance, name: string, x = 0, y = 0) {
   await act(async () => {
     ;(el.props[name] as (e: unknown) => void)(touch(x, y))

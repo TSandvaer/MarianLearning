@@ -192,9 +192,12 @@ export async function advance(ms: number) {
   }
 }
 
-const touch = (p: Point) => ({
-  nativeEvent: { pageX: p.x, pageY: p.y, touches: [{}] },
-})
+// One finger, as the native event carries it (the drag layer follows its
+// `identifier`).
+const touch = (p: Point) => {
+  const t = { identifier: '1', pageX: p.x, pageY: p.y }
+  return { nativeEvent: { ...t, changedTouches: [t], touches: [t] } }
+}
 
 /**
  * One responder event, straight to the piece's handler (RNTL's
