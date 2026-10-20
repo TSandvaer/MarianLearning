@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>/v/ in-frame audition — letter-sound "vvv" scratch</title>
+    <style>
+      :root {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        --ink: #2a2a2a;
+        --muted: #6b6b6b;
+        --line: #ece4d6;
+        --cream: #faf7f2;
+        --green: #1b5e20;
+        --green-soft: #eaf3ea;
+        --blue: #2c5d8a;
+        --blue-soft: #e7eefb;
+        --amber: #8a6d3b;
+        --amber-soft: #fcf8e3;
+        --orange: #d9822b;
+        --purple: #5b3d8a;
+        --purple-soft: #efe7fb;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 1rem 0.75rem 6rem;
+        background: var(--cream);
+        color: var(--ink);
+        max-width: 920px;
+        margin-inline: auto;
+        -webkit-text-size-adjust: 100%;
+      }
+      h1 {
+        font-size: 1.35rem;
+        margin: 0 0 0.25rem;
+      }
+      .voice {
+        display: inline-block;
+        background: var(--green);
+        color: #fff;
+        border-radius: 999px;
+        padding: 0.1rem 0.6rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        vertical-align: middle;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin: 0 0 0.75rem;
+        line-height: 1.45;
+      }
+      .sub code {
+        background: #f0e9dc;
+        padding: 0 0.25rem;
+        border-radius: 4px;
+      }
+      .status {
+        font-size: 0.86rem;
+        color: var(--amber);
+        background: var(--amber-soft);
+        border: 1px solid #faebcc;
+        border-radius: 8px;
+        padding: 0.6rem 0.75rem;
+        margin: 0.5rem 0;
+      }
+      .status.ok {
+        color: var(--green);
+        background: var(--green-soft);
+        border-color: #cce4cc;
+      }
+      .status.err {
+        color: #a94442;
+        background: #f2dede;
+        border-color: #ebccd1;
+      }
+      .legend {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        padding: 0.6rem 0.85rem;
+        margin: 0 0 1.25rem;
+        font-size: 0.82rem;
+        line-height: 1.5;
+        color: #444;
+      }
+      .legend h3 {
+        margin: 0 0 0.4rem;
+        font-size: 0.95rem;
+        color: var(--ink);
+      }
+      .legend dl {
+        margin: 0;
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 0.6rem;
+        row-gap: 0.3rem;
+      }
+      .legend dt {
+        font-weight: 700;
+        color: var(--blue);
+      }
+      .legend dd {
+        margin: 0;
+      }
+      .group {
+        margin: 0 0 1.5rem;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        overflow: hidden;
+      }
+      .group.isolated {
+        border-color: #d8c9ec;
+      }
+      .group > .ghead {
+        padding: 0.75rem 0.85rem;
+        background: #f6f0e6;
+        border-bottom: 1px solid var(--line);
+      }
+      .group.isolated > .ghead {
+        background: var(--purple-soft);
+      }
+      .group > .ghead h2 {
+        margin: 0 0 0.2rem;
+        font-size: 1.1rem;
+        letter-spacing: 0.01em;
+      }
+      .group > .ghead .gtext {
+        font-size: 0.92rem;
+        color: var(--ink);
+        font-weight: 600;
+        margin-top: 0.15rem;
+      }
+      .group > .ghead .gctx {
+        font-size: 0.78rem;
+        color: var(--muted);
+        margin-top: 0.3rem;
+        line-height: 1.4;
+      }
+      .group > .ghead .gpick {
+        font-size: 0.82rem;
+        color: var(--blue);
+        font-weight: 700;
+        margin-top: 0.35rem;
+      }
+      .gbody {
+        padding: 0.5rem;
+      }
+      .row {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.55rem;
+        padding: 0.6rem 0.5rem;
+        border-bottom: 1px solid #f1ece2;
+        flex-wrap: wrap;
+      }
+      .row:last-child {
+        border-bottom: none;
+      }
+      .row.baseline {
+        background: #fbf6ee;
+      }
+      .row.picked {
+        background: var(--blue-soft);
+      }
+      .row.unrendered {
+        opacity: 0.65;
+      }
+      .meta {
+        flex: 1 1 16rem;
+        min-width: 12rem;
+      }
+      .meta .label {
+        font-weight: 700;
+        font-size: 0.95rem;
+        line-height: 1.3;
+      }
+      .meta .label .tag {
+        display: inline-block;
+        font-size: 0.68rem;
+        font-weight: 700;
+        border-radius: 999px;
+        padding: 0.05rem 0.45rem;
+        margin-left: 0.35rem;
+        vertical-align: middle;
+      }
+      .tag.base {
+        background: #efe3cf;
+        color: var(--amber);
+      }
+      .tag.ref {
+        background: #f2dede;
+        color: #a94442;
+      }
+      .meta .mech {
+        color: var(--muted);
+        font-size: 0.78rem;
+        margin-top: 0.2rem;
+        line-height: 1.4;
+      }
+      .meta .ssml {
+        color: #555;
+        font-size: 0.7rem;
+        margin-top: 0.25rem;
+        word-break: break-all;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: #f7f2e9;
+        border: 1px solid #efe6d6;
+        border-radius: 6px;
+        padding: 0.3rem 0.4rem;
+        display: none;
+      }
+      .meta .ssml.show {
+        display: block;
+      }
+      .meta .errnote {
+        color: #a94442;
+        font-size: 0.78rem;
+        font-style: italic;
+        margin-top: 0.2rem;
+      }
+      .actions {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      button.act {
+        appearance: none;
+        border: 1px solid #cdbfa6;
+        background: #f4ecdd;
+        color: var(--ink);
+        border-radius: 8px;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        min-height: 44px;
+        min-width: 44px;
+      }
+      button.act:active {
+        transform: translateY(1px);
+      }
+      button.act.playing {
+        background: var(--green);
+        color: #fff;
+        border-color: var(--green);
+      }
+      button.act.pick[aria-pressed='true'] {
+        background: var(--blue);
+        color: #fff;
+        border-color: var(--blue);
+      }
+      button.act[disabled] {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      button.ssmltoggle {
+        appearance: none;
+        border: none;
+        background: none;
+        color: var(--blue);
+        font-size: 0.72rem;
+        cursor: pointer;
+        padding: 0.15rem 0;
+        text-decoration: underline;
+      }
+      footer {
+        margin-top: 1.5rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.8rem;
+        line-height: 1.5;
+      }
+      footer code {
+        background: #f0e9dc;
+        padding: 0 0.25rem;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>/v/ in-frame audition <span class="voice">Olivia renders</span></h1>
+    <p class="sub">
+      The isolated <code>vvv</code> letter-sound scratches in the en-GB-Olivia
+      voice. An earlier candidate (<code>vːə</code>@&minus;35%) won a
+      <strong>bare-token</strong> audition but
+      <strong>still scratched in the production sentence frame</strong>, so it
+      was reverted and the /v/ floor (#446) stands. Root-cause hypothesis: the
+      production frame (the connected lead-in + a ~300&nbsp;ms reset break + the
+      trailing <code>?</code>) re-introduces the scratch the bare token hides.
+      So this audition renders
+      <strong>every candidate in the ACTUAL production utterance frame</strong>
+      — all four <code>p2.*</code> slots — through the same break structure the
+      bake uses, <em>and</em> as the bare isolated token for direct A/B (per
+      <code>testing-and-ci.md §4.4.7</code>). In each group,
+      <strong>v0</strong> is the current live floor (your anchor) and
+      <strong>v1</strong> is the bare-token winner included as the
+      known-fails-in-frame reference. Play each, <strong>Pick</strong> the best
+      per slot; once you hear a clear in-frame winner, report the candidate
+      letter in chat or the issue — or confirm none beats the floor (then /v/
+      stays accepted-floor). The winner gets ported into
+      <code>renderSsmlInnerText</code> + re-baked in a follow-up PR. Unlinked
+      audition tooling — <strong>open in a private tab</strong> to dodge any
+      stale service-worker cache.
+    </p>
+
+    <div id="status" class="status">Loading /v/ renders&hellip;</div>
+
+    <div id="legend" class="legend" hidden>
+      <h3>Candidate legend (the /v/ lever per row)</h3>
+      <dl id="legend-dl"></dl>
+    </div>
+
+    <div id="groups"></div>
+
+    <footer id="footer"></footer>
+
+    <script>
+      'use strict'
+
+      // localStorage namespace for picks (display-only; Thomas reports picks
+      // in chat/issue). Distinct from the other audition pages' keys.
+      const LS_PICKS = 'v-frame-audition-picks'
+      const DATA_URL = '/v-frame-audition-data.json'
+
+      let picks = loadPicks()
+
+      function loadPicks() {
+        try {
+          const raw = localStorage.getItem(LS_PICKS)
+          if (!raw) return {}
+          const parsed = JSON.parse(raw)
+          return parsed && typeof parsed === 'object' ? parsed : {}
+        } catch {
+          return {}
+        }
+      }
+      function savePicks() {
+        try {
+          localStorage.setItem(LS_PICKS, JSON.stringify(picks))
+        } catch {
+          /* best-effort; quota / private mode */
+        }
+      }
+
+      function setStatus(msg, cls) {
+        const el = document.getElementById('status')
+        el.textContent = msg
+        el.className = 'status' + (cls ? ' ' + cls : '')
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+      }
+
+      function base64ToBlobUrl(base64, mime) {
+        const bin = atob(base64)
+        const bytes = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+        return URL.createObjectURL(
+          new Blob([bytes], { type: mime || 'audio/mpeg' }),
+        )
+      }
+
+      // ── Audio playback (one active clip, one live blob) ──────────────────
+      let currentAudio = null
+      let currentBtn = null
+      let currentItemId = null
+      const blobUrlByItem = new Map()
+      function releaseActiveBlob() {
+        if (currentItemId) {
+          const url = blobUrlByItem.get(currentItemId)
+          if (url) {
+            URL.revokeObjectURL(url)
+            blobUrlByItem.delete(currentItemId)
+          }
+          currentItemId = null
+        }
+      }
+      function stopActive() {
+        if (currentAudio) {
+          currentAudio.pause()
+          currentAudio = null
+        }
+        if (currentBtn) {
+          currentBtn.classList.remove('playing')
+          currentBtn = null
+        }
+        releaseActiveBlob()
+      }
+      function playCandidate(itemId, base64, mime, btn) {
+        stopActive()
+        let url = blobUrlByItem.get(itemId)
+        if (!url) {
+          url = base64ToBlobUrl(base64, mime)
+          blobUrlByItem.set(itemId, url)
+        }
+        const audio = new Audio(url)
+        currentAudio = audio
+        currentBtn = btn
+        currentItemId = itemId
+        btn.classList.add('playing')
+        const clear = () => {
+          if (currentBtn === btn) {
+            btn.classList.remove('playing')
+            if (currentAudio === audio) releaseActiveBlob()
+          }
+        }
+        audio.onended = clear
+        audio.onerror = clear
+        audio.play().catch(clear)
+      }
+
+      // ── Pick model (one pick per slot) ───────────────────────────────────
+      function recordPick(slotKey, candidateId) {
+        picks[slotKey] = candidateId
+        savePicks()
+        refreshGroup(slotKey)
+      }
+
+      const groupRefs = new Map() // slotKey -> { pickLabelEl, rows:[{row, pickBtn, candidateId}] }
+
+      function refreshGroup(slotKey) {
+        const ref = groupRefs.get(slotKey)
+        if (!ref) return
+        const picked = picks[slotKey]
+        for (const r of ref.rows) {
+          const isPicked = r.candidateId === picked
+          r.row.classList.toggle('picked', isPicked)
+          if (r.pickBtn)
+            r.pickBtn.setAttribute('aria-pressed', String(isPicked))
+        }
+        ref.pickLabelEl.textContent = picked
+          ? 'Picked: ' + picked
+          : 'No pick yet — tap Pick on the best render.'
+      }
+
+      // ── Legend (candidate lever, derived from the first slot) ────────────
+      function buildLegend(slots) {
+        const dl = document.getElementById('legend-dl')
+        const first = slots[0]
+        if (!first) return
+        for (const c of first.candidates) {
+          const dt = document.createElement('dt')
+          dt.textContent = c.id
+          const dd = document.createElement('dd')
+          dd.textContent = c.mechanism
+          dl.append(dt, dd)
+        }
+        document.getElementById('legend').hidden = false
+      }
+
+      // ── Render ───────────────────────────────────────────────────────────
+      function buildGroup(slot) {
+        const groupsEl = document.getElementById('groups')
+        const group = document.createElement('section')
+        group.className = 'group' + (slot.isolated ? ' isolated' : '')
+        group.setAttribute('data-testid', 'audition-group-' + slot.key)
+
+        const head = document.createElement('div')
+        head.className = 'ghead'
+        const h2 = document.createElement('h2')
+        h2.textContent = slot.title
+        const gtext = document.createElement('div')
+        gtext.className = 'gtext'
+        gtext.textContent = slot.isolated
+          ? 'bare token (no frame): "vvv"'
+          : 'frame: "' + slot.text + '"'
+        const gctx = document.createElement('div')
+        gctx.className = 'gctx'
+        gctx.textContent = slot.context
+        const gpick = document.createElement('div')
+        gpick.className = 'gpick'
+        gpick.setAttribute('data-testid', 'audition-pick-' + slot.key)
+        head.append(h2, gtext, gctx, gpick)
+        group.appendChild(head)
+
+        const body = document.createElement('div')
+        body.className = 'gbody'
+
+        const rows = []
+        for (const c of slot.candidates) {
+          const itemId = slot.key + '#' + c.id
+          const isBaseline = c.id === 'v0'
+          const isRef = c.id === 'v1'
+          const rendered = !!c.base64 && !c.error
+
+          const row = document.createElement('div')
+          row.className =
+            'row' +
+            (isBaseline ? ' baseline' : '') +
+            (rendered ? '' : ' unrendered')
+          row.setAttribute('data-testid', 'audition-row-' + itemId)
+
+          const meta = document.createElement('div')
+          meta.className = 'meta'
+
+          const label = document.createElement('div')
+          label.className = 'label'
+          label.innerHTML =
+            escapeHtml(c.label) +
+            (isBaseline ? ' <span class="tag base">floor anchor</span>' : '') +
+            (isRef ? ' <span class="tag ref">known-fails-in-frame</span>' : '')
+          meta.appendChild(label)
+
+          const mech = document.createElement('div')
+          mech.className = 'mech'
+          mech.textContent = c.mechanism
+          meta.appendChild(mech)
+
+          // Collapsible SSML (the load-bearing detail for the inventory).
+          const ssmlToggle = document.createElement('button')
+          ssmlToggle.className = 'ssmltoggle'
+          ssmlToggle.textContent = 'show SSML'
+          const ssml = document.createElement('div')
+          ssml.className = 'ssml'
+          ssml.textContent = c.ssml
+          ssmlToggle.addEventListener('click', () => {
+            const showing = ssml.classList.toggle('show')
+            ssmlToggle.textContent = showing ? 'hide SSML' : 'show SSML'
+          })
+          meta.append(ssmlToggle, ssml)
+
+          if (c.error) {
+            const errnote = document.createElement('div')
+            errnote.className = 'errnote'
+            errnote.textContent = 'Azure rejected this SSML: ' + c.error
+            meta.appendChild(errnote)
+          }
+
+          const actions = document.createElement('div')
+          actions.className = 'actions'
+
+          const playBtn = document.createElement('button')
+          playBtn.className = 'act play'
+          playBtn.setAttribute('data-testid', 'audition-play-' + itemId)
+          playBtn.textContent = '▶ Play'
+          if (rendered) {
+            playBtn.addEventListener('click', () =>
+              playCandidate(itemId, c.base64, c.mime, playBtn),
+            )
+          } else {
+            playBtn.disabled = true
+          }
+
+          const pickBtn = document.createElement('button')
+          pickBtn.className = 'act pick'
+          pickBtn.setAttribute('data-testid', 'audition-pickbtn-' + itemId)
+          pickBtn.setAttribute('aria-pressed', 'false')
+          pickBtn.textContent = 'Pick'
+          if (rendered) {
+            pickBtn.addEventListener('click', () => recordPick(slot.key, c.id))
+          } else {
+            pickBtn.disabled = true
+          }
+
+          actions.append(playBtn, pickBtn)
+          row.append(meta, actions)
+          body.appendChild(row)
+          rows.push({
+            row,
+            pickBtn: rendered ? pickBtn : null,
+            candidateId: c.id,
+          })
+        }
+
+        group.appendChild(body)
+        groupsEl.appendChild(group)
+        groupRefs.set(slot.key, { pickLabelEl: gpick, rows })
+        refreshGroup(slot.key)
+      }
+
+      function renderFooter(data) {
+        const el = document.getElementById('footer')
+        const total = data.slots.reduce((n, s) => n + s.candidates.length, 0)
+        const rejected = data.slots.reduce(
+          (n, s) => n + s.candidates.filter((c) => c.error).length,
+          0,
+        )
+        el.innerHTML =
+          '<span data-testid="audition-render-count">Rendered <strong>' +
+          total +
+          '</strong> candidates across <strong>' +
+          data.slots.length +
+          '</strong> slots (4 in-frame + 1 isolated)</span> ' +
+          (rejected
+            ? '(<strong style="color:#a94442">' +
+              rejected +
+              ' Azure-rejected</strong>) '
+            : '') +
+          '· voice <code>' +
+          escapeHtml(data.voice) +
+          '</code> · root prosody rate <code>' +
+          escapeHtml(data.rootProsody.rate) +
+          '</code> pitch <code>' +
+          escapeHtml(data.rootProsody.pitch) +
+          '</code> volume <code>' +
+          escapeHtml(data.rootProsody.volume) +
+          '</code> · baked <code>' +
+          escapeHtml(data.generatedAt) +
+          '</code>. ' +
+          escapeHtml(data.note)
+      }
+
+      // ── Boot ─────────────────────────────────────────────────────────────
+      async function main() {
+        try {
+          setStatus('Loading /v/ renders…')
+          // no-store + cache-bust so an installed SW can't serve a stale
+          // manifest; the SW bypass below is the belt, this is the suspenders.
+          const res = await fetch(DATA_URL + '?v=' + Date.now(), {
+            cache: 'no-store',
+          })
+          if (!res.ok) throw new Error('manifest ' + res.status)
+          const data = await res.json()
+          if (!data || !Array.isArray(data.slots)) {
+            throw new Error('manifest has no slots array')
+          }
+          buildLegend(data.slots)
+          for (const slot of data.slots) buildGroup(slot)
+          renderFooter(data)
+          const total = data.slots.reduce((n, s) => n + s.candidates.length, 0)
+          setStatus(
+            'Ready — ' +
+              data.slots.length +
+              ' slots, ' +
+              total +
+              ' candidates. Play each, then Pick the best per slot (or confirm none beats v0).',
+            'ok',
+          )
+        } catch (err) {
+          setStatus(
+            'Failed to load: ' +
+              err.message +
+              '. Is v-frame-audition-data.json deployed?',
+            'err',
+          )
+        }
+      }
+      window.addEventListener('pagehide', stopActive)
+
+      // ── Service-worker bypass (mirrors blend-audition.html / voice-qa.html) ─
+      // This standalone audition page gets no value from the app's Workbox
+      // SW. On an installed iPad PWA whose SW predates this deploy, precached
+      // assets (and a precached copy of this page) can be served stale. So on
+      // first load we unregister every SW + delete every Cache Storage bucket,
+      // then reload ONCE so the reloaded document is no longer SW-controlled.
+      // A sessionStorage one-shot guards the reload loop. (The manifest JSON
+      // is fetched with no-store + cache-bust above as defense-in-depth.)
+      const SW_BYPASS_FLAG = 'v-frame-audition-sw-bypassed'
+
+      async function bypassServiceWorker() {
+        let alreadyBypassed = false
+        try {
+          alreadyBypassed = sessionStorage.getItem(SW_BYPASS_FLAG) === '1'
+        } catch {
+          /* sessionStorage blocked (private mode) — fall through. */
+        }
+        if (alreadyBypassed) return false
+        if (!('serviceWorker' in navigator)) return false
+
+        let hadSomethingToClear = false
+        try {
+          const regs = await navigator.serviceWorker.getRegistrations()
+          if (regs.length > 0) hadSomethingToClear = true
+          await Promise.all(regs.map((r) => r.unregister().catch(() => false)))
+        } catch {
+          /* getRegistrations can throw in locked-down contexts — ignore. */
+        }
+        try {
+          if ('caches' in self) {
+            const keys = await caches.keys()
+            if (keys.length > 0) hadSomethingToClear = true
+            await Promise.all(
+              keys.map((k) => caches.delete(k).catch(() => false)),
+            )
+          }
+        } catch {
+          /* Cache Storage unavailable — ignore. */
+        }
+        if (navigator.serviceWorker.controller) hadSomethingToClear = true
+        if (!hadSomethingToClear) return false
+
+        try {
+          sessionStorage.setItem(SW_BYPASS_FLAG, '1')
+        } catch {
+          /* Cannot persist the flag → must NOT reload (would loop). */
+          return false
+        }
+        setStatus('Clearing service worker cache for a fresh audition…')
+        location.reload()
+        return true
+      }
+
+      async function boot() {
+        const reloading = await bypassServiceWorker()
+        if (reloading) return
+        main()
+      }
+      boot()
+    </script>
+  </body>
+</html>
