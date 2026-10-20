@@ -20,9 +20,16 @@ describe('the retired game (C4)', () => {
     expect(PATH_ART_IDS).not.toContain('ui-flower-bed' as PathArtId)
   })
 
-  it('packages/core/src/games/ does not exist', () => {
-    expect(
-      existsSync(join(process.cwd(), 'packages', 'core', 'src', 'games')),
-    ).toBe(false)
+  // The spec's C4 says `games/` does not exist; the Play place
+  // (play-place spec § 1.1, `games/playPlace.ts`) has since moved in, so the
+  // check names the retired game's own files.
+  it('packages/core/src/games/miniGames.ts and its test do not exist', () => {
+    for (const file of ['miniGames.ts', 'miniGames.test.ts']) {
+      expect(
+        existsSync(
+          join(process.cwd(), 'packages', 'core', 'src', 'games', file),
+        ),
+      ).toBe(false)
+    }
   })
 })
