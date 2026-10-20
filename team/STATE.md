@@ -1,6 +1,6 @@
 # STATE — Marian Tutor live coordination
 
-**Resume next-action:** _2026-10-19 12:10Z: Content wave 4 SHIPPED: #608 + #607 merged, production released (smoke green), TestFlight build 15 queued (EAS fe2159e8), baseline #611 merging. Next: Thomas installs build 15 on both devices; Orca workspace cleanup (devon-ng-more-and-less, kevin-ws-land-8, review/fix workspaces) + remote branch deletes; then wave 5 per Dave's roadmap (ai/ay, oa) when Thomas says go. Open: Dave's land-7 first-tap check (T5)._
+**Resume next-action:** _2026-10-20 07:50Z: RELEASED fc16006 (wave 5 #617/#621, profiles A+B #622/#634, planner #631, avatars #633, take-away #624, flower-bed game #635 with soil beds); smoke SUCCESS; TestFlight build 16 EAS a348688d (auto-submit b429e7ec); baseline PR #641 merge on green. Next: Thomas installs build 16 on BOTH devices -> profiles device ACs 39-42. Real blending #636 (Kevin) + #637 (Devon) approved but HELD: merge main, CI, ear test 31 lines, device ACs 18-20, then build 17 BEFORE any yarn release. Profiles phase 3 name audio starts after build 16 (Thomas). Auto-status ON local (cron 1be7c5ac). Code merges/releases/builds need Thomas._
 
 _Earlier headers and log-like sections (2026-08-02 to 2026-10-14) are archived verbatim in [`log/state-archive-2026-08-02-to-2026-10-14.md`](log/state-archive-2026-08-02-to-2026-10-14.md)._
 
