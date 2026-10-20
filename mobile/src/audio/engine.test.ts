@@ -81,6 +81,33 @@ describe('audio engine: speak contract', () => {
     expect(times).toEqual([0, 900, 3200])
   })
 
+  it('ends a line at its endAtMs: pauses the clip, shows every word, resolves (real blending § 4: the sounds, cut before the word)', async () => {
+    const { engine } = setup()
+    const times: number[] = []
+    const ticks: number[] = []
+    const done = engine.speak('session:p1.blend', SRC, {
+      text: 'f - a - n ... fan',
+      label: 'session:p1.blend',
+      onTime: (ms) => times.push(ms),
+      onWordTick: (i) => ticks.push(i),
+      endAtMs: 1_980,
+    })
+    await flush()
+    const p = fakePlayers[0]!
+    p.start(3.2)
+    p.emit({ playing: true, currentTime: 1.95 })
+    expect(p.calls).not.toContain('pause')
+    p.emit({ playing: true, currentTime: 2.0 })
+    await expect(done).resolves.toBeUndefined()
+    expect(p.calls).toContain('pause')
+    expect(times).toEqual([0, 1950, 2000])
+    expect(ticks).toEqual([0, 1, 2, 3, 4, 5, 6])
+    expect(p.listenerCount).toBe(0)
+    // A later status (the paused clip) changes nothing.
+    p.emit({ playing: false, currentTime: 2.05 })
+    expect(times).toEqual([0, 1950, 2000])
+  })
+
   it('a new line cancels the one in flight (one Emma line at a time, across sources)', async () => {
     const { engine } = setup()
     const hub = engine.speak('hub:hub.welcome.what-today', SRC, {

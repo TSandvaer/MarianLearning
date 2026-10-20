@@ -72,10 +72,23 @@
  * reveal: the chips fade, the scene (or the answer's picture) enters, Emma
  * reads the story with the read-along, 800 ms, the advance.
  *
+ * Native-only, real blending's two stops in land 2 (`design/native/real-
+ * blending.md` § 3–§ 5, § 10): the picture's slot stays empty until the
+ * answer (`./WordStage.tsx`). Blending sounds (`listen-blend`): "Listen.",
+ * 300 ms, then the blend clip to its cut before the word (`soundsCutMs`),
+ * each letter lit and held on its mark, the ribbon the sounds alone ("f - a
+ * - n"); the chips open at the cut; without the clip's marks the hint line
+ * plays in place of the sounds. Sounding out (`sound-out`): "What is it?";
+ * the 2nd wrong is the same cut sounds (the hint without marks); the 3rd
+ * plays the whole clip when the reprompt ends, the chips closed and no
+ * glow, then "This one is mat." with the guided glow (the answer alone
+ * without marks).
+ *
  * Emma is App's `EmmaStage`; this screen reports her pose (`onPoseChange`).
  */
 import type { EmmaPose } from '@marian/core/character/emmaPose'
 import { storyReadLine } from '@marian/core/emmasPath/guidanceLines'
+import { blendSoundsText } from '@marian/core/wordSong/blendHighlight'
 import type { SkillLevel, SkillNode } from '@marian/core/progress'
 import {
   ADVANCE_AFTER_CORRECT_MS,
@@ -96,6 +109,7 @@ import {
   isCleanWin,
   isCorrectChip,
   secondWrongPrompt,
+  usesBlendClip,
   wrongTapOutcome,
 } from '@marian/core/wordSong/wordRound'
 import {
@@ -140,6 +154,8 @@ import {
   sessionGuidePlayer,
   SFX_SOURCES,
   sentenceOfWord,
+  soundsCutMs,
+  soundsHeldAt,
   STORY_READ_ALONG,
   STORY_READ_LINE,
   storyGuidePlayer,
@@ -210,6 +226,8 @@ export const WORD_SONG_EXIT_MS = 250
 export const TAP_LIGHT_MIN_MS = 400
 /** Review spec § 5: the stage fades in over 200 ms after the opener. */
 export const STAGE_FADE_MS = 200
+/** Real blending § 4: "Listen." ends → this long → the sounds. */
+export const LISTEN_SOUNDS_GAP_MS = 300
 
 /** Little stories (content wave 3 § 4.4, § 4.5). */
 /** "Yes! The fox!" ends → this long → the reveal (chips out, scene in). */
@@ -345,10 +363,14 @@ const FRESH: PerProblemState = {
 
 type Timer = ReturnType<typeof setTimeout> | null
 
-/** The blend clip of a `cvc-word` problem and its marks, when measured. */
+/**
+ * The blend clip of a problem that plays one (`usesBlendClip`: cvc words,
+ * real blending's two stops) and its marks, when measured.
+ */
 function blendOf(problem: WordSongProblem, clipFor: ClipFileFn | undefined) {
-  const text =
-    problem.contentType === 'cvc-word' ? problem.utterances.blend : undefined
+  const text = usesBlendClip(problem.contentType)
+    ? problem.utterances.blend
+    : undefined
   const clip = text !== undefined ? clipFor?.(text) : undefined
   const marks =
     text !== undefined && clip ? blendMarksFor(text, clip.bytes) : null
@@ -522,6 +544,12 @@ export function WordSong({
   const [celebrating, setCelebrating] = useState(false)
   const [streakFadingOut, setStreakFadingOut] = useState(false)
   const [guidedActive, setGuidedActive] = useState(false)
+  /**
+   * Sounding out's 3rd wrong plays the whole clip before the answer (real
+   * blending § 4): the chips are closed and nothing answers meanwhile.
+   */
+  const [answerClip, setAnswerClip] = useState(false)
+  const answerClipRef = useRef(false)
   // A little story's card (content wave 3 § 4.4).
   /** The question has started: the chips mount (closed until its end). */
   const [storyAsked, setStoryAsked] = useState(false)
@@ -572,6 +600,7 @@ export function WordSong({
   const storyCueTimerRef = useRef<Timer>(null)
   const askAgainTimerRef = useRef<Timer>(null)
   const readOffTimerRef = useRef<Timer>(null)
+  const soundsTimerRef = useRef<Timer>(null)
   const beatRef = useRef<SilentBeat | null>(null)
   /** Bumped by every tap sound; a stale one never darkens a newer light. */
   const tapTokenRef = useRef(0)
@@ -606,6 +635,7 @@ export function WordSong({
       storyCueTimerRef,
       askAgainTimerRef,
       readOffTimerRef,
+      soundsTimerRef,
     ]) {
       if (ref.current !== null) {
         clearTimeout(ref.current)
@@ -781,6 +811,86 @@ export function WordSong({
   )
 
   /**
+   * Real blending's sounds (§ 4, § 5): the blend clip to its cut, before the
+   * word, Emma `attentive-pointing`. Letter k lights at its mark − 40 and
+   * stays lit (the spotlight, on the clip's clock, so a parked line's
+   * lights follow it); the ribbon shows the sounds alone ("f - a - n") on
+   * the same marks; at the cut the letters go dark (the row's 200 ms end
+   * fade). Resolves at the cut.
+   */
+  const playSounds = useCallback(
+    (problem: WordSongProblem, text: string, marks: readonly Segment[]) => {
+      const sounds = blendSoundsText(text)
+      const n = problem.target.word.length
+      let held = 0
+      setPose('attentive-pointing')
+      return speak(text, {
+        caption: sounds,
+        endAtMs: soundsCutMs(marks),
+        revealAt: (ms) => blendRevealAt(sounds, marks, ms),
+        onTime: (ms) => {
+          const k = Math.min(n, soundsHeldAt(marks, ms))
+          if (k === held) return
+          held = k
+          setSpotlight(Array.from({ length: n }, (_, i) => (i < k ? 0 : null)))
+        },
+      }).then(() => {
+        if (unmounted.current) return
+        setSpotlight(null)
+        setPose((c) => (c === 'attentive-pointing' ? 'idle' : c))
+      })
+    },
+    [speak, unmounted],
+  )
+
+  /**
+   * The whole blend clip ("c - a - t ... cat") on its marks: one letter lit
+   * at a time, all of them on the word (`litAt`), the caption revealed on
+   * the marks; dark at its end.
+   */
+  const playWholeBlend = useCallback(
+    (problem: WordSongProblem, text: string, marks: readonly Segment[]) => {
+      const n = problem.target.word.length
+      return speak(text, {
+        onTime: (ms) => setLit(litAt(marks, ms, n)),
+        revealAt: (ms) => blendRevealAt(text, marks, ms),
+      }).then(() => {
+        if (!unmounted.current) setLit(null)
+      })
+    },
+    [speak, unmounted],
+  )
+
+  /**
+   * Blending sounds' read after "Listen." (§ 4): 300 ms, then the sounds to
+   * the cut; without the clip's marks the hint line in their place, so the
+   * problem stays answerable by ear (§ 10). Resolves at their end; never
+   * when the problem moved on meanwhile.
+   */
+  const listenThenSounds = useCallback(
+    (problem: WordSongProblem) => {
+      const my = problemIndexRef.current
+      return new Promise<void>((resolve) => {
+        soundsTimerRef.current = setTimeout(() => {
+          soundsTimerRef.current = null
+          if (unmounted.current || problemIndexRef.current !== my) return
+          const { text, marks } = blendOf(problem, clipForRef.current)
+          if (text !== undefined && marks !== null) {
+            void playSounds(problem, text, marks).then(resolve)
+            return
+          }
+          setPose('attentive-pointing')
+          void speak(problem.utterances.hint).then(() => {
+            setPose((c) => (c === 'attentive-pointing' ? 'idle' : c))
+            resolve()
+          })
+        }, LISTEN_SOUNDS_GAP_MS)
+      })
+    },
+    [playSounds, speak, unmounted],
+  )
+
+  /**
    * A story word plays (content wave 3 § 4.4): that word alone, lit for
    * max(400 ms, the clip); live from the card's first frame until the
    * reveal, inert while Emma speaks; a new one cuts the last. Not a move:
@@ -830,12 +940,21 @@ export function WordSong({
       // A story's chips mount as its question starts (§ 4.4 step 4).
       if (isStoryCard) setStoryAsked(true)
       setPose('listening')
-      void speak(problem.utterances.read).then(() => {
-        if (unmounted.current || problemIndexRef.current !== my) return
-        readAloudPlayedRef.current = true
-        setReadAloudPlayed(true)
-        setPose((c) => (c === 'listening' ? 'idle' : c))
-      })
+      void speak(problem.utterances.read)
+        .then(() =>
+          // Blending sounds: the chips open at the sounds' cut (§ 4).
+          problem.contentType === 'listen-blend' &&
+          !unmounted.current &&
+          problemIndexRef.current === my
+            ? listenThenSounds(problem)
+            : undefined,
+        )
+        .then(() => {
+          if (unmounted.current || problemIndexRef.current !== my) return
+          readAloudPlayedRef.current = true
+          setReadAloudPlayed(true)
+          setPose((c) => (c === 'listening' ? 'idle' : c))
+        })
     }
     // Review spec § 4: the opener where problem 1's read would start; the
     // warm-up line before each warm-up read; content wave 1 § 6.1: the step
@@ -1160,6 +1279,8 @@ export function WordSong({
       setLit(null)
       setPose('idle')
       setGuidedActive(false)
+      answerClipRef.current = false
+      setAnswerClip(false)
       setStreakFadingOut(false)
       setCelebrating(false)
       setStoryAsked(false)
@@ -1276,6 +1397,14 @@ export function WordSong({
         return
       }
       const prompt = secondWrongPrompt(problem)
+      const { marks } = blendOf(problem, clipForRef.current)
+      // Sounding out (real blending § 4): the sounds cut before the word,
+      // so the learner still does the join; the hint without marks (§ 10).
+      if (prompt.kind === 'sounds') {
+        if (marks !== null) void playSounds(problem, prompt.text, marks)
+        else void speak(problem.utterances.hint).then(backToIdleSoon)
+        return
+      }
       if (prompt.kind === 'hint') {
         const word = problem.target.word
         const cue = quietECue(word)
@@ -1290,28 +1419,29 @@ export function WordSong({
         void speak(prompt.text).then(backToIdleSoon)
         return
       }
-      const { marks } = blendOf(problem, clipForRef.current)
-      const word = problem.target.word.length
-      const hooks: SpeakHooks =
+      const done =
         marks !== null
-          ? {
-              onTime: (ms) => setLit(litAt(marks, ms, word)),
-              revealAt: (ms) => blendRevealAt(prompt.text, marks, ms),
-            }
-          : {
+          ? playWholeBlend(problem, prompt.text, marks)
+          : speak(prompt.text, {
               onWordTick: (i) => {
                 // A 'sounds' prompt (real blending's stop 2) has no steps.
                 const next =
                   prompt.kind === 'blend' ? prompt.steps[i] : undefined
                 if (next !== undefined) setLit(next)
               },
-            }
-      void speak(prompt.text, hooks).then(() => {
-        setLit(null)
+            }).then(() => setLit(null))
+      void done.then(() => {
         setPose((c) => (c === 'attentive-pointing' ? 'idle' : c))
       })
     },
-    [speak, backToIdleSoon, readStory, askAgainSoon],
+    [
+      speak,
+      backToIdleSoon,
+      readStory,
+      askAgainSoon,
+      playSounds,
+      playWholeBlend,
+    ],
   )
 
   const handleWrongTap = useCallback(
@@ -1377,9 +1507,35 @@ export function WordSong({
             askAgainSoon(problem, outcome.wrongCount)
         }
         if (outcome.scheduleGuided) {
-          setGuidedActive(true)
-          setProblemState((prev) => ({ ...prev, guidedPlayed: true }))
-          void speak(problem.utterances.giveAnswer).then(backToIdleSoon)
+          const giveAnswer = () => {
+            setGuidedActive(true)
+            setProblemState((prev) => ({ ...prev, guidedPlayed: true }))
+            void speak(problem.utterances.giveAnswer).then(backToIdleSoon)
+          }
+          // Sounding out (real blending § 4, Dave's extra): the whole clip
+          // first, with no wait, the chips closed and no glow; then the
+          // answer, the glow on as it starts. The answer alone without marks.
+          const { text, marks } =
+            problem.contentType === 'sound-out'
+              ? blendOf(problem, clipForRef.current)
+              : { text: undefined, marks: null }
+          if (text === undefined || marks === null) {
+            giveAnswer()
+            return
+          }
+          answerClipRef.current = true
+          setAnswerClip(true)
+          setPose('attentive-pointing')
+          void playWholeBlend(problem, text, marks).then(() => {
+            if (unmounted.current || problemIndexRef.current !== myProblem) {
+              return
+            }
+            answerClipRef.current = false
+            setAnswerClip(false)
+            if (resolvedRef.current) return
+            setPose('puzzled-tilt')
+            giveAnswer()
+          })
         } else if (outcome.scheduleHint) {
           hintTimerRef.current = setTimeout(() => {
             hintTimerRef.current = null
@@ -1397,6 +1553,7 @@ export function WordSong({
       unmounted,
       backToIdleSoon,
       playSecondWrong,
+      playWholeBlend,
       isPeek,
       askAgainSoon,
     ],
@@ -1534,6 +1691,8 @@ export function WordSong({
   const onChipTap = useCallback(
     (word: string) => {
       if (resolvedRef.current) return
+      // Sounding out's 3rd-wrong clip: nothing answers until the answer.
+      if (answerClipRef.current) return
       // Before Emma has read the problem, a tap is not an answer.
       if (!readAloudPlayedRef.current) return
       const problem = plan.problems[problemIndex]!
@@ -1565,7 +1724,7 @@ export function WordSong({
   })
   useEffect(() => {
     if (qaAutoAnswerAfterMs === undefined) return
-    if (!readAloudPlayed || problemState.resolved) return
+    if (!readAloudPlayed || problemState.resolved || answerClip) return
     const target = plan.problems[problemIndex]!.target.word
     // The scored problems' first two, as before; warm-ups answered right.
     const scored = problemIndex - warmups
@@ -1578,6 +1737,7 @@ export function WordSong({
   }, [
     qaAutoAnswerAfterMs,
     readAloudPlayed,
+    answerClip,
     problemState.resolved,
     problemState.wrongCount,
     problemIndex,
@@ -1796,7 +1956,7 @@ export function WordSong({
                       face={round.chipFace}
                       label={chipLabel(round.chipFace, entry.word)}
                       size={chips.size}
-                      ready={readAloudPlayed}
+                      ready={readAloudPlayed && !answerClip}
                       resolved={problemState.resolved}
                       dimForGuided={guidedActive && !isCorrect}
                       glow={guidedActive && isCorrect}

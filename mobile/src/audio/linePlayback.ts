@@ -37,6 +37,15 @@ export interface LineCallbacks {
    * blend highlight follows its measured marks with it.
    */
   onTime?: (ms: number) => void
+  /**
+   * End the line this far into the clip: on the first status at or past it
+   * the clip pauses and the line settles as at a natural end (every word
+   * shown, resolve). Real blending's sounds, cut before the word
+   * (`design/native/real-blending.md` § 4): the 50 ms status cadence lands
+   * well inside the ≥ 220 ms of silence between the cut and the word. A
+   * parked line resumes and still ends here, on the clip's own clock.
+   */
+  endAtMs?: number
 }
 
 export interface StartLineOptions extends LineCallbacks {
@@ -156,6 +165,18 @@ export function startLine(
       }
       tickUpTo(wordIndexAt(status.currentTime, status.duration, wordCount))
       opts.onTime?.(status.currentTime * 1000)
+      if (
+        opts.endAtMs !== undefined &&
+        status.currentTime * 1000 >= opts.endAtMs
+      ) {
+        try {
+          player.pause()
+        } catch {
+          // Best effort: the line is over for the caller either way.
+        }
+        tickUpTo(wordCount - 1)
+        settle(null)
+      }
     },
   )
 

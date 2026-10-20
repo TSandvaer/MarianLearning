@@ -124,6 +124,33 @@ it('a story step peeks and replays from its canon (content wave 3 § 7: a story 
   }
 })
 
+it('real blending: both land-2 stops peek and replay from their canon (blendReads, real-blending § 8)', () => {
+  for (const [node, type] of [
+    ['blending-cv', 'listen-blend'],
+    ['sounding-out', 'sound-out'],
+  ] as const) {
+    const peek = peekPlanFromServer(
+      'word-song',
+      peekOf('word-song', node),
+      node,
+    )
+    if (peek.world !== 'word-song') throw new Error('expected a word-song peek')
+    expect(peek.plan.problems.map((p) => p.contentType)).toEqual(
+      Array(3).fill(type),
+    )
+    const replay = replayPlanFromServer(
+      'word-song',
+      { ...canonPlan('word-song', node, 8), id: 'replay-word-song' },
+      node,
+    )
+    if (replay.world !== 'word-song')
+      throw new Error('expected a word-song replay')
+    expect(replay.plan.problems.map((p) => p.contentType)).toEqual(
+      Array(8).fill(type),
+    )
+  }
+})
+
 it('requestPeek: loads beside the current session and resolves the plan', async () => {
   const { start, audio } = fakeStart(peekOf('math', 'sub-to-10'))
   const prepared = await requestPeek({

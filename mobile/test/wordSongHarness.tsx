@@ -124,7 +124,11 @@ export async function advance(ms: number) {
   await flush()
 }
 
-/** The line starts and ticks every word (and its clock); optionally ends. */
+/**
+ * The line starts and ticks every word (and its clock); optionally ends.
+ * A clock at or past the line's `endAtMs` ends it there, as the engine
+ * does (real blending's cut).
+ */
 export async function say(
   line: Line,
   { end = true, ms }: { end?: boolean; ms?: number[] } = {},
@@ -133,7 +137,13 @@ export async function say(
   await act(async () => {
     line.opts.onPlay?.()
     for (let i = 0; i < words.length; i++) line.opts.onWordTick?.(i)
-    for (const t of ms ?? []) line.opts.onTime?.(t)
+    for (const t of ms ?? []) {
+      line.opts.onTime?.(t)
+      if (line.opts.endAtMs !== undefined && t >= line.opts.endAtMs) {
+        line.resolve()
+        break
+      }
+    }
     if (end) line.resolve()
   })
   await flush()

@@ -3,7 +3,11 @@
  * fills the rect between the ribbon and the chips, centred vertically.
  *
  * - `picture`: the picture (P × P; it says its word when tapped after the
- *   read), 8 pt, the letter row (`./LetterRow.tsx`).
+ *   read), 8 pt, the letter row (`./LetterRow.tsx`). Real blending's two
+ *   stops (`hidesPictureUntilAnswer`, `design/native/real-blending.md`
+ *   § 3, § 5): the P × P slot stays empty, nothing drawn, until the answer;
+ *   then the picture mounts in it (its entrance is the reveal) and every
+ *   letter lights. The slot keeps its size, so the row never moves.
  * - `letters`: the letter row alone (a word without art, § 7).
  * - `letter` / `letter-sound`: one glyph in a P × P box, Fredoka 700 at
  *   0.71 P; a tap replays the question.
@@ -17,6 +21,7 @@
  * aligned. Press feedback on the picture, glyph and scene: scale 0.96 over
  * 80 ms, back on a 300 / 20 spring; they are inert unless `tapsOpen`.
  */
+import { hidesPictureUntilAnswer } from '@marian/core/wordSong/wordRound'
 import type { WordSongProblem } from '@marian/core/wordSong/wordSessionPlans'
 import { Image } from 'expo-image'
 import { useEffect, type ReactNode } from 'react'
@@ -146,13 +151,14 @@ export function WordStage({
 }: WordStageProps) {
   const word = problem.target.word
   const p = l.picture
+  const hidesPicture = hidesPictureUntilAnswer(problem.contentType)
   const letters = (
     <LetterRow
       word={word}
       font={l.letterFont}
       cellMin={l.letterCellMin}
       maxWidth={l.stage.width}
-      lit={lit}
+      lit={hidesPicture && resolved ? word.length : lit}
       spotlight={spotlight}
       endPulse={endPulse}
       quiet={quiet}
@@ -161,22 +167,34 @@ export function WordStage({
   )
   let body: ReactNode = null
   if (round.card === 'picture') {
+    const picture = (
+      <TapTarget
+        testID="word-song-word-picture"
+        label={word}
+        size={p}
+        enabled={tapsOpen}
+        onPress={onPicturePress}
+      >
+        <WordPicture
+          pictureKey={problem.target.pictureKey}
+          size={p}
+          label={word}
+        />
+      </TapTarget>
+    )
     body = (
       <View testID="word-song-word-card" style={[styles.column, { gap: 8 }]}>
         <WithCue show={showThCue} cue={l.thCue}>
-          <TapTarget
-            testID="word-song-word-picture"
-            label={word}
-            size={p}
-            enabled={tapsOpen}
-            onPress={onPicturePress}
-          >
-            <WordPicture
-              pictureKey={problem.target.pictureKey}
-              size={p}
-              label={word}
-            />
-          </TapTarget>
+          {hidesPicture ? (
+            <View
+              testID="word-song-picture-slot"
+              style={{ width: p, height: p }}
+            >
+              {resolved && picture}
+            </View>
+          ) : (
+            picture
+          )}
         </WithCue>
         {letters}
       </View>

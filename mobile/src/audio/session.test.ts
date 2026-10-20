@@ -296,6 +296,22 @@ describe('session audio: eager files, lazy players', () => {
     await expect(again).rejects.toThrow('cancelled')
   })
 
+  it("a line's endAtMs reaches the engine: it ends at the cut (real blending § 4)", async () => {
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files,
+      yieldThen: sync,
+    })
+    const done = s.playUtterance('Three plus two. How many?', {
+      endAtMs: 500,
+    })
+    const p = fakePlayers[0]!
+    p.start(1.5)
+    p.emit({ playing: true, currentTime: 0.5 })
+    await expect(done).resolves.toBeUndefined()
+    expect(p.calls).toContain('pause')
+  })
+
   it('text the server never rendered fails soft: onPlay + every tick, resolves silently', async () => {
     const s = loadSessionAudio('s1', UTTERANCES, {
       engine,

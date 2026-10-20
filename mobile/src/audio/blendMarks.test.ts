@@ -17,6 +17,8 @@ import {
   blendRevealAt,
   letterWindow,
   litAt,
+  soundsCutMs,
+  soundsHeldAt,
   wordWindow,
   type Segment,
 } from './blendMarks'
@@ -121,4 +123,15 @@ it('tap windows: a letter ±, the word to the end', () => {
   expect(letterWindow([885, 1164])).toEqual({ from: 855, to: 1244 })
   expect(letterWindow([10, 300])).toEqual({ from: 0, to: 380 })
   expect(wordWindow(SEGS)).toEqual({ from: 2631, to: null })
+})
+
+it('real blending: the cut is 80 ms after the 3rd sound; the sounds light and stay lit on their marks', () => {
+  expect(soundsCutMs(SEGS)).toBe(1888 + 80)
+  expect(soundsHeldAt(SEGS, 2)).toBe(0)
+  expect(soundsHeldAt(SEGS, 3)).toBe(1)
+  expect(soundsHeldAt(SEGS, 844)).toBe(1)
+  expect(soundsHeldAt(SEGS, 845)).toBe(2)
+  expect(soundsHeldAt(SEGS, 1588)).toBe(3)
+  // The word is not a sound: it never adds a fourth.
+  expect(soundsHeldAt(SEGS, 2621)).toBe(3)
 })

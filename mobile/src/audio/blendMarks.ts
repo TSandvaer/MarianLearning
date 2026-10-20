@@ -55,6 +55,27 @@ export function litAt(
   return null
 }
 
+/**
+ * Real blending's cut (`design/native/real-blending.md` § 4, § 8): the
+ * sounds end 80 ms after the 3rd, before the silence and the word.
+ */
+export function soundsCutMs(segments: readonly Segment[]): number {
+  return segments[2]![1] + TAP_TAIL_MS
+}
+
+/**
+ * How many of the 3 sounds have lit `ms` into the clip; each lights 40 ms
+ * before its sound and stays lit (real blending's sounds, § 4). The word is
+ * not a sound.
+ */
+export function soundsHeldAt(segments: readonly Segment[], ms: number): number {
+  let held = 0
+  for (let k = 0; k < 3; k++) {
+    if (ms >= segments[k]![0] - MARK_LEAD_MS) held = k + 1
+  }
+  return held
+}
+
 const SEPARATOR = /^(?:-+|\.{2,}|—|…)$/
 
 /** How many of the blend line's caption tokens show `ms` into the clip. */

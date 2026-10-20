@@ -23,6 +23,9 @@
  *   cells (n t) pulse once together (`introEndPulse`) once the last cell has
  *   lit, i.e. after its own lit pulse; with Reduce Motion they light at
  *   once, with no pulse.
+ * - Sounding out, "Tap the letters. Hear the sounds!": crab words'
+ *   lighting (`design/native/real-blending.md` § 4, § 5, D1). Blending
+ *   sounds' lead lights nothing.
  * - Cake words, "The E is quiet. It makes the A say its name.": nothing at
  *   the start; on the word tick "quiet" the e cell goes quiet, on the tick
  *   "A" the vowel cell lights (`introTickCue`).
@@ -45,6 +48,7 @@ const PATTERNS: Readonly<Partial<Record<IntroGuideLineId, Pattern>>> = {
   'guide.session.intro.moon-words': 'team-pair',
   'guide.session.intro.crab-words': 'left-to-right',
   'guide.session.intro.tent-words': 'left-to-right',
+  'guide.session.intro.sounding-out': 'left-to-right',
 }
 
 /** The intros whose last two cells pulse once after the stagger. */
