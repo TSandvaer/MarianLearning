@@ -281,9 +281,7 @@ export function LetterCritters({ kit, sounds, progress }: LetterCrittersProps) {
     const next = (k: number) => {
       if (songRef.current !== token) return
       if (k === letters.length) {
-        kit.later(() => {
-          if (songRef.current === token) after(run, outcome)
-        }, SOUND_GAP_MS)
+        after(run, outcome)
         return
       }
       bounceSeat(run[k]!)
