@@ -20,7 +20,6 @@ import { PathImage } from '../../components/PathImage'
 import type { Rect } from '../../layout/layout'
 import type { MapCaptionSlot } from '../../layout/mapScreenLayout'
 import { FILL, fonts } from '../../theme'
-import { FlowerBed } from '../game/FlowerBed'
 import { GAME_DOOR_LABELS } from '../game/gameLines'
 import { TITLE } from '../hub/cardLook'
 import { PRESS_MS } from '../hub/clay'
@@ -270,7 +269,7 @@ export function GameDoor({
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         >
-          <GameDoorPicture disc={rect.width} />
+          <GameDoorPicture k={k} />
         </View>
       </Animated.View>
     </Pressable>
@@ -278,16 +277,16 @@ export function GameDoor({
 }
 
 /**
- * The door's picture, and the one site the door's clay piece plugs into
- * (§ 1.2.1, T6). Until Thomas picks it, the bed's own drawing, full, at
- * 0.8 × the disc. Then this returns `<PathImage id="ui-flower-bed"
- * px={Math.round(68 * k)} />`, as Home draws its house, once
- * `'ui-flower-bed'` is in `UiArtId` and `PATH_ART_SET`
- * (`@marian/core/emmasPath/pathArt`), `yarn path-art` has built its webps
- * and `npm run export-assets` has registered them.
+ * The door's picture (§ 1.2.1, T6, Thomas's pick of 2026-10-20): the clay
+ * piece `ui-flower-bed`, a small soil bed planted full, drawn as Home draws
+ * its house. A fixed picture: it never shows how a round went (D7 c).
  */
-function GameDoorPicture({ disc }: { disc: number }) {
+function GameDoorPicture({ k }: { k: number }) {
   return (
-    <FlowerBed width={0.8 * disc} given={10} testIDPrefix="map-game-door" />
+    <PathImage
+      id="ui-flower-bed"
+      px={Math.round(68 * k)}
+      testID="map-game-door-art"
+    />
   )
 }

@@ -50,6 +50,8 @@ export type UiArtId =
   | 'ui-bud-closed'
   | 'ui-arch-open'
   | 'ui-arch-closed'
+  /** The play door's clay piece (mini-game spec § 1.2.1, T6). */
+  | 'ui-flower-bed'
 
 export type PathArtId = SkillNode | LandArtId | UiArtId
 
@@ -125,6 +127,7 @@ const PATH_ART_SET: Readonly<Record<PathArtId, true>> = {
   'ui-bud-closed': true,
   'ui-arch-open': true,
   'ui-arch-closed': true,
+  'ui-flower-bed': true,
 }
 
 /** Every art piece, in manifest order. */

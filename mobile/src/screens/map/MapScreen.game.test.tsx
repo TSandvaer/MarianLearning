@@ -19,7 +19,8 @@ import {
 } from '@marian/core/progress'
 import { seedUnlocksCelebrated } from '@marian/core/progress/pathBeats'
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
-import { BackHandler } from 'react-native'
+import { BackHandler, PixelRatio } from 'react-native'
+import { pathArtAsset } from '../../assets'
 import type { Sfx } from '../../audio'
 import { mapScreenLayout } from '../../layout/mapScreenLayout'
 import type { MapLinePlayer } from './mapAudio'
@@ -151,7 +152,7 @@ describe('N2: the door shows exactly when a game is open', () => {
     expect(h.readProgress).toHaveBeenCalledTimes(1)
   })
 
-  it('sits at the layout’s door rect, with a full flower bed inside and no text', async () => {
+  it('sits at the layout’s door rect, holding the ui-flower-bed clay piece at Math.round(68 × k) pt, no FlowerBed and no text', async () => {
     await mount(progressAtStep('add-to-10'))
     expect(door()).toHaveStyle({
       left: P.door.x,
@@ -159,19 +160,20 @@ describe('N2: the door shows exactly when a game is open', () => {
       width: P.door.width,
       height: P.door.height,
     })
+    // § 1.2.1 (T6, Thomas's pick): drawn as Home draws its house.
+    const HIDDEN = { includeHiddenElements: true }
+    const art = screen.getByTestId('map-game-door-art', HIDDEN)
+    const px = Math.round(68 * P.homeScale)
+    expect(art).toHaveStyle({ width: px, height: px })
+    // expo-image hands its host the source as a list.
+    expect(art.props.source).toEqual([
+      pathArtAsset('ui-flower-bed', px * PixelRatio.get() > 256 ? 512 : 256),
+    ])
     expect(
-      screen.getAllByTestId('map-game-door-flower', {
-        includeHiddenElements: true,
-      }),
-    ).toHaveLength(10)
+      screen.queryAllByTestId(/^map-game-door-(flower|slot|hole)/, HIDDEN),
+    ).toHaveLength(0)
     expect(screen.queryByText(/flower/i)).not.toBeOnTheScreen()
   })
-
-  // § 1.2.1: lands with Thomas's pick of the clay piece (T6), in
-  // `GameDoorPicture` (`mapChrome.tsx`).
-  it.todo(
-    'holds the ui-flower-bed clay piece at Math.round(68 × k) pt and no FlowerBed',
-  )
 })
 
 describe('N3: a door tap follows the Map’s stop rules', () => {
