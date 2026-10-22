@@ -34,6 +34,15 @@
  * and at once on the given answer; hints 1–2 ripple them. A wrong tap that
  * cuts the read never lifts them (K9), and the minuend flash plays first.
  *
+ * Native-only, the flower bed (`design/native/flower-bed-into-add-to-10.md`):
+ * a missing number whose whole is ten (`isBondToTenProblem`, adding to
+ * ten's P4, P6 and P8 wherever they play) draws `FlowerBed` in the counting
+ * row's place, its flowers the row's size. The missing part is bare soil:
+ * hint 1 ripples the planted flowers by row, hint 3 (or the guided answer
+ * when hint 3 was cut) opens and pulses the holes, and a right tap hops
+ * buds from the chip into the slots (`BudHop`), each hole opening as its
+ * bud lands. The lines, chips and scoring are the lesson's own.
+ *
  * Native-only, Number Garden 1 and 8–11 (core's extended kinds; spec
  * `design/native/math-skip-counting-multiplication-native.md`): a number-
  * recognition problem shows `NumberStrip`, a skip-count problem `SkipTrack`,
@@ -107,6 +116,7 @@ import {
   subMinuendFromProblem,
 } from '@marian/core/math/dotCard'
 import {
+  isBondToTenProblem,
   isHundredsProblem,
   isPlaceValueArithmetic,
   type ExtendedMathProblem,
@@ -198,13 +208,27 @@ import {
 } from '../../lifecycle/appVisibility'
 import { colors, FILL, fonts } from '../../theme'
 import { AnswerChip } from './AnswerChip'
+import { BudHop, HOP_MS, HOP_STAGGER_MS } from './BudHop'
 import { CountingRow } from './CountingRow'
 import type { MathOfferedClass } from './extendedChipOrder'
+import { FlowerBed } from './FlowerBed'
+import {
+  BED_VIEW_W,
+  bedSize,
+  chipCentre,
+  SLOT_GLYPH_UNITS,
+  slotCentre,
+} from './flowerBedGeometry'
 import { GettingReady } from './GettingReady'
 import { countSpokenFactor } from './extendedHints'
 import { GroupsRow } from './GroupsRow'
 import { MathHud } from './MathHud'
-import { EquationGap, MissingGroup, type BudReveal } from './MissingNumber'
+import {
+  BLOOM_STAGGER_MS,
+  EquationGap,
+  MissingGroup,
+  type BudReveal,
+} from './MissingNumber'
 import { problemChips, type ProblemChips } from './problemChips'
 import type {
   MathSessionResult,
@@ -1644,6 +1668,8 @@ export function MathScreen({
   // hidden part; never a dot card (it would show both parts).
   const missing =
     currentProblem.kind === 'missing-addend' ? currentProblem : null
+  // The flower bed's problem (flower bed into adding to ten § 1).
+  const bond = missing !== null && isBondToTenProblem(missing) ? missing : null
   const showStreak = streak >= 2 || streakFadingOut
   // The subitising scaffolds never run for review, warm-up or peek problems.
   const scaffoldsAllowed = !review && !isPeek && problemIndex >= warmups
@@ -1731,24 +1757,68 @@ export function MathScreen({
     takeAway === null
       ? null
       : takeAwayMetrics(layout, takeAway.step, area.width)
+  // § 3: the bed's flowers are the row's; it fits the phone's slot, or the
+  // tablet's space under the equation.
+  const bed =
+    bond !== null && counting !== null
+      ? bedSize(
+          counting.size,
+          layout.visualSlot ??
+            area.height - layout.equationLineHeight - layout.problemGap,
+          area.width,
+        )
+      : null
   const visualHeight =
     layout.visualSlot ??
-    (counting !== null
-      ? counting.height
-      : takeAwaySize !== null
-        ? Math.max(
-            takeAwaySize.height,
-            subMinuendInScope ? layout.dotCard.cell : 0,
-          )
-        : subMinuendInScope
-          ? layout.dotCard.cell
-          : 0)
+    (bed !== null
+      ? bed.height
+      : counting !== null
+        ? counting.height
+        : takeAwaySize !== null
+          ? Math.max(
+              takeAwaySize.height,
+              subMinuendInScope ? layout.dotCard.cell : 0,
+            )
+          : subMinuendInScope
+            ? layout.dotCard.cell
+            : 0)
   const showVisualRow =
     (arith !== null || missing !== null) &&
     (layout.visualSlot !== null ||
       counting !== null ||
       subMinuendInScope ||
       takeAwaySize !== null)
+  // § 4: the right move's hop, from the right chip's centre to each empty
+  // slot. The problem rect centres the equation over the visual row, and
+  // the row centres the bed. Reduce Motion: no hop.
+  const bedHop =
+    bond !== null && bed !== null && problemState.resolved && !reducedMotion
+      ? (() => {
+          const block =
+            layout.equationLineHeight + layout.problemGap + visualHeight
+          const x = area.x + (area.width - bed.width) / 2
+          const y =
+            area.y +
+            (area.height - block) / 2 +
+            layout.equationLineHeight +
+            layout.problemGap +
+            (visualHeight - bed.height) / 2
+          const values = chipOrderWithClass.values
+          return {
+            from: chipCentre(
+              chips,
+              layout.chipsAxis,
+              values.indexOf(bond.correct),
+              values.length,
+            ),
+            to: Array.from({ length: bond.correct }, (_, j) => {
+              const c = slotCentre(bond.addendA + j, bed.width)
+              return { x: x + c.x, y: y + c.y }
+            }),
+            size: (SLOT_GLYPH_UNITS * bed.width) / BED_VIEW_W,
+          }
+        })()
+      : null
 
   // The extended kinds' visuals, sized once per plan (spec decision 10).
   const skipMetrics = useMemo(
@@ -2054,7 +2124,25 @@ export function MathScreen({
                       hintBeat={hintBeat}
                     />
                   )}
-                  {counting !== null && missing !== null && (
+                  {bond !== null && bed !== null && (
+                    <FlowerBed
+                      key={`bed-${problemIndex}`}
+                      width={bed.width}
+                      given={bond.addendA}
+                      filled={problemState.resolved}
+                      landMs={(j) =>
+                        reducedMotion
+                          ? BLOOM_STAGGER_MS * j
+                          : HOP_MS + HOP_STAGGER_MS * j
+                      }
+                      // § 5: hint 1 ripples the planted flowers by row; hint
+                      // 3, or the guided answer it didn't reach, opens the
+                      // holes (the row's buds in the stone's place).
+                      pulseGiven={hintBeat === 'group-a' ? 1 : 0}
+                      hint={budReveal === 'hidden' ? 0 : 1}
+                    />
+                  )}
+                  {counting !== null && missing !== null && bond === null && (
                     <CountingRow
                       key={`missing-${problemIndex}`}
                       addendA={missing.addendA}
@@ -2154,6 +2242,14 @@ export function MathScreen({
                 )
               })}
             </View>
+            {bedHop !== null && (
+              <BudHop
+                key={`hop-${problemIndex}`}
+                from={bedHop.from}
+                to={bedHop.to}
+                size={bedHop.size}
+              />
+            )}
           </StageLayer>
         )}
       </Animated.View>

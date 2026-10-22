@@ -63,7 +63,6 @@ export type GuidanceLineKind =
   | 'story-read'
   | 'story-word'
   | 'picker-who'
-  | 'game'
   | 'play'
 
 export interface GuidanceLine {
@@ -279,28 +278,6 @@ function buildLines(): GuidanceLine[] {
   // picker's question, on a device with 2 or more learners. No name in it
   // (P7).
   add(PICKER_WHO_ID, 'picker-who', 'Who is playing?')
-  // The side mini-games (design/native/mini-game-flower-bed.md § 3.1; T3,
-  // the texts, judged at the ear test). The shared lines are world-free: B
-  // and C reuse "Hmm... try again?" and the guided "This one is <n>.". Fill
-  // the flower bed's lines say each bond to ten whole. No line invites a
-  // round, and no line outside `guide.game.*` names a game.
-  add(GAME_AGAIN_ID, 'game', 'Hmm... try again?')
-  NUMBER_WORDS.forEach((n, i) =>
-    add(gameThisIsId(i + 1), 'game', `This one is ${n}.`),
-  )
-  add(BED_OPEN_ID, 'game', 'Ten flowers in every bed!', 'math')
-  NUMBER_WORDS.forEach((n, i) =>
-    add(bedAskId(i + 1), 'game', `${capitalize(n)} and what make ten?`, 'math'),
-  )
-  NUMBER_WORDS.forEach((n, i) =>
-    add(
-      bedYesId(i + 1),
-      'game',
-      `Yes! ${capitalize(n)} and ${NUMBER_WORDS[8 - i]} make ten!`,
-      'math',
-    ),
-  )
-  add(BED_CLOSE_ID, 'game', 'Ten every time! What a garden!', 'math')
   // The Play place and its two games (design/native/play-place.md § 4.1;
   // T3, the texts, approved for rendering 2026-10-20 and judged at the ear
   // test). World-free. The totals are one word, so Lily gets "Seven," (the
@@ -401,12 +378,6 @@ const replayCloseId = (n: SkillNode) => `guide.session.replay-close.${n}`
 const STORY_READ_ID = 'guide.story.read'
 const PICKER_WHO_ID = 'guide.picker.who'
 const storyWordId = (word: string) => `guide.story.word.${word}`
-const GAME_AGAIN_ID = 'guide.game.again'
-const gameThisIsId = (n: number) => `guide.game.this-is.${n}`
-const BED_OPEN_ID = 'guide.game.bed.open'
-const bedAskId = (given: number) => `guide.game.bed.ask.${given}`
-const bedYesId = (given: number) => `guide.game.bed.yes.${given}`
-const BED_CLOSE_ID = 'guide.game.bed.close'
 const PLAY_OPEN_ID = 'guide.play.open'
 const RAFT_OPEN_ID = 'guide.play.raft.open'
 const raftTotalId = (total: number) => `guide.play.raft.total.${total}`

@@ -337,6 +337,15 @@ export function isMissingAddendProblem(
   return 'kind' in problem && problem.kind === 'missing-addend'
 }
 
+/** A missing number whose whole is ten: the flower bed's problem
+ *  (`design/native/flower-bed-into-add-to-10.md` § 1). Only adding to ten's
+ *  missing numbers have one; adding to twenty's wholes are 11–14. */
+export function isBondToTenProblem(
+  problem: MathProblem | ExtendedMathProblem,
+): problem is MissingAddendProblem {
+  return isMissingAddendProblem(problem) && problem.total === 10
+}
+
 export function isMultiplyProblem(
   problem: ExtendedMathProblem,
 ): problem is MultiplyProblem {

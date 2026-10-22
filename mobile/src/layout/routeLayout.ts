@@ -15,11 +15,10 @@ export function layoutForRoute(route: Route, viewport: Viewport): ScreenLayout {
   switch (route) {
     case 'greet':
       return greetLayout(viewport)
-    // A mini-game wears the lesson's Math frame (mini-game spec § 1.4), as
-    // a Play-place game does (play-place spec § 1.7). The Play place itself
-    // keeps the Hub's frames (the default), so Emma does not move.
+    // A Play-place game wears the lesson's Math frame (play-place spec
+    // § 1.7). The Play place itself keeps the Hub's frames (the default),
+    // so Emma does not move.
     case 'math':
-    case 'game':
     case 'play-game':
       return mathLayout(viewport)
     case 'literacy':

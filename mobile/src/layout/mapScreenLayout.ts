@@ -91,11 +91,6 @@ export interface MapScreenLayout extends ScreenLayout {
   caption: MapCaptionSlot
   /** The path's pane. */
   pane: Rect
-  /**
-   * The play door (mini-game spec § 1.2), Home's size: Home's mirror on the
-   * right (P, W), under Home in the rail (L), beside Home (TL).
-   */
-  door: Rect
 }
 
 const bottom = (r: Rect) => r.y + r.height
@@ -198,12 +193,6 @@ export function mapScreenLayout(v: Viewport): MapScreenLayout {
       break
     }
   }
-  const door: Rect =
-    form === 'L'
-      ? { ...home, y: bottom(home) + 16 }
-      : form === 'TL'
-        ? { ...home, x: right(home) + 24 }
-        : { ...home, x: right(S) - (home.x - S.x) - homeSize }
   return {
     form,
     landscape: form === 'L' || form === 'TL',
@@ -218,7 +207,6 @@ export function mapScreenLayout(v: Viewport): MapScreenLayout {
     title,
     caption,
     pane,
-    door,
   }
 }
 

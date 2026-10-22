@@ -5,8 +5,7 @@
  * after Splash, and a pick switches the store and mounts their Greet or
  * Hub; the badge switches back, and the next learner's Hub speaks even
  * within 30 s (K2); the return rule after 10 minutes hidden; Session End
- * hands over (and a mini-game on that Map keeps its Home, mini-game N4);
- * Parent Settings' Done opens the picker after a change.
+ * hands over; Parent Settings' Done opens the picker after a change.
  */
 import {
   LEARNERS_STORAGE_KEY,
@@ -38,7 +37,6 @@ import { PICKER_AFTER_HIDDEN_MS } from './lifecycle/pickerReturn'
 import { NO_LAUNCH_FLAGS } from './platform/launchFlags'
 import { bootNative, type SyncKeyValueBackend } from './platform/native'
 import { resetHubAudioForTests } from './screens/hub/hubAudio'
-import { LAUNCH_DELAY_MS } from './screens/map/useMapVisit'
 import { resetPickerAudioForTests } from './screens/picker/pickerAudio'
 import { PICK_ROUTE_DELAY_MS } from './screens/picker/pickerTiming'
 import { LEAVE_DELAY_MS } from './screens/sessionEnd/SessionEnd'
@@ -441,35 +439,6 @@ describe('AC 33: Session End hands over', () => {
     await advance(LEAVE_DELAY_MS)
     expect(screen.getByTestId('map-math-beat-unlock')).toBeOnTheScreen()
     await settle(4000)
-    await fireEvent.press(screen.getByTestId('map-home'))
-    expect(screen.getByTestId('picker')).toBeOnTheScreen()
-  })
-
-  it('mini-game N4: a game entered and left on that Map keeps its Home → the picker', async () => {
-    const day = (d: number) =>
-      localDateKey(new Date(Date.now() - d * 86_400_000))
-    boot([MARIAN, SAM])
-    hasPlayed(MARIAN.id)
-    hasPlayed(SAM.id)
-    saveProgress({
-      ...defaultProgress(),
-      goodDays: { 'add-to-10': [day(2), day(1)] },
-    })
-    await renderPastSplash()
-    await pick(MARIAN.id)
-    await settle(2000)
-    await playMathSession()
-    await fireEvent.press(screen.getByTestId('session-end-cta'))
-    await advance(LEAVE_DELAY_MS)
-    expect(screen.getByTestId('map-math-beat-unlock')).toBeOnTheScreen()
-    await settle(4000)
-    await fireEvent.press(screen.getByTestId('map-game-door'))
-    await advance(LAUNCH_DELAY_MS)
-    await settle(300)
-    expect(screen.getByTestId('game')).toBeOnTheScreen()
-    await fireEvent.press(screen.getByTestId('game-back-to-hub'))
-    await settle(300)
-    expect(screen.getByTestId('map-math-beat-none')).toBeOnTheScreen()
     await fireEvent.press(screen.getByTestId('map-home'))
     expect(screen.getByTestId('picker')).toBeOnTheScreen()
   })

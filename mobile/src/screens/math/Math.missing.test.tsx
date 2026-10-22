@@ -1,10 +1,12 @@
 /**
  * Missing numbers on Math's screen (content wave 1
- * `design/native/content-wave-1.md` §§ 1.1–1.5, AC 11): `7 + ? = 10` over
- * group A and the "?" stone, the hiding lead line, the buds from hint 3, the
- * bloom and the fill on a right answer, the ring on the given answer, and no
- * dot card. Driven through fakes of Emma's voice and the session-guide
- * player; silent.
+ * `design/native/content-wave-1.md` §§ 1.1–1.5, AC 11): `7 + ? = 10`, the
+ * hiding lead line, the hint, the bloom and the fill on a right answer, the
+ * ring on the given answer, and no dot card. A whole of ten draws the flower
+ * bed in the counting row's place (`design/native/flower-bed-into-add-to-10.md`,
+ * N8: these expectations stand with the bed's test IDs); `3 + ? = 5` keeps
+ * group A and the "?" stone. Driven through fakes of Emma's voice and the
+ * session-guide player; silent.
  */
 import type { ExtendedMathSessionPlan } from '@marian/core/math/extendedProblems'
 import { mathSessionPlanFromServer } from '@marian/core/math/planFromServer'
@@ -262,20 +264,14 @@ beforeEach(() => jest.useFakeTimers())
 afterEach(() => jest.useRealTimers())
 
 describe('add-to-10 P4: 7 + ? = 10 (AC 11)', () => {
-  it('shows 7 + ? = 10, 7 flowers, the "?" stone and chips 2 3 4', async () => {
+  it('shows 7 + ? = 10, 7 flowers in the bed, bare soil for the rest and chips 2 3 4', async () => {
     const h = await setup()
     await toP4(h)
     // The gap holds "?" and, faded out until a right tap, the answer.
     expect(equationTokens()).toEqual(['7', '+', '?', '3', '=', '10'])
     expect(screen.getByTestId('math-equation-gap')).toBeOnTheScreen()
-    expect(
-      screen.getByTestId('math-flower-group-a', HIDDEN).props
-        .accessibilityLabel,
-    ).toBe('7')
-    expect(screen.getByTestId('math-missing-stone', HIDDEN)).toBeOnTheScreen()
-    expect(
-      screen.getByTestId('math-missing-group-stone', HIDDEN),
-    ).toBeOnTheScreen()
+    expect(screen.getAllByTestId('math-bed-flower', HIDDEN)).toHaveLength(7)
+    expect(screen.queryAllByTestId(/^math-bed-hole-[789]/, HIDDEN)).toEqual([])
     const chips = screen
       .getAllByTestId(/^math-chip-/)
       .map((c) => Number(String(c.props.testID).replace('math-chip-', '')))
@@ -303,7 +299,7 @@ describe('add-to-10 P4: 7 + ? = 10 (AC 11)', () => {
     expect(result.totalCorrect).toBe(8)
   })
 
-  it("hint 3 shows 3 buds in the stone's place; group A ripples on hints 1–2", async () => {
+  it('hint 3 opens the 3 holes; the planted flowers ripple on hint 1', async () => {
     const h = await setup()
     await toP4(h)
     await fireEvent.press(screen.getByTestId('math-chip-2'))
@@ -313,24 +309,22 @@ describe('add-to-10 P4: 7 + ? = 10 (AC 11)', () => {
     await advance(HINT_DELAY_AFTER_WRONG_MS)
     expect(h.voice.last().text).toBe('Look at the flowers.')
     expect(
-      screen.getByTestId('math-flower-group-a-pulsing', HIDDEN),
+      screen.getByTestId('math-bed-given-0-pulsed', HIDDEN),
     ).toBeOnTheScreen()
     await startAndEnd(h.voice.last())
     expect(h.voice.last().text).toBe('Seven flowers.')
-    expect(
-      screen.getByTestId('math-missing-group-stone', HIDDEN),
-    ).toBeOnTheScreen()
+    expect(screen.queryAllByTestId(/^math-bed-hole-[789]/, HIDDEN)).toEqual([])
     await startAndEnd(h.voice.last())
     expect(h.voice.last().text).toBe('How many more make ten?')
-    const group = screen.getByTestId('math-missing-group-buds', HIDDEN)
-    expect(group.props.accessibilityLabel).toBe('3')
-    expect(screen.queryByTestId('math-missing-stone', HIDDEN)).toBeNull()
+    expect(
+      screen.getAllByTestId(/^math-bed-hole-[789]-pulsed$/, HIDDEN),
+    ).toHaveLength(3)
     await startAndEnd(h.voice.last())
     await advance(0)
-    // The buds stay after the hint ends.
+    // The holes stay open after the hint ends.
     expect(
-      screen.getByTestId('math-missing-group-buds', HIDDEN),
-    ).toBeOnTheScreen()
+      screen.getAllByTestId(/^math-bed-hole-[789]-pulsed$/, HIDDEN),
+    ).toHaveLength(3)
   })
 
   it('a right tap fills the "?" with 3 and blooms the buds', async () => {
@@ -341,12 +335,11 @@ describe('add-to-10 P4: 7 + ? = 10 (AC 11)', () => {
     expect(h.voice.last().text).toBe('Yes! Seven and three make ten!')
     expect(screen.getByTestId('math-equation-gap-answered')).toBeOnTheScreen()
     expect(
-      screen.getByTestId('math-missing-group-bloom', HIDDEN),
-    ).toBeOnTheScreen()
-    expect(screen.queryByTestId('math-missing-stone', HIDDEN)).toBeNull()
+      screen.getAllByTestId(/^math-bed-bloom-[789]$/, HIDDEN),
+    ).toHaveLength(3)
   })
 
-  it('the 3rd wrong shows the buds and rings the "?"', async () => {
+  it('the 3rd wrong opens the holes and rings the "?"', async () => {
     const h = await setup()
     await toP4(h)
     // Two wrongs, then a third before the hint starts.
@@ -359,14 +352,14 @@ describe('add-to-10 P4: 7 + ? = 10 (AC 11)', () => {
     expect(h.voice.last().text).toBe('This one is three.')
     expect(screen.getByTestId('math-equation-gap-ring')).toBeOnTheScreen()
     expect(
-      screen.getByTestId('math-missing-group-buds', HIDDEN),
-    ).toBeOnTheScreen()
+      screen.getAllByTestId(/^math-bed-hole-[789]-pulsed$/, HIDDEN),
+    ).toHaveLength(3)
     await startAndEnd(h.voice.last())
     await fireEvent.press(screen.getByTestId('math-chip-3'))
     await flush()
     expect(
-      screen.getByTestId('math-missing-group-bloom', HIDDEN),
-    ).toBeOnTheScreen()
+      screen.getAllByTestId(/^math-bed-bloom-[789]$/, HIDDEN),
+    ).toHaveLength(3)
   })
 })
 

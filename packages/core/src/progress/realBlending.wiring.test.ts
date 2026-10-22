@@ -443,8 +443,10 @@ describe('the lines (§ 11, AC 7)', () => {
     )
   })
 
-  it('counts: guidance 330 → 354 ids, path lines 814 → 851, baked 254 → 259 (on main after content wave 5, the flower-bed game, #635, and the Play place)', () => {
-    expect(GUIDANCE_LINES).toHaveLength(354)
+  // Guidance was 354 on main with #635's 30 game lines and the Play place's
+  // 18; the flower bed's move into adding to ten takes the game lines out.
+  it('counts: guidance 354 → 324 ids after the game lines left, path lines 814 → 851, baked 254 → 259', () => {
+    expect(GUIDANCE_LINES).toHaveLength(324)
     expect(PATH_LINES).toHaveLength(851)
     expect(BAKED_PATH_LINES).toHaveLength(259)
   })
