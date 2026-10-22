@@ -1,0 +1,29 @@
+# tap-and-confirm.yaml for a TARGET that stays on screen after the tap
+# (a map stop: its tap opens the peek prompt over the map).
+#
+#   TARGET  the id to tap, e.g. map-stop-cvc-words-short-u
+#   NEXT    the id the tap brings up, e.g. map-peek-button
+#
+# tap-and-confirm.yaml re-taps when TARGET is still visible, which a stop
+# always is, so it re-tapped after every stop tap even when NEXT had shown
+# (06-map-peek, 2026-10-22). Here the lost tap is read from NEXT instead:
+# not up within 15 s → tap once more, labelled MAESTRO-RETAP so run.sh
+# counts it. A second stop tap on an open prompt only replays its question.
+appId: host.exp.Exponent
+---
+- tapOn:
+    id: ${TARGET}
+- extendedWaitUntil:
+    visible:
+      id: ${NEXT}
+    timeout: 15000
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: ${NEXT}
+    commands:
+      - tapOn:
+          id: ${TARGET}
+          optional: true
+          label: 'MAESTRO-RETAP: what the tap opens is not up 15 s after it, tapping it again'

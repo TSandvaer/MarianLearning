@@ -1,0 +1,69 @@
+# Map peek: a locked later stop asks first, the green button starts the peek.
+#
+# `cvc-words` seed: Word Song on CVC words, the short-o to short-e stops of
+# the same land still locked. A tap on a stop after the current step that is
+# not mastered is a peek (core `isPeekableStop`, `packages/core/src/map/peek.ts`);
+# it opens the peek prompt (#657): the stop's name, then the question and
+# the round button `map-peek-button` (`useMapVisit.ts` `openPrompt`).
+#
+# The button starts the peek: `requestPeek` asks the API for the step's 3
+# problems (`src/session/peekSession.ts`). With the harness's closed API
+# port the request fails at once, the request rejects, and the map says the
+# stop's name again and stays (`useMapVisit.ts` `startPeek`: "Failure: the
+# stop's name, and taps resume"), so the flow asserts that line's caption,
+# `map-line-path.stop.<node>`, not the peek screen.
+appId: host.exp.Exponent
+name: Map peek
+tags:
+  - map
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: cvc-words
+- runFlow: ../subflows/open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 120000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: hub-map-word-song
+      NEXT: map
+- extendedWaitUntil:
+    visible:
+      id: map-stop-cvc-words-short-u
+    timeout: 15000
+# The stop stays on screen after its tap: tap-and-confirm-stays.yaml.
+- runFlow:
+    file: ../subflows/tap-and-confirm-stays.yaml
+    env:
+      TARGET: map-stop-cvc-words-short-u
+      NEXT: map-peek-button
+- extendedWaitUntil:
+    visible:
+      id: map-peek-button
+    timeout: 30000
+- takeScreenshot: map-peek-button
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: map-peek-button
+      NEXT: map-line-path.stop.cvc-words-short-u
+- extendedWaitUntil:
+    visible:
+      id: map-line-path.stop.cvc-words-short-u
+    timeout: 15000
+- assertNotVisible:
+    id: map-peek-button
+- takeScreenshot: map-peek-fallback
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: map-home
+      NEXT: hub
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 30000

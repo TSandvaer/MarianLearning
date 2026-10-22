@@ -3,6 +3,7 @@
 #
 #   mobile/maestro/run.sh                    # every flow in flows/, in order
 #   mobile/maestro/run.sh mobile/maestro/flows/03-word-song.yaml
+#   mobile/maestro/run.sh mobile/maestro/on-demand/*.yaml   # by hand only
 #
 # Run from the repo root as above, or from mobile/ as maestro/run.sh. Flow
 # paths are relative to the current directory.
@@ -102,6 +103,9 @@ xcrun simctl get_app_container "$UDID" "$EXPO_GO" >/dev/null 2>&1 ||
 # Expo Go's first-run onboarding would cover the app.
 xcrun simctl spawn "$UDID" defaults write "$EXPO_GO" EXDevMenuIsOnboardingFinished -bool YES
 xcrun simctl spawn "$UDID" defaults write "$EXPO_GO" ExpoGoOnboardingFinished -bool YES
+# Expo Go's floating dev-menu button (a gear, top right) sits over the
+# Hub's Play disc and swallows taps on it.
+xcrun simctl spawn "$UDID" defaults write "$EXPO_GO" EXDevMenuShowFloatingActionButton -bool NO
 
 # ── Guards ───────────────────────────────────────────────────────────────
 if nc -z -G 2 127.0.0.1 9 >/dev/null 2>&1; then
