@@ -33,7 +33,7 @@ She is on the Hub (Home). At least one game is open for the playing learner (§ 
 3. **The Play place reuses the Hub's frames.** Emma, her light and her bubble sit exactly where they sit on the Hub, so she does not jump when the place opens, and the tiles take the card boxes' width (§ 1.3).
 4. **No toy state in this build.** Dave allows a game to keep its own toy state (§ 2, "Writes nothing" relaxed). Neither game needs it to be fun, and keeping none keeps every visit at zero writes (AC N5). The island fills during a visit and starts empty next time.
 5. **The raft's shore refills; three crossings make a trip.** Six animals wait, always with at least two ways to make ten. After a crossing, newcomers walk on so there are six again. The third crossing is the natural stop. Dave's test is "many right ways": a shore of three fixed pairs gives only three, so it refills instead (§ 2.1). A raft that can no longer reach ten is unstuck by the world, never by Emma: after two splashes in a row, a newcomer of exactly the missing weight walks on (§ 2.3, D4).
-6. **Letter critters pops only the learner's CVC words, and never treats a real word as a mistake.** Two critters together sing their two sounds and nothing more. A three-letter run that is a CVC word from a Word Song step current or mastered for this learner pops its picture, because those are exactly the words with tuned blend clips and pack pictures (§ 3.1). Any other real CVC word (on the text-only list `CRITTER_REAL_WORDS`) sings its sounds and the three sit together, quietly. Only a run that is not a word gets the boing, the tumble and the giggle, and no line ever says "not a word" (§ 3.3, § 3.5, D5).
+6. **Letter critters pops all 45 picture words for every learner, says the other real words, and never treats a real word as a mistake** (CHANGE, Thomas 2026-10-22). Two critters together sing their two sounds and nothing more. A three-letter run that is one of the 45 picture words pops its picture whatever her steps, because those are exactly the words with tuned blend clips and pack pictures (§ 3.1); the old step gate is gone. Any other real CVC word sings its sounds, and then Emma says it (`CRITTER_SAID_WORDS`, 156 whole-word Lily clips, no picture), except the words on Dave's two lists (`CRITTER_NEVER_SAY`, `CRITTER_NOT_SAID`), which sing their sounds and sit together, quietly, as before. Only a run that is not a word gets the boing, the tumble and a line, every time: one of three that ask, kindly, whether it is a word (CHANGE, Thomas 2026-10-22; this replaces "no line ever says 'not a word'" and the two-giggle cap). No line says "not a word" or says the run (§ 3.3, § 3.5, D5).
 7. **The sounds are the shipped blend clips, bundled.** Every critter sound is a segment of an ear-approved Word Song blend clip, played through the shipped tap-to-hear window. A picture word plays its own whole clip. No phoneme is rendered for this game (§ 3.4).
 8. **At most 16 critters on the meadow.** A learner past every CVC step knows 22 letters, which do not fit a phone in landscape at a touchable size. A visit with more than 16 shows every vowel she knows and a rotating set of consonants (§ 3.1).
 9. **Emma waves the raft off from her place in this build.** She does not ride it: a rowing Emma is new Emma art (T4).
@@ -273,12 +273,12 @@ The scene fills `A` (§ 1.7). Its axis follows the screen: **portrait** (phone P
 
 **Too heavy** (the total would pass 10):
 
-| t (ms) | What happens                                                                                                                                                                                                   |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0      | The animal lands on its seat. The deck sinks until the water covers it. The flag keeps the old total: it never shows more than 10.                                                                             |
-| 0-900  | The raft wobbles: rotate +6° / −6°, three times, easing out. Drops on the raft are refused while it wobbles (they spring home).                                                                                |
-| 500    | The newest animal slides off the low edge into the water (400 ms). `sfx-splash`. A splash ring and six droplets arc up and fall (300 ms). Emma `puzzled-tilt`, `guide.play.raft.splash`, "Too heavy! Splash!". |
-| 900    | The deck rises back to the old load. The animal paddles to its shore spot (1200 ms, bobbing ±3 pt), climbs out and shakes itself (a 300 ms wiggle). It can be dragged again at once.                           |
+| t (ms) | What happens                                                                                                                                                                                                                                                      |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0      | The animal lands on its seat. The deck sinks until the water covers it. The flag keeps the old total: it never shows more than 10.                                                                                                                                |
+| 0-900  | The raft wobbles: rotate +6° / −6°, three times, easing out. Drops on the raft are refused while it wobbles (they spring home).                                                                                                                                   |
+| 500    | The newest animal slides off the low edge into the water (400 ms). `sfx-splash`. A splash ring and six droplets arc up and fall (300 ms). Emma `puzzled-tilt`, `guide.play.raft.splash`, "Too heavy!" (Thomas 2026-10-22: the splash is the sound's, not Emma's). |
+| 900    | The deck rises back to the old load. The animal paddles to its shore spot (1200 ms, bobbing ±3 pt), climbs out and shakes itself (a 300 ms wiggle). It can be dragged again at once.                                                                              |
 
 Everyone else stays aboard. Nothing is lost and nothing is counted: no lives, no tries, no score. Never red, never an X, no poof. Emma never hints (D4).
 
@@ -371,16 +371,19 @@ Lines and sounds are unchanged. Dragging still follows the finger: it is the inp
 
 In `playPlace.ts`:
 
-| Name                     | Shape                                                       | Meaning                                                                                                         |
-| ------------------------ | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `CRITTER_WORDS_BY_STEP`  | `Partial<Record<WordSongNode, readonly string[]>>`          | Each CVC step's words (table below)                                                                             |
-| `CRITTER_LEFT_OUT`       | `readonly string[]`                                         | `['gem']` (D6)                                                                                                  |
-| `CRITTER_REAL_WORDS`     | `ReadonlySet<string>`                                       | The text-only list of real CVC words over the 22 letters (below, D5): no clips, no pictures                     |
-| `critterRun(run, words)` | `(string, string[]) => 'picture' \| 'real' \| 'funny'`      | What a 3-letter run does: in `words` (the visit's `critterSet(...).words`), on `CRITTER_REAL_WORDS`, or neither |
-| `critterWords(progress)` | `(Progress \| null) => string[]`                            | The union of the words of every step in the table that is current or mastered for this learner, sorted          |
-| `CRITTER_CAP`            | `16`                                                        | Most critters on the meadow at once (Decision 8)                                                                |
-| `critterSet(words, rng)` | `(string[], rng) => { letters: string[]; words: string[] }` | This visit's letters and the words they can spell (below)                                                       |
-| `CRITTER_SOUND_SOURCE`   | `Record<string, { word: string; index: 0 \| 1 \| 2 }>`      | Which clip and which of its sounds a letter sings when it is not inside one of its own words (§ 3.4)            |
+| Name                     | Shape                                                       | Meaning                                                                                                      |
+| ------------------------ | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `CRITTER_WORDS_BY_STEP`  | `Partial<Record<WordSongNode, readonly string[]>>`          | Each CVC step's words (table below)                                                                          |
+| `CRITTER_LEFT_OUT`       | `readonly string[]`                                         | `['gem']` (D6)                                                                                               |
+| `CRITTER_PICTURE_WORDS`  | `readonly string[]`                                         | All 45 picture words, sorted: every learner's, with no step gate (Thomas 2026-10-22)                         |
+| `CRITTER_REAL_WORDS`     | `ReadonlySet<string>`                                       | The real CVC words over the 22 letters (below, D5)                                                           |
+| `CRITTER_NEVER_SAY`      | `ReadonlySet<string>`                                       | Real words Emma never says (Dave 2026-10-22, below): 10                                                      |
+| `CRITTER_NOT_SAID`       | `ReadonlySet<string>`                                       | Real words Emma does not say because the sounds do not spell them, and _rum_ (Dave 2026-10-22, below): 9     |
+| `CRITTER_SAID_WORDS`     | `readonly string[]`                                         | The real words that are not picture words and on neither list, sorted: 156, each with a whole-word clip      |
+| `critterRun(run)`        | `(string) => CritterRun`                                    | What a 3-letter run does: `'picture'`, `'word'` (said), `'quiet'` (on either list) or `'funny'` (not a word) |
+| `CRITTER_CAP`            | `16`                                                        | Most critters on the meadow at once (Decision 8)                                                             |
+| `critterSet(words, rng)` | `(string[], rng) => { letters: string[]; words: string[] }` | This visit's letters and the words they can spell (below)                                                    |
+| `CRITTER_SOUND_SOURCE`   | `Record<string, { word: string; index: 0 \| 1 \| 2 }>`      | Which clip and which of its sounds a letter sings when it is not inside one of its own words (§ 3.4)         |
 
 **The words** are each step's canon blend words, the `word.p*.blend` texts of `public/canon/word-song/level-1/<step>.json` (listed by a scratch script on 2026-10-20, not committed). Every one has a tuned blend clip with measured marks (`mobile/src/audio/blendMarks.generated.ts`, 46 entries) and a pack picture (`mobile/assets/pictures/<word>.webp`; all 46 present, checked the same day).
 
@@ -394,9 +397,7 @@ In `playPlace.ts`:
 | `cvc-words-short-i` | bib, bin, fig, lid, pig, pin, sip, wig           |
 | `cvc-words-short-e` | bed, hen, jet, leg, net, pen, web (gem left out) |
 
-**"Current or mastered"** is § 1.1's rule, per step. A step past the CVC tiers (digraphs and on) adds no words: its learner has every CVC step mastered, so all 45 words are in.
-
-**What a learner gets** (computed from the table, 2026-10-20):
+**No step gate** (CHANGE, Thomas 2026-10-22). Every learner who has the game gets all 45 words, so a visit's letters are `critterSet(CRITTER_PICTURE_WORDS, rng)`: 22 letters, more than the cap, so every vowel and a rotating set of consonants, 16 in all. The table above now only says where each word comes from (C4). The old per-learner shapes, kept for the record (2026-10-20):
 
 | Steps current or mastered | Words | Letters                   |
 | ------------------------- | ----- | ------------------------- |
@@ -409,13 +410,14 @@ In `playPlace.ts`:
 
 **`critterSet(words, rng)`:** when the words use 16 letters or fewer, all of them, and all the words. Otherwise every vowel the words use, then consonants word by word in `rng` order, adding a word only when all its letters still fit in 16. `words` is then every word the chosen letters spell. So from short u on, a visit shows every vowel she knows and a rotating set of consonants, and every critter can make at least one real word. App passes `Math.random`, tests a seeded generator.
 
-**Picture words = this list only.** A three-letter run pops its clip and picture exactly when it is in `critterSet(...).words`. Those are the learner's current or mastered CVC words, so nothing that pops comes from a step she has not reached (Dave § 2).
+**Picture words = all 45, always** (CHANGE, Thomas 2026-10-22; replaces "Picture words = this list only", which popped only her current or mastered steps' words). A three-letter run pops its clip and picture exactly when it is in `CRITTER_PICTURE_WORDS`. The visit's letters spell only words in `critterSet(...).words`, so every picture word she can build pops.
 
-**Real words that are not picture words** (D5 CHANGE, Dave 2026-10-20). With only the blending-sounds letters, Dave counted by hand, not exhaustively, cab, cap, gap, map, nap, tap, ham, bat, fat, mat, pat and tan: real words that the first draft gave the boing and the tumble. To a child the tumble says "that didn't work", whatever the line says, so it marked correct blending as a mistake. `CRITTER_REAL_WORDS` fixes that. It is text only: nothing is rendered, generated or bought for it.
+**Real words that are not picture words** (D5 CHANGE, Dave 2026-10-20). With only the blending-sounds letters, Dave counted by hand, not exhaustively, cab, cap, gap, map, nap, tap, ham, bat, fat, mat, pat and tan: real words that the first draft gave the boing and the tumble. To a child the tumble says "that didn't work", whatever the line says, so it marked correct blending as a mistake. `CRITTER_REAL_WORDS` fixes that. Since Thomas 2026-10-22 Emma also says the word after the sounds, for the 156 on `CRITTER_SAID_WORDS` (one Lily clip each, `guide.play.critters.word.<w>`, § 3.3); no picture is generated or bought for them.
 
 - **What is on it:** 220 three-letter words, each a consonant, a short vowel letter and a consonant from the 22 critter letters. I drew them on 2026-10-20 from the candidates that `/usr/share/dict/words` on this Mac gives for that letter pattern (461), kept the ones a 6-9 learner may meet, and added _has_, which that file lacks. All 45 picture words are on it, so are _gem_ (Dave: "includes gem") and Dave's twelve. Kevin pins the list exactly as printed here (C10).
-- **Rude words sit on it** (Dave left it to me). Six are on it: _bum_, _cum_, _fag_, _git_, _sex_, _tit_. The critters sing letter sounds only, either way, so a rude word is never said back to her. On the list, it gets the plainest outcome there is (it sings and the three sit, with no boing, no tumble and no giggle), so building one earns nothing to come back for. Off the list, it would get the boing and Emma's giggle, the funniest outcome in the game, which would reward building it.
-- **Words whose sounds don't spell them** (_gem_, _was_, _his_, _son_, _won_, _put_) are on it because they are real words. The critters still sing their own letter sounds (the g critter sings /g/ in _gem_, D6), and sitting says nothing about the word's sound, so nothing false is said.
+- **Rude words sit on it, and are never said** (Dave left it to me; the never-say list is Dave's, 2026-10-22). `CRITTER_NEVER_SAY` is _bum_, _cum_, _fag_, _git_, _sex_, _tit_, _dam_ (sounds like "damn"), _hag_ (an insult), _god_ (an exclamation) and _gun_ (a weapon). The critters sing their letter sounds and the three sit, with no word, no boing, no tumble and no giggle: the plainest outcome there is, so building one earns nothing to come back for. Off the list, it would get the boing and Emma's giggle, the funniest outcome in the game, which would reward building it.
+- **Words whose sounds don't spell them are not said** (Dave 2026-10-22). `CRITTER_NOT_SAID` is _gem_ and _gin_ (the g critter sings /g/, the word says /dʒ/, D6), _has_, _his_ and _was_ (s is /z/), _son_ and _won_ (o is /ʌ/), _put_ (u is /ʊ/), and _rum_ (an adult drink). They are real words, so they sing and sit like the never-say words: saying them after the critters' sounds would contradict the sounds. Dave kept _fat_, _but_, _pus_, _hex_, _sin_, _nip_, _pig_, _rob_, _hit_, _cut_, _pot_ and _bog_ as ordinary words.
+- **What is said:** `CRITTER_SAID_WORDS`, the other 156 (220 = 45 + 10 + 9 + 156).
 
 ```
 a (61): bad bag ban bat cab can cap cat dab dad dam fad fag fan fat fax gag gap gas had hag ham has hat jab
@@ -431,7 +433,7 @@ u (44): bud bug bum bun bus but cub cum cup cut dud dug fun gum gun gut hub hug 
         mum nun nut pub pug pun pup pus put rub rug rum run rut sub sum sun tub tug
 ```
 
-**Order:** `critterRun` checks the visit's picture words first, so a word on both (all 45 are) pops when its step is current or mastered and sits before that. Only a run on neither is `'funny'`.
+**Order:** `critterRun` checks the picture words first (all 45 are on the real list too), then the real list: a real word on `CRITTER_NEVER_SAY` or `CRITTER_NOT_SAID` is `'quiet'`, any other is `'word'`. Only a run on neither list is `'funny'`.
 
 ### 3.2 The scene
 
@@ -479,10 +481,11 @@ No Emma line: the clip already says the word, and the picture says the rest.
 **Any other run** (2 seated, or 3 that are not a picture word): each critter, left to right, sings its own sound (§ 3.4) and bounces as it starts. The next one starts 300 ms after the one before ends, the rhythm of the blend clips, which leave at least 300 ms of silence between sounds (`blendMarks.ts` header). Emma `listening` while they sing.
 
 - **Two critters:** that is all. They lean toward each other and wait for a friend. No line.
-- **Three that make a real word** (`'real'`, D5): 300 ms after the last sound, the three bounce together once (0.15 c, 250 ms) and sit, leaning in. No boing, no tumble, no line, no picture, no sparkle. Emma goes back to `idle`.
-- **Three that are not a word** (`'funny'`): 300 ms after the last sound, `sfx-boing`, and the three tumble (rotate −12° → +12° → 0 with a 0.1 c drop, 500 ms) and sit back up. Emma `cheering` and a giggle line, `guide.play.critters.funny.1`, "Hee hee! What a funny song!", then `funny.2`, "Ha ha! Silly sounds!", alternating. **At most two giggle lines in a visit;** after that the boing and the tumble play alone, so Emma never nags.
+- **Three that make a said word** (`'word'`, CHANGE, Thomas 2026-10-22): 300 ms after the last sound (at least the 300 ms gap the blend clips leave, `blendMarks.ts` header; Dave's safeguard 1), Emma says the word, its `critterWordLine(word)` clip ("Map.", Lily, plain falling intonation), and the three bounce together once (0.15 c, 250 ms) as it starts, then sit, leaning in. No praise line, no sparkle, no picture, no boing, no tumble (Dave's safeguard 2). Emma `listening` while she says it, then `idle`.
+- **Three that make a quiet word** (`'quiet'`, on `CRITTER_NEVER_SAY` or `CRITTER_NOT_SAID`; D5 as before): 300 ms after the last sound, the three bounce together once (0.15 c, 250 ms) and sit, leaning in. No word, no boing, no tumble, no line, no picture, no sparkle. Emma goes back to `idle` (Dave's safeguard 3).
+- **Three that are not a word** (`'funny'`): 300 ms after the last sound, `sfx-boing`, and the three tumble (rotate −12° → +12° → 0 with a 0.1 c drop, 500 ms) and sit back up. Emma `cheering` and a non-word line, **every time, the three in turn** (CHANGE, Thomas 2026-10-22): `guide.play.critters.funny.1`, "Is this a word? I don't know what it means!", then `funny.2`, "Hmm! What could that mean?", then `funny.3`, "Hee hee! Is that a word?", then `funny.1` again. The old two-giggle cap and its lines ("Hee hee! What a funny song!", "Ha ha! Silly sounds!") are retired; the ids `funny.1` and `funny.2` keep their names with the new texts.
 
-**Open and leave.** At the start, 300 ms after the fade-in, Emma (`listening`) says `guide.play.critters.open`, "Join the letters! Hear them sing!". A critter tap or drag during the line cuts it (`cancelActive()`). Letter critters is a toy: it has no rounds and no end of its own. She leaves with Back (§ 1.4), and the Play place returns silently.
+**Open and leave.** At the start, 300 ms after the fade-in, Emma (`listening`) says `guide.play.critters.open`, "Join three letters. If they make a word, I'll say it!" (Thomas 2026-10-22: it tells her a real word gets said; no "sing"). A critter tap or drag during the line cuts it (`cancelActive()`). Letter critters is a toy: it has no rounds and no end of its own. She leaves with Back (§ 1.4), and the Play place returns silently.
 
 ### 3.4 Which sounds, and which clips (audio)
 
@@ -506,10 +509,10 @@ Derived on 2026-10-20 from § 3.1's 45 words; `CRITTER_SOUND_SOURCE` is computed
 
 ### 3.5 Words and what Emma never says
 
-- **Emma never says "not a word"** and never says a made-up run. Dave's "Tup? That's not a word! Tup, tup!" would need a render per non-word.
-- **A real word is never a mistake** (D5). A real CVC word that is not a picture word for her ("sat", "hop", "map") sings its sounds and sits (§ 3.3): it gets no boing, no tumble and no giggle. Only runs on neither list get those, and "What a funny song!" and "Silly sounds!" are said only of them.
-- **No run is spoken as a word unless it is a picture word.** The critters sing sounds only, so a rude word the learner builds is never said back to her, and it gets the quiet sit, not the giggle (§ 3.1).
-- **Pictures** appear only for picture words, from the shipped pack.
+- **Emma never says "not a word"** and never says a made-up run. Dave's "Tup? That's not a word! Tup, tup!" would need a render per non-word. She asks instead, in one of three lines (Thomas 2026-10-22): "Is this a word? I don't know what it means!", "Hmm! What could that mean?", "Hee hee! Is that a word?" (§ 3.3).
+- **A real word is never a mistake** (D5). A real CVC word that is not a picture word ("sat", "hop", "map") sings its sounds and Emma says it, or, on Dave's lists, sits (§ 3.3): it gets no boing, no tumble and no giggle. Only runs that are not words get those, and the three non-word lines are said only of them.
+- **A run is spoken as a word only if it is a picture word (its blend clip) or on `CRITTER_SAID_WORDS`** (CHANGE, Thomas 2026-10-22). A word on `CRITTER_NEVER_SAY` (rude words and the like) or `CRITTER_NOT_SAID` (sounds that don't spell it) is never said back to her, and it gets the quiet sit, not the giggle (§ 3.1).
+- **Pictures** appear only for the 45 picture words, from the shipped pack; a said word has none.
 
 ### 3.6 Wireframes (phone portrait, "fan" just popped; phone landscape, two seated)
 
@@ -561,19 +564,21 @@ PHONE PORTRAIT  375×667                     PHONE LANDSCAPE  667×375
 
 All lines are Lily, as `GUIDANCE_LINES` rows (`packages/core/src/emmasPath/guidanceLines.ts`) with a new kind `'play'` in `GuidanceLineKind` (`:38-66`), `world: null`, and `src = pathLineSrc(id)`, so the files are `/assets/audio/path/guide-play-*.mp3`. Native plays them through `mobile/src/screens/play/playLines.ts`, the flower bed's `gameLines.ts` pattern (one manifest line player with word ticks). `<N>` is a capitalised number word.
 
-| Id                                 | Caption text (= Lily input unless noted) | When                                         | Lines  | Chars   |
-| ---------------------------------- | ---------------------------------------- | -------------------------------------------- | ------ | ------- |
-| `guide.play.open`                  | "What shall we play?"                    | The Play place, entered from the Hub         | 1      | 19      |
-| `guide.play.raft.open`             | "The raft can carry ten!"                | Raft: the start                              | 1      | 23      |
-| `guide.play.raft.total.<t>`, t 1-9 | "<N>!" (input "<N>,", § 4.3)             | Raft: the total after a boarding or take-off | 9      | 45      |
-| `guide.play.raft.go`               | "Ten! Off we go!"                        | Raft: exactly ten                            | 1      | 15      |
-| `guide.play.raft.splash`           | "Too heavy! Splash!"                     | Raft: too heavy                              | 1      | 18      |
-| `guide.play.raft.silly`            | "Hee hee! Silly animals!"                | Raft: the silly scene                        | 1      | 23      |
-| `guide.play.raft.close`            | "What a party on the island!"            | Raft: after the third crossing               | 1      | 27      |
-| `guide.play.critters.open`         | "Join the letters! Hear them sing!"      | Critters: the start                          | 1      | 33      |
-| `guide.play.critters.funny.1`      | "Hee hee! What a funny song!"            | Critters: three that are not a word          | 1      | 27      |
-| `guide.play.critters.funny.2`      | "Ha ha! Silly sounds!"                   | Critters: the next one                       | 1      | 20      |
-| **Total**                          |                                          |                                              | **18** | **250** |
+| Id                                                 | Caption text (= Lily input unless noted)                   | When                                         | Lines   | Chars         |
+| -------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------- | ------- | ------------- |
+| `guide.play.open`                                  | "What shall we play?"                                      | The Play place, entered from the Hub         | 1       | 19            |
+| `guide.play.raft.open`                             | "The raft can carry ten!"                                  | Raft: the start                              | 1       | 23            |
+| `guide.play.raft.total.<t>`, t 1-9                 | "<N>!" (input "<N>,", § 4.3)                               | Raft: the total after a boarding or take-off | 9       | 45            |
+| `guide.play.raft.go`                               | "Ten! Off we go!"                                          | Raft: exactly ten                            | 1       | 15            |
+| `guide.play.raft.splash`                           | "Too heavy!" (was "Too heavy! Splash!", Thomas 2026-10-22) | Raft: too heavy                              | 1       | 10            |
+| `guide.play.raft.silly`                            | "Hee hee! Silly animals!"                                  | Raft: the silly scene                        | 1       | 23            |
+| `guide.play.raft.close`                            | "What a party on the island!"                              | Raft: after the third crossing               | 1       | 27            |
+| `guide.play.critters.open`                         | "Join three letters. If they make a word, I'll say it!"    | Critters: the start (Thomas 2026-10-22)      | 1       | 53            |
+| `guide.play.critters.funny.1`                      | "Is this a word? I don't know what it means!"              | Critters: three that are not a word          | 1       | 43            |
+| `guide.play.critters.funny.2`                      | "Hmm! What could that mean?"                               | Critters: the next one                       | 1       | 26            |
+| `guide.play.critters.funny.3`                      | "Hee hee! Is that a word?"                                 | Critters: the one after, then funny.1 again  | 1       | 24            |
+| `guide.play.critters.word.<w>`, kind `'play-word'` | "<W>." (input "<W>,", § 4.3), w in `CRITTER_SAID_WORDS`    | Critters: a said word (Thomas 2026-10-22)    | 156     | 626 (input)   |
+| **Total**                                          |                                                            |                                              | **175** | **308 + 626** |
 
 The raft's open line plays 300 ms after the game fades in, as the critters' does. The raft's total lines are its only content lines; the critters' content is the shipped blend clips (§ 3.4).
 
@@ -599,17 +604,17 @@ They sit in `playLines.ts` beside the spoken rows, so a language version swaps r
 
 ### 4.3 Render inputs and words
 
-- **The one-word rule** (`.claude/docs/audio-system.md:65`; a one-word clip goes to Lily as "Word," because "Sat." came back as "Saturday"): the nine total lines carry `input: "<N>,"` (`GuidanceLine.input`). No other line is one word.
+- **The one-word rule** (`.claude/docs/audio-system.md:65`; a one-word clip goes to Lily as "Word," because "Sat." came back as "Saturday"): the nine total lines carry `input: "<N>,"` (`GuidanceLine.input`), and so do the 156 said words ("Map,"; Thomas 2026-10-22). _six_'s input "Six," is the raft total's, so it reuses that render. **Except _sat_ and _wed_** (ear test #661, 2026-10-22): "Sat," still came back as "Saturday" and "Wed," as "Wednesday", so they go as "Satt," and "Wedd," (a doubled letter cannot be a day; captions unchanged), picked from the auditioned candidates by voiced length nearest a plain CVC.
 - **New spoken words** (checked by the same script against every shipped text): _shall_, _raft_, _carry_, _off_, _too_, _heavy_, _splash_, _hee_, _silly_, _animals_, _party_, _island_, _join_, _them_, _sing_, _funny_, _ha_. Common words, except _raft_ and _splash_, which the picture shows.
-- **No line** mentions speed, "fast", "again", "next", "more", "round", "win" or "not a word" (AC C8).
+- **No line of Emma's own** (kind `'play'`) mentions speed, "fast", "again", "next", "more", "round", "win" or "not a word" (AC C8); the said words (kind `'play-word'`) only say back the run she built, "Win." among them (Thomas 2026-10-22).
 - **Danish version:** each row is one language row. The raft's content is the number words; the critters' sounds are the language's own blend clips, so a Danish version needs its own clips and word list, not new screens.
 
 ### 4.4 Prediction for the ear test (Predict-Before-Soak)
 
-- "Hee hee! Silly animals!" and "Hee hee! What a funny song!": Lily will **read** "hee hee" as two words, /hiː hiː/, not laugh. If Thomas wants a real giggle, it is a sound effect, not a line (T3).
+- "Hee hee! Silly animals!" and "Hee hee! Is that a word?": Lily will **read** "hee hee" as two words, /hiː hiː/, not laugh. If Thomas wants a real giggle, it is a sound effect, not a line (T3).
 - The total lines, from "One," and "Seven,", come back as single, falling, stand-alone number words, each under 1 s, with no "and" and no rising tone.
 - "What shall we play?" rises on _play_. _Shall_ is the weak /ʃəl/.
-- "Too heavy! Splash!": _Splash_ is short and bright; the line stays under the 3.5 s flag (`LONG_SECONDS`, `scripts/renderGuidanceLinesLily.ts:39`), as every line here does.
+- "Too heavy!" (re-rendered 2026-10-22 without "Splash!"): the line stays under the 3.5 s flag (`LONG_SECONDS`, `scripts/renderGuidanceLinesLily.ts:39`), as every line here does.
 - "What a party on the island!": British, non-rhotic _party_ (/ˈpɑːti/), and _island_ with a silent s.
 
 **Bounded convergence:** I rendered and ear-tested nothing, and I played no blend clip for this spec. The 46 clips are reused as the lessons ship them; **not tested:** how a coda g (from "bag") or x (from "box") sounds when it sings alone at the start of a made-up run, and whether two sliced sounds in a row feel like one critter song or two separate taps. The device check V8 covers both.
@@ -669,12 +674,12 @@ The shipped effects came from Thomas's own sourcing (`design/screen-3-math.md:25
 2. **C2.** Over 1,000 seeds, `raftShore(rng)` returns 6 weights in 1-9 with at least 2 loads and at least one 2-animal load; the same seed gives the same shore. `raftRefill` keeps the waiting weights in order and returns a 6 with the same guarantee, over 1,000 seeds and random waiting sets of 2-5.
 3. **C3.** `raftLoads([7, 3, 6, 4, 8, 2])` is exactly the three pairs. `raftStuck([2, 5, 7, 9], 6)` is true (no set makes 4); `raftStuck([2, 5, 7, 9], 5)` is false (the 5); `raftStuck([1, 3, 5, 9], 6)` is false (1 + 3); `raftStuck(w, 0)` and `raftStuck(w, 10)` are false for any `w`.
 4. **C4.** `CRITTER_WORDS_BY_STEP` equals, step by step, the `word.p*.blend` words of `public/canon/word-song/level-1/<step>.json`, minus `CRITTER_LEFT_OUT`. Every word has a `BLEND_MARKS` key, "<g1> - <g2> - <g3> ... <word>" (checked in N15, where the generated file lives).
-5. **C5.** `critterWords` gives § 3.1's counts (8, 14, 22, 30, 38, 45) for the six progress shapes there. `critterSet` returns at most 16 letters, every vowel the words use, only words its letters spell, and at least 1 word per consonant, over 1,000 seeds; with 16 letters or fewer it returns them all.
+5. **C5.** `CRITTER_PICTURE_WORDS` is all 45 words, for every learner (Thomas 2026-10-22; `critterWords` and its step gate are gone); the step table still gives § 3.1's counts (8, 14, 22, 30, 38, 45). `critterSet` returns at most 16 letters, every vowel the words use, only words its letters spell, and at least 1 word per consonant, over 1,000 seeds; with 16 letters or fewer it returns them all.
 6. **C6.** `CRITTER_SOUND_SOURCE` follows § 3.4's rule and equals its table. Every source word is in the 45 and the index points at that letter.
 7. **C7.** `GUIDANCE_LINES` has 354 lines (336 today, `guidanceLines.test.ts:63`). The test's per-kind count map gains `play: 18` beside `game: 30` (`:61`), and its totals become 354 ids, 349 texts and 354 srcs (`:63-69`; 336 / 331 / 336 today; K3, Kevin 2026-10-20). The 336 shipped lines are unchanged in id, kind, text and src. The 18 `guide.play.*` lines have kind `'play'`, § 4.1's texts (250 characters in all) and `src = pathLineSrc(id)`; only the nine total lines carry an input, "<N>,". `public/voice-qa.html`'s `GUIDANCE_FILES` mirrors them (the existing drift guard, `guidanceLines.test.ts:424`). After the render commit, `GUIDANCE_LINES_AWAITING_RENDER` is `[]`.
-8. **C8.** No `guide.play.*` text contains "again", "next", "more", "round", "win", "fast" or "not a word".
+8. **C8.** No `guide.play.*` line of kind `'play'` (Emma's own lines) contains "again", "next", "more", "round", "win", "fast" or "not a word". The `'play-word'` lines (`CRITTER_SAID_WORDS`) are out of scope (Thomas 2026-10-22): they only say back the run she built (§ 3.3), so "Win." is not winning language.
 9. **C9.** `Route` has `'play-place'` and `'play-game'`, and not `'play'` (K5). Lands in PR 2 with N3 (§ 7).
-10. **C10.** `CRITTER_REAL_WORDS` is exactly § 3.1's 220 words (61 a, 29 e, 47 i, 39 o, 44 u), each three letters from the 22 critter letters with a vowel in the middle; it holds all 45 picture words and _gem_. `critterRun` gives `'picture'` for a run in the visit's words, `'real'` for one on the list only (with the blending-sounds letters: _map_, _cab_, _ham_), and `'funny'` otherwise (_tup_, _baf_).
+10. **C10.** `CRITTER_REAL_WORDS` is exactly § 3.1's 220 words (61 a, 29 e, 47 i, 39 o, 44 u), each three letters from the 22 critter letters with a vowel in the middle; it holds all 45 picture words and _gem_. `CRITTER_PICTURE_WORDS` is all 45 for every learner, with no step-gated word list (Thomas 2026-10-22). `CRITTER_NEVER_SAY` and `CRITTER_NOT_SAID` are Dave's 10 and 9 (§ 3.1), real words, no picture word, disjoint; `CRITTER_SAID_WORDS` is the other 156, sorted, each with a `critterWordLine` (kind `'play-word'`, "<W>." / "<W>,", rendered and bundled). `critterRun` gives `'picture'` for all 45, `'word'` for a said word (_map_, _cab_, _ham_, _sat_, _hop_), `'quiet'` for one on either list, and `'funny'` otherwise (_tup_, _baf_).
 
 ### 6.2 Native (jest, `mobile`)
 
@@ -688,7 +693,7 @@ The shipped effects came from Thomas's own sourcing (`design/screen-3-math.md:25
 17. **N7a** (D4). Raft, with a test shore set stuck (e.g. a 6 aboard, waiting 2, 5, 7, 9, 9: no set makes 4): after the first splash no newcomer comes; after the second, `RAFT_ANIMALS[10 − total]` walks into the empty spot nearest the outer edge, with no line, no sound and no Emma pose other than `idle`; boarding it departs. A board or take-off between the two splashes resets the count, so no newcomer comes. A splash on a raft that is not stuck never brings one. With one animal aboard and its spot taken by the newcomer, taking that animal off sends the newcomer out and puts the animal on its own spot.
 18. **N8.** Raft: exactly 10 → sparkle, `waving`, `raft.go`, boarding closed; arrival → the animals on the island, a scene not equal to the last one, `raft.silly`; crossings 1-2 → the raft back and the shore at 6; crossing 3 → `raft.close`, then the Play place with no line.
 19. **N9.** Critters: three seated that spell a picture word play that word's bundled clip (a `require()`d module, through the widened `TapClipPlayer.play`, K2) from 0, timed by that text's `BLEND_MARKS` entry; critter k's bounce starts at `segments[k][0] − 40` and the picture mounts at `segments[3][0] − 40`; no line plays; meadow taps are closed until the picture leaves.
-20. **N10.** Critters: a pair plays each letter's `letterWindow` of its `CRITTER_SOUND_SOURCE` segment, 300 ms apart, and nothing else. Three non-words: the same sounds, then `sfx-boing` and `funny.1`, then on the next `funny.2`; from the third on, no line. Three that make a real word that is not a picture word (_map_ for a learner on blending sounds, D5): the same sounds, then one bounce together, and no `sfx-boing`, no tumble, no line and no picture; it does not count toward the two giggle lines.
+20. **N10.** Critters: a pair plays each letter's `letterWindow` of its `CRITTER_SOUND_SOURCE` segment, 300 ms apart, and nothing else. Three non-words: the same sounds, then `sfx-boing` and `funny.1`, then on the next `funny.2`, then `funny.3`, then `funny.1` again: a line every time (Thomas 2026-10-22). Three that make a said word (_map_, Thomas 2026-10-22): the same sounds, then, at least 300 ms after the last, the word's `critterWordLine` clip and one bounce together, and no `sfx-boing`, no tumble, no other line, no sparkle and no picture. Three that make a quiet word (_sex_, _was_): the same sounds, then one bounce together, and no word, no `sfx-boing`, no tumble, no line and no picture. A picture word of any step (_dog_) pops for every learner.
 21. **N11.** Critters: a drag leaves a twin in the burrow; a drop on an occupied seat sends the occupant home; seats 1 and 3 with 2 empty do not sing; a tap on the log replays the run.
 22. **N12.** With Reduce Motion on (mocked), no wobble, bob, hop, scene, bounce or tumble starts; § 2.5's and § 3.7's fades run; the drag still follows the finger.
 23. **N13.** The raft's bands, cells, deck and seats equal § 2.2's sizes on the four viewports, and nothing overlaps another part; a viewport change mid-trip keeps what is aboard, the crossing number and the island.
@@ -702,9 +707,9 @@ The shipped effects came from Thomas's own sourcing (`design/screen-3-math.md:25
 27. **V1.** The Hub shows the Play button in the corner opposite the badge (in Emma's column on a phone in landscape). It reads as a button like the Map's Home, it is clearly not a world, and nothing announces it. A learner with no open game sees none.
 28. **V2.** Play → the Play place: Emma stays where she was, says "What shall we play?", and two clay tiles sit at the bottom. No Map, no path, no stop anywhere.
 29. **V3.** Raft: drag and tap both board; the flag and Emma say each total; the raft sits lower as it fills. Watch (D2, Dave): whether a learner new to adding to ten can read the numeral tags. Splash twice on a stuck raft: a newcomer walks on, unannounced (D4).
-30. **V4.** Raft: too heavy → a funny wobble and a splash, "Too heavy! Splash!", the animal paddles back and shakes. The others stay. No red, no X, no poof.
+30. **V4.** Raft: too heavy → a funny wobble and a splash, "Too heavy!" and the splash sound, the animal paddles back and shakes. The others stay. No red, no X, no poof.
 31. **V5.** Raft: exactly ten → Emma waves, "Ten! Off we go!", the raft rows to the island, a silly scene, then the raft comes back and newcomers walk on. After the third crossing, "What a party on the island!", then the Play place with no line and no "again".
-32. **V6.** Critters: seat f, a, n → each critter bounces as its sound plays, then the word and the fan picture. Seat a non-word → sounds, a boing, a tumble, a giggle line (twice at most). Seat a real word that has no picture for her (m, a, p) → sounds, then the three sit together: no boing, no tumble, no giggle.
+32. **V6.** Critters: seat f, a, n → each critter bounces as its sound plays, then the word and the fan picture. Seat a non-word → sounds, a boing, a tumble, and one of the three non-word lines, every time, in turn. Seat a real word that has no picture (m, a, p) → sounds, then Emma says "map" and the three sit together: no boing, no tumble, no giggle. Seat a never-say word (s, e, x) → sounds, then they sit, silent.
 33. **V7.** Back from a game mid-move returns to the Play place at once, silently; Home returns to the Hub. The Hub's stardust is unchanged.
 34. **V8.** Thomas's ear (T3): the 18 lines on the hosted voice-QA page from a preview URL or after a release (§ 7), and the critters' sliced sounds alone and in pairs on a device build that carries the bundled clips (§ 4.4's untested surface).
 35. **V9.** Reduce Motion: fades only, same lines. Rotate mid-crossing and mid-word: everything lays out again and keeps its place. Lock the device mid-line for 10 s: the line resumes and the game waits.
@@ -755,6 +760,8 @@ Two PRs, in order (Pattern A: the core names land first, so the UI builds on mer
 - **T4 (look). Emma and the raft.** Your pick said "Emma rows to an island". In this build Emma waves the raft off from her place (the shipped `waving` pose) while the raft's oar rows by itself (§ 2.3). A rowing Emma on the raft is new Emma art in her manhwa style, and I have not costed it. **Recommendation:** ship the wave now, and decide on a rowing Emma after Marian has played it.
 - **T5 (spend). Two sound effects, a splash and a boing** (§ 5.3), sourced as the shipped five were. **Cost unknown.** **Recommendation:** source both before Devon's PR; it can merge before they land, silent in their place.
 - **Watch (Dave, #620 § 4), not a decision.** The default profile opens the raft on day 1 (adding to ten is current from the start), which the rails allow ("open from the start"). Check, once learners have played, that lessons stay at least about 2/3 of app time. Nothing in this build measures it, because the games write nothing; it is a look at real use.
+
+- **Play-place feedback (Thomas 2026-10-22), applied.** (1) Raft: "Too heavy! Splash!" becomes "Too heavy!"; the splash is a separate sound effect (T5) (§ 2.3, § 4.1, V4). (2) Letter critters: all 45 picture words pop with their picture for every learner (the step gate and "Picture words = this list only" are gone); the other real words are said whole by Emma after the sounds (156 Lily clips, no picture), except Dave's never-say and not-said lists, which sing and sit as before (Decision 6, § 3.1, § 3.3, § 3.5, C10, N10, V6). (3) Three letters stay. (4) New critter lines: the open line becomes "Join three letters. If they make a word, I'll say it!" and a non-word gets one of three lines every time, in turn ("Is this a word? I don't know what it means!", "Hmm! What could that mean?", "Hee hee! Is that a word?"); the two old giggle lines and the two-giggle cap are retired (Decision 6, § 3.3, § 3.5, § 4.1, N10, V6); 146 Lily characters. Spend: one render, 776 Lily characters by the dry run (155 words + "Too heavy!" = 630, plus the 4 critter lines = 146; _six_ reuses the raft's "Six,"), approved by Thomas before the paid call. Core names (Kevin's PR): `CRITTER_PICTURE_WORDS`, `CRITTER_NEVER_SAY`, `CRITTER_NOT_SAID`, `CRITTER_SAID_WORDS`, `critterRun(run): CritterRun`, `critterWordLine(word)`.
 
 ### 8.2 For Dave (D-items, pedagogy): answered 2026-10-20
 

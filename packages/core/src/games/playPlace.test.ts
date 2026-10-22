@@ -4,15 +4,19 @@ import { describe, expect, it } from 'vitest'
 import { defaultProgress } from '../progress/defaults'
 import { LITERACY_TREE, MATH_TREE } from '../progress/mastery'
 import type { Progress, SkillNode, WordSongNode } from '../progress/types'
+import * as PlayPlace from './playPlace'
 import {
   CRITTER_CAP,
   CRITTER_LEFT_OUT,
+  CRITTER_NEVER_SAY,
+  CRITTER_NOT_SAID,
+  CRITTER_PICTURE_WORDS,
   CRITTER_REAL_WORDS,
+  CRITTER_SAID_WORDS,
   CRITTER_SOUND_SOURCE,
   CRITTER_WORDS_BY_STEP,
   critterRun,
   critterSet,
-  critterWords,
   openPlayGames,
   PLAY_GAMES,
   RAFT_ANIMALS,
@@ -262,6 +266,16 @@ const ALL_45 = [
   ...new Set(Object.values(CRITTER_WORDS_BY_STEP).flatMap((ws) => ws!)),
 ].sort()
 
+/** The words of the CVC steps up to and including `last`, sorted. */
+const wordsThrough = (last: WordSongNode) =>
+  [
+    ...new Set(
+      CVC_STEPS.slice(0, CVC_STEPS.indexOf(last) + 1).flatMap(
+        (s) => CRITTER_WORDS_BY_STEP[s]!,
+      ),
+    ),
+  ].sort()
+
 describe('the critters (§ 3.1)', () => {
   it('C4: each step’s words are its canon blend words, minus gem', () => {
     expect(CRITTER_LEFT_OUT).toEqual(['gem'])
@@ -315,36 +329,33 @@ describe('the critters (§ 3.1)', () => {
     })
   })
 
-  it('C5: critterWords gives 8, 14, 22, 30, 38 and 45 words, sorted', () => {
-    const shapes: [Progress | null, number, number][] = [
-      [withLevels(currentAt('blending-cv')), 8, 11],
-      [withLevels(currentAt('cvc-words')), 14, 13],
-      [withLevels(currentAt('cvc-words-short-o')), 22, 16],
-      [withLevels(currentAt('cvc-words-short-u')), 30, 19],
-      [withLevels(currentAt('cvc-words-short-i')), 38, 21],
-      [withLevels(currentAt('cvc-words-short-e')), 45, 22],
-      [withLevels(currentAt('digraphs-sh')), 45, 22],
-      [withLevels(allMastered(LITERACY_TREE)), 45, 22],
+  it('C5: CRITTER_PICTURE_WORDS is all 45 words, sorted, over the 22 letters, with no step gate (Thomas 2026-10-22)', () => {
+    expect(CRITTER_PICTURE_WORDS).toEqual(ALL_45)
+    expect(CRITTER_PICTURE_WORDS).toHaveLength(45)
+    expect(new Set(CRITTER_PICTURE_WORDS.join('')).size).toBe(22)
+    // The step gate is gone: no learner-dependent word list is exported.
+    expect(Object.keys(PlayPlace)).not.toContain('critterWords')
+    // § 3.1's per-step shapes still hold for the step table itself.
+    const shapes: [WordSongNode, number, number][] = [
+      ['blending-cv', 8, 11],
+      ['cvc-words', 14, 13],
+      ['cvc-words-short-o', 22, 16],
+      ['cvc-words-short-u', 30, 19],
+      ['cvc-words-short-i', 38, 21],
+      ['cvc-words-short-e', 45, 22],
     ]
-    for (const [p, words, letters] of shapes) {
-      const ws = critterWords(p)
-      expect(ws).toHaveLength(words)
-      expect(ws).toEqual([...ws].sort())
-      expect(new Set(ws.join('')).size).toBe(letters)
+    for (const [step, words, letters] of shapes) {
+      expect(wordsThrough(step)).toHaveLength(words)
+      expect(new Set(wordsThrough(step).join('')).size).toBe(letters)
     }
-    expect(critterWords(withLevels(currentAt('blending-cv'))).join(' ')).toBe(
-      'bag cat fan hat man pan tag van',
-    )
-    expect(critterWords(withLevels(currentAt('letter-sounds')))).toEqual([])
-    expect(critterWords(null)).toEqual([])
   })
 
   it('C5: critterSet keeps at most 16 letters, every vowel, only words they spell, a word per consonant', () => {
     expect(CRITTER_CAP).toBe(16)
     for (const words of [
-      critterWords(withLevels(currentAt('cvc-words-short-u'))),
-      critterWords(withLevels(currentAt('cvc-words-short-i'))),
-      ALL_45,
+      wordsThrough('cvc-words-short-u'),
+      wordsThrough('cvc-words-short-i'),
+      CRITTER_PICTURE_WORDS,
     ]) {
       const vowels = [...new Set(words.join(''))].filter((l) => VOWELS.has(l))
       for (let seed = 1; seed <= 1000; seed++) {
@@ -364,7 +375,7 @@ describe('the critters (§ 3.1)', () => {
   })
 
   it('C5: with 16 letters or fewer, critterSet keeps them all, vowels first, then alphabetical', () => {
-    const words = critterWords(withLevels(currentAt('cvc-words-short-o')))
+    const words = wordsThrough('cvc-words-short-o')
     const set = critterSet(words, seeded(5))
     expect(set.letters).toEqual([
       'a',
@@ -472,18 +483,67 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     expect(CRITTER_REAL_WORDS.has('gem')).toBe(true)
   })
 
-  it('C10: critterRun: picture in the visit’s words, real on the list only, funny otherwise', () => {
-    const words = critterSet(
-      critterWords(withLevels(currentAt('blending-cv'))),
-      seeded(1),
-    ).words
-    expect(critterRun('fan', words)).toBe('picture')
-    expect(critterRun('van', words)).toBe('picture')
-    for (const w of ['map', 'cab', 'ham'])
-      expect(critterRun(w, words)).toBe('real')
-    for (const w of ['tup', 'baf']) expect(critterRun(w, words)).toBe('funny')
-    // A picture word of a step not reached only sits.
-    expect(critterRun('dog', words)).toBe('real')
-    expect(critterRun('dog', [...words, 'dog'])).toBe('picture')
+  it('C10: CRITTER_NEVER_SAY and CRITTER_NOT_SAID are Dave’s lists, real words, no picture word (Dave 2026-10-22)', () => {
+    expect([...CRITTER_NEVER_SAY].sort()).toEqual([
+      'bum',
+      'cum',
+      'dam',
+      'fag',
+      'git',
+      'god',
+      'gun',
+      'hag',
+      'sex',
+      'tit',
+    ])
+    expect([...CRITTER_NOT_SAID].sort()).toEqual([
+      'gem',
+      'gin',
+      'has',
+      'his',
+      'put',
+      'rum',
+      'son',
+      'was',
+      'won',
+    ])
+    for (const w of [...CRITTER_NEVER_SAY, ...CRITTER_NOT_SAID]) {
+      expect(CRITTER_REAL_WORDS.has(w)).toBe(true)
+      expect(ALL_45).not.toContain(w)
+    }
+    expect(
+      [...CRITTER_NEVER_SAY].filter((w) => CRITTER_NOT_SAID.has(w)),
+    ).toEqual([])
+  })
+
+  it('C10: CRITTER_SAID_WORDS is every other real word that is not a picture word: 156, sorted', () => {
+    expect(CRITTER_SAID_WORDS).toHaveLength(156)
+    expect(CRITTER_SAID_WORDS).toEqual([...CRITTER_SAID_WORDS].sort())
+    expect(new Set(CRITTER_SAID_WORDS).size).toBe(156)
+    expect([...CRITTER_SAID_WORDS].sort()).toEqual(
+      [...CRITTER_REAL_WORDS]
+        .filter(
+          (w) =>
+            !ALL_45.includes(w) &&
+            !CRITTER_NEVER_SAY.has(w) &&
+            !CRITTER_NOT_SAID.has(w),
+        )
+        .sort(),
+    )
+    // 220 = 45 pictures + 10 never said + 9 not said + 156 said.
+    expect(45 + CRITTER_NEVER_SAY.size + CRITTER_NOT_SAID.size + 156).toBe(220)
+    for (const w of ['map', 'cab', 'ham', 'sat', 'hop', 'six', 'win'])
+      expect(CRITTER_SAID_WORDS).toContain(w)
+  })
+
+  it('C10: critterRun: picture for all 45 (no step gate), word, quiet, funny', () => {
+    for (const w of ALL_45) expect(critterRun(w)).toBe('picture')
+    for (const w of ['map', 'cab', 'ham', 'sat', 'hop'])
+      expect(critterRun(w)).toBe('word')
+    for (const w of CRITTER_SAID_WORDS) expect(critterRun(w)).toBe('word')
+    for (const w of [...CRITTER_NEVER_SAY, ...CRITTER_NOT_SAID])
+      expect(critterRun(w)).toBe('quiet')
+    for (const w of ['tup', 'baf', 'gub', 'vop'])
+      expect(critterRun(w)).toBe('funny')
   })
 })

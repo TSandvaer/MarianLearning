@@ -3,13 +3,15 @@
  * for a learner on blending sounds (11 letters, 8 picture words), with a
  * fake tap-sound player whose sounds end after their window.
  */
+import { critterWordLine } from '@marian/core/emmasPath/guidanceLines'
 import {
   CRITTER_SOUND_SOURCE,
   CRITTER_WORDS_BY_STEP,
+  critterRun,
 } from '@marian/core/games/playPlace'
-import { defaultProgress, type Progress } from '@marian/core/progress'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { letterWindow, MARK_LEAD_MS } from '../../audio/blendMarks'
+import * as bundledAudio from '../../audio/bundledAudio'
 import { audioForWebPath } from '../../audio/bundledAudio'
 import { mathLayout } from '../../layout/mathLayout'
 import {
@@ -37,14 +39,8 @@ import {
 } from './LetterCritters'
 import { centre, critterScene, playArea } from './playGeometry'
 
-/** Letter sounds mastered: blending sounds is the current step. */
-const BLENDING: Progress = {
-  ...defaultProgress(),
-  skillLevels: {
-    ...defaultProgress().skillLevels,
-    'letter-sounds': 'mastered',
-  },
-}
+/** Blending sounds' 8 words (11 letters), through the words seam. */
+const BLENDING_WORDS = CRITTER_WORDS_BY_STEP['blending-cv']!
 
 const WORDS = [...new Set(Object.values(CRITTER_WORDS_BY_STEP).flat())]
 const clipOf = (word: string) => audioForWebPath(blendClipPath(word)) as number
@@ -52,6 +48,16 @@ const wordOfClip = new Map(WORDS.map((w) => [clipOf(w), w]))
 const WHOLE_TAIL = 200
 const wholeMs = (uri: string | number) =>
   blendSegments(wordOfClip.get(uri as number)!)![3]![1] + WHOLE_TAIL
+/** Time enough for any whole clip (the fake times them all alike) to end. */
+const WORD_CLIP_MS = Math.max(...WORDS.map((w) => wholeMs(clipOf(w)))) + 10
+/** Whole-clip plays (from 0 to the end): a picture word or a said word. */
+const whole = (calls: { from: number; to: number | null }[]) =>
+  calls.filter((c) => c.from === 0 && c.to === null)
+/** The said-word clips the screen looked up in the bundle. */
+const wordClipsAsked = (spy: jest.SpyInstance) =>
+  spy.mock.calls
+    .map(([path]) => String(path))
+    .filter((path) => path.includes('critters-word'))
 
 /** A letter's own sound, as the fake player sees it. */
 function own(letter: string) {
@@ -69,7 +75,7 @@ const seatCentre = (i: number) => {
 async function mount() {
   const s = fakeSounds(wholeMs)
   const g = await mountGame('critters', {
-    progress: BLENDING,
+    words: BLENDING_WORDS,
     sounds: s.sounds,
   })
   // The open line plays and ends.
@@ -82,7 +88,10 @@ async function seat(...letters: string[]) {
 }
 
 beforeEach(() => jest.useFakeTimers())
-afterEach(() => jest.useRealTimers())
+afterEach(() => {
+  jest.useRealTimers()
+  jest.restoreAllMocks()
+})
 
 it('§ 3.1: the visit’s letters, vowels first, for a learner on blending sounds', async () => {
   const g = await mount()
@@ -92,6 +101,17 @@ it('§ 3.1: the visit’s letters, vowels first, for a learner on blending sound
     .map((el) => String(el.props.testID).slice(-1))
   expect(letters).toEqual('abcfghmnptv'.split(''))
   expect(byId('critter-f').props.accessibilityLabel).toBe('Letter f')
+})
+
+it('§ 3.1 (Thomas 2026-10-22): with no words seam, a visit draws on all 45 picture words, for any learner', async () => {
+  const s = fakeSounds(wholeMs)
+  await mountGame('critters', { sounds: s.sounds })
+  const letters = screen
+    .queryAllByTestId(/^critter-[a-z]$/)
+    .map((el) => String(el.props.testID).slice(-1))
+  // 22 letters do not fit: the cap, every vowel first.
+  expect(letters).toHaveLength(16)
+  expect(letters.slice(0, 5)).toEqual(['a', 'e', 'i', 'o', 'u'])
 })
 
 describe('N9: a picture word', () => {
@@ -154,10 +174,11 @@ describe('N10: songs that are not picture words', () => {
     void g
   }
 
-  it('non-words boing and giggle twice at most, alternating; a real word sits quietly and does not count', async () => {
+  it('every non-word boings and gets a line, the three in turn; a quiet word sits quietly and does not count', async () => {
     const g = await mount()
-    await sing3(g, 'map')
-    expect(g.calls.slice(-3)).toEqual([own('m'), own('a'), own('p')])
+    expect(critterRun('hag')).toBe('quiet')
+    await sing3(g, 'hag')
+    expect(g.calls.slice(-3)).toEqual([own('h'), own('a'), own('g')])
     expect(g.sfx.boing.play).not.toHaveBeenCalled()
     expect(has('critter-tumble')).toBe(false)
     expect(has('critter-picture')).toBe(false)
@@ -175,7 +196,70 @@ describe('N10: songs that are not picture words', () => {
 
     await sing3(g, 'vtp')
     expect(g.sfx.boing.play).toHaveBeenCalledTimes(3)
-    expect(g.lines.filter((l) => l.includes('funny'))).toHaveLength(2)
+    expect(g.lines.at(-1)).toBe('guide.play.critters.funny.3')
+
+    await sing3(g, 'bgf')
+    expect(g.sfx.boing.play).toHaveBeenCalledTimes(4)
+    expect(g.lines.at(-1)).toBe('guide.play.critters.funny.1')
+    expect(g.lines.filter((l) => l.includes('funny'))).toHaveLength(4)
+  })
+
+  it('a said word (Thomas 2026-10-22): the sounds, a 300 ms gap, then its Lily clip once, the three bounce and sit; no boing, line, sparkle or picture', async () => {
+    const mapClip = audioForWebPath(critterWordLine('map')!.src)
+    const asked = jest.spyOn(bundledAudio, 'audioForWebPath')
+    const g = await mount()
+    expect(critterRun('map')).toBe('word')
+    await seat('m', 'a', 'p')
+    await advance(SING_AFTER_MS)
+    expect(g.calls).toEqual([own('m')])
+    await advance(ownMs('m') + SOUND_GAP_MS)
+    await advance(ownMs('a') + SOUND_GAP_MS)
+    expect(g.calls).toEqual([own('m'), own('a'), own('p')])
+    // At least the blend clips' 300 ms gap after the last sound.
+    await advance(ownMs('p') + SOUND_GAP_MS - 10)
+    expect(g.calls).toHaveLength(3)
+    await advance(10)
+    expect(g.calls.at(-1)).toEqual({
+      uri: mapClip,
+      from: 0,
+      to: null,
+    })
+    expect(wordClipsAsked(asked)).toEqual([
+      '/assets/audio/path/guide-play-critters-word-map.mp3',
+    ])
+    expect(g.poses.at(-1)).toBe('listening')
+    await advance(WORD_CLIP_MS)
+    expect(whole(g.calls)).toHaveLength(1)
+    expect(g.calls).toHaveLength(4)
+    expect(g.poses.at(-1)).toBe('idle')
+    expect(g.sfx.boing.play).not.toHaveBeenCalled()
+    expect(g.sfx.sparkle.play).not.toHaveBeenCalled()
+    expect(has('critter-tumble')).toBe(false)
+    expect(has('critter-picture')).toBe(false)
+    expect(g.lines).toEqual(['guide.play.critters.open'])
+  })
+
+  it('a never-say word (sex): the sounds only, no word clip, no boing, line or picture', async () => {
+    const asked = jest.spyOn(bundledAudio, 'audioForWebPath')
+    const s = fakeSounds(wholeMs)
+    const g = await mountGame('critters', {
+      words: ['six', 'bed', 'box'],
+      sounds: s.sounds,
+    })
+    await advance(CRITTERS_OPEN_DELAY_MS + LINE_MS)
+    expect(critterRun('sex')).toBe('quiet')
+    await seat('s', 'e', 'x')
+    await advance(SING_AFTER_MS)
+    for (const l of 'sex') await advance(ownMs(l) + SOUND_GAP_MS)
+    await advance(WORD_CLIP_MS)
+    expect(s.calls).toEqual([own('s'), own('e'), own('x')])
+    expect(whole(s.calls)).toEqual([])
+    expect(wordClipsAsked(asked)).toEqual([])
+    expect(g.sfx.boing.play).not.toHaveBeenCalled()
+    expect(g.sfx.sparkle.play).not.toHaveBeenCalled()
+    expect(has('critter-tumble')).toBe(false)
+    expect(has('critter-picture')).toBe(false)
+    expect(g.lines).toEqual(['guide.play.critters.open'])
   })
 })
 

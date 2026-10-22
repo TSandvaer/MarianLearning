@@ -18,6 +18,7 @@
  * already uses, both loadable by the node-typed render scripts).
  */
 import type { MapStop } from '../map/mapModel'
+import { CRITTER_SAID_WORDS } from '../games/playPlace'
 import type { Land } from '../progress/lands'
 import type { SkillNode } from '../progress/types'
 import {
@@ -67,6 +68,7 @@ export type GuidanceLineKind =
   | 'play'
   | 'map-peek-ask-locked'
   | 'map-peek-ask'
+  | 'play-word'
 
 export interface GuidanceLine {
   /** Dotted id, e.g. `guide.hub.suggest.math`. */
@@ -298,12 +300,20 @@ function buildLines(): GuidanceLine[] {
     ),
   )
   add(RAFT_GO_ID, 'play', 'Ten! Off we go!')
-  add(RAFT_SPLASH_ID, 'play', 'Too heavy! Splash!')
+  // "Splash!" is the splash sound's now (Thomas 2026-10-22).
+  add(RAFT_SPLASH_ID, 'play', 'Too heavy!')
   add(RAFT_SILLY_ID, 'play', 'Hee hee! Silly animals!')
   add(RAFT_CLOSE_ID, 'play', 'What a party on the island!')
-  add(CRITTERS_OPEN_ID, 'play', 'Join the letters! Hear them sing!')
-  add(crittersFunnyId(1), 'play', 'Hee hee! What a funny song!')
-  add(crittersFunnyId(2), 'play', 'Ha ha! Silly sounds!')
+  // The critters' open line and their three non-word lines (Thomas
+  // 2026-10-22): no "sing", and a non-word run asks whether it is a word.
+  add(
+    CRITTERS_OPEN_ID,
+    'play',
+    "Join three letters. If they make a word, I'll say it!",
+  )
+  add(crittersFunnyId(1), 'play', "Is this a word? I don't know what it means!")
+  add(crittersFunnyId(2), 'play', 'Hmm! What could that mean?')
+  add(crittersFunnyId(3), 'play', 'Hee hee! Is that a word?')
   // The locked-stop peek prompt (design/native/locked-stop-peek-prompt.md
   // § 3; T1, the texts, approved for rendering by Thomas 2026-10-20 and
   // judged at the ear test). World-free: they play after the stop's own
@@ -314,6 +324,18 @@ function buildLines(): GuidanceLine[] {
     'This one is locked. Want to try it?',
   )
   add(PEEK_ASK_ID, 'map-peek-ask', 'Want to try it?')
+  // The letter critters' real words, said whole after the sounds (Thomas
+  // 2026-10-22; play-place spec § 3.3): one clip per `CRITTER_SAID_WORDS`
+  // word, its caption "Map." and its input "Map," (the one-word rule, as
+  // the story words since wave 4).
+  for (const word of CRITTER_SAID_WORDS)
+    add(
+      critterWordId(word),
+      'play-word',
+      `${capitalize(word)}.`,
+      null,
+      CRITTER_WORD_INPUTS[word] ?? `${capitalize(word)},`,
+    )
   return lines
 }
 
@@ -399,9 +421,19 @@ const RAFT_SPLASH_ID = 'guide.play.raft.splash'
 const RAFT_SILLY_ID = 'guide.play.raft.silly'
 const RAFT_CLOSE_ID = 'guide.play.raft.close'
 const CRITTERS_OPEN_ID = 'guide.play.critters.open'
-const crittersFunnyId = (n: 1 | 2) => `guide.play.critters.funny.${n}`
+const crittersFunnyId = (n: 1 | 2 | 3) => `guide.play.critters.funny.${n}`
 const PEEK_ASK_LOCKED_ID = 'guide.map.peek-ask.locked'
 const PEEK_ASK_ID = 'guide.map.peek-ask'
+const critterWordId = (word: string) => `guide.play.critters.word.${word}`
+/**
+ * Critter words whose "Word," input Lily reads as a day: "Sat," came back
+ * as "Saturday" and "Wed," as "Wednesday" (ear test #661, 2026-10-22). A
+ * doubled final letter cannot be a day's abbreviation; the caption stays.
+ */
+const CRITTER_WORD_INPUTS: Readonly<Record<string, string>> = {
+  sat: 'Satt,',
+  wed: 'Wedd,',
+}
 
 /** Every guidance line: Hub, then session end, then in session. */
 export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
@@ -437,6 +469,14 @@ export function storyReadLine(): GuidanceLine {
 /** A story word's own clip ("Fox."), or undefined for a word without one. */
 export function storyWordLine(word: string): GuidanceLine | undefined {
   return BY_ID.get(storyWordId(word))
+}
+
+/**
+ * A letter-critter word's whole-word clip ("Map."), or undefined for a word
+ * Emma does not say (not on `CRITTER_SAID_WORDS`).
+ */
+export function critterWordLine(word: string): GuidanceLine | undefined {
+  return BY_ID.get(critterWordId(word))
 }
 
 /** "Who is playing?" (learner profiles § 1.3): the picker's line. */

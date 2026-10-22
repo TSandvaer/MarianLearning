@@ -3,11 +3,15 @@
  * round creatures in burrows on a meadow; she drags 2-3 of them onto a
  * log's seats and they sing their sounds. Three that spell one of her
  * picture words play that word's tuned blend clip, each critter bouncing on
- * its sound, and the picture pops. Three that make another real word sing
- * and sit together, quietly (D5). Three that make no word sing, boing and
- * tumble, and Emma giggles (two giggle lines a visit at most). A real word
- * is never a mistake, and no run is ever spoken as a word unless it is a
- * picture word.
+ * its sound, and the picture pops. Three that make another real word sing,
+ * then, 300 ms after the last sound, Emma says the word (its Lily clip,
+ * `critterWordLine`) and they bounce and sit together, with no praise,
+ * sparkle or picture (Thomas 2026-10-22; Dave's safeguards). A word on
+ * Dave's never-say or not-said list sings and sits, quietly (D5). Three
+ * that make no word sing, boing and tumble, and Emma says one of three
+ * non-word lines, in turn, every time (Thomas 2026-10-22). A real word is
+ * never a mistake, and no run is spoken as a word unless it is a picture
+ * word or a said word.
  *
  * Every sound is a bundled Word Song blend clip (`/native/blend/<word>.mp3`,
  * marks straight from `BLEND_MARKS`, K2): a word plays its whole clip; a
@@ -19,13 +23,13 @@
  * letter lights, the picture fades, a non-word dims. Dragging still
  * follows the finger.
  */
+import { critterWordLine } from '@marian/core/emmasPath/guidanceLines'
 import {
+  CRITTER_PICTURE_WORDS,
   CRITTER_SOUND_SOURCE,
   critterRun,
   critterSet,
-  critterWords,
 } from '@marian/core/games/playPlace'
-import { loadProgress, type Progress } from '@marian/core/progress'
 import { Image } from 'expo-image'
 import {
   useEffect,
@@ -75,8 +79,6 @@ export const SOUND_GAP_MS = 300
 /** A picture word: clip end → the picture floats away (500 ms). */
 export const PICTURE_HOLD_MS = 2400
 export const PICTURE_LEAVE_MS = 500
-/** At most two giggle lines a visit. */
-export const MAX_GIGGLES = 2
 
 const HONEY = '#f2c27a'
 const HONEY_LEDGE = '#b27b37'
@@ -86,17 +88,12 @@ const VOWELS = new Set(['a', 'e', 'i', 'o', 'u'])
 
 export interface LetterCrittersProps {
   kit: GameKit
-  /** Test seams: the tap-sound player, and the learner's progress. */
+  /**
+   * Test seams: the tap-sound player, and the picture words the visit's
+   * letters are drawn from (default all 45, `CRITTER_PICTURE_WORDS`).
+   */
   sounds?: TapClipPlayer
-  progress?: Progress | null
-}
-
-function readProgress(): Progress | null {
-  try {
-    return loadProgress()
-  } catch {
-    return null
-  }
+  words?: readonly string[]
 }
 
 /** A letter's own sound: its source clip and tap window (§ 3.4). */
@@ -109,16 +106,15 @@ function letterSound(letter: string) {
   return { clip, window: letterWindow(segments[source.index]!) }
 }
 
-type Outcome = 'pair' | 'real' | 'funny'
+type Outcome = 'pair' | 'real' | 'word' | 'funny'
 
-export function LetterCritters({ kit, sounds, progress }: LetterCrittersProps) {
+export function LetterCritters({
+  kit,
+  sounds,
+  words = CRITTER_PICTURE_WORDS,
+}: LetterCrittersProps) {
   const { reducedMotion, sfx } = kit
-  const [visit] = useState(() =>
-    critterSet(
-      critterWords(progress === undefined ? readProgress() : progress),
-      kit.rng,
-    ),
-  )
+  const [visit] = useState(() => critterSet(words, kit.rng))
   const [player] = useState<TapClipPlayer>(
     () => sounds ?? createTapClipPlayer(audioEngine),
   )
@@ -224,9 +220,16 @@ export function LetterCritters({ kit, sounds, progress }: LetterCrittersProps) {
     if (run === null) return
     const letters = run.map((i) => current[i]!)
     const word = letters.join('')
-    const kind = run.length === 3 ? critterRun(word, visit.words) : null
-    if (kind === 'picture') pictureWord(word, run)
-    else song(run, letters, kind === null ? 'pair' : kind)
+    const kind = run.length === 3 ? critterRun(word) : null
+    if (kind === 'picture') {
+      pictureWord(word, run)
+      return
+    }
+    song(
+      run,
+      letters,
+      kind === null ? 'pair' : kind === 'quiet' ? 'real' : kind,
+    )
   }
 
   const pictureWord = (word: string, run: number[]) => {
@@ -281,7 +284,7 @@ export function LetterCritters({ kit, sounds, progress }: LetterCrittersProps) {
     const next = (k: number) => {
       if (songRef.current !== token) return
       if (k === letters.length) {
-        after(run, outcome)
+        after(run, letters.join(''), outcome)
         return
       }
       bounceSeat(run[k]!)
@@ -293,13 +296,28 @@ export function LetterCritters({ kit, sounds, progress }: LetterCrittersProps) {
     next(0)
   }
 
-  const after = (run: number[], outcome: Outcome) => {
+  /** Called `SOUND_GAP_MS` after the last sound ends. */
+  const after = (run: number[], word: string, outcome: Outcome) => {
     if (outcome === 'pair') {
       setLean(true)
       kit.setPose('idle')
       return
     }
-    if (outcome === 'real') {
+    const line = outcome === 'word' ? critterWordLine(word) : undefined
+    const clip = line === undefined ? null : audioForWebPath(line.src)
+    if (typeof clip === 'number') {
+      // A said word (play-place § 3.3, Thomas 2026-10-22): Emma says it,
+      // the three bounce together as it starts, then sit. No praise line,
+      // no sparkle, no picture (Dave's safeguard 2).
+      const token = songRef.current
+      run.forEach(bounceSeat)
+      setLean(true)
+      player.play(clip, 0, null, () => {
+        if (songRef.current === token) kit.setPose('idle')
+      })
+      return
+    }
+    if (outcome === 'real' || outcome === 'word') {
       run.forEach(bounceSeat)
       setLean(true)
       kit.setPose('idle')
@@ -307,14 +325,11 @@ export function LetterCritters({ kit, sounds, progress }: LetterCrittersProps) {
     }
     sfx.boing.play()
     setTumble((t) => t + 1)
-    if (gigglesRef.current >= MAX_GIGGLES) {
-      kit.setPose('idle')
-      return
-    }
-    gigglesRef.current += 1
+    // Every non-word gets a line, the three in turn (Thomas 2026-10-22).
+    gigglesRef.current = (gigglesRef.current % 3) + 1
     kit.setPose('cheering')
     void kit
-      .speak(crittersFunnyLine(gigglesRef.current as 1 | 2))
+      .speak(crittersFunnyLine(gigglesRef.current as 1 | 2 | 3))
       .then((ok) => {
         if (ok) kit.setPose('idle')
       })

@@ -3,7 +3,7 @@
  * wobble, rowing, scene or tumble starts; the dim fades run; lines and
  * sounds are unchanged; a drag still follows the finger.
  */
-import { defaultProgress, type Progress } from '@marian/core/progress'
+import { CRITTER_WORDS_BY_STEP } from '@marian/core/games/playPlace'
 import { screen } from '@testing-library/react-native'
 import * as Reanimated from 'react-native-reanimated'
 import { mathLayout } from '../../layout/mathLayout'
@@ -22,13 +22,7 @@ import { CRITTERS_OPEN_DELAY_MS, SING_AFTER_MS } from './LetterCritters'
 import { centre, playArea, raftScene } from './playGeometry'
 import { REDUCED_SPLASH_END_MS, ROW_AT_MS, SCENE_AT_MS } from './RaftCrossing'
 
-const BLENDING: Progress = {
-  ...defaultProgress(),
-  skillLevels: {
-    ...defaultProgress().skillLevels,
-    'letter-sounds': 'mastered',
-  },
-}
+const BLENDING_WORDS = CRITTER_WORDS_BY_STEP['blending-cv']!
 
 beforeEach(() => {
   jest.useFakeTimers()
@@ -64,7 +58,7 @@ it('raft: a splash dims instead of wobbling, with the same sound and line; a cro
 it('critters: a non-word dims instead of tumbling; the boing and the line play', async () => {
   const s = fakeSounds(() => 2000)
   const g = await mountGame('critters', {
-    progress: BLENDING,
+    words: BLENDING_WORDS,
     sounds: s.sounds,
   })
   await advance(CRITTERS_OPEN_DELAY_MS + 20)
