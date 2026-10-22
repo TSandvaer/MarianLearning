@@ -33,13 +33,15 @@ export interface MapTapPoint {
 
 /**
  * The path a stop tap took: a mastered stop's replay, the current stop's
- * Hub-card session, a later stop's peek, the stop's name only, or nothing
+ * Hub-card session, a later stop's peek prompt (`peek-ask`; its button
+ * logs `peek`, locked-stop-peek-prompt § 7), the stop's name only, or nothing
  * (`ignored(<why>)`: the 400 ms guard, the launch lock, the unlock beat, a
  * peek request out).
  */
 export type MapTapPath =
   | 'replay'
   | 'hub-session'
+  | 'peek-ask'
   | 'peek'
   | 'name-only'
   | 'ignored(arming)'

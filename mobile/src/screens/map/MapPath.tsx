@@ -17,7 +17,7 @@ import {
   type StopLayout,
 } from '@marian/core/map/mapLayout'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
-import { ScrollView, StyleSheet, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import {
   focusBox,
   mapPathScale,
@@ -49,6 +49,7 @@ export function MapPath({
     launches,
     tapStop,
     tapGate,
+    tapPane,
     debugLog,
   } = state
   const { model } = view
@@ -78,6 +79,14 @@ export function MapPath({
       style={[styles.layer, { width: pane.width, height: k.contentH }]}
       testID={k.scrolls ? 'map-path-scrolls' : 'map-path-fits'}
     >
+      {/* Peek prompt § 5: a tap on the map outside every stop and gate
+          closes an open prompt; stops and gates sit above it. */}
+      <Pressable
+        testID="map-pane-tap"
+        accessible={false}
+        onPress={tapPane}
+        style={styles.fill}
+      />
       {geo.bands.map((band, i) => (
         <MapBand
           key={band.land}
@@ -245,4 +254,5 @@ function ScrollablePath({
 const styles = StyleSheet.create({
   abs: { position: 'absolute' },
   layer: { position: 'relative' },
+  fill: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
 })

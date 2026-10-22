@@ -9,6 +9,7 @@ import {
   GUIDANCE_LINES_AWAITING_RENDER,
   guidanceLine,
   peekLines,
+  peekAskLine,
   pickerWhoLine,
   replayLines,
   sessionIntroLine,
@@ -60,14 +61,17 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'picker-who': 1,
       // The Play place and its two games (play-place spec § 4.1).
       play: 18,
+      // The locked-stop peek prompt (locked-stop-peek-prompt § 3).
+      'map-peek-ask-locked': 1,
+      'map-peek-ask': 1,
     })
-    expect(GUIDANCE_LINES).toHaveLength(324)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(324)
+    expect(GUIDANCE_LINES).toHaveLength(326)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(326)
     // Bee, car, snail and moon words' leads are duck words' text (content
-    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories': 324 ids,
-    // 319 texts, 324 files.
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(319)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(324)
+    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories': 326 ids,
+    // 321 texts, 326 files.
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(321)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(326)
   })
 
   it('AC8: both replay sets, one line per STAGE_SPOKEN_NAMES step, with the exact texts (map-tap-to-play § 6, T1 approved 2026-10-17)', () => {
@@ -392,7 +396,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(324)
+    ).toHaveLength(326)
   })
 
   it('repeats no Emma’s Path line', () => {
@@ -458,7 +462,10 @@ describe('the flower bed moved into adding to ten (flower-bed-into-add-to-10 § 
     expect(GUIDANCE_LINES.filter((l) => realBlending.has(l.id))).toHaveLength(6)
     const shipped = JSON.stringify(
       GUIDANCE_LINES.filter(
-        (l) => !realBlending.has(l.id) && l.kind !== 'play',
+        (l) =>
+          !realBlending.has(l.id) &&
+          l.kind !== 'play' &&
+          !l.kind.startsWith('map-peek-ask'),
       ).map(({ id, kind, world, text, input, src }) => [
         id,
         kind,
@@ -551,7 +558,7 @@ describe('the Play place lines (play-place spec § 4)', () => {
       hash = Math.imul(hash, 0x01000193) >>> 0
     }
     expect([shipped.length, hash.toString(16)]).toEqual([46755, 'c9263c74'])
-    expect(GUIDANCE_LINES.slice(306)).toEqual(play)
+    expect(GUIDANCE_LINES.slice(306, 324)).toEqual(play)
   })
 
   it('C7: has the exact texts of § 4.1, world-free, the path src, inputs only on the totals', () => {
@@ -592,6 +599,45 @@ describe('the Play place lines (play-place spec § 4)', () => {
       GUIDANCE_LINES.filter(
         (l) => (l.kind === 'play') !== l.id.startsWith('guide.play.'),
       ),
+    ).toEqual([])
+  })
+})
+
+describe('the locked-stop peek prompt lines (locked-stop-peek-prompt § 3)', () => {
+  const ask = GUIDANCE_LINES.filter((l) => l.kind.startsWith('map-peek-ask'))
+
+  it('AC 1: appends the two lines with the exact texts, world-free, the path src', () => {
+    expect(GUIDANCE_LINES.slice(324)).toEqual(ask)
+    expect(ask).toEqual([
+      {
+        id: 'guide.map.peek-ask.locked',
+        kind: 'map-peek-ask-locked',
+        world: null,
+        text: 'This one is locked. Want to try it?',
+        src: '/assets/audio/path/guide-map-peek-ask-locked.mp3',
+      },
+      {
+        id: 'guide.map.peek-ask',
+        kind: 'map-peek-ask',
+        world: null,
+        text: 'Want to try it?',
+        src: '/assets/audio/path/guide-map-peek-ask.mp3',
+      },
+    ])
+    // 50 Lily characters (§ 3, T1).
+    expect(ask.reduce((n, l) => n + l.text.length, 0)).toBe(50)
+  })
+
+  it('AC 2: peekAskLine is the locked line for a locked stop, the plain one for an open later stop', () => {
+    expect(peekAskLine({ state: 'locked' }).id).toBe(
+      'guide.map.peek-ask.locked',
+    )
+    expect(peekAskLine({ state: 'open' }).id).toBe('guide.map.peek-ask')
+  })
+
+  it('the two lines are rendered in Lily (none awaits its render)', () => {
+    expect(
+      ask.filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id)),
     ).toEqual([])
   })
 })

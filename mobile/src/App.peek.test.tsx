@@ -1,7 +1,8 @@
 /**
  * The Map peek end to end on an in-memory store (native spec
  * `design/native/fast-track-native.md` §§ 6.3–6.5, AC 18): Hub → map → a
- * locked stop → Emma's opener → the step's 3 problems → the closer → the
+ * locked stop → its name and "This one is locked. Want to try it?" → the
+ * prompt's button (`locked-stop-peek-prompt.md` AC 13) → Emma's opener → the step's 3 problems → the closer → the
  * same map, quiet. The persisted progress JSON and the session-history
  * store are byte-identical before and after, and nothing reaches the
  * network but the (stubbed) peek request.
@@ -30,7 +31,7 @@ import { sessionPrefetcher, type LoadedSessionAudio } from './audio'
 import { resetLaunchReconcileForTests } from './lifecycle/launchReconcile'
 import { bootNative, type SyncKeyValueBackend } from './platform/native'
 import { resetHubAudioForTests } from './screens/hub/hubAudio'
-import { MAP_TAP_ARM_MS } from './screens/map/useMapVisit'
+import { MAP_TAP_ARM_MS, PEEK_ASK_GAP_MS } from './screens/map/useMapVisit'
 import { SPLASH_FADE_OUT_MS } from './screens/Splash'
 import * as peekSession from './session/peekSession'
 
@@ -192,6 +193,18 @@ it('AC 18: a full peek writes nothing — progress JSON and session history byte
   const fetchesBefore = (globalThis.fetch as jest.Mock).mock.calls.length
 
   await fireEvent.press(screen.getByTestId('map-stop-sub-to-10'))
+  await act(async () => {
+    await flush()
+  })
+  // The prompt asks first (locked-stop-peek-prompt § 2): the name, 250 ms,
+  // the question and the button.
+  expect(request).not.toHaveBeenCalled()
+  expect(screen.getByTestId('map-caption').props.children).toBe(
+    'Taking away to ten. This one is locked. Want to try it?',
+  )
+  await finishGuideLine()
+  await advance(PEEK_ASK_GAP_MS)
+  await fireEvent.press(screen.getByTestId('map-peek-button'))
   await act(async () => {
     await flush()
   })

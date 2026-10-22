@@ -444,9 +444,10 @@ describe('the lines (§ 11, AC 7)', () => {
   })
 
   // Guidance was 354 on main with #635's 30 game lines and the Play place's
-  // 18; the flower bed's move into adding to ten takes the game lines out.
-  it('counts: guidance 354 → 324 ids after the game lines left, path lines 814 → 851, baked 254 → 259', () => {
-    expect(GUIDANCE_LINES).toHaveLength(324)
+  // 18; the flower bed's move into adding to ten takes the game lines out,
+  // and the locked-stop peek prompt adds its 2 (peek prompt § 3).
+  it('counts: guidance 354 → 324 ids after the game lines left (326 with the peek prompt), path lines 814 → 851, baked 254 → 259', () => {
+    expect(GUIDANCE_LINES).toHaveLength(326)
     expect(PATH_LINES).toHaveLength(851)
     expect(BAKED_PATH_LINES).toHaveLength(259)
   })

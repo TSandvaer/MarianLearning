@@ -1,14 +1,17 @@
 /**
  * The map's chrome (web `src/screens/Map/mapParts.tsx` + `MapScreen.tsx`;
  * map-native § 2): the sky-to-meadow backdrop over the whole screen, the
- * clay Home button, the world title and the caption slab.
+ * clay Home button, the world title, the caption slab, and the peek
+ * prompt's round button (`design/native/locked-stop-peek-prompt.md` § 4).
  */
 import type { PathArtId } from '@marian/core/emmasPath/pathArt'
-import type { PathLine } from '@marian/core/emmasPath/pathLines'
-import type { MasteryTrack } from '@marian/core/progress'
+import type { MasteryTrack, SkillNode } from '@marian/core/progress'
 import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeOut,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -21,6 +24,9 @@ import type { MapCaptionSlot } from '../../layout/mapScreenLayout'
 import { FILL, fonts } from '../../theme'
 import { TITLE } from '../hub/cardLook'
 import { PRESS_MS } from '../hub/clay'
+import { CLAY_LOOK } from '../sessionEnd/clayLook'
+import { EASE_OUT } from './mapMotion'
+import type { MapCaptionLine } from './useMapVisit'
 
 export function MapBackdrop() {
   return <View pointerEvents="none" style={styles.backdrop} />
@@ -195,7 +201,7 @@ export function MapCaption({
   line,
   caption,
 }: {
-  line: PathLine | null
+  line: MapCaptionLine | null
   caption: MapCaptionSlot
 }) {
   const { slot, metrics, align } = caption
@@ -228,8 +234,124 @@ export function MapCaption({
   )
 }
 
+/** Peek prompt § 4: in with the caption's entrance; out over 150 ms. */
+const peekIn = FadeInDown.duration(200)
+  .easing(EASE_OUT)
+  .withInitialValues({ opacity: 0, transform: [{ translateY: 8 }] })
+const peekInReduced = FadeIn.duration(200).easing(EASE_OUT)
+const peekOut = FadeOut.duration(150)
+
+/**
+ * The peek prompt's round button (§ 4): Session End's green clay ("All
+ * done"), its slab, highlight and 9 pt × size / 112 press sink; the tapped
+ * stop's sticker in full colour (70 %) with a white play triangle in a
+ * green disc at its lower right (28 %). No text: the caption asks.
+ */
+export function MapPeekButton({
+  rect,
+  node,
+  reducedMotion,
+  onPress,
+}: {
+  rect: Rect
+  node: SkillNode
+  reducedMotion: boolean
+  onPress: () => void
+}) {
+  const look = CLAY_LOOK.go
+  const size = rect.width
+  const k = size / 112
+  const sink = useSharedValue(0)
+  const sinkStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: sink.get() }],
+  }))
+  const shadow = (pressed: boolean) =>
+    pressed
+      ? `inset 0 ${5 * k}px 0 ${look.highlight}, 0 ${2 * k}px 0 ${look.slab}, 0 ${6 * k}px ${10 * k}px ${look.drop}`
+      : `inset 0 ${5 * k}px 0 ${look.highlight}, 0 ${11 * k}px 0 ${look.slab}, 0 ${18 * k}px ${24 * k}px ${look.drop}`
+  const disc = size * 0.28
+  const tri = disc * 0.4
+  return (
+    <Animated.View
+      entering={reducedMotion ? peekInReduced : peekIn}
+      exiting={peekOut}
+      style={[
+        styles.abs,
+        { left: rect.x, top: rect.y, width: size, height: size },
+      ]}
+    >
+      <Animated.View style={[styles.fillBox, sinkStyle]}>
+        <Pressable
+          testID="map-peek-button"
+          accessibilityRole="button"
+          accessibilityLabel="Try it"
+          onPressIn={() => {
+            if (!reducedMotion) {
+              sink.set(withTiming(9 * k, { duration: PRESS_MS }))
+            }
+          }}
+          onPressOut={() => sink.set(withTiming(0, { duration: PRESS_MS }))}
+          onPress={onPress}
+          style={({ pressed }) => [
+            styles.peekFace,
+            {
+              borderRadius: size / 2,
+              backgroundColor: look.flat,
+              experimental_backgroundImage: look.face,
+              boxShadow: shadow(pressed),
+            },
+          ]}
+        >
+          <PathImage
+            id={node}
+            px={Math.round(size * 0.7)}
+            testID="map-peek-button-art"
+          />
+          <View
+            pointerEvents="none"
+            style={[
+              styles.peekPlay,
+              {
+                width: disc,
+                height: disc,
+                borderRadius: disc / 2,
+                right: size * 0.04,
+                bottom: size * 0.04,
+                backgroundColor: look.slab,
+              },
+            ]}
+          >
+            <View
+              style={{
+                marginLeft: tri * 0.25,
+                borderTopWidth: tri / 2,
+                borderBottomWidth: tri / 2,
+                borderLeftWidth: tri * 0.85,
+                borderTopColor: 'transparent',
+                borderBottomColor: 'transparent',
+                borderLeftColor: '#ffffff',
+              }}
+            />
+          </View>
+        </Pressable>
+      </Animated.View>
+    </Animated.View>
+  )
+}
+
 const styles = StyleSheet.create({
   abs: { position: 'absolute' },
+  fillBox: { ...FILL },
+  peekFace: {
+    ...FILL,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  peekPlay: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   backdrop: {
     ...FILL,
     backgroundColor: '#d9f0c2',
