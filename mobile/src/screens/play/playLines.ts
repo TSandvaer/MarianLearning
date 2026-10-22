@@ -27,6 +27,7 @@ export type PlayLineId =
   | 'guide.play.critters.open'
   | 'guide.play.critters.funny.1'
   | 'guide.play.critters.funny.2'
+  | 'guide.play.critters.funny.3'
 
 export const PLAY_LINE_MANIFEST: Readonly<Record<PlayLineId, ManifestLine>> =
   Object.fromEntries(
@@ -46,8 +47,8 @@ export function createPlayLinePlayer(): PlayLinePlayer {
 export const raftTotalLine = (t: number) =>
   `guide.play.raft.total.${t}` as PlayLineId
 
-/** The two giggle lines, alternating (§ 3.3). */
-export const crittersFunnyLine = (n: 1 | 2) =>
+/** The three non-word lines, in turn, every time (§ 3.3, Thomas 2026-10-22). */
+export const crittersFunnyLine = (n: 1 | 2 | 3) =>
   `guide.play.critters.funny.${n}` as PlayLineId
 
 /** § 4.2: the labels nobody speaks. */

@@ -7,7 +7,6 @@ import {
   CRITTER_SOUND_SOURCE,
   CRITTER_WORDS_BY_STEP,
 } from '@marian/core/games/playPlace'
-import { defaultProgress, type Progress } from '@marian/core/progress'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { letterWindow, MARK_LEAD_MS } from '../../audio/blendMarks'
 import { audioForWebPath } from '../../audio/bundledAudio'
@@ -37,14 +36,8 @@ import {
 } from './LetterCritters'
 import { centre, critterScene, playArea } from './playGeometry'
 
-/** Letter sounds mastered: blending sounds is the current step. */
-const BLENDING: Progress = {
-  ...defaultProgress(),
-  skillLevels: {
-    ...defaultProgress().skillLevels,
-    'letter-sounds': 'mastered',
-  },
-}
+/** Blending sounds' 8 words (11 letters), through the words seam. */
+const BLENDING_WORDS = CRITTER_WORDS_BY_STEP['blending-cv']!
 
 const WORDS = [...new Set(Object.values(CRITTER_WORDS_BY_STEP).flat())]
 const clipOf = (word: string) => audioForWebPath(blendClipPath(word)) as number
@@ -69,7 +62,7 @@ const seatCentre = (i: number) => {
 async function mount() {
   const s = fakeSounds(wholeMs)
   const g = await mountGame('critters', {
-    progress: BLENDING,
+    words: BLENDING_WORDS,
     sounds: s.sounds,
   })
   // The open line plays and ends.
@@ -92,6 +85,17 @@ it('§ 3.1: the visit’s letters, vowels first, for a learner on blending sound
     .map((el) => String(el.props.testID).slice(-1))
   expect(letters).toEqual('abcfghmnptv'.split(''))
   expect(byId('critter-f').props.accessibilityLabel).toBe('Letter f')
+})
+
+it('§ 3.1 (Thomas 2026-10-22): with no words seam, a visit draws on all 45 picture words, for any learner', async () => {
+  const s = fakeSounds(wholeMs)
+  await mountGame('critters', { sounds: s.sounds })
+  const letters = screen
+    .queryAllByTestId(/^critter-[a-z]$/)
+    .map((el) => String(el.props.testID).slice(-1))
+  // 22 letters do not fit: the cap, every vowel first.
+  expect(letters).toHaveLength(16)
+  expect(letters.slice(0, 5)).toEqual(['a', 'e', 'i', 'o', 'u'])
 })
 
 describe('N9: a picture word', () => {
@@ -154,7 +158,7 @@ describe('N10: songs that are not picture words', () => {
     void g
   }
 
-  it('non-words boing and giggle twice at most, alternating; a real word sits quietly and does not count', async () => {
+  it('every non-word boings and gets a line, the three in turn; a real word sits quietly and does not count', async () => {
     const g = await mount()
     await sing3(g, 'map')
     expect(g.calls.slice(-3)).toEqual([own('m'), own('a'), own('p')])
@@ -175,7 +179,12 @@ describe('N10: songs that are not picture words', () => {
 
     await sing3(g, 'vtp')
     expect(g.sfx.boing.play).toHaveBeenCalledTimes(3)
-    expect(g.lines.filter((l) => l.includes('funny'))).toHaveLength(2)
+    expect(g.lines.at(-1)).toBe('guide.play.critters.funny.3')
+
+    await sing3(g, 'bgf')
+    expect(g.sfx.boing.play).toHaveBeenCalledTimes(4)
+    expect(g.lines.at(-1)).toBe('guide.play.critters.funny.1')
+    expect(g.lines.filter((l) => l.includes('funny'))).toHaveLength(4)
   })
 })
 

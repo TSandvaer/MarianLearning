@@ -208,10 +208,20 @@ export const CRITTER_WORDS_BY_STEP: Readonly<
 export const CRITTER_LEFT_OUT: readonly string[] = ['gem']
 
 /**
- * The text-only list of real CVC words over the 22 critter letters (D5): a
- * run on it that is not a picture word sings and sits, never boings. No
- * clips, no pictures; nothing on it is said or shown. Pinned exactly as
- * § 3.1 prints it (C10), by vowel.
+ * Every picture word, sorted: the 45 words of `CRITTER_WORDS_BY_STEP`. All
+ * of them pop with their picture for every learner, whatever her steps
+ * (Thomas 2026-10-22), and they are the sound sources' search order.
+ */
+export const CRITTER_PICTURE_WORDS: readonly string[] = [
+  ...new Set(Object.values(CRITTER_WORDS_BY_STEP).flatMap((ws) => ws!)),
+].sort()
+
+/**
+ * The real CVC words over the 22 critter letters (D5). A run on it that is
+ * not a picture word is never a mistake: Emma says it after the sounds
+ * (`CRITTER_SAID_WORDS`, Thomas 2026-10-22), unless it is on
+ * `CRITTER_NEVER_SAY` or `CRITTER_NOT_SAID`. Pinned exactly as § 3.1
+ * prints it (C10), by vowel.
  */
 export const CRITTER_REAL_WORDS: ReadonlySet<string> = new Set(
   [
@@ -232,33 +242,69 @@ export const CRITTER_REAL_WORDS: ReadonlySet<string> = new Set(
 )
 
 /**
- * What a 3-letter run does: `'picture'` when it is one of the visit's
- * words (`critterSet(...).words`), `'real'` when it is only on
- * `CRITTER_REAL_WORDS`, `'funny'` otherwise. Picture words are checked
- * first, so a word on both pops once its step is reached and sits before.
+ * Real words Emma never says (Dave 2026-10-22): rude words, an insult, an
+ * exclamation and a weapon. They sing their sounds and sit, as before.
  */
-export function critterRun(
-  run: string,
-  words: readonly string[],
-): 'picture' | 'real' | 'funny' {
-  if (words.includes(run)) return 'picture'
-  return CRITTER_REAL_WORDS.has(run) ? 'real' : 'funny'
-}
+export const CRITTER_NEVER_SAY: ReadonlySet<string> = new Set([
+  'bum',
+  'cum',
+  'fag',
+  'git',
+  'sex',
+  'tit',
+  'dam',
+  'hag',
+  'god',
+  'gun',
+])
 
 /**
- * The words of every step in `CRITTER_WORDS_BY_STEP` that is current or
- * mastered for this learner, deduplicated and sorted. A step past the CVC
- * tiers adds none: its learner has them all mastered.
+ * Real words Emma does not say because the critters' sounds do not spell
+ * them (gem, gin: g sings /g/; has, his, was: s is /z/; son, won: o is
+ * /ʌ/; put: u is /ʊ/) and _rum_, an adult drink (Dave 2026-10-22). They
+ * sing their sounds and sit.
  */
-export function critterWords(progress: Progress | null): string[] {
-  if (progress === null) return []
-  const words = new Set<string>()
-  for (const [step, ws] of Object.entries(CRITTER_WORDS_BY_STEP)) {
-    if (currentOrMastered(progress, step as WordSongNode)) {
-      for (const w of ws!) words.add(w)
-    }
-  }
-  return [...words].sort()
+export const CRITTER_NOT_SAID: ReadonlySet<string> = new Set([
+  'gem',
+  'gin',
+  'has',
+  'his',
+  'was',
+  'son',
+  'won',
+  'put',
+  'rum',
+])
+
+/**
+ * The words Emma says after the critters sing them, sorted: every real word
+ * that is not a picture word, not on `CRITTER_NEVER_SAY` and not on
+ * `CRITTER_NOT_SAID`. Each has a whole-word Lily clip
+ * (`critterWordLine(word)` in `emmasPath/guidanceLines.ts`), no picture.
+ */
+export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
+  .filter(
+    (w) =>
+      !CRITTER_PICTURE_WORDS.includes(w) &&
+      !CRITTER_NEVER_SAY.has(w) &&
+      !CRITTER_NOT_SAID.has(w),
+  )
+  .sort()
+
+/**
+ * What a 3-letter run does: `'picture'` pops its clip and picture, `'word'`
+ * sings its sounds and Emma says it (`CRITTER_SAID_WORDS`), `'quiet'` sings
+ * and sits (a real word on `CRITTER_NEVER_SAY` or `CRITTER_NOT_SAID`), and
+ * `'funny'` (not a word) boings and tumbles.
+ */
+export type CritterRun = 'picture' | 'word' | 'quiet' | 'funny'
+
+export function critterRun(run: string): CritterRun {
+  if (CRITTER_PICTURE_WORDS.includes(run)) return 'picture'
+  if (!CRITTER_REAL_WORDS.has(run)) return 'funny'
+  return CRITTER_NEVER_SAY.has(run) || CRITTER_NOT_SAID.has(run)
+    ? 'quiet'
+    : 'word'
 }
 
 /** Most critters on the meadow at once (Decision 8). */
@@ -303,11 +349,6 @@ export function critterSet(
   }
 }
 
-/** Every picture word, sorted: the sound sources' search order. */
-const ALL_CRITTER_WORDS: readonly string[] = [
-  ...new Set(Object.values(CRITTER_WORDS_BY_STEP).flatMap((ws) => ws!)),
-].sort()
-
 /**
  * Which clip and which of its sounds a letter sings alone (§ 3.4): a
  * consonant from the first word (alphabetically) it starts, a vowel from
@@ -318,9 +359,9 @@ export const CRITTER_SOUND_SOURCE: Readonly<
   Record<string, { word: string; index: 0 | 1 | 2 }>
 > = (() => {
   const out: Record<string, { word: string; index: 0 | 1 | 2 }> = {}
-  const letters = meadowOrder(ALL_CRITTER_WORDS.join(''))
+  const letters = meadowOrder(CRITTER_PICTURE_WORDS.join(''))
   for (const l of letters) {
-    const at = (i: 0 | 1 | 2) => ALL_CRITTER_WORDS.find((w) => w[i] === l)
+    const at = (i: 0 | 1 | 2) => CRITTER_PICTURE_WORDS.find((w) => w[i] === l)
     const index: 0 | 1 | 2 = VOWELS.has(l) ? 1 : at(0) !== undefined ? 0 : 2
     out[l] = { word: at(index)!, index }
   }

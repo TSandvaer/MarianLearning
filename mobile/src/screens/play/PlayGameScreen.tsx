@@ -15,7 +15,6 @@
  */
 import type { EmmaPose } from '@marian/core/character/emmaPose'
 import type { PlayGameId } from '@marian/core/games/playPlace'
-import type { Progress } from '@marian/core/progress'
 import {
   useEffect,
   useLayoutEffect,
@@ -71,9 +70,9 @@ export interface PlayGameScreenProps {
   rng?: () => number
   /** Raft: the first shore's weights (default `raftShore(rng)`). */
   shore?: readonly number[]
-  /** Critters: the tap-sound player, and the learner's progress. */
+  /** Critters: the tap-sound player, and the visit's picture words. */
   sounds?: TapClipPlayer
-  progress?: Progress | null
+  words?: readonly string[]
 }
 
 export function PlayGameScreen({
@@ -87,7 +86,7 @@ export function PlayGameScreen({
   rng: rngProp,
   shore,
   sounds,
-  progress,
+  words,
 }: PlayGameScreenProps) {
   const reducedMotion = useReducedMotion()
   const [player] = useState<PlayLinePlayer>(
@@ -252,7 +251,7 @@ export function PlayGameScreen({
             key="critters"
             kit={kit}
             sounds={sounds}
-            progress={progress}
+            words={words}
           />
         )}
 

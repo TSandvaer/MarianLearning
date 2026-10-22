@@ -8,7 +8,9 @@ import {
 import {
   GUIDANCE_LINES,
   GUIDANCE_LINES_AWAITING_RENDER,
+  critterWordLine,
 } from '@marian/core/emmasPath/guidanceLines'
+import { CRITTER_SAID_WORDS } from '@marian/core/games/playPlace'
 import { HUB_LINES } from '@marian/core/hub/hubLines'
 import { WEB_AUDIO_MODULES } from './audioRegistry'
 import { BLEND_MARKS } from './blendMarks.generated'
@@ -123,5 +125,19 @@ describe('bundled blend clips (play-place spec § 3.4, N15)', () => {
     expect(
       readdirSync(join(mobileRoot, 'assets', 'audio', 'blend')).sort(),
     ).toEqual(words.map((w) => `${w}.mp3`).sort())
+  })
+})
+
+describe('bundled critter word clips (Thomas 2026-10-22)', () => {
+  it('bundles a whole-word clip for each of the 156 said words, byte-identical to the web original', () => {
+    expect(CRITTER_SAID_WORDS).toHaveLength(156)
+    const wrong = CRITTER_SAID_WORDS.filter((w) => {
+      const src = critterWordLine(w)?.src
+      if (src === undefined || !registryPaths.includes(src)) return true
+      return !readFileSync(join(webPublic, src)).equals(
+        readFileSync(nativeFileFor(src)),
+      )
+    })
+    expect(wrong).toEqual([])
   })
 })

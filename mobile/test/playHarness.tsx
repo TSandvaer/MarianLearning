@@ -8,7 +8,6 @@
  */
 import type { EmmaPose } from '@marian/core/character/emmaPose'
 import type { PlayGameId } from '@marian/core/games/playPlace'
-import type { Progress } from '@marian/core/progress'
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
 
 type ReactTestInstance = ReturnType<typeof screen.getByTestId>
@@ -142,7 +141,7 @@ export async function mountGame(
     viewport?: Viewport
     shore?: readonly number[]
     rng?: () => number
-    progress?: Progress | null
+    words?: readonly string[]
     sounds?: TapClipPlayer
   } = {},
 ) {
@@ -162,7 +161,7 @@ export async function mountGame(
     visibility: visibility.store,
     rng: opts.rng ?? seeded(3),
     shore: opts.shore,
-    progress: opts.progress,
+    words: opts.words,
     sounds: opts.sounds,
   }
   const view = await render(
