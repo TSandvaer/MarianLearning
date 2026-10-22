@@ -2090,20 +2090,22 @@ describe('Math (Number Garden) screen', () => {
    * original race fix. Brief from ticket 86c9hf4ef round 2.
    */
   it('cold-mount real-flow: chips unlock even when playUtterance rejects (Path A pipeline failure — ticket 86c9hf4ef round 2)', async () => {
-    // Build a harness whose playUtterance rejects on the microtask queue.
-    // Mirrors prepareMathPathA's pass-through of a sessionAudio rejection
-    // (loaderror, playerror, "no utterance with id", etc.).
+    // Build a harness whose playUtterance stays pending until the test
+    // rejects it. Mirrors prepareMathPathA's pass-through of a sessionAudio
+    // rejection (loaderror, playerror, "no utterance with id", etc.).
+    //
+    // The test owns the reject (no timer inside the mock): a mock-side
+    // `setTimeout(reject, 0)` is armed only once the read-aloud microtask
+    // calls playUtterance, i.e. AFTER the test's own wait timer, so a
+    // >4 ms stall on a loaded CI runner let the wait win and the assertion
+    // ran before the rejection (flake on #574/#599/#623/#640/#652/#663).
+    let rejectPlay: ((err: Error) => void) | null = null
     const playUtterance: PlayMathUtteranceFn = vi.fn(async (_text, opts) => {
       return await new Promise<void>((_resolve, reject) => {
         // Fire onPlay (caption renders) so this matches the screenshot
         // shape Thomas captured: caption visible, no audio, chips locked.
         opts?.onPlay?.()
-        // Reject on a later macrotask so the same React-commit timing
-        // window the cancelled-flag race depended on is exercised.
-        setTimeout(
-          () => reject(new Error('[test] simulated Path A failure')),
-          0,
-        )
+        rejectPlay = reject
       })
     })
 
@@ -2120,8 +2122,22 @@ describe('Math (Number Garden) screen', () => {
       ),
     )
 
+    // Let the cold-mount read-aloud microtask run and call playUtterance.
+    // Microtasks always drain before a macrotask, so one timer tick is
+    // enough regardless of runner load.
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 5))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(playUtterance).toHaveBeenCalledTimes(1)
+    expect(rejectPlay).not.toBeNull()
+
+    // Reject on a later macrotask than the mount commit (the React-commit
+    // window the cancelled-flag race depended on), then drain: speak()'s
+    // catch/finally and the read-aloud .then() are all microtasks, so they
+    // complete before the timer tick resolves.
+    await act(async () => {
+      rejectPlay?.(new Error('[test] simulated Path A failure'))
+      await new Promise((resolve) => setTimeout(resolve, 0))
     })
 
     // Even on rejection, chips MUST unlock — the gate exists to delay
