@@ -10,6 +10,7 @@
  * Lines play their bundled clips on the fake expo-audio players; the test
  * starts and ends each (`finishPlayLine`, as App.game's `finishGameLine`).
  */
+import { CRITTER_PICTURE_WORDS } from '@marian/core/games/playPlace'
 import { loadProgress, saveProgress, STORAGE_KEY } from '@marian/core/progress'
 import { SESSION_HISTORY_KEY } from '@marian/core/sessionEnd/sessionHistory'
 import { loadStardust } from '@marian/core/shared/stardust'
@@ -265,8 +266,13 @@ it('N4, N5: a full raft trip and a critters visit write nothing and call nothing
   expect(screen.queryByTestId('play-bubble')).not.toBeOnTheScreen()
 
   await open('critters')
-  // A word, a non-word and a pair.
-  for (const word of ['cat', 'bgf']) {
+  // A word, a non-word and a pair, from the letters this visit shows (16 of
+  // the 22: every picture word for every learner, Thomas 2026-10-22).
+  const here = (l: string) => screen.queryByTestId(`critter-${l}`) !== null
+  const picture = CRITTER_PICTURE_WORDS.find((w) => [...w].every(here))!
+  const nonWord = [...'bcdfghjklmnprstvwxz'].filter(here).slice(0, 3).join('')
+  expect(nonWord).toHaveLength(3)
+  for (const word of [picture, nonWord]) {
     for (const letter of word) {
       await fireEvent(
         screen.getByTestId(`critter-${letter}`),
@@ -287,7 +293,7 @@ it('N4, N5: a full raft trip and a critters visit write nothing and call nothing
       }
     }
   }
-  for (const letter of ['f', 'a']) {
+  for (const letter of picture.slice(0, 2)) {
     await fireEvent(
       screen.getByTestId(`critter-${letter}`),
       'accessibilityAction',
