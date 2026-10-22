@@ -23,6 +23,12 @@
  * stop a replay (`onReplay`); during a launch Home and Android back are
  * ignored. A map remounted after a peek, a replay or a Map-started session
  * (`quietReturn`) opens quiet. See `useMapVisit`.
+ *
+ * The locked-stop peek prompt (`design/native/locked-stop-peek-prompt.md`):
+ * a later stop's tap asks first; the round button (`MapPeekButton`, from
+ * the question's start) starts the peek. While a prompt is up the caption
+ * narrows beside the button (`layout.promptCaption`), and Android back
+ * closes the prompt before it goes Home.
  */
 import type { MasteryTrack } from '@marian/core/progress'
 import { useEffect, useRef } from 'react'
@@ -34,7 +40,13 @@ import Animated, {
 } from 'react-native-reanimated'
 import type { MapScreenLayout } from '../../layout/mapScreenLayout'
 import { EASE_OUT } from './mapMotion'
-import { HomeButton, MapBackdrop, MapCaption, MapTitle } from './mapChrome'
+import {
+  HomeButton,
+  MapBackdrop,
+  MapCaption,
+  MapPeekButton,
+  MapTitle,
+} from './mapChrome'
 import { MapPath } from './MapPath'
 import { useMapVisit, type MapVisitOptions } from './useMapVisit'
 
@@ -86,7 +98,7 @@ export function MapScreen({
     ...seams,
   })
   const leavingRef = useRef(false)
-  const { leave, launchLocked } = state
+  const { leave, launchLocked, closePrompt } = state
   const home = () => {
     // The launch lock (map-tap-to-play § 2.2): ignored until the route changes.
     if (leavingRef.current || launchLocked()) return
@@ -94,20 +106,24 @@ export function MapScreen({
     leave()
     onHome()
   }
-  const homeRef = useRef(home)
+  // Android back: closes an open peek prompt, else Home (§ 7).
+  const back = () => {
+    if (!launchLocked() && closePrompt()) return
+    home()
+  }
+  const backRef = useRef(back)
   useEffect(() => {
-    homeRef.current = home
+    backRef.current = back
   })
-  // Android back = Home (§ 7).
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      homeRef.current()
+      backRef.current()
       return true
     })
     return () => sub.remove()
   }, [])
 
-  const { visit } = state
+  const { visit, prompt } = state
   return (
     <Animated.View
       testID="map"
@@ -123,7 +139,19 @@ export function MapScreen({
         <MapPath layout={layout} state={state} reducedMotion={reducedMotion} />
         <HomeButton rect={layout.home} k={layout.homeScale} onPress={home} />
         {layout.title && <MapTitle world={world} rect={layout.title} />}
-        <MapCaption line={state.caption} caption={layout.caption} />
+        <MapCaption
+          line={state.caption}
+          caption={prompt !== null ? layout.promptCaption : layout.caption}
+        />
+        {prompt?.button && (
+          <MapPeekButton
+            key={prompt.node}
+            rect={layout.peekButton}
+            node={prompt.node}
+            reducedMotion={reducedMotion}
+            onPress={state.tapPeekButton}
+          />
+        )}
       </Animated.View>
     </Animated.View>
   )

@@ -11,6 +11,8 @@ import {
   layoutMap,
   PORTRAIT_FIT_LANDS,
 } from '@marian/core/map/mapLayout'
+import { peekAskLine } from '@marian/core/emmasPath/guidanceLines'
+import { pathLine } from '@marian/core/emmasPath/pathLines'
 import { buildMapModel } from '@marian/core/map/mapModel'
 import {
   defaultProgress,
@@ -21,6 +23,7 @@ import {
   type SkillLevels,
   type SkillNode,
 } from '@marian/core/progress'
+import { FREDOKA_600, fontMeasure } from '../../test/fontAdvances'
 import type { Viewport } from './layout'
 import {
   focusBox,
@@ -404,5 +407,123 @@ describe('hit areas (§ 1)', () => {
     for (const v of [vp(375, 667), vp(667, 375)]) {
       expect(hitSlopFor(worst(v, 'word-song').stop)).toBeLessThanOrEqual(2.2)
     }
+  })
+})
+
+describe('the peek prompt’s button and caption (locked-stop-peek-prompt § 4, AC 10)', () => {
+  const forms = [
+    ['P 375×667', vp(375, 667)],
+    ['L 667×375', vp(667, 375)],
+    ['W 820×1180', vp(820, 1180, 24, 20)],
+    ['TL 1180×820', vp(1180, 820, 0, 20)],
+  ] as const
+  type R = { x: number; y: number; width: number; height: number }
+  const inside = (a: R, b: R) =>
+    a.x >= b.x &&
+    a.y >= b.y &&
+    a.x + a.width <= b.x + b.width &&
+    a.y + a.height <= b.y + b.height
+  const overlap = (a: R, b: R) =>
+    a.x < b.x + b.width &&
+    b.x < a.x + a.width &&
+    a.y < b.y + b.height &&
+    b.y < a.y + a.height
+  const clip = (a: R, b: R): R | null => {
+    const x = Math.max(a.x, b.x)
+    const y = Math.max(a.y, b.y)
+    const w = Math.min(a.x + a.width, b.x + b.width) - x
+    const h = Math.min(a.y + a.height, b.y + b.height) - y
+    return w > 0 && h > 0 ? { x, y, width: w, height: h } : null
+  }
+
+  it('the button per form: 72 on phones at the slot’s right end, 112 on tablets; TL in the column above the caption', () => {
+    const P = mapScreenLayout(vp(375, 667))
+    expect(P.peekButton).toEqual({ x: 287, y: 553, width: 72, height: 72 })
+    expect(P.promptCaption.slot).toEqual({
+      ...P.caption.slot,
+      width: 343 - 72 - 10,
+    })
+    const L = mapScreenLayout(vp(667, 375))
+    expect(L.peekButton).toEqual({ x: 579, y: 287, width: 72, height: 72 })
+    expect(L.promptCaption.slot.width).toBe(635 - 72 - 10)
+    const W = mapScreenLayout(vp(820, 1180, 24, 20))
+    expect(W.peekButton).toEqual({ x: 668, y: 1040, width: 112, height: 112 })
+    expect(W.promptCaption.slot.width).toBe(740 - 112 - 14)
+    const TL = mapScreenLayout(vp(1180, 820, 0, 20))
+    expect(TL.peekButton).toEqual({ x: 135, y: 448, width: 112, height: 112 })
+    expect(TL.promptCaption).toEqual(TL.caption)
+  })
+
+  it.each(forms)(
+    '%s: inside the safe rect, clear of the narrowed caption, Home, the title and every visible stop hit area',
+    (_name, v) => {
+      const layout = mapScreenLayout(v)
+      const b = layout.peekButton
+      expect(inside(b, layout.safe)).toBe(true)
+      expect(overlap(b, layout.promptCaption.slot)).toBe(false)
+      expect(overlap(b, layout.home)).toBe(false)
+      if (layout.title) expect(overlap(b, layout.title)).toBe(false)
+      for (const world of ['math', 'word-song'] as const) {
+        const tree = world === 'math' ? MATH_TREE : LITERACY_TREE
+        for (let cur = 0; cur < tree.length; cur++) {
+          const model = buildMapModel(seed(tree, cur), world)
+          const k = mapPathScale(layout.pane, model, [], layout.landscape)
+          const geo = layoutMap(model, k.virtualW, k.virtualH)
+          for (const st of geo.stops) {
+            const size = st.size * k.s
+            const slop = hitSlopFor(size)
+            const hit = {
+              x: layout.pane.x + st.x * k.s - size / 2 - slop,
+              y: layout.pane.y + st.y * k.s - size / 2 - slop,
+              width: size + 2 * slop,
+              height: size + 2 * slop,
+            }
+            // A scrolled-away stop is clipped by the pane.
+            const seen = clip(hit, layout.pane)
+            if (seen)
+              expect([world, cur, st.node, overlap(b, seen)]).toEqual([
+                world,
+                cur,
+                st.node,
+                false,
+              ])
+          }
+        }
+      }
+    },
+  )
+
+  it('P 375×667: every later stop’s prompt fits the narrowed slab in 4 lines (the longest, mult-2-5-10, measured)', () => {
+    const measure = fontMeasure(FREDOKA_600)
+    const { promptCaption } = mapScreenLayout(vp(375, 667))
+    const m = promptCaption.metrics
+    const textW =
+      promptCaption.slot.width - 2 * m.padding.horizontal - m.speaker - m.gap
+    expect(textW).toBe(191)
+    const lines = (text: string) => {
+      let n = 1
+      let line = ''
+      for (const word of text.split(' ')) {
+        const next = line === '' ? word : `${line} ${word}`
+        if (line !== '' && measure(next, m.font) > textW) {
+          n++
+          line = word
+        } else line = next
+      }
+      return n
+    }
+    const longest = `${pathLine('path.stop.mult-2-5-10')!.text} ${peekAskLine({ state: 'locked' }).text}`
+    expect(longest).toBe(
+      'Groups of two, five and ten. This one is locked. Want to try it?',
+    )
+    expect(lines(longest)).toBe(4)
+    expect(4 * m.lineHeight + 2 * m.padding.vertical).toBeLessThanOrEqual(
+      promptCaption.slot.height,
+    )
+    for (const tree of [MATH_TREE, LITERACY_TREE])
+      for (const node of tree.slice(1)) {
+        const text = `${pathLine(`path.stop.${node}`)!.text} ${peekAskLine({ state: 'locked' }).text}`
+        expect([node, lines(text) <= 4]).toEqual([node, true])
+      }
   })
 })

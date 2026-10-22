@@ -5,8 +5,9 @@
  * both on release and ~200 ms later; the launch lock holds every stop, gate
  * and Home tap until the route changes; a replay that fails says the
  * stop's name and taps resume; a stop tap within 400 ms of mount, or
- * before the unlock beat's cheer, is ignored. Later stops still peek and
- * gates still say their land. The line player and effects are fakes.
+ * before the unlock beat's cheer, is ignored. Later stops still open their
+ * peek prompt (`locked-stop-peek-prompt.md`) and gates still say their
+ * land. The line player and effects are fakes.
  */
 import { setKeyValueStore } from '@marian/core'
 import { progressAtStep } from '@marian/core/debug/stepProgress'
@@ -24,7 +25,7 @@ import type { Sfx } from '../../audio'
 import { mapScreenLayout } from '../../layout/mapScreenLayout'
 import type { MapLinePlayer } from './mapAudio'
 import { MapScreen } from './MapScreen'
-import { LAUNCH_DELAY_MS, MAP_TAP_ARM_MS } from './useMapVisit'
+import { LAUNCH_DELAY_MS, MAP_TAP_ARM_MS, PEEK_ASK_GAP_MS } from './useMapVisit'
 
 const P = mapScreenLayout({
   width: 375,
@@ -33,13 +34,26 @@ const P = mapScreenLayout({
 })
 
 function fakePlayer() {
+  let inFlight: (() => void) | null = null
   const player = {
-    play: jest.fn<Promise<void>, [PathLine]>(() => new Promise<void>(() => {})),
+    play: jest.fn<Promise<void>, [PathLine]>(
+      () =>
+        new Promise<void>((resolve) => {
+          inFlight = resolve
+        }),
+    ),
     cancel: jest.fn(),
     unload: jest.fn(),
   } satisfies MapLinePlayer
   const ids = () => player.play.mock.calls.map(([l]) => l.id)
-  return { player, ids }
+  /** The line in flight ends. */
+  const end = async () => {
+    await act(async () => {
+      inFlight?.()
+      for (let i = 0; i < 5; i++) await Promise.resolve()
+    })
+  }
+  return { player, ids, end }
 }
 
 function fakeSfx() {
@@ -88,7 +102,7 @@ function landUnlockDoc(): Progress {
 }
 
 async function mount(doc: Progress, debugLog?: (line: string) => void) {
-  const { player, ids } = fakePlayer()
+  const { player, ids, end } = fakePlayer()
   // App's answer: `true` once the route changed.
   const onPlay = jest.fn<boolean, [SkillNode]>(() => true)
   const replay = fakeRequest()
@@ -111,7 +125,7 @@ async function mount(doc: Progress, debugLog?: (line: string) => void) {
       debugLog={debugLog}
     />,
   )
-  return { player, ids, onPlay, replay, peek, onHome }
+  return { player, ids, end, onPlay, replay, peek, onHome }
 }
 
 async function advance(ms: number) {
@@ -254,12 +268,16 @@ it('AC 5: taps wait for the unlock beat’s cheer; then the current stop plays',
   expect(h.onPlay.mock.calls).toEqual([['two-digit-addsub-no-regroup']])
 })
 
-it('AC 3: later stops still peek at once, and gates still say their land', async () => {
+it('AC 3: later stops open their peek prompt (no launch), and gates still say their land', async () => {
   const h = await mount(progressAtStep('add-to-20'))
   await advance(MAP_TAP_ARM_MS)
   await fireEvent.press(screen.getByTestId('map-gate-2'))
   expect(h.ids().at(-1)).toBe('path.land.math.2')
   await tap('mult-6-9')
+  expect(h.ids().at(-1)).toBe('path.stop.mult-6-9')
+  await h.end()
+  await advance(PEEK_ASK_GAP_MS)
+  await fireEvent.press(screen.getByTestId('map-peek-button'))
   expect(h.peek.fn).toHaveBeenCalledTimes(1)
   expect(h.peek.calls[0]!.node).toBe('mult-6-9')
   expect(
@@ -321,14 +339,18 @@ it('debug only: each stop logs its state and hit rect on mount; each tap logs th
   expect(taps()).toHaveLength(4)
 })
 
-it('debug only: a later stop logs path=peek', async () => {
+it('debug only: a later stop logs path=peek-ask, its button path=peek', async () => {
   const lines: string[] = []
-  await mount(progressAtStep('add-to-20'), (l) => lines.push(l))
+  const h = await mount(progressAtStep('add-to-20'), (l) => lines.push(l))
   await advance(MAP_TAP_ARM_MS)
   await tap('mult-6-9')
+  await h.end()
+  await advance(PEEK_ASK_GAP_MS)
+  await fireEvent.press(screen.getByTestId('map-peek-button'))
   expect(lines.filter((l) => l.startsWith('[map-tap]'))).toEqual([
     expect.stringMatching(
-      /^\[map-tap\] stop=mult-6-9 state=locked path=peek x,y=/,
+      /^\[map-tap\] stop=mult-6-9 state=locked path=peek-ask x,y=/,
     ),
+    '[map-tap] stop=mult-6-9 state=locked path=peek x,y=? local=? rect=?',
   ])
 })

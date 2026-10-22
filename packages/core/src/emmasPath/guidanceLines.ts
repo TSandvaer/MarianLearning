@@ -17,6 +17,7 @@
  * only (its runtime imports are `pathLines.ts` and the spoken step names it
  * already uses, both loadable by the node-typed render scripts).
  */
+import type { MapStop } from '../map/mapModel'
 import type { Land } from '../progress/lands'
 import type { SkillNode } from '../progress/types'
 import {
@@ -64,6 +65,8 @@ export type GuidanceLineKind =
   | 'story-word'
   | 'picker-who'
   | 'play'
+  | 'map-peek-ask-locked'
+  | 'map-peek-ask'
 
 export interface GuidanceLine {
   /** Dotted id, e.g. `guide.hub.suggest.math`. */
@@ -301,6 +304,16 @@ function buildLines(): GuidanceLine[] {
   add(CRITTERS_OPEN_ID, 'play', 'Join the letters! Hear them sing!')
   add(crittersFunnyId(1), 'play', 'Hee hee! What a funny song!')
   add(crittersFunnyId(2), 'play', 'Ha ha! Silly sounds!')
+  // The locked-stop peek prompt (design/native/locked-stop-peek-prompt.md
+  // § 3; T1, the texts, approved for rendering by Thomas 2026-10-20 and
+  // judged at the ear test). World-free: they play after the stop's own
+  // name line (`path.stop.<node>`), so one shared line serves every stop.
+  add(
+    PEEK_ASK_LOCKED_ID,
+    'map-peek-ask-locked',
+    'This one is locked. Want to try it?',
+  )
+  add(PEEK_ASK_ID, 'map-peek-ask', 'Want to try it?')
   return lines
 }
 
@@ -387,6 +400,8 @@ const RAFT_SILLY_ID = 'guide.play.raft.silly'
 const RAFT_CLOSE_ID = 'guide.play.raft.close'
 const CRITTERS_OPEN_ID = 'guide.play.critters.open'
 const crittersFunnyId = (n: 1 | 2) => `guide.play.critters.funny.${n}`
+const PEEK_ASK_LOCKED_ID = 'guide.map.peek-ask.locked'
+const PEEK_ASK_ID = 'guide.map.peek-ask'
 
 /** Every guidance line: Hub, then session end, then in session. */
 export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
@@ -398,9 +413,12 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: none.
+ * Now: the locked-stop peek prompt's two lines.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
+  PEEK_ASK_LOCKED_ID,
+  PEEK_ASK_ID,
+]
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 
@@ -427,6 +445,15 @@ export function storyWordLine(word: string): GuidanceLine | undefined {
 /** "Who is playing?" (learner profiles § 1.3): the picker's line. */
 export function pickerWhoLine(): GuidanceLine {
   return BY_ID.get(PICKER_WHO_ID)!
+}
+
+/**
+ * The Map's question after a later stop's name (locked-stop-peek-prompt
+ * § 2): "This one is locked. Want to try it?" for a locked stop, "Want to
+ * try it?" for an open one (a later stop a parent's level opened).
+ */
+export function peekAskLine(stop: Pick<MapStop, 'state'>): GuidanceLine {
+  return BY_ID.get(stop.state === 'locked' ? PEEK_ASK_LOCKED_ID : PEEK_ASK_ID)!
 }
 
 /** "Some flowers are hiding!" (§ 6.1): before a round's first missing number. */

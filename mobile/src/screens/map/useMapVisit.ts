@@ -23,12 +23,23 @@
  *   too, and releases the map's clips and effects.
  *
  * Native-only, the Map peek (fast-track spec
- * `design/native/fast-track-native.md` § 6): a tap on a stop after the
+ * `design/native/fast-track-native.md` § 6): a peek on a stop after the
  * current one that is not mastered (locked ones included) cuts the line in
- * flight and asks App for a peek (`peek`); stop and gate taps wait while
- * it is out, and Home aborts it. It replaces the locked response (poof,
- * wiggle, pointing, requirement line). On failure Emma says the stop's
- * name and taps resume; on success App leaves for the peek.
+ * flight and asks App for it (`peek`); stop and gate taps wait while it is
+ * out, and Home aborts it. It replaces the locked response (poof, wiggle,
+ * pointing, requirement line). On failure Emma says the stop's name and
+ * taps resume; on success App leaves for the peek.
+ *
+ * The locked-stop peek prompt (`design/native/locked-stop-peek-prompt.md`):
+ * such a tap first opens a prompt (`prompt`). The line in flight is cut,
+ * the caption shows "<Name>. This one is locked. Want to try it?" at once,
+ * Emma says the stop's name (`path.stop.<node>`), then `PEEK_ASK_GAP_MS`
+ * later the question (`peekAskLine`), and the round button shows as the
+ * question starts. The button (`tapPeekButton`) starts the peek. The same
+ * stop again replays the question only (nothing during the name); any
+ * other stop or gate tap, a tap on the empty map or Android back
+ * (`closePrompt`) closes it. Waiting does nothing: no re-ask, no timeout.
+ * A per-prompt token keeps a closed or replaced prompt from asking.
  *
  * Native-only, Map tap-to-play (`design/native/map-tap-to-play.md`
  * §§ 1, 2, 5): the current stop starts the Hub card's session (`play`), a
@@ -51,6 +62,7 @@
  * audio needs no unlock, hub-native § 5).
  */
 import type { EmmaPose } from '@marian/core/character/emmaPose'
+import { peekAskLine } from '@marian/core/emmasPath/guidanceLines'
 import type { PathLine } from '@marian/core/emmasPath/pathLines'
 import { gateLine, stopLine, stopNameLine } from '@marian/core/map/mapLines'
 import type { MapLand, MapStop } from '@marian/core/map/mapModel'
@@ -98,6 +110,22 @@ export const LAUNCH_DELAY_MS = 200
 /** § 5: a stop tap within this long of the map mounting is ignored. */
 export const MAP_TAP_ARM_MS = 400
 
+/** Peek prompt § 2: the stop's name ends → this long → the question. */
+export const PEEK_ASK_GAP_MS = 250
+
+/** A line on the caption slab: a path or guidance line, or the prompt's. */
+export interface MapCaptionLine {
+  id: string
+  text: string
+}
+
+/** The peek prompt that is up (peek prompt § 2). */
+export interface MapPrompt {
+  node: SkillNode
+  /** The button shows (from the question's start). */
+  button: boolean
+}
+
 export interface MapVisitOptions {
   world: MasteryTrack
   /** Test seams. */
@@ -142,7 +170,9 @@ export interface MapVisitState {
   view: MapBeatView
   phase: UnlockPhase | null
   /** The line on the caption slab (null: none yet). */
-  caption: PathLine | null
+  caption: MapCaptionLine | null
+  /** The peek prompt that is up, or null. */
+  prompt: MapPrompt | null
   pose: EmmaPose
   /** Locked-stop taps so far, per stop: one "not yet" wiggle each. */
   wiggles: Readonly<Partial<Record<string, number>>>
@@ -155,6 +185,12 @@ export interface MapVisitState {
   /** `tap`: where the finger landed, for the debug log only. */
   tapStop: (stop: MapStop, tap?: MapTapPoint) => void
   tapGate: (land: MapLand) => void
+  /** The prompt's button: start its peek. */
+  tapPeekButton: () => void
+  /** A tap on the path pane outside every stop and gate. */
+  tapPane: () => void
+  /** Closes an open prompt (Android back); false when none was open. */
+  closePrompt: () => boolean
   /** Call before leaving for the Hub. */
   leave: () => void
   /** Debug only: the Metro line logger (`./mapTapLog.ts`), or none. */
@@ -188,9 +224,10 @@ export function useMapVisit({
   const [phase, setPhase] = useState<UnlockPhase | null>(visit.phase)
   // A quiet return: no open line, so no caption either (§ 6.4).
   const [quiet] = useState(quietReturn && visit.unlock === null)
-  const [caption, setCaption] = useState<PathLine | null>(
+  const [caption, setCaption] = useState<MapCaptionLine | null>(
     quiet ? null : visit.caption,
   )
+  const [prompt, setPrompt] = useState<MapPrompt | null>(null)
   const [pose, setPose] = useState<EmmaPose>(visit.restPose)
   const [wiggles, setWiggles] = useState<Partial<Record<string, number>>>({})
   const [launching, setLaunching] = useState<SkillNode | null>(null)
@@ -208,6 +245,13 @@ export function useMapVisit({
   /** The launch under way (§ 2.2): set from the release to the route change. */
   const launchRef = useRef<AbortController | null>(null)
   const launchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** The open peek prompt (its token guards its clips), or null. */
+  const promptRef = useRef<{
+    stop: MapStop
+    token: object
+    asked: boolean
+  } | null>(null)
+  const askTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const effect = (sfx: Parameters<CreateMapSfx>[0]): Sfx => {
     const s = createSfx(sfx)
@@ -270,6 +314,8 @@ export function useMapVisit({
       launchRef.current?.abort()
       launchRef.current = null
       if (launchTimer.current !== null) clearTimeout(launchTimer.current)
+      promptRef.current = null
+      if (askTimer.current !== null) clearTimeout(askTimer.current)
       player.unload()
       sfxRef.current.forEach((s) => s.unload())
       sfxRef.current = []
@@ -283,9 +329,10 @@ export function useMapVisit({
   )
 
   const leave = () => {
-    // Home cancels a peek request in flight (§ 6.1).
+    // Home cancels a peek request in flight (§ 6.1), and an open prompt.
     peekRef.current?.abort()
     peekRef.current = null
+    dropPrompt()
     player.cancel()
     markLeft(wallClock())
   }
@@ -293,6 +340,75 @@ export function useMapVisit({
   const speak = (line: PathLine) => {
     setCaption(line)
     void player.play(line)
+  }
+
+  /** Drops the open prompt (its clips and button); the caller speaks next. */
+  const dropPrompt = (): boolean => {
+    if (promptRef.current === null) return false
+    promptRef.current = null
+    if (askTimer.current !== null) clearTimeout(askTimer.current)
+    askTimer.current = null
+    setPrompt(null)
+    return true
+  }
+
+  /** Closes the prompt silently: the line is cut and the caption clears. */
+  const closePrompt = (): boolean => {
+    if (!dropPrompt()) return false
+    player.cancel()
+    setCaption(null)
+    return true
+  }
+
+  /**
+   * Peek prompt § 2: the line in flight is cut, both sentences go on the
+   * slab, the name plays, then (`PEEK_ASK_GAP_MS` later) the question and
+   * the button, unless the prompt was closed or replaced meanwhile.
+   */
+  const openPrompt = (stop: MapStop) => {
+    dropPrompt()
+    player.cancel()
+    const token = {}
+    const open = { stop, token, asked: false }
+    promptRef.current = open
+    const name = stopNameLine(stop)
+    const ask = peekAskLine(stop)
+    setPrompt({ node: stop.node, button: false })
+    setCaption({
+      id: `peek-ask.${stop.node}`,
+      text: `${name.text} ${ask.text}`,
+    })
+    void player.play(name).then(() => {
+      if (promptRef.current?.token !== token || leftRef.current) return
+      askTimer.current = setTimeout(() => {
+        askTimer.current = null
+        if (promptRef.current?.token !== token) return
+        open.asked = true
+        setPrompt({ node: stop.node, button: true })
+        void player.play(ask)
+      }, PEEK_ASK_GAP_MS)
+    })
+  }
+
+  /** § 5: the same stop again replays the question (not during the name). */
+  const reask = () => {
+    const open = promptRef.current
+    if (open === null || !open.asked) return
+    void player.play(peekAskLine(open.stop))
+  }
+
+  const tapPeekButton = () => {
+    const open = promptRef.current
+    if (open === null || !open.asked || peek === undefined) return
+    if (launchRef.current !== null || peekRef.current !== null) return
+    debugLog?.(formatMapTap(open.stop.node, open.stop.state, 'peek', undefined))
+    dropPrompt()
+    startPeek(open.stop, peek)
+  }
+
+  const tapPane = () => {
+    if (launchRef.current !== null || peekRef.current !== null) return
+    closePrompt()
   }
 
   /** § 6.1: the line in flight is cut, the request goes out, taps wait. */
@@ -380,18 +496,23 @@ export function useMapVisit({
             : launch === 'play'
               ? 'hub-session'
               : peeks
-                ? 'peek'
+                ? 'peek-ask'
                 : 'name-only'),
         tap,
       ),
     )
     if (ignored !== null) return
+    if (peeks && promptRef.current?.stop.node === stop.node) {
+      reask()
+      return
+    }
+    dropPrompt()
     if (launch !== null) {
       startLaunch(stop, launch)
       return
     }
-    if (peeks && peek !== undefined) {
-      startPeek(stop, peek)
+    if (peeks) {
+      openPrompt(stop)
       return
     }
     if (stop.state === 'locked') {
@@ -411,6 +532,7 @@ export function useMapVisit({
   const tapGate = (land: MapLand) => {
     if (launchRef.current !== null) return
     if (view.tapsWait || peekRef.current !== null) return
+    dropPrompt()
     speak(gateLine(view.model, land))
   }
 
@@ -419,6 +541,7 @@ export function useMapVisit({
     view,
     phase,
     caption,
+    prompt,
     pose,
     wiggles,
     launching,
@@ -426,6 +549,9 @@ export function useMapVisit({
     launchLocked: () => launchRef.current !== null,
     tapStop,
     tapGate,
+    tapPeekButton,
+    tapPane,
+    closePrompt,
     leave,
     debugLog,
   }

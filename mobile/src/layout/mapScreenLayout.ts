@@ -12,6 +12,12 @@
  *   scroll, a 2-line caption across the base.
  * - **TL** (tablet landscape): the web landscape with a 350 pt column.
  *
+ * The locked-stop peek prompt's round button
+ * (`design/native/locked-stop-peek-prompt.md` § 4): 72 pt on phones, 112 on
+ * tablets, at the caption slot's right end, which narrows the caption by
+ * the button and a gap while a prompt is up; in TL it sits in the left
+ * column, 24 pt above the caption slot, and the caption keeps its width.
+ *
  * The path scales as one picture (§ 1): core's `layoutMap` works in web
  * px ("virtual px") and native draws every path value × `s`, so hit areas
  * stay real-size (no `transform: scale`).
@@ -49,6 +55,9 @@ export const MAP_MIN_HIT = 44
 export const TL_COLUMN = 350
 /** Home on phones: the web's 96 px button × 7/12. */
 export const PHONE_HOME_SCALE = 7 / 12
+/** The peek prompt's button (§ 4): phones, tablets. */
+export const PEEK_BUTTON_PHONE = 72
+export const PEEK_BUTTON_TABLET = 112
 
 /** Session End's phone caption (§ 2 P, L). */
 const PHONE_CAPTION: CaptionMetrics = {
@@ -91,6 +100,10 @@ export interface MapScreenLayout extends ScreenLayout {
   caption: MapCaptionSlot
   /** The path's pane. */
   pane: Rect
+  /** The peek prompt's round button (§ 4). */
+  peekButton: Rect
+  /** The caption slot while a peek prompt is up: narrowed beside the button. */
+  promptCaption: MapCaptionSlot
 }
 
 const bottom = (r: Rect) => r.y + r.height
@@ -193,6 +206,32 @@ export function mapScreenLayout(v: Viewport): MapScreenLayout {
       break
     }
   }
+  // The peek prompt's button (§ 4).
+  const b = tablet ? PEEK_BUTTON_TABLET : PEEK_BUTTON_PHONE
+  let peekButton: Rect
+  let promptCaption: MapCaptionSlot
+  if (form === 'TL') {
+    peekButton = {
+      x: caption.slot.x + (caption.slot.width - b) / 2,
+      y: caption.slot.y - 24 - b,
+      width: b,
+      height: b,
+    }
+    promptCaption = caption
+  } else {
+    const { slot } = caption
+    peekButton = {
+      x: right(slot) - b,
+      y: slot.y + (slot.height - b) / 2,
+      width: b,
+      height: b,
+    }
+    const gap = tablet ? 14 : 10
+    promptCaption = {
+      ...caption,
+      slot: { ...slot, width: slot.width - b - gap },
+    }
+  }
   return {
     form,
     landscape: form === 'L' || form === 'TL',
@@ -207,6 +246,8 @@ export function mapScreenLayout(v: Viewport): MapScreenLayout {
     title,
     caption,
     pane,
+    peekButton,
+    promptCaption,
   }
 }
 
