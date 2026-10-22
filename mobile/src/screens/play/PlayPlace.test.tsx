@@ -67,16 +67,29 @@ beforeEach(() => {
 afterEach(() => jest.useRealTimers())
 
 it('N4: one open game, one tile, centred; Home at the Map’s Home rect', async () => {
-  seed()
+  // On numbers: the raft is not open yet, the critters always are.
+  seed({ 'number-recog': 'practicing', 'add-to-10': 'locked' })
   await mount()
   expect(screen.getAllByTestId(/^play-tile-(raft|critters)$/)).toHaveLength(1)
-  expect(rectOf('play-tile-raft')).toEqual(P.single)
+  expect(rectOf('play-tile-critters')).toEqual(P.single)
   expect(rectOf('play-home')).toEqual(P.home)
   expect(screen.getByTestId('play-home').props.accessibilityLabel).toBe('Home')
-  expect(screen.getByTestId('play-tile-raft').props.accessibilityLabel).toBe(
-    'Raft crossing',
-  )
-  expect(screen.getAllByTestId('play-tile-raft-art')).toHaveLength(1)
+  expect(
+    screen.getByTestId('play-tile-critters').props.accessibilityLabel,
+  ).toBe('Letter critters')
+  expect(screen.getAllByTestId('play-tile-critters-art')).toHaveLength(1)
+})
+
+it('N4 (Thomas 2026-10-22): a learner on letter names and adding to ten has both tiles', async () => {
+  seed({
+    'letter-names': 'practicing',
+    'letter-sounds': 'locked',
+    'blending-cv': 'locked',
+  })
+  await mount()
+  expect(screen.getAllByTestId(/^play-tile-(raft|critters)$/)).toHaveLength(2)
+  expect(rectOf('play-tile-raft')).toEqual(P.tiles[0])
+  expect(rectOf('play-tile-critters')).toEqual(P.tiles[1])
 })
 
 it('N4: two open games, a tile per card column, in tile order', async () => {

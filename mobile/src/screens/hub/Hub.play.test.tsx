@@ -33,13 +33,13 @@ function fakePlayer(): GuidancePlayer {
   }
 }
 
-/** The default profile: adding to ten current, so the raft is open. */
+/** The default profile: adding to ten current, so both games are open. */
 function seedDefault() {
   saveProgress(defaultProgress())
 }
 
-/** On numbers and letter names: no game open. */
-function seedNoGame() {
+/** On numbers and letter names: the critters only (Thomas 2026-10-22). */
+function seedEarly() {
   const p = defaultProgress()
   const locked = Object.fromEntries(
     Object.keys(p.skillLevels).map((k) => [k, 'locked']),
@@ -102,10 +102,15 @@ afterEach(() => {
   jest.useRealTimers()
 })
 
-it('N2: no open game, no Play disc', async () => {
-  seedNoGame()
+it('N2: no progress, no open game, no Play disc', async () => {
   await mount(P)
   expect(screen.queryByTestId('hub-play')).toBeNull()
+})
+
+it('N2 (Thomas 2026-10-22): a learner on numbers and letter names has the disc', async () => {
+  seedEarly()
+  await mount(P)
+  expect(screen.getByTestId('hub-play')).toBeOnTheScreen()
 })
 
 it.each([
@@ -115,7 +120,7 @@ it.each([
   'N2 (%s): an open game shows the disc at layout.play, holding ui-play',
   async (_form, layout) => {
     seedDefault()
-    expect(openPlayGames(defaultProgress())).toEqual(['raft'])
+    expect(openPlayGames(defaultProgress())).toEqual(['raft', 'critters'])
     await mount(layout)
     const disc = screen.getByTestId('hub-play')
     expect(disc).toHaveStyle({
@@ -163,8 +168,9 @@ it('N2: a 3 s hold that starts on the disc (or 8 pt from it) does not open Paren
 })
 
 it('N2: no Hub line changes, and none names Play', async () => {
-  seedNoGame()
+  // No progress yet: the only Hub with no Play disc.
   const without = await mount(P)
+  expect(screen.queryByTestId('hub-play')).toBeNull()
   const linesWithout = (without.player.playLine as jest.Mock).mock.calls.map(
     (c) => c[0],
   )

@@ -3,7 +3,10 @@
  * wobble, rowing, scene or tumble starts; the dim fades run; lines and
  * sounds are unchanged; a drag still follows the finger.
  */
+import { setKeyValueStore } from '@marian/core'
+import { progressAtStep } from '@marian/core/debug/stepProgress'
 import { CRITTER_WORDS_BY_STEP } from '@marian/core/games/playPlace'
+import { saveProgress } from '@marian/core/progress'
 import { screen } from '@testing-library/react-native'
 import * as Reanimated from 'react-native-reanimated'
 import { mathLayout } from '../../layout/mathLayout'
@@ -27,8 +30,21 @@ const BLENDING_WORDS = CRITTER_WORDS_BY_STEP['blending-cv']!
 beforeEach(() => {
   jest.useFakeTimers()
   jest.spyOn(Reanimated, 'useReducedMotion').mockReturnValue(true)
+  // A learner on blending sounds: a non-word boings (Dave's safeguard).
+  const map = new Map<string, string>()
+  setKeyValueStore({
+    getItem: (k) => map.get(k) ?? null,
+    setItem: (k, v) => {
+      map.set(k, v)
+    },
+    removeItem: (k) => {
+      map.delete(k)
+    },
+  })
+  saveProgress(progressAtStep('blending-cv'))
 })
 afterEach(() => {
+  setKeyValueStore(null)
   jest.restoreAllMocks()
   jest.useRealTimers()
 })

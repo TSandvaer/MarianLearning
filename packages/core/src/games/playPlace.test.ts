@@ -7,6 +7,7 @@ import type { Progress, SkillNode, WordSongNode } from '../progress/types'
 import * as PlayPlace from './playPlace'
 import {
   CRITTER_CAP,
+  CRITTER_FUNNY_FROM,
   CRITTER_LEFT_OUT,
   CRITTER_NEVER_SAY,
   CRITTER_NOT_SAID,
@@ -15,6 +16,7 @@ import {
   CRITTER_SAID_WORDS,
   CRITTER_SOUND_SOURCE,
   CRITTER_WORDS_BY_STEP,
+  critterFunnyOpen,
   critterRun,
   critterSet,
   openPlayGames,
@@ -70,16 +72,20 @@ const VOWELS = new Set(['a', 'e', 'i', 'o', 'u'])
 const CRITTER_LETTERS = 'abcdefghijlmnoprstuvwx'.split('')
 
 describe('PLAY_GAMES and openPlayGames (play-place spec § 1.1)', () => {
-  it('has the raft at adding to ten and the critters at blending sounds, in tile order', () => {
+  it('has the raft at adding to ten and the critters at letter names, in tile order (Thomas 2026-10-22)', () => {
     expect(PLAY_GAMES).toEqual({
       raft: { opensAt: 'add-to-10' },
-      critters: { opensAt: 'blending-cv' },
+      critters: { opensAt: 'letter-names' },
     })
     expect(Object.keys(PLAY_GAMES)).toEqual(['raft', 'critters'])
   })
 
-  it('C1: the default profile opens the raft only', () => {
-    expect(openPlayGames(defaultProgress())).toEqual(['raft'])
+  it('C1: the critters open at Word Song’s first step, so every learner has them', () => {
+    expect(LITERACY_TREE[0]).toBe(PLAY_GAMES.critters.opensAt)
+  })
+
+  it('C1: the default profile opens both', () => {
+    expect(openPlayGames(defaultProgress())).toEqual(['raft', 'critters'])
   })
 
   it('C1: both open once letter sounds is mastered, and once both steps are mastered', () => {
@@ -105,7 +111,23 @@ describe('PLAY_GAMES and openPlayGames (play-place spec § 1.1)', () => {
     ).toEqual(['raft', 'critters'])
   })
 
-  it('C1: the critters only, with numbers not mastered and blending sounds current', () => {
+  it('C1: a learner on letter names or letter sounds has the critters (Thomas 2026-10-22)', () => {
+    expect(
+      openPlayGames(
+        withLevels({ ...currentAt('add-to-10'), ...currentAt('letter-names') }),
+      ),
+    ).toEqual(['raft', 'critters'])
+    expect(
+      openPlayGames(
+        withLevels({
+          'number-recog': 'practicing',
+          ...currentAt('letter-sounds'),
+        }),
+      ),
+    ).toEqual(['critters'])
+  })
+
+  it('C1: the critters only, with numbers not mastered', () => {
     expect(
       openPlayGames(
         withLevels({
@@ -116,16 +138,12 @@ describe('PLAY_GAMES and openPlayGames (play-place spec § 1.1)', () => {
     ).toEqual(['critters'])
   })
 
-  it('C1: nothing for null, or on numbers and letter sounds', () => {
+  it('C1: the critters for a learner with every step locked; nothing for null', () => {
+    const locked = Object.fromEntries(
+      [...MATH_TREE, ...LITERACY_TREE].map((n) => [n, 'locked']),
+    )
+    expect(openPlayGames(withLevels(locked))).toEqual(['critters'])
     expect(openPlayGames(null)).toEqual([])
-    expect(
-      openPlayGames(
-        withLevels({
-          'number-recog': 'practicing',
-          ...currentAt('letter-sounds'),
-        }),
-      ),
-    ).toEqual([])
   })
 })
 
@@ -374,6 +392,15 @@ describe('the critters (§ 3.1)', () => {
     }
   })
 
+  it('C5: the meadow needs no Word Song step: any learner’s visit has 16 critters and words to build (Thomas 2026-10-22)', () => {
+    for (let seed = 1; seed <= 1000; seed++) {
+      const set = critterSet(CRITTER_PICTURE_WORDS, seeded(seed))
+      expect(set.letters).toHaveLength(CRITTER_CAP)
+      expect(set.words.length).toBeGreaterThan(0)
+      for (const w of set.words) expect(critterRun(w)).toBe('picture')
+    }
+  })
+
   it('C5: with 16 letters or fewer, critterSet keeps them all, vowels first, then alphabetical', () => {
     const words = wordsThrough('cvc-words-short-o')
     const set = critterSet(words, seeded(5))
@@ -545,5 +572,29 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
       expect(critterRun(w)).toBe('quiet')
     for (const w of ['tup', 'baf', 'gub', 'vop'])
       expect(critterRun(w)).toBe('funny')
+  })
+
+  it('C10 (Dave’s safeguard, Thomas 2026-10-22): with funny false, a non-word is quiet; every other run is unchanged', () => {
+    const off = { funny: false }
+    for (const w of ['tup', 'baf', 'gub', 'vop'])
+      expect(critterRun(w, off)).toBe('quiet')
+    for (const w of ALL_45) expect(critterRun(w, off)).toBe('picture')
+    for (const w of CRITTER_SAID_WORDS) expect(critterRun(w, off)).toBe('word')
+    for (const w of [...CRITTER_NEVER_SAY, ...CRITTER_NOT_SAID])
+      expect(critterRun(w, off)).toBe('quiet')
+    expect(critterRun('tup', { funny: true })).toBe('funny')
+  })
+
+  it('C10 (Dave’s safeguard): non-words are funny from blending sounds on, quiet before it and for null', () => {
+    expect(CRITTER_FUNNY_FROM).toBe('blending-cv')
+    expect(critterFunnyOpen(null)).toBe(false)
+    expect(critterFunnyOpen(withLevels(currentAt('letter-names')))).toBe(false)
+    expect(critterFunnyOpen(withLevels(currentAt('letter-sounds')))).toBe(false)
+    expect(critterFunnyOpen(defaultProgress())).toBe(false)
+    expect(critterFunnyOpen(withLevels(currentAt('blending-cv')))).toBe(true)
+    expect(critterFunnyOpen(withLevels(currentAt('cvc-words-short-e')))).toBe(
+      true,
+    )
+    expect(critterFunnyOpen(withLevels(allMastered(LITERACY_TREE)))).toBe(true)
   })
 })

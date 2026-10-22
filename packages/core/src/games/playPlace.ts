@@ -22,7 +22,9 @@ export const PLAY_GAMES: Readonly<
   Record<PlayGameId, { readonly opensAt: SkillNode }>
 > = {
   raft: { opensAt: 'add-to-10' },
-  critters: { opensAt: 'blending-cv' },
+  // Word Song's first step, always current or mastered: the critters are
+  // open for every learner (Thomas 2026-10-22).
+  critters: { opensAt: 'letter-names' },
 }
 
 const worldOf = (node: SkillNode): MasteryTrack =>
@@ -295,13 +297,30 @@ export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
  * What a 3-letter run does: `'picture'` pops its clip and picture, `'word'`
  * sings its sounds and Emma says it (`CRITTER_SAID_WORDS`), `'quiet'` sings
  * and sits (a real word on `CRITTER_NEVER_SAY` or `CRITTER_NOT_SAID`), and
- * `'funny'` (not a word) boings and tumbles.
+ * `'funny'` (not a word) boings and tumbles. With `funny: false` a non-word
+ * is `'quiet'` too (`critterFunnyOpen`).
  */
 export type CritterRun = 'picture' | 'word' | 'quiet' | 'funny'
 
-export function critterRun(run: string): CritterRun {
+/** The step from which a non-word boings (Dave's safeguard, Thomas 2026-10-22). */
+export const CRITTER_FUNNY_FROM: WordSongNode = 'blending-cv'
+
+/**
+ * Whether a non-word is `'funny'` for this learner: blending sounds is
+ * current or mastered. Before it, joining sounds is not taught yet, so a
+ * non-word sings and sits (Dave's safeguard, Thomas 2026-10-22). `null`
+ * gives `false`.
+ */
+export function critterFunnyOpen(progress: Progress | null): boolean {
+  return progress !== null && currentOrMastered(progress, CRITTER_FUNNY_FROM)
+}
+
+export function critterRun(
+  run: string,
+  { funny = true }: { funny?: boolean } = {},
+): CritterRun {
   if (CRITTER_PICTURE_WORDS.includes(run)) return 'picture'
-  if (!CRITTER_REAL_WORDS.has(run)) return 'funny'
+  if (!CRITTER_REAL_WORDS.has(run)) return funny ? 'funny' : 'quiet'
   return CRITTER_NEVER_SAY.has(run) || CRITTER_NOT_SAID.has(run)
     ? 'quiet'
     : 'word'
