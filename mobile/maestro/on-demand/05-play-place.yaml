@@ -1,0 +1,127 @@
+# Play place: the Hub's Play disc, both tiles, both games and back.
+#
+# A game is open when its `opensAt` step is current or mastered in that
+# step's world (core `openPlayGames`, `packages/core/src/games/playPlace.ts`):
+# the raft at `add-to-10`, the letter critters at `letter-names`, Word
+# Song's first step, so for every learner (#663, Thomas 2026-10-22).
+#
+# Learner 1, an early reader: `qaStep: add-to-10` puts Number Garden on
+# add-to-10 (the raft opens) and leaves Word Song at a fresh install's start,
+# land 1 (`placeAtStep` touches one world); the `letter-names` seed, applied
+# on top (`bootNative`: the jump first, then the seed), makes Word Song's
+# step letter-names explicit. Before #663 this learner saw the raft only.
+#
+# Learner 2, past blending: the same jump with the `cvc-words` seed (Word
+# Song's earlier steps mastered, CVC words practising). Both tiles again.
+#
+# Screenshots go to Maestro's output (run.sh `--debug-output`, under
+# MAESTRO_OUT/05-play-place/).
+appId: host.exp.Exponent
+name: Play place
+tags:
+  - play
+---
+# Learner 1: Word Song at letter-names.
+- launchApp:
+    stopApp: true
+    arguments:
+      qaStep: add-to-10
+      seed: letter-names
+- runFlow: ../subflows/open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 120000
+- extendedWaitUntil:
+    visible:
+      id: hub-play
+    timeout: 30000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: hub-play
+      NEXT: play-place
+- extendedWaitUntil:
+    visible:
+      id: play-tile-critters
+    timeout: 15000
+- assertVisible:
+    id: play-tile-raft
+- takeScreenshot: play-place-tiles-early-learner
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: play-tile-critters
+      NEXT: letter-critters
+- extendedWaitUntil:
+    visible:
+      id: letter-critters
+    timeout: 15000
+- takeScreenshot: letter-critters
+# Back is the game's clay disc; it returns to the place, silent.
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: play-game-back
+      NEXT: play-place
+- extendedWaitUntil:
+    visible:
+      id: play-tile-raft
+    timeout: 15000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: play-tile-raft
+      NEXT: raft-crossing
+- extendedWaitUntil:
+    visible:
+      id: raft-crossing
+    timeout: 15000
+- takeScreenshot: raft-crossing
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: play-game-back
+      NEXT: play-place
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: play-home
+      NEXT: hub
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 30000
+
+# Learner 2: Word Song past blending.
+- launchApp:
+    stopApp: true
+    arguments:
+      qaStep: add-to-10
+      seed: cvc-words
+- runFlow: ../subflows/open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub-play
+    timeout: 120000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: hub-play
+      NEXT: play-place
+- extendedWaitUntil:
+    visible:
+      id: play-tile-critters
+    timeout: 15000
+- assertVisible:
+    id: play-tile-raft
+- takeScreenshot: play-place-tiles-cvc-learner
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: play-home
+      NEXT: hub
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 30000

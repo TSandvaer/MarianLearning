@@ -2,12 +2,16 @@
 
 Phase 4 of `design/react-native-migration-plan.md`: the native app's critical paths as [Maestro](https://maestro.dev) flows, run on the **iOS Simulator with Expo Go**.
 
-| Flow                                 | Path                                                                                                                  |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| `flows/01-first-launch.yaml`         | empty storage: Splash → Greet (heart tap) → Math → Session End "1 of 3" → Hub                                         |
-| `flows/02-hub-math-session-end.yaml` | returning child: Splash → Hub → Number Garden → Math → Session End "1 of 3" → Hub                                     |
-| `flows/03-word-song.yaml`            | returning child on CVC words: Hub → Word Song → Session End "1 of 3" → Hub                                            |
-| `flows/04-mastery-promotion.yaml`    | `cvc-words-short-o` seed, three Word Song days ("1/2/3 of 3"), the third promotes: "All done" → map unlock beat → Hub |
+| Flow                                 | Path                                                                                                                                                                                                                               |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `flows/01-first-launch.yaml`         | empty storage: Splash → Greet (heart tap) → Math → Session End "1 of 3" → Hub                                                                                                                                                      |
+| `flows/02-hub-math-session-end.yaml` | returning child: Splash → Hub → Number Garden → Math → Session End "1 of 3" → Hub                                                                                                                                                  |
+| `flows/03-word-song.yaml`            | returning child on CVC words: Hub → Word Song → Session End "1 of 3" → Hub                                                                                                                                                         |
+| `flows/04-mastery-promotion.yaml`    | `cvc-words-short-o` seed, three Word Song days ("1/2/3 of 3"), the third promotes: "All done" → map unlock beat → Hub                                                                                                              |
+| `on-demand/05-play-place.yaml`       | Hub's Play disc → Play place with both tiles (an early learner, Word Song at letter-names, then a CVC-words learner) → Letter critters → back → Raft crossing → back → Hub; screenshots of each                                    |
+| `on-demand/06-map-peek.yaml`         | `cvc-words` seed: Word Song map → a locked later stop (short-u) → the peek prompt's green button → tap: with the closed API port the peek fails and the map says the stop's name → Hub; screenshots of the button and the fallback |
+
+`flows/` is what `run.sh` runs with no arguments, on every PR in CI. `on-demand/` holds screen checks that are run by hand, not on PRs: they take 4–5 minutes on this Mac (05: 179 s, 06: 94 s on 2026-10-22), roughly 10–15 on a hosted runner, which is too much to add to every PR for screens that change rarely. Run them before a TestFlight build that touches the Play place or the map, and look at their screenshots (see Run).
 
 `subflows/` holds the shared steps (open the app from Metro, tap and confirm, one Math or Word Song session).
 
@@ -29,7 +33,7 @@ MAESTRO_DEVICE=<UDID> \
 maestro/run.sh                          # all four flows, in order
 ```
 
-One flow: `maestro/run.sh maestro/flows/03-word-song.yaml`. With exactly one booted simulator, `MAESTRO_DEVICE` can be left out. `MAESTRO_METRO_PORT` (default 8399) and `MAESTRO_OUT` (Metro's log and Maestro's screenshots/logs per flow; default: a fresh temp dir) are optional.
+One flow: `maestro/run.sh maestro/flows/03-word-song.yaml`. The on-demand flows: `maestro/run.sh maestro/on-demand/*.yaml`; their `takeScreenshot` images land in `$MAESTRO_OUT/<flow>/.maestro/tests/<timestamp>/<flow name>/takeScreenshot/` (e.g. `play-place-tiles-early-learner.png`, `letter-critters.png`, `raft-crossing.png`, `map-peek-button.png`). With exactly one booted simulator, `MAESTRO_DEVICE` can be left out. `MAESTRO_METRO_PORT` (default 8399) and `MAESTRO_OUT` (Metro's log and Maestro's screenshots/logs per flow; default: a fresh temp dir) are optional.
 
 **The runner empties the app's storage inside Expo Go on that simulator before every flow**, so each flow starts as a fresh install. Don't point it at a simulator whose progress you want to keep.
 
@@ -137,9 +141,10 @@ On the hosted `macos-26` runner (CI run 38396715552, 2026-10-13): 409 / 335 / 28
 
 - `testID` is the element's `id` in Maestro (`resource-id` in `maestro hierarchy`). Run `maestro --device <UDID> hierarchy --compact` on a live screen to see what is exposed.
 - A `Pressable` with an accessibility label is one accessibility element on iOS, so the ids **inside** it are not reliably visible (the Hub cards' current step, tray and map button). Assert on the card itself, or on what the next screen shows.
+- Expo Go's floating dev-menu button (a gear, top right) covers the Hub's Play disc and swallowed both taps on it (2026-10-22). `run.sh` turns it off (`EXDevMenuShowFloatingActionButton NO`) with the onboarding defaults.
 - iOS asks "Open in 'Expo Go'?" for an `exp://` link the first time; `subflows/open-app.yaml` taps "Open" when it shows.
 - Don't tap Greet's wake target: the QA autotap fires it at 2.5 s and the two would race. The heart has no autotap; the flow taps it.
-- Tap through `subflows/tap-and-confirm.yaml` (`TARGET`, the id to tap; `NEXT`, the id it opens), not a bare `tapOn`. It waits up to 15 s for `NEXT`, and if `TARGET` is still there it taps once more, labelled `MAESTRO-RETAP`. Without this, Maestro can't tell that a tap was lost, because an animated screen always looks "changed". A second tap is safe because every target ignores taps after the first. `subflows/open-app.yaml` does the same for the system dialog.
+- Tap through `subflows/tap-and-confirm.yaml` (`TARGET`, the id to tap; `NEXT`, the id it opens), not a bare `tapOn`. It waits up to 15 s for `NEXT`, and if `TARGET` is still there it taps once more, labelled `MAESTRO-RETAP`. Without this, Maestro can't tell that a tap was lost, because an animated screen always looks "changed". A second tap is safe because every target ignores taps after the first. `subflows/open-app.yaml` does the same for the system dialog. A target that stays on screen after its tap (a map stop opening the peek prompt) goes through `subflows/tap-and-confirm-stays.yaml` instead, which re-taps only if `NEXT` is not up.
 - Splash lasts 1.75 s; it is checked by where it routes (Greet or Hub), not asserted itself.
 - An `extendedWaitUntil` timeout counts from the last interaction (launch, link, tap), not from the start of the wait (Maestro 2.11.0, `Orchestra.adjustedToLatestInteraction`). Back-to-back waits share one budget, so give the later wait the sum. Flow 1's heart wait is 180 s because the Greet wait before it can use most of its 120 s on a CI runner.
 
