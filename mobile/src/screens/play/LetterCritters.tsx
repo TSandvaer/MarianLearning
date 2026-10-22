@@ -9,7 +9,9 @@
  * sparkle or picture (Thomas 2026-10-22; Dave's safeguards). A word on
  * Dave's never-say or not-said list sings and sits, quietly (D5). Three
  * that make no word sing, boing and tumble, and Emma says one of three
- * non-word lines, in turn, every time (Thomas 2026-10-22). A real word is
+ * non-word lines, in turn, every time (Thomas 2026-10-22); before blending
+ * sounds (`critterFunnyOpen`, read once at mount) they sing and sit,
+ * quietly, too (Dave's safeguard, Thomas 2026-10-22). A real word is
  * never a mistake, and no run is spoken as a word unless it is a picture
  * word or a said word.
  *
@@ -27,9 +29,11 @@ import { critterWordLine } from '@marian/core/emmasPath/guidanceLines'
 import {
   CRITTER_PICTURE_WORDS,
   CRITTER_SOUND_SOURCE,
+  critterFunnyOpen,
   critterRun,
   critterSet,
 } from '@marian/core/games/playPlace'
+import { loadProgress } from '@marian/core/progress'
 import { Image } from 'expo-image'
 import {
   useEffect,
@@ -108,6 +112,15 @@ function letterSound(letter: string) {
 
 type Outcome = 'pair' | 'real' | 'word' | 'funny'
 
+/** Whether a non-word boings for the playing learner; unreadable: quiet. */
+function readFunny(): boolean {
+  try {
+    return critterFunnyOpen(loadProgress())
+  } catch {
+    return false
+  }
+}
+
 export function LetterCritters({
   kit,
   sounds,
@@ -115,6 +128,7 @@ export function LetterCritters({
 }: LetterCrittersProps) {
   const { reducedMotion, sfx } = kit
   const [visit] = useState(() => critterSet(words, kit.rng))
+  const [funny] = useState(readFunny)
   const [player] = useState<TapClipPlayer>(
     () => sounds ?? createTapClipPlayer(audioEngine),
   )
@@ -220,7 +234,7 @@ export function LetterCritters({
     if (run === null) return
     const letters = run.map((i) => current[i]!)
     const word = letters.join('')
-    const kind = run.length === 3 ? critterRun(word) : null
+    const kind = run.length === 3 ? critterRun(word, { funny }) : null
     if (kind === 'picture') {
       pictureWord(word, run)
       return

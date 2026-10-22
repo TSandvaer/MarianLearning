@@ -1,14 +1,18 @@
 /**
  * Letter critters on screen (play-place § 3; ACs N9, N10, N11, N14, N17),
  * for a learner on blending sounds (11 letters, 8 picture words), with a
- * fake tap-sound player whose sounds end after their window.
+ * fake tap-sound player whose sounds end after their window; and, for a
+ * learner before blending sounds, Dave's safeguard (non-words sit quietly).
  */
+import { setKeyValueStore } from '@marian/core'
+import { progressAtStep } from '@marian/core/debug/stepProgress'
 import { critterWordLine } from '@marian/core/emmasPath/guidanceLines'
 import {
   CRITTER_SOUND_SOURCE,
   CRITTER_WORDS_BY_STEP,
   critterRun,
 } from '@marian/core/games/playPlace'
+import { saveProgress, type SkillNode } from '@marian/core/progress'
 import { fireEvent, screen } from '@testing-library/react-native'
 import { letterWindow, MARK_LEAD_MS } from '../../audio/blendMarks'
 import * as bundledAudio from '../../audio/bundledAudio'
@@ -87,8 +91,27 @@ async function seat(...letters: string[]) {
   for (const l of letters) await activate(byId(`critter-${l}`))
 }
 
-beforeEach(() => jest.useFakeTimers())
+/** The playing learner, just arrived at `step`, in a fresh store. */
+function learnerAt(step: SkillNode) {
+  const map = new Map<string, string>()
+  setKeyValueStore({
+    getItem: (k) => map.get(k) ?? null,
+    setItem: (k, v) => {
+      map.set(k, v)
+    },
+    removeItem: (k) => {
+      map.delete(k)
+    },
+  })
+  saveProgress(progressAtStep(step))
+}
+
+beforeEach(() => {
+  jest.useFakeTimers()
+  learnerAt('blending-cv')
+})
 afterEach(() => {
+  setKeyValueStore(null)
   jest.useRealTimers()
   jest.restoreAllMocks()
 })
@@ -337,5 +360,50 @@ describe('N17: VoiceOver', () => {
     expect(has('critter-seat-0')).toBe(false)
     await activate(byId('critter-m'), 'hear')
     expect(g.calls.at(-1)).toEqual(own('m'))
+  })
+})
+
+describe('Dave’s safeguard (Thomas 2026-10-22): a learner before blending sounds', () => {
+  const runOf = async (word: string) => {
+    for (let i = 0; i < 3; i++) {
+      if (has(`critter-seat-${i}`)) await activate(byId(`critter-seat-${i}`))
+    }
+    await seat(...word.split(''))
+    await advance(SING_AFTER_MS)
+    for (const l of word) await advance(ownMs(l) + SOUND_GAP_MS)
+    await advance(WORD_CLIP_MS + PICTURE_HOLD_MS + PICTURE_LEAVE_MS)
+  }
+
+  it.each(['letter-names', 'letter-sounds'] as const)(
+    'on %s, a non-word sings its sounds and sits: no boing, tumble, line or cheer, every time',
+    async (step) => {
+      learnerAt(step)
+      const g = await mount()
+      for (const word of ['bgf', 'ptv', 'vtp', 'bgf']) {
+        const before = g.calls.length
+        await runOf(word)
+        expect(g.calls.slice(before)).toEqual([...word].map(own))
+      }
+      expect(g.sfx.boing.play).not.toHaveBeenCalled()
+      expect(has('critter-tumble')).toBe(false)
+      expect(has('critter-picture')).toBe(false)
+      expect(g.poses).not.toContain('cheering')
+      expect(g.lines).toEqual(['guide.play.critters.open'])
+    },
+  )
+
+  it('on letter names, a picture word still pops and a said word is still said', async () => {
+    learnerAt('letter-names')
+    const mapClip = audioForWebPath(critterWordLine('map')!.src)
+    const g = await mount()
+    await seat('f', 'a', 'n')
+    await advance(SING_AFTER_MS)
+    expect(g.calls.at(-1)).toEqual({ uri: clipOf('fan'), from: 0, to: null })
+    await advance(blendSegments('fan')![3]![0])
+    expect(has('critter-picture-fan')).toBe(true)
+    await advance(WORD_CLIP_MS + PICTURE_HOLD_MS + PICTURE_LEAVE_MS)
+    await runOf('map')
+    expect(g.calls.at(-1)).toEqual({ uri: mapClip, from: 0, to: null })
+    expect(g.sfx.boing.play).not.toHaveBeenCalled()
   })
 })

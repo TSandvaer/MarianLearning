@@ -360,8 +360,11 @@ it('N6: Back mid-drag, mid-crossing and while a picture shows, and a background 
   expect(snapshot()).toEqual(before)
 })
 
-it('N16: a learner on numbers and letter names sees no Play disc', async () => {
+it('N16: a learner on numbers and letter names has the Play disc and the critters (Thomas 2026-10-22)', async () => {
   boot('letter-names')
   await toHub()
-  expect(screen.queryByTestId('hub-play')).not.toBeOnTheScreen()
+  expect(screen.getByTestId('hub-play')).toBeOnTheScreen()
+  await toPlace()
+  expect(screen.getAllByTestId(/^play-tile-(raft|critters)$/)).toHaveLength(1)
+  expect(screen.getByTestId('play-tile-critters')).toBeOnTheScreen()
 })

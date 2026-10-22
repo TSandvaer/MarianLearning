@@ -1,9 +1,10 @@
 /**
  * The Play place per learner (play-place § 1.5, AC N16), over the real
  * learner-scoped store: learner A on adding to ten and letter sounds sees
- * the Play disc and the raft only; learner B on numbers and letter names
- * sees no Play disc; a visit as A (the place and a raft trip's first
- * crossing) writes no key of either learner.
+ * the Play disc and both games; learner B on numbers and letter names sees
+ * the Play disc and the critters only (Thomas 2026-10-22); a visit as A
+ * (the place and a raft trip's first crossing) writes no key of either
+ * learner.
  */
 import { setKeyValueStore } from '@marian/core'
 import { progressAtStep } from '@marian/core/debug/stepProgress'
@@ -103,8 +104,8 @@ it('N16: A sees the Play disc', async () => {
   expect(screen.getByTestId('hub-play')).toBeOnTheScreen()
 })
 
-it('N16: A’s Play place has the raft only', async () => {
-  activateLearner(a.id)
+async function placeAs(learner: LearnerEntry) {
+  activateLearner(learner.id)
   await render(
     <PlayPlace
       layout={playPlaceLayout(VIEWPORT)}
@@ -115,13 +116,26 @@ it('N16: A’s Play place has the raft only', async () => {
       plink={jest.fn()}
     />,
   )
-  expect(screen.getAllByTestId(/^play-tile-(raft|critters)$/)).toHaveLength(1)
-  expect(screen.getByTestId('play-tile-raft')).toBeOnTheScreen()
+}
+
+const tiles = () =>
+  screen
+    .getAllByTestId(/^play-tile-(raft|critters)$/)
+    .map((el) => el.props.testID)
+
+it('N16: A’s Play place has both games', async () => {
+  await placeAs(a)
+  expect(tiles()).toEqual(['play-tile-raft', 'play-tile-critters'])
 })
 
-it('N16: B sees no Play disc', async () => {
+it('N16 (Thomas 2026-10-22): B sees the Play disc', async () => {
   await hubAs(b)
-  expect(screen.queryByTestId('hub-play')).not.toBeOnTheScreen()
+  expect(screen.getByTestId('hub-play')).toBeOnTheScreen()
+})
+
+it('N16 (Thomas 2026-10-22): B’s Play place has the critters only', async () => {
+  await placeAs(b)
+  expect(tiles()).toEqual(['play-tile-critters'])
 })
 
 it('N16: a visit as A writes no key of either learner', async () => {
