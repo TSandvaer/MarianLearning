@@ -3,12 +3,15 @@
  * round creatures in burrows on a meadow; she drags 2-3 of them onto a
  * log's seats and they sing their sounds. Three that spell one of her
  * picture words play that word's tuned blend clip, each critter bouncing on
- * its sound, and the picture pops. Three that make another real word sing
- * and sit together, quietly (D5). Three that make no word sing, boing and
- * tumble, and Emma says one of three non-word lines, in turn, every time
- * (Thomas 2026-10-22). A real word
- * is never a mistake, and no run is ever spoken as a word unless it is a
- * picture word.
+ * its sound, and the picture pops. Three that make another real word sing,
+ * then, 300 ms after the last sound, Emma says the word (its Lily clip,
+ * `critterWordLine`) and they bounce and sit together, with no praise,
+ * sparkle or picture (Thomas 2026-10-22; Dave's safeguards). A word on
+ * Dave's never-say or not-said list sings and sits, quietly (D5). Three
+ * that make no word sing, boing and tumble, and Emma says one of three
+ * non-word lines, in turn, every time (Thomas 2026-10-22). A real word is
+ * never a mistake, and no run is spoken as a word unless it is a picture
+ * word or a said word.
  *
  * Every sound is a bundled Word Song blend clip (`/native/blend/<word>.mp3`,
  * marks straight from `BLEND_MARKS`, K2): a word plays its whole clip; a
@@ -20,6 +23,7 @@
  * letter lights, the picture fades, a non-word dims. Dragging still
  * follows the finger.
  */
+import { critterWordLine } from '@marian/core/emmasPath/guidanceLines'
 import {
   CRITTER_PICTURE_WORDS,
   CRITTER_SOUND_SOURCE,
@@ -102,7 +106,7 @@ function letterSound(letter: string) {
   return { clip, window: letterWindow(segments[source.index]!) }
 }
 
-type Outcome = 'pair' | 'real' | 'funny'
+type Outcome = 'pair' | 'real' | 'word' | 'funny'
 
 export function LetterCritters({
   kit,
@@ -221,12 +225,10 @@ export function LetterCritters({
       pictureWord(word, run)
       return
     }
-    // A said word ('word') sits quietly, as 'quiet' does, until its clip is
-    // wired (Thomas 2026-10-22; play-place § 3.3).
     song(
       run,
       letters,
-      kind === null ? 'pair' : kind === 'funny' ? 'funny' : 'real',
+      kind === null ? 'pair' : kind === 'quiet' ? 'real' : kind,
     )
   }
 
@@ -282,7 +284,7 @@ export function LetterCritters({
     const next = (k: number) => {
       if (songRef.current !== token) return
       if (k === letters.length) {
-        after(run, outcome)
+        after(run, letters.join(''), outcome)
         return
       }
       bounceSeat(run[k]!)
@@ -294,13 +296,28 @@ export function LetterCritters({
     next(0)
   }
 
-  const after = (run: number[], outcome: Outcome) => {
+  /** Called `SOUND_GAP_MS` after the last sound ends. */
+  const after = (run: number[], word: string, outcome: Outcome) => {
     if (outcome === 'pair') {
       setLean(true)
       kit.setPose('idle')
       return
     }
-    if (outcome === 'real') {
+    const line = outcome === 'word' ? critterWordLine(word) : undefined
+    const clip = line === undefined ? null : audioForWebPath(line.src)
+    if (typeof clip === 'number') {
+      // A said word (play-place § 3.3, Thomas 2026-10-22): Emma says it,
+      // the three bounce together as it starts, then sit. No praise line,
+      // no sparkle, no picture (Dave's safeguard 2).
+      const token = songRef.current
+      run.forEach(bounceSeat)
+      setLean(true)
+      player.play(clip, 0, null, () => {
+        if (songRef.current === token) kit.setPose('idle')
+      })
+      return
+    }
+    if (outcome === 'real' || outcome === 'word') {
       run.forEach(bounceSeat)
       setLean(true)
       kit.setPose('idle')
