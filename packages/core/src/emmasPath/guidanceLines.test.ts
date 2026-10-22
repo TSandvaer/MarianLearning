@@ -602,12 +602,22 @@ describe('the Play place lines (play-place spec § 4)', () => {
     ).toEqual([])
   })
 
-  it('C8: no play line says again, next, more, round, win, fast or "not a word"', () => {
-    expect(play).toHaveLength(19)
-    for (const l of play) {
-      expect(l.text).not.toMatch(/\b(again|next|more|round|win|fast)\b/i)
-      expect(l.text).not.toMatch(/not a word/i)
-    }
+  it('C8: no Emma line (kind play) says again, next, more, round, win, fast or "not a word"; the read-back words (kind play-word) are out of scope', () => {
+    const banned = /\b(again|next|more|round|win|fast)\b|not a word/i
+    // C8's scope (Thomas 2026-10-22): every guide.play.* line but the
+    // 'play-word' ones, which only say back the run she built (§ 3.3).
+    const scoped = GUIDANCE_LINES.filter(
+      (l) => l.id.startsWith('guide.play.') && l.kind !== 'play-word',
+    )
+    expect(scoped).toEqual(play)
+    expect(scoped).toHaveLength(19)
+    for (const l of scoped) expect(l.text).not.toMatch(banned)
+    // Out of scope by name: "Win." is the one read-back word that hits.
+    expect(
+      GUIDANCE_LINES.filter(
+        (l) => l.kind === 'play-word' && banned.test(l.text),
+      ).map((l) => l.id),
+    ).toEqual(['guide.play.critters.word.win'])
   })
 
   it('C8: no line outside guide.play.* is a play line', () => {
