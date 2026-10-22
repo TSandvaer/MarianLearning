@@ -682,12 +682,18 @@ describe('the letter critters’ said words (Thomas 2026-10-22)', () => {
         kind: 'play-word',
         world: null,
         text: `${cap(w)}.`,
-        input: `${cap(w)},`,
+        // "Sat," and "Wed," read as days (ear test #661): a doubled letter.
+        input:
+          ({ sat: 'Satt,', wed: 'Wedd,' } as Record<string, string>)[w] ??
+          `${cap(w)},`,
         src: `/assets/audio/path/guide-play-critters-word-${w}.mp3`,
       })),
     )
-    // 156 inputs of four characters each.
-    expect(words.reduce((n, l) => n + l.input!.length, 0)).toBe(624)
+    // 156 inputs of four characters each, two of them five.
+    expect(words.reduce((n, l) => n + l.input!.length, 0)).toBe(626)
+    expect(
+      words.filter((l) => /^(Sat|Wed),$/.test(l.input!)).map((l) => l.id),
+    ).toEqual([])
   })
 
   it('the 156 are rendered in Lily (none awaits its render)', () => {

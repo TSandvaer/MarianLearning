@@ -334,7 +334,7 @@ function buildLines(): GuidanceLine[] {
       'play-word',
       `${capitalize(word)}.`,
       null,
-      `${capitalize(word)},`,
+      CRITTER_WORD_INPUTS[word] ?? `${capitalize(word)},`,
     )
   return lines
 }
@@ -425,6 +425,15 @@ const crittersFunnyId = (n: 1 | 2 | 3) => `guide.play.critters.funny.${n}`
 const PEEK_ASK_LOCKED_ID = 'guide.map.peek-ask.locked'
 const PEEK_ASK_ID = 'guide.map.peek-ask'
 const critterWordId = (word: string) => `guide.play.critters.word.${word}`
+/**
+ * Critter words whose "Word," input Lily reads as a day: "Sat," came back
+ * as "Saturday" and "Wed," as "Wednesday" (ear test #661, 2026-10-22). A
+ * doubled final letter cannot be a day's abbreviation; the caption stays.
+ */
+const CRITTER_WORD_INPUTS: Readonly<Record<string, string>> = {
+  sat: 'Satt,',
+  wed: 'Wedd,',
+}
 
 /** Every guidance line: Hub, then session end, then in session. */
 export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()

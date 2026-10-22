@@ -577,8 +577,8 @@ All lines are Lily, as `GUIDANCE_LINES` rows (`packages/core/src/emmasPath/guida
 | `guide.play.critters.funny.1`                      | "Is this a word? I don't know what it means!"              | Critters: three that are not a word          | 1       | 43            |
 | `guide.play.critters.funny.2`                      | "Hmm! What could that mean?"                               | Critters: the next one                       | 1       | 26            |
 | `guide.play.critters.funny.3`                      | "Hee hee! Is that a word?"                                 | Critters: the one after, then funny.1 again  | 1       | 24            |
-| `guide.play.critters.word.<w>`, kind `'play-word'` | "<W>." (input "<W>,", § 4.3), w in `CRITTER_SAID_WORDS`    | Critters: a said word (Thomas 2026-10-22)    | 156     | 624 (input)   |
-| **Total**                                          |                                                            |                                              | **175** | **308 + 624** |
+| `guide.play.critters.word.<w>`, kind `'play-word'` | "<W>." (input "<W>,", § 4.3), w in `CRITTER_SAID_WORDS`    | Critters: a said word (Thomas 2026-10-22)    | 156     | 626 (input)   |
+| **Total**                                          |                                                            |                                              | **175** | **308 + 626** |
 
 The raft's open line plays 300 ms after the game fades in, as the critters' does. The raft's total lines are its only content lines; the critters' content is the shipped blend clips (§ 3.4).
 
@@ -604,7 +604,7 @@ They sit in `playLines.ts` beside the spoken rows, so a language version swaps r
 
 ### 4.3 Render inputs and words
 
-- **The one-word rule** (`.claude/docs/audio-system.md:65`; a one-word clip goes to Lily as "Word," because "Sat." came back as "Saturday"): the nine total lines carry `input: "<N>,"` (`GuidanceLine.input`), and so do the 156 said words ("Map,"; Thomas 2026-10-22). _six_'s input "Six," is the raft total's, so it reuses that render.
+- **The one-word rule** (`.claude/docs/audio-system.md:65`; a one-word clip goes to Lily as "Word," because "Sat." came back as "Saturday"): the nine total lines carry `input: "<N>,"` (`GuidanceLine.input`), and so do the 156 said words ("Map,"; Thomas 2026-10-22). _six_'s input "Six," is the raft total's, so it reuses that render. **Except _sat_ and _wed_** (ear test #661, 2026-10-22): "Sat," still came back as "Saturday" and "Wed," as "Wednesday", so they go as "Satt," and "Wedd," (a doubled letter cannot be a day; captions unchanged), picked from the auditioned candidates by voiced length nearest a plain CVC.
 - **New spoken words** (checked by the same script against every shipped text): _shall_, _raft_, _carry_, _off_, _too_, _heavy_, _splash_, _hee_, _silly_, _animals_, _party_, _island_, _join_, _them_, _sing_, _funny_, _ha_. Common words, except _raft_ and _splash_, which the picture shows.
 - **No line of Emma's own** (kind `'play'`) mentions speed, "fast", "again", "next", "more", "round", "win" or "not a word" (AC C8); the said words (kind `'play-word'`) only say back the run she built, "Win." among them (Thomas 2026-10-22).
 - **Danish version:** each row is one language row. The raft's content is the number words; the critters' sounds are the language's own blend clips, so a Danish version needs its own clips and word list, not new screens.
