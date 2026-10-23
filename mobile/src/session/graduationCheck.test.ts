@@ -119,6 +119,7 @@ function fakeAudio(lines: ReadonlyArray<{ id: string; text: string }>) {
     textToId,
     utteranceCount: lines.length,
     fileCount: textToId.size,
+    bundledCount: 0,
     filesWritten: 0,
     bytesWritten: 0,
     ready: Promise.resolve(),

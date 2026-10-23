@@ -56,6 +56,7 @@ function fakeAudio(): LoadedSessionAudio & {
     textToId: new Map(),
     utteranceCount: 0,
     fileCount: 0,
+    bundledCount: 0,
     filesWritten: 0,
     bytesWritten: 0,
     ready: Promise.resolve(),

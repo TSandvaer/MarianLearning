@@ -14,6 +14,8 @@ import { CRITTER_SAID_WORDS } from '@marian/core/games/playPlace'
 import { HUB_LINES } from '@marian/core/hub/hubLines'
 import { WEB_AUDIO_MODULES } from './audioRegistry'
 import { BLEND_MARKS } from './blendMarks.generated'
+import { canonClipFor } from './bundledAudio'
+import { CANON_AUDIO_BYTES, CANON_AUDIO_MODULES } from './canonAudioRegistry'
 import { GREET_LINE_SOURCES } from './greetAudio'
 import { SFX_SOURCES } from './sfx'
 
@@ -140,5 +142,81 @@ describe('bundled critter word clips (Thomas 2026-10-22)', () => {
       )
     })
     expect(wrong).toEqual([])
+  })
+})
+
+describe('bundled canon clips (no-Claude plan phase 1, design/native/no-claude-sizing.md § 4)', () => {
+  /** Every canon clip by its text, decoded from `public/canon/**`. */
+  const canon = new Map<string, Buffer>()
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, name.name)
+      if (name.isDirectory()) walk(p)
+      else if (name.name.endsWith('.json')) {
+        const json = JSON.parse(readFileSync(p, 'utf8')) as {
+          utterances?: { text: string; audio?: { base64?: string } }[]
+        }
+        for (const u of json.utterances ?? []) {
+          if (!u.audio?.base64) continue
+          canon.set(u.text, Buffer.from(u.audio.base64, 'base64'))
+        }
+      }
+    }
+  }
+  walk(join(webPublic, 'canon'))
+  const sha256 = (b: Buffer) => createHash('sha256').update(b).digest('hex')
+
+  /** text → its bundled file, read from the generated source. */
+  const source = readFileSync(join(__dirname, 'canonAudioRegistry.ts'), 'utf8')
+  const entries = new Map<string, { file: string; bytes: number }>()
+  for (const m of source.matchAll(
+    /^ {2}('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"): require\('([^']+)'\),$/gm,
+  )) {
+    const text = m[1]!.slice(1, -1).replace(/\\(.)/g, '$1')
+    entries.set(text, {
+      file: resolve(__dirname, m[2]!),
+      bytes: CANON_AUDIO_BYTES[text]!,
+    })
+  }
+
+  it('resolves every canon line to a bundled clip with the same bytes and hash', () => {
+    expect(canon.size).toBeGreaterThan(1000)
+    const wrong = [...canon].filter(([text, mp3]) => {
+      const entry = entries.get(text)
+      if (entry === undefined) return true
+      const bundled = readFileSync(entry.file)
+      return (
+        entry.bytes !== mp3.length ||
+        bundled.length !== mp3.length ||
+        sha256(bundled) !== sha256(mp3)
+      )
+    })
+    expect(wrong.map(([text]) => text)).toEqual([])
+    expect(Object.keys(CANON_AUDIO_MODULES)).toHaveLength(canon.size)
+    expect(Object.keys(CANON_AUDIO_BYTES)).toHaveLength(canon.size)
+  })
+
+  it('looks a line up by its text: the module and its byte length', () => {
+    const [text, mp3] = [...canon][0]!
+    expect(canonClipFor(text)).toEqual({
+      module: CANON_AUDIO_MODULES[text],
+      bytes: mp3.length,
+    })
+    expect(canonClipFor('Not a canon line.')).toBeUndefined()
+    expect(canonClipFor('constructor')).toBeUndefined()
+  })
+
+  it('bundles no other canon clip (a blend line reuses its blend clip)', () => {
+    expect([...entries.keys()].sort()).toEqual([...canon.keys()].sort())
+    const canonDir = join(mobileRoot, 'assets', 'audio', 'canon')
+    const targets = new Set([...entries.values()].map((e) => e.file))
+    const files = readdirSync(canonDir).map((f) => join(canonDir, f))
+    expect(files.filter((f) => !targets.has(f))).toEqual([])
+    const blendDir = join(mobileRoot, 'assets', 'audio', 'blend')
+    for (const text of Object.keys(BLEND_MARKS)) {
+      expect(entries.get(text)?.file).toBe(
+        join(blendDir, `${text.split('...').pop()!.trim()}.mp3`),
+      )
+    }
   })
 })

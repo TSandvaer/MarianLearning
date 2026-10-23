@@ -46,14 +46,29 @@ export interface ClaudeStubResponse {
 // Word Song) don't exist. When they land, the broader session-plan shape
 // will move into a shared module — for now we keep the surface narrow.
 
-/** A single audio reference. Currently only inline base64 is shipped. */
-export type AudioRef = {
+/** Inline base64 audio: the only kind the server sends. */
+export type InlineAudioRef = {
   kind: 'inline'
   /** Base64-encoded audio bytes (no data: prefix). */
   base64: string
   /** Always `audio/mpeg` for the Edge-AnaNeural pipeline. */
   mime: 'audio/mpeg'
 }
+
+/**
+ * A canon clip shipped inside the native app (no-Claude plan phase 1,
+ * `design/native/no-claude-sizing.md` § 4): `mobile/scripts/export-audio.mjs`
+ * bundles every `public/canon/**` clip, one per text. The device makes these
+ * refs; the server never sends one.
+ */
+export type BundledAudioRef = {
+  kind: 'bundled'
+  /** The clip's key in the app's canon registry: the text it speaks. */
+  key: string
+}
+
+/** A single audio reference. */
+export type AudioRef = InlineAudioRef | BundledAudioRef
 
 /** A line Melody speaks, paired with its pre-rendered audio. */
 export interface Utterance {
@@ -62,7 +77,12 @@ export interface Utterance {
   /** Spoken text. The frontend's caption layer uses this; it MUST match
    *  what was synthesized. */
   text: string
-  /** Audio bundle. */
+  /** Audio bundle. The wire carries inline audio only. */
+  audio: InlineAudioRef
+}
+
+/** A line the native app can play: a server line, or one bundled in the app. */
+export interface PlayableUtterance extends Omit<Utterance, 'audio'> {
   audio: AudioRef
 }
 
