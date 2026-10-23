@@ -62,6 +62,7 @@ export interface PageDefinitions {
     baselineHashes: ReadonlySet<string>,
   ) => DiffState
   initialFilterOf: (search: string, newCount: number) => string
+  groupFilterOf: (search: string) => string | null
 }
 
 export interface BaselineFile {
@@ -105,7 +106,7 @@ export function loadPageDefinitions(html: string): PageDefinitions {
     `'use strict'\n${manifest}\n${pure}\n` +
       'return { CANON_FILES, ASSET_BASES, GREET_FILES, HUB_FILES, ' +
       'PATH_GROUPS, GUIDANCE_FILES, canonicalItemIdOf, baselineHashesOf, ' +
-      'baselineDiffOf, initialFilterOf }',
+      'baselineDiffOf, initialFilterOf, groupFilterOf }',
   )
   return factory() as PageDefinitions
 }

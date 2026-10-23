@@ -2549,7 +2549,17 @@
         if (requested && FILTER_KEYS.includes(requested)) return requested
         return newCount > 0 ? 'new' : 'all'
       }
+      // ?group=<label>: show one group's rows only (a canon group's label is
+      // its file stem, e.g. cvc-words-probe); null shows every group.
+      function groupFilterOf(search) {
+        try {
+          return new URLSearchParams(search || '').get('group') || null
+        } catch {
+          return null
+        }
+      }
       // ── Pure helpers END ─────────────────────────────────────────────────
+      const activeGroup = groupFilterOf(location.search)
 
       function loadVerdicts() {
         try {
@@ -2750,6 +2760,7 @@
       }
 
       function rowMatchesFilter(item) {
+        if (activeGroup !== null && item.group !== activeGroup) return false
         if (activeFilter === 'all') return true
         if (activeFilter === 'new') return item.diff != null
         return stateOf(item) === activeFilter
@@ -3306,6 +3317,7 @@
           // Register into the flat item registry.
           const item = {
             itemId: r.itemId,
+            group: label,
             audioHash: r.audioHash,
             text: r.text,
             members: r.members,
@@ -3444,9 +3456,21 @@
                 EXPECTED_CANON_UNIQUE +
                 ')'
               : ''
-          const newNote = baseline
-            ? ' ' + newCount + ' new or changed since the baseline.'
-            : ''
+          const inGroup = items.filter((it) => it.group === activeGroup)
+          const groupNote =
+            activeGroup === null
+              ? ''
+              : inGroup.length === 0
+                ? ' No group named "' + activeGroup + '": nothing shown.'
+                : ' Showing the ' +
+                  activeGroup +
+                  ' group only (' +
+                  inGroup.filter(rowMatchesFilter).length +
+                  ' rows).'
+          const newNote =
+            (baseline
+              ? ' ' + newCount + ' new or changed since the baseline.'
+              : '') + groupNote
           setStatus(
             'Ready — ' +
               items.length +
