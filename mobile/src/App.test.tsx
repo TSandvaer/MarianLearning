@@ -372,6 +372,11 @@ async function answerWordRight(): Promise<void> {
   await settle(ADVANCE_AFTER_CORRECT_MS + 400)
 }
 
+// The file's longest test: two whole sessions and two 16 s Session End
+// settles in 100 ms steps (more than 640 act() calls). 0.4-0.6 s on a Mac,
+// 2.2 s on its slow cores (`taskpolicy -c background`), but over jest's
+// default 5 s on CI runs 40031736352 and 40036028858, whose runners ran the
+// whole job about 1.7x slower (typecheck 19 s against 11-13 s).
 it('Session End writes once per session: Math → Session End → Hub → Word Song → Session End (+5), and nothing replays after', async () => {
   boot()
   await greetToMath()
@@ -406,7 +411,7 @@ it('Session End writes once per session: Math → Session End → Hub → Word S
   await settle(1000)
   expect(readSessionHistory().sessionCount).toBe(2)
   expect(loadProgress()?.history).toHaveLength(2)
-})
+}, 15_000)
 
 it('QA route literacy: Word Song runs at once, and its Session End writes exactly once', async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {})

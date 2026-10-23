@@ -342,9 +342,13 @@ it('N6: Back mid-drag, mid-crossing and while a picture shows, and a background 
   await fireEvent.press(screen.getByTestId('play-game-back'))
   await settle(300)
   expect(screen.getByTestId('play-place')).toBeOnTheScreen()
-  // While a picture shows.
+  // While a picture shows: a picture word from the letters this visit
+  // shows. A phone's meadow holds 16 letters drawn with Math.random
+  // (`critterSet`), so a fixed word ('cat') missed 1 visit in 4.
   await open('critters')
-  for (const letter of 'cat') {
+  const here = (l: string) => screen.queryByTestId(`critter-${l}`) !== null
+  const picture = CRITTER_PICTURE_WORDS.find((w) => [...w].every(here))!
+  for (const letter of picture) {
     await fireEvent(
       screen.getByTestId(`critter-${letter}`),
       'accessibilityAction',
