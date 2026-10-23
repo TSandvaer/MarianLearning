@@ -475,7 +475,7 @@ Every meadow critter is at least 48 pt and every seat at least 60 pt.
 | 1024 × 768 (t24 b20)   | 7       | 4    | 542   | 461        | −81    | no   |
 | 1024 × 768 (no insets) | 7       | 4    | 542   | 505        | −37    | no   |
 
-So, by the rule (both orientations, insets at least t24 b20): the 820 × 1180 and 834 × 1194 iPads get all 22; the iPad mini (744 × 1133) gets 16, its landscape being 1 pt short with a status bar's inset (the app hides the status bar, `App.tsx`, so its real top inset may be 0, which fits with 23 pt to spare; the rule does not count on it); the 1024 × 768 class gets 16.
+So, by the rule (both orientations, insets at least t24 b20): the 820 × 1180 and 834 × 1194 iPads get all 22; the iPad mini (744 × 1133) gets 16, its landscape being 1 pt short with a status bar's inset (the app hides the status bar, `App.tsx`, and on the iPad Pro 11-inch (M5) simulator it logged `[layout] frame 834×1210 insets t0 b20` on 2026-10-23, so the mini's real top inset is likely 0 too, which fits with 23 pt to spare; the rule does not count on it); the 1024 × 768 class gets 16.
 
 ### 3.3 Moves
 

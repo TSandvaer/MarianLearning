@@ -168,8 +168,11 @@ tags:
 - takeScreenshot: critters-shelf-clear-after-picture
 
 # A said word with a pack picture: "rat" (r row 3 cell 2, a row 1 cell 0,
-# t row 3 cell 4). The sounds; Emma says "Rat." (her caption, if the
-# short line is caught); then the rat picture; then the shelf clears.
+# t row 3 cell 4). The sounds, then Emma says "Rat." (her line, too short
+# to catch here; Metro's log shows `play:guide.play.critters.word.rat`),
+# then the rat picture (2.9 s up), then the shelf clears. The last swipe
+# barely waits to settle: Emma's breathing keeps the screen from settling,
+# and the default wait (8-12 s) outlasts the whole run.
 - swipe:
     start: 313, 915
     end: 291, 576
@@ -182,21 +185,7 @@ tags:
     start: 521, 915
     end: 543, 576
     duration: 800
-- extendedWaitUntil:
-    visible:
-      id: critter-seat-2
-    timeout: 5000
-- extendedWaitUntil:
-    visible:
-      id: play-game-ribbon
-    timeout: 15000
-    optional: true
-- runFlow:
-    when:
-      visible:
-        id: play-game-ribbon
-    commands:
-      - takeScreenshot: critters-rat-emma-says
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible:
       id: critter-picture
