@@ -50,8 +50,15 @@ const CANON_DIR = resolve(process.cwd(), 'public/canon/word-song/level-1')
  * parses without `littleStories`, so their plans throw there by design.
  * So are real blending's two stops (`design/native/real-blending.md` § 8):
  * the web parses without `blendReads` and plays its silent static plan.
+ * The cvc-words graduation check's probe lines are not a plan at all: the
+ * app swaps their blocks into the cvc-words plan
+ * (`@marian/core/wordSong/graduationCheck`).
  */
-const NATIVE_ONLY = new Set(['blending-cv.json', 'sounding-out.json'])
+const NATIVE_ONLY = new Set([
+  'blending-cv.json',
+  'sounding-out.json',
+  'cvc-words-probe.json',
+])
 const PLANS: { file: string; plan: WordSongSessionPlan }[] = readdirSync(
   CANON_DIR,
 )

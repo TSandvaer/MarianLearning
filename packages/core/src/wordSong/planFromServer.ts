@@ -922,7 +922,7 @@ const PROBLEM_ID =
 const WARMUP_ID =
   /^word\.w(\d+)\.(read|correct|reprompt|hint|giveAnswer|blend)$/
 
-function isServerPlan(value: unknown): value is ServerPlan {
+export function isServerPlan(value: unknown): value is ServerPlan {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
   if (typeof v.id !== 'string' || typeof v.label !== 'string') return false

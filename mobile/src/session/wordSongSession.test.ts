@@ -3,7 +3,8 @@
  * runtime-safe split), the kick latch and the frozen extras, settle
  * (resolve, failure, unreadable plan), the visible-wait fallback, the Hub
  * prefetch and the tear-down that aborts a request in flight.
- * `startSession` is faked: no network, no audio.
+ * `startSession` is faked: no network, no audio. The graduation check the
+ * app builds itself is `./graduationCheck.test.ts`.
  */
 import {
   STATIC_WORD_SONG_PLANS,
@@ -47,6 +48,22 @@ const GRADUATION: WordSongProgressHints = {
   isGraduationSession: true,
   lifetimeFirstEncounters: ['blending-cv'],
   letterSoundsVowelStates: undefined,
+  planKind: { kind: 'forward', warmup: [] },
+}
+
+/** Letter sounds with a vowel map: the one canon-bypassing hint left. */
+const VOWEL_MAP: WordSongProgressHints = {
+  focusNode: 'letter-sounds',
+  focusMode: 'forward',
+  recentSuccessRate: 0.9,
+  isGraduationSession: false,
+  lifetimeFirstEncounters: ['letter-sounds'],
+  letterSoundsVowelStates: {
+    '/o/': 'mastered',
+    '/u/': 'practicing',
+    '/i/': 'intro',
+    '/e/': 'intro',
+  },
   planKind: { kind: 'forward', warmup: [] },
 }
 
@@ -121,7 +138,7 @@ it('sends the web payload: no progress → the bare request', () => {
   })
 })
 
-it('sends the hints, and strips the canon-bypassing ones for the fallback', () => {
+it('sends the hints, never asks for a graduation plan, and strips the vowel map for the fallback', () => {
   const full = buildWordSongSessionPayload(GRADUATION, true)
   expect(full).toEqual({
     track: 'word-song',
@@ -130,7 +147,7 @@ it('sends the hints, and strips the canon-bypassing ones for the fallback', () =
     progress: {
       focusNode: 'cvc-words',
       recentSuccessRate: 0.9,
-      isGraduationSession: true,
+      isGraduationSession: false,
       lifetimeFirstEncounters: ['blending-cv'],
     },
   })
@@ -144,6 +161,12 @@ it('sends the hints, and strips the canon-bypassing ones for the fallback', () =
       lifetimeFirstEncounters: ['blending-cv'],
     },
   })
+  expect(buildWordSongSessionPayload(VOWEL_MAP, true).progress).toHaveProperty(
+    'letterSoundsVowelStates',
+  )
+  expect(
+    buildWordSongSessionPayload(VOWEL_MAP, false).progress,
+  ).not.toHaveProperty('letterSoundsVowelStates')
   // Runtime-safe split: the app never asks for render options.
   expect(JSON.stringify(full)).not.toMatch(/render|synth|fidelity/i)
 })
@@ -199,7 +222,7 @@ it('an unreadable plan unloads its audio and falls back', async () => {
 it('a slow hinted request is replaced by a hint-free one after 5 s on screen', async () => {
   jest.useFakeTimers()
   try {
-    const { calls, session } = harness(GRADUATION)
+    const { calls, session } = harness(VOWEL_MAP)
     session.kick()
     session.startWaitTimer()
     jest.advanceTimersByTime(SESSION_START_WAIT_TIMEOUT_MS)
@@ -208,10 +231,23 @@ it('a slow hinted request is replaced by a hint-free one after 5 s on screen', a
     expect(calls[1]!.args.sessionId).toBe(
       'word-song-word-song-shorta-A-1000-fallback',
     )
-    expect(
-      (calls[1]!.args.payload.progress as Record<string, unknown>)
-        .isGraduationSession,
-    ).toBeUndefined()
+    expect(calls[1]!.args.payload.progress).not.toHaveProperty(
+      'letterSoundsVowelStates',
+    )
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+it('a due graduation check gets no wait timer: there is no hinted request to abandon', () => {
+  jest.useFakeTimers()
+  try {
+    const { calls, session } = harness(GRADUATION)
+    session.kick()
+    session.startWaitTimer()
+    jest.advanceTimersByTime(SESSION_START_WAIT_TIMEOUT_MS * 3)
+    expect(calls).toHaveLength(1)
+    expect(calls[0]!.args.signal?.aborted).toBe(false)
   } finally {
     jest.useRealTimers()
   }
