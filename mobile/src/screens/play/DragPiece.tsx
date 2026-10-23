@@ -38,7 +38,14 @@ import Animated, {
 import type { Rect } from '../../layout/layout'
 import type { Point } from './playGeometry'
 
-import { dragLock, LIFT_MS, LIFT_SCALE, SPRING, TAP_SLOP } from './dragLock'
+import {
+  dragLock,
+  LIFT_MS,
+  LIFT_SCALE,
+  PIECE_Z,
+  SPRING,
+  TAP_SLOP,
+} from './dragLock'
 
 export interface DragPieceProps {
   rect: Rect
@@ -243,5 +250,5 @@ export function DragPiece({
 }
 
 const styles = StyleSheet.create({
-  piece: { position: 'absolute', zIndex: 1 },
+  piece: { position: 'absolute', zIndex: PIECE_Z },
 })

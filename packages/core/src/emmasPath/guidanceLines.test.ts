@@ -532,10 +532,11 @@ function expectedPlayLines(): { id: string; text: string; input?: string }[] {
     { id: 'guide.play.raft.splash', text: 'Too heavy!' },
     { id: 'guide.play.raft.silly', text: 'Hee hee! Silly animals!' },
     { id: 'guide.play.raft.close', text: 'What a party on the island!' },
-    // The open line and three non-word lines (Thomas 2026-10-22).
+    // The open line and three non-word lines (Thomas 2026-10-22); the
+    // open line names the drag (Thomas 2026-10-23, Marian's play test).
     {
       id: 'guide.play.critters.open',
-      text: "Join three letters. If they make a word, I'll say it!",
+      text: "Drag three letters up to the log. If they make a word, I'll say it!",
     },
     {
       id: 'guide.play.critters.funny.1',
@@ -590,10 +591,11 @@ describe('the Play place lines (play-place spec § 4)', () => {
       NUMBER.map((_, i) => `guide.play.raft.total.${i + 1}`),
     )
     // About 250 Lily characters (T3); 242 when "Splash!" left, 308 with the
-    // critters' new open line and three non-word lines (Thomas 2026-10-22).
+    // critters' new open line and three non-word lines (Thomas 2026-10-22),
+    // 322 with the open line naming the drag (53 → 67, Thomas 2026-10-23).
     // The inputs are as long as the texts.
-    expect(play.reduce((n, l) => n + l.text.length, 0)).toBe(308)
-    expect(play.reduce((n, l) => n + (l.input ?? l.text).length, 0)).toBe(308)
+    expect(play.reduce((n, l) => n + l.text.length, 0)).toBe(322)
+    expect(play.reduce((n, l) => n + (l.input ?? l.text).length, 0)).toBe(322)
   })
 
   it('C7: the 19 play lines are rendered in Lily (none awaits its render)', () => {
