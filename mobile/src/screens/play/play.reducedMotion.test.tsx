@@ -25,6 +25,7 @@ import { DRAG_HINT_MS } from './DragHintHand'
 import {
   CRITTERS_OPEN_DELAY_MS,
   DIM_MS,
+  PICTURE_HOLD_MS,
   SHELF_FADE_MS,
   SHELF_HOLD_MS,
   SING_AFTER_MS,
@@ -126,4 +127,29 @@ it('critters (Thomas 2026-10-23): the shelf clears with a fade back, no drop; th
   expect(byId('critter-seat-0').props.accessibilityLabel).toBe(
     'Letter c, on the log',
   )
+})
+
+it('critters (Thomas 2026-10-23, build 20): a said word’s picture fades in after Emma says it and out over 300 ms, then the shelf fades back', async () => {
+  const s = fakeSounds(() => 2000)
+  const g = await mountGame('critters', {
+    words: ['rug', 'cat'],
+    sounds: s.sounds,
+  })
+  await advance(CRITTERS_OPEN_DELAY_MS + 20)
+  for (const letter of ['r', 'a', 't'])
+    await activate(byId(`critter-${letter}`))
+  let t = 0
+  while (!has('critter-picture-rat') && t < 20_000) {
+    await advance(10)
+    t += 10
+  }
+  expect(has('critter-picture-rat')).toBe(true)
+  expect(g.lines.at(-1)).toBe('guide.play.critters.word.rat')
+  await advance(PICTURE_HOLD_MS + 300 - 20)
+  expect(has('critter-picture')).toBe(true)
+  await advance(30)
+  expect(has('critter-picture')).toBe(false)
+  await advance(SHELF_HOLD_MS)
+  expect(screen.queryAllByTestId(/^critter-fade-\d$/)).toHaveLength(3)
+  expect(screen.queryAllByTestId(/^critter-drop-\d$/)).toHaveLength(0)
 })

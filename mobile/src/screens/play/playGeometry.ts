@@ -3,8 +3,8 @@
  * pure maths from the lesson's Math frame. Each game fills `A`, the
  * problem and chip regions together (a game has no chips).
  */
-import type { Rect } from '../../layout/layout'
-import type { MathLayout } from '../../layout/mathLayout'
+import { isTablet, type Rect, type Viewport } from '../../layout/layout'
+import { mathLayout, type MathLayout } from '../../layout/mathLayout'
 
 export interface Point {
   x: number
@@ -327,4 +327,43 @@ export function critterScene(
       height: p,
     },
   }
+}
+
+/**
+ * The insets a tablet's other orientation is measured with, at least: a
+ * status bar (24) and a home indicator (20). Its real ones are not known
+ * until she turns it, so the fit takes the larger (coordinator 2026-10-23).
+ */
+export const TABLET_FIT_INSETS = { top: 24, bottom: 20 } as const
+
+/**
+ * Whether `count` critters fit this tablet at the tablet size (c 88) in
+ * both orientations: the log band and every burrow inside each one's `A`
+ * (Thomas 2026-10-23, build 20; the coordinator's rule). Each orientation
+ * is laid out as the app lays it out (`mathLayout`), with insets no
+ * smaller than `TABLET_FIT_INSETS`. A phone: false (it keeps the cap).
+ */
+export function crittersFitBothWays(v: Viewport, count: number): boolean {
+  if (!isTablet(v)) return false
+  const insets = {
+    ...v.insets,
+    top: Math.max(v.insets.top, TABLET_FIT_INSETS.top),
+    bottom: Math.max(v.insets.bottom, TABLET_FIT_INSETS.bottom),
+  }
+  return [
+    { width: v.width, height: v.height },
+    { width: v.height, height: v.width },
+  ].every(({ width, height }) => {
+    const layout = mathLayout({ width, height, insets })
+    const A = playArea(layout)
+    const s = critterScene(A, true, layout.landscape, count)
+    // 0.01 pt for float error: the block is centred in `A`.
+    return [s.logBand, ...s.cells].every(
+      (r) =>
+        r.x >= A.x - 0.01 &&
+        r.y >= A.y - 0.01 &&
+        right(r) <= right(A) + 0.01 &&
+        bottom(r) <= bottom(A) + 0.01,
+    )
+  })
 }

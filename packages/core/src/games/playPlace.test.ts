@@ -13,6 +13,7 @@ import {
   CRITTER_NOT_SAID,
   CRITTER_PICTURE_WORDS,
   CRITTER_REAL_WORDS,
+  CRITTER_SAID_PICTURE_WORDS,
   CRITTER_SAID_WORDS,
   CRITTER_SOUND_SOURCE,
   CRITTER_WORDS_BY_STEP,
@@ -270,6 +271,21 @@ function canonBlendWords(step: WordSongNode): string[] {
     .map((u) => u.text.split('...').pop()!.trim())
 }
 
+/**
+ * The pack pictures the app bundles: the picture keys of
+ * `mobile/src/assets/registry.ts`, the map `pictureAsset(key)` reads.
+ */
+function bundledPictures(): Set<string> {
+  const registry = readFileSync(
+    join(process.cwd(), 'mobile', 'src', 'assets', 'registry.ts'),
+    'utf8',
+  )
+  const keys = registry.matchAll(
+    /'\/(?:assets\/pictures\/picture-([a-z]+)\.svg|native\/pictures\/([a-z]+))'/g,
+  )
+  return new Set([...keys].map((m) => m[1] ?? m[2]!))
+}
+
 const CVC_STEPS: readonly WordSongNode[] = [
   'blending-cv',
   'sounding-out',
@@ -399,6 +415,24 @@ describe('the critters (§ 3.1)', () => {
       expect(set.words.length).toBeGreaterThan(0)
       for (const w of set.words) expect(critterRun(w)).toBe('picture')
     }
+  })
+
+  it('C5 (Thomas 2026-10-23, build 20): with no cap (a tablet), critterSet keeps all 22 letters and all 45 words on every visit, no rotation', () => {
+    const meadow = [
+      ...'aeiou',
+      ...CRITTER_LETTERS.filter((l) => !VOWELS.has(l)),
+    ]
+    for (let seed = 1; seed <= 1000; seed++) {
+      const set = critterSet(CRITTER_PICTURE_WORDS, seeded(seed), {
+        cap: Infinity,
+      })
+      expect(set.letters).toEqual(meadow)
+      expect(set.words).toEqual(CRITTER_PICTURE_WORDS)
+    }
+    // With no option, still the phone's cap.
+    expect(critterSet(CRITTER_PICTURE_WORDS, seeded(1)).letters).toHaveLength(
+      CRITTER_CAP,
+    )
   })
 
   it('C5: with 16 letters or fewer, critterSet keeps them all, vowels first, then alphabetical', () => {
@@ -561,6 +595,28 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     expect(45 + CRITTER_NEVER_SAY.size + CRITTER_NOT_SAID.size + 156).toBe(220)
     for (const w of ['map', 'cab', 'ham', 'sat', 'hop', 'six', 'win'])
       expect(CRITTER_SAID_WORDS).toContain(w)
+  })
+
+  it('C10 (Thomas 2026-10-23, build 20): CRITTER_SAID_PICTURE_WORDS is exactly the said words with a bundled pack picture: 9, sorted', () => {
+    const bundled = bundledPictures()
+    // The registry read works: every picture word's picture is found.
+    for (const w of ALL_45) expect(bundled.has(w)).toBe(true)
+    expect(CRITTER_SAID_PICTURE_WORDS).toEqual([
+      'bun',
+      'gum',
+      'hut',
+      'map',
+      'nap',
+      'pop',
+      'rat',
+      'tap',
+      'top',
+    ])
+    expect(CRITTER_SAID_PICTURE_WORDS).toEqual(
+      CRITTER_SAID_WORDS.filter((w) => bundled.has(w)),
+    )
+    for (const w of CRITTER_SAID_PICTURE_WORDS)
+      expect(critterRun(w)).toBe('word')
   })
 
   it('C10: critterRun: picture for all 45 (no step gate), word, quiet, funny', () => {

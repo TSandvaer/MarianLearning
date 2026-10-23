@@ -889,6 +889,7 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
             <PlayGameScreen
               key={`play-${playGame}`}
               layout={playFrame}
+              viewport={viewport}
               game={playGame}
               onExit={onPlayGameExit}
               onPoseChange={setPlayPose}

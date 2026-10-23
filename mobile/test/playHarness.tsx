@@ -165,11 +165,17 @@ export async function mountGame(
     sounds: opts.sounds,
   }
   const view = await render(
-    <PlayGameScreen layout={mathLayout(viewport)} {...props} />,
+    <PlayGameScreen
+      layout={mathLayout(viewport)}
+      viewport={viewport}
+      {...props}
+    />,
   )
   await act(async () => {})
   const relayout = async (v: Viewport) => {
-    await view.rerender(<PlayGameScreen layout={mathLayout(v)} {...props} />)
+    await view.rerender(
+      <PlayGameScreen layout={mathLayout(v)} viewport={v} {...props} />,
+    )
     await act(async () => {})
   }
   return { ...lines, sfx, visibility, poses, onExit, relayout }
