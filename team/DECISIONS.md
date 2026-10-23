@@ -70,3 +70,33 @@ _2026-10-16 to 2026-10-17 entries are archived verbatim in [`log/decisions-archi
   4. Released fc16006 (smoke green), TestFlight build 16 (EAS a348688d-a796-4e12-a5bb-4fc2a6f34875), voice-QA baseline #641. EAS is on Starter (Thomas).
   5. Real blending: spec #630 (Dave D1-D4 confirmed, plus his 3rd-wrong whole-clip extra); Dave's change: sounding-out stays out of reviews and warm-ups until played (no goodDays/secureDays). #636 (core) and #637 (native) approved; ear test #642 37/38, cap blend take 1 picked. Both HELD: old builds cannot parse "Listen." canon, so build 17 goes on both devices before any release with it.
 - **Decided by:** Thomas (merges, picks, release, builds, look); Dave (pedagogy changes, adopted by the team).
+
+## 2026-10-20 — Games move to one Play place; flower bed moves onto the path; peek prompt; TTS hole closed
+
+- **Decided:**
+  1. Games live in ONE shared Play place from Home, outside the path; first games Raft crossing and Letter critters; no parent play limit for now (spec #650). Drills belong on the path.
+  2. The flower bed is "not really a game ... belongs on the path" (Thomas): it moves into add-to-10's missing-number problems (spec #648, Dave D1: holes hidden until hint 3, hint 1 ripples by row); the game, its door, route and 30 lines are retired (#652).
+  3. Locked-stop peek prompt: lines "This one is locked. Want to try it?" / "Want to try it?" and a green clay button approved (spec #649, built in #657).
+  4. Sounding out gets the stories' tap hand (Thomas: "its not intuitive that you can tap the letters"): #651, option A (the hand's press plays the letter's sound).
+  5. TTS hole: "Fresh fix now" -> #646 merged, #487 closed. Profiles phase 3 (name audio) spec #645 merged (T11-T13 approved); the build waits until profiles part B is on both devices.
+- **Decided by:** Thomas (popups); Dave (pedagogy rules, adopted by the team).
+
+## 2026-10-20 to 2026-10-22 — Play place shipped; release d58e7408; builds 17-19
+
+- **Decided:**
+  1. Release hold kept until build 17 (EAS 5c358df4, from 843e456d, real blending) was on both devices (Thomas: "its installed"); then released d58e7408 (Play place core #654), voice-QA baseline #655.
+  2. Play place shipped: clay pieces #653, core + 18 Lily lines #654, native UI #656. Build 18 (EAS 5dc3bd9a, dc5dec79) and build 19 (EAS c39e183f, cab7a4e0).
+  3. Letter critters after Thomas's device test (Thomas: "if the letters dont make up any word she should sound the phonics and say 'Is this a word...' or something funny"): Emma says a real three-letter word; a non-word gets one of three funny lines in turn ("Is this a word? I don't know what it means!" ...). Raft: Emma's "Splash!" line becomes "Too heavy!" (Thomas: "it should be a splash sound instead"); the splash itself is a sound effect (#660). Ear-test fixes: sat and wed read as "Saturday"/"Wednesday", so their render inputs are `Satt,` / `Wedd,`.
+  4. Letter critters opens for every learner: `opensAt` moves from `blending-cv` to `letter-names` (Thomas: "the only game in play place is raft crossing"); until blending-cv is current or mastered, a non-word sits quietly instead of getting a funny line (Dave's safeguard) (#663).
+  5. Splash and boing sound effects: blocked until the ElevenLabs key has Sound Effects enabled (Thomas to do); brief tmp/specs/spec-kevin-play-sfx.txt.
+  6. Web Math.test cold-mount flake fixed (Thomas: "Fix it") #664.
+  7. Simulator pre-check before every TestFlight build with new native screens (Thomas: "Yes I want"): Maestro on-demand flows with screenshots (#665), no paid calls; not a replacement for device checks.
+- **Decided by:** Thomas (merges, release, builds, ear tests, popups); Dave (the before-blending rule).
+
+## 2026-10-23 — Letter critters fixes from Marian's play test (build 20); e2e runs in the Playwright container
+
+- **Decided:**
+  1. Marian's four comments fixed in #666: the caption clears when its line ends; the picture draws above the letters; every finished run clears the shelf (critters fall back to the meadow); a drag hint (new intro "Drag three letters up to the log. If they make a word, I'll say it!" + a hand that drags, on entry and after ~8 s idle until the first run). Ear test of the one new line passed (Thomas: "listened to it and it sounds good"). Whether a critter should travel with the hand: judge in build 20 first.
+  2. Build 20 (EAS 48a0943c, from f10a29d2) on TestFlight.
+  3. e2e's Playwright job runs in mcr.microsoft.com/playwright:v1.59.1-noble (#667): a slow Ubuntu apt mirror had made the browser-deps install take 47-53 min and cancel runs at the 70-min cap (twice on #666, twice on main). Thomas chose a second rerun for #666 and the fix (popups).
+- **Decided by:** Thomas (popups, ear test); Kevin (#667 approach), Devon review.
