@@ -107,6 +107,21 @@ jobs:
     # Suite runs ~33-35min and was at the edge of the old 35-min cap
     # (a green run hit 35:15 and got killed mid-test). 50 gives headroom.
     timeout-minutes: 70
+    # Run inside the official Playwright image. It ships Chromium + WebKit
+    # and the ~180 system packages they need, so the job no longer installs
+    # anything from the Ubuntu apt mirror. `playwright install --with-deps`
+    # used to fetch 119 MB of .debs from azure.archive.ubuntu.com on every
+    # run (the browser cache only covered the binaries); a slow mirror made
+    # that step take 47-53 min and the suite was cancelled at 70 min
+    # (PR #666 run 39938053420, main runs 39856012129 and 39842405209).
+    # The tag MUST equal the @playwright/test version yarn.lock resolves:
+    # bump both together, or Playwright cannot find its browsers and every
+    # test fails at launch. `--user 1001` is the runner user, so checkout and
+    # the caches stay writable; `--ipc=host` keeps Chromium from running out
+    # of the container's 64 MB /dev/shm.
+    container:
+      image: mcr.microsoft.com/playwright:v1.59.1-noble
+      options: --user 1001 --ipc=host
     steps:
       - uses: actions/checkout@v4
 
@@ -118,20 +133,6 @@ jobs:
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          # Bump key when @playwright/test version in package.json bumps
-          # so a stale cache doesn't pin us to an outdated browser bundle.
-          key: ${{ runner.os }}-playwright-${{ hashFiles('package.json') }}
-
-      - name: Install Playwright browsers
-        # `--with-deps` pulls in the system libraries Chromium / WebKit need
-        # on Ubuntu (libgbm, libnss3, etc.). On a cache HIT this still runs
-        # but is a no-op for the binaries.
-        run: npx playwright install --with-deps chromium webkit
 
       - name: Run e2e suite
         run: yarn e2e --shard=${{ matrix.shard }}/2
