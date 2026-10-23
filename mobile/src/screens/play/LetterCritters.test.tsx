@@ -13,7 +13,8 @@ import {
   critterRun,
 } from '@marian/core/games/playPlace'
 import { saveProgress, type SkillNode } from '@marian/core/progress'
-import { fireEvent, screen } from '@testing-library/react-native'
+import { act, fireEvent, screen } from '@testing-library/react-native'
+import { StyleSheet } from 'react-native'
 import { letterWindow, MARK_LEAD_MS } from '../../audio/blendMarks'
 import * as bundledAudio from '../../audio/bundledAudio'
 import { audioForWebPath } from '../../audio/bundledAudio'
@@ -33,15 +34,26 @@ import {
   PHONE_P,
   tap,
 } from '../../../test/playHarness'
+import { STORY_TAP_CUE_CANCEL_OUT_MS } from '../wordSong/storyTapCueMotion'
 import { blendClipPath, blendSegments } from './critterModel'
+import { DRAG_HINT_MS } from './DragHintHand'
 import {
+  BOUNCE_MS,
   CRITTERS_OPEN_DELAY_MS,
+  HINT_IDLE_MS,
   PICTURE_HOLD_MS,
   PICTURE_LEAVE_MS,
+  SHELF_DROP_MS,
+  SHELF_HOLD_MS,
   SING_AFTER_MS,
   SOUND_GAP_MS,
+  TUMBLE_MS,
 } from './LetterCritters'
 import { centre, critterScene, playArea } from './playGeometry'
+import { PLAY_LINE_MANIFEST } from './playLines'
+
+/** A run's outcome is over → the shelf has dropped and the log is ready. */
+const CLEAR_MS = SHELF_HOLD_MS + SHELF_DROP_MS + 10
 
 /** Blending sounds' 8 words (11 letters), through the words seam. */
 const BLENDING_WORDS = CRITTER_WORDS_BY_STEP['blending-cv']!
@@ -165,6 +177,8 @@ describe('N9: a picture word', () => {
     expect(g.poses.at(-1)).toBe('idle')
     // No line was spoken for the word.
     expect(g.lines).toEqual(['guide.play.critters.open'])
+    // The meadow opens once the shelf is clear (Thomas 2026-10-23).
+    await advance(CLEAR_MS)
     await tap(byId('critter-b'))
     expect(g.calls.at(-1)).toEqual(own('b'))
   })
@@ -193,7 +207,8 @@ describe('N10: songs that are not picture words', () => {
     await seat(...word.split(''))
     await advance(SING_AFTER_MS)
     for (const l of word) await advance(ownMs(l) + SOUND_GAP_MS)
-    await advance(LINE_MS + 10)
+    // The outcome, then the shelf clears (Thomas 2026-10-23).
+    await advance(TUMBLE_MS + CLEAR_MS)
     void g
   }
 
@@ -307,13 +322,14 @@ describe('N11: moves', () => {
   it('seats 1 and 3 with 2 empty do not sing; the log replays a run', async () => {
     const g = await mount()
     await dragTo(byId('critter-f'), seatCentre(0))
-    await dragTo(byId('critter-n'), seatCentre(2))
+    await dragTo(byId('critter-a'), seatCentre(2))
     await advance(SING_AFTER_MS + 1000)
     expect(g.calls).toEqual([])
-    await dragTo(byId('critter-a'), seatCentre(1))
+    // a moves to the middle seat: "f a" is a run of two.
+    await dragTo(byId('critter-seat-2'), seatCentre(1))
     await advance(SING_AFTER_MS)
     expect(g.calls).toHaveLength(1)
-    await advance(8000)
+    await advance(4000)
     const before = g.calls.length
     await fireEvent.press(byId('critter-log'))
     expect(g.calls.length).toBe(before + 1)
@@ -405,5 +421,275 @@ describe('Dave’s safeguard (Thomas 2026-10-22): a learner before blending soun
     await runOf('map')
     expect(g.calls.at(-1)).toEqual({ uri: mapClip, from: 0, to: null })
     expect(g.sfx.boing.play).not.toHaveBeenCalled()
+  })
+})
+
+describe('Thomas 2026-10-23 (Marian’s play test)', () => {
+  const ribbon = () => screen.queryByTestId('play-game-ribbon')
+  const openText = PLAY_LINE_MANIFEST['guide.play.critters.open'].text
+  const seated = () => [0, 1, 2].filter((i) => has(`critter-seat-${i}`))
+  const dropping = () => screen.queryAllByTestId(/^critter-drop-\d$/).length
+  // The hand is hidden from VoiceOver, like the story cue's.
+  const HIDDEN = { includeHiddenElements: true } as const
+  const hint = () => screen.queryByTestId('critter-drag-hint', HIDDEN) !== null
+  const zOf = (el: ReturnType<typeof byId>) =>
+    (StyleSheet.flatten(el.props.style)?.zIndex as number | undefined) ?? 0
+  /** The highest zIndex among the critters, the twins, the seats and the log. */
+  const topPieceZ = () => {
+    const pieces = [
+      ...screen.queryAllByTestId(/^critter-([a-z]|seat-\d|twin-[a-z])$/),
+      byId('critter-log'),
+    ]
+    expect(pieces.length).toBeGreaterThan(11)
+    return Math.max(...pieces.map(zOf))
+  }
+  /** Seats `word` by VoiceOver and runs to the end of its last sound + gap. */
+  const run = async (word: string) => {
+    await seat(...word.split(''))
+    await advance(SING_AFTER_MS)
+    for (const l of word) await advance(ownMs(l) + SOUND_GAP_MS)
+  }
+  /** The log is empty and ready: a tap sings, a drag seats. */
+  const expectReady = async (g: Awaited<ReturnType<typeof mount>>) => {
+    expect(seated()).toEqual([])
+    expect(dropping()).toBe(0)
+    await tap(byId('critter-b'))
+    expect(g.calls.at(-1)).toEqual(own('b'))
+    await dragTo(byId('critter-c'), seatCentre(0))
+    expect(byId('critter-seat-0').props.accessibilityLabel).toBe(
+      'Letter c, on the log',
+    )
+  }
+
+  describe('1. a line’s caption goes when the line ends or is cut', () => {
+    it('the open line: up while it plays, gone when it ends', async () => {
+      const s = fakeSounds(wholeMs)
+      await mountGame('critters', { words: BLENDING_WORDS, sounds: s.sounds })
+      expect(ribbon()).toBeNull()
+      await advance(CRITTERS_OPEN_DELAY_MS)
+      expect(ribbon()?.props.accessibilityLabel).toBe(openText)
+      await advance(LINE_MS)
+      expect(ribbon()).toBeNull()
+    })
+
+    it('"Is this a word? I don’t know what it means!" goes when it ends', async () => {
+      const g = await mount()
+      await run('bgf')
+      expect(g.lines.at(-1)).toBe('guide.play.critters.funny.1')
+      expect(ribbon()?.props.accessibilityLabel).toBe(
+        PLAY_LINE_MANIFEST['guide.play.critters.funny.1'].text,
+      )
+      await advance(LINE_MS)
+      expect(ribbon()).toBeNull()
+    })
+
+    it('a tap that cuts the open line takes its caption with it', async () => {
+      const s = fakeSounds(wholeMs)
+      await mountGame('critters', { words: BLENDING_WORDS, sounds: s.sounds })
+      await advance(CRITTERS_OPEN_DELAY_MS)
+      expect(ribbon()).not.toBeNull()
+      await tap(byId('critter-f'))
+      expect(ribbon()).toBeNull()
+    })
+
+    it('the raft’s lines go too (the frame is shared)', async () => {
+      const g = await mountGame('raft', { shore: [7, 3, 6, 4, 8, 2] })
+      await advance(CRITTERS_OPEN_DELAY_MS + LINE_MS)
+      expect(g.lines).toEqual(['guide.play.raft.open'])
+      expect(ribbon()).toBeNull()
+    })
+  })
+
+  it('2. a picture word’s picture draws over every critter, the log and the drag layer', async () => {
+    await mount()
+    await seat('f', 'a', 'n')
+    await advance(SING_AFTER_MS + blendSegments('fan')![3]![0])
+    const card = byId('critter-picture')
+    const top = topPieceZ()
+    // The drag layer's pieces carry a zIndex, which on iOS lifts them over
+    // any overlay without one, wherever it sits in the tree.
+    expect(top).toBeGreaterThanOrEqual(1)
+    expect(zOf(card)).toBeGreaterThan(top)
+  })
+
+  describe('3. every run of three ends with the shelf cleared', () => {
+    it('a said word: after Emma says it, the three drop home; no line, no praise', async () => {
+      const g = await mount()
+      await run('map')
+      const said = wholeMs(
+        audioForWebPath(critterWordLine('map')!.src) as number,
+      )
+      await advance(said + SHELF_HOLD_MS - 20)
+      expect(seated()).toEqual([0, 1, 2])
+      expect(dropping()).toBe(0)
+      await advance(30)
+      expect(seated()).toEqual([])
+      expect(dropping()).toBe(3)
+      await advance(SHELF_DROP_MS)
+      expect(g.lines).toEqual(['guide.play.critters.open'])
+      expect(g.sfx.sparkle.play).not.toHaveBeenCalled()
+      await expectReady(g)
+    })
+
+    it('a picture word: after the picture leaves', async () => {
+      const g = await mount()
+      await seat('f', 'a', 'n')
+      await advance(SING_AFTER_MS)
+      const left = wholeMs(clipOf('fan')) + PICTURE_HOLD_MS + PICTURE_LEAVE_MS
+      await advance(left + SHELF_HOLD_MS - 20)
+      expect(has('critter-picture')).toBe(false)
+      expect(seated()).toEqual([0, 1, 2])
+      await advance(30)
+      expect(seated()).toEqual([])
+      expect(dropping()).toBe(3)
+      await advance(SHELF_DROP_MS)
+      expect(g.sfx.sparkle.play).toHaveBeenCalledTimes(1)
+      await expectReady(g)
+    })
+
+    it('a non-word: after the tumble and Emma’s line', async () => {
+      const g = await mount()
+      await run('bgf')
+      expect(g.sfx.boing.play).toHaveBeenCalledTimes(1)
+      await advance(TUMBLE_MS + SHELF_HOLD_MS - 20)
+      expect(seated()).toEqual([0, 1, 2])
+      await advance(30)
+      expect(seated()).toEqual([])
+      expect(dropping()).toBe(3)
+      await advance(SHELF_DROP_MS)
+      expect(g.lines.filter((l) => l.includes('funny'))).toHaveLength(1)
+      await expectReady(g)
+    })
+
+    it('a quiet run (sounds only): after the sounds', async () => {
+      const g = await mount()
+      expect(critterRun('hag')).toBe('quiet')
+      await run('hag')
+      await advance(BOUNCE_MS + SHELF_HOLD_MS - 20)
+      expect(seated()).toEqual([0, 1, 2])
+      await advance(30)
+      expect(seated()).toEqual([])
+      expect(dropping()).toBe(3)
+      await advance(SHELF_DROP_MS)
+      expect(g.lines).toEqual(['guide.play.critters.open'])
+      await expectReady(g)
+    })
+
+    it('a drag during the run is ignored until the shelf is clear', async () => {
+      const g = await mount()
+      await seat('b', 'g', 'f')
+      // Mid-song: a meadow critter dragged onto a seat stays home.
+      await advance(SING_AFTER_MS + ownMs('b') + 10)
+      await dragTo(byId('critter-c'), seatCentre(0))
+      expect(byId('critter-seat-0').props.accessibilityLabel).toBe(
+        'Letter b, on the log',
+      )
+      expect(g.calls).toEqual([own('b')])
+      await advance(ownMs('g') + ownMs('f') + 3 * SOUND_GAP_MS)
+      expect(g.sfx.boing.play).toHaveBeenCalledTimes(1)
+      // Mid-tumble: a seated one dragged off stays seated.
+      await dragTo(byId('critter-seat-1'), { x: 5, y: 5 })
+      expect(seated()).toEqual([0, 1, 2])
+      await advance(TUMBLE_MS + CLEAR_MS)
+      await expectReady(g)
+    })
+
+    it('a run cut short by the background still ends with the log empty once she is back', async () => {
+      const g = await mount()
+      await seat('m', 'a', 'p')
+      await advance(SING_AFTER_MS + 10)
+      await act(async () => g.visibility.set(true))
+      await advance(5000)
+      expect(seated()).toEqual([0, 1, 2])
+      await act(async () => g.visibility.set(false))
+      await advance(CLEAR_MS)
+      await expectReady(g)
+    })
+  })
+
+  describe('4. the drag hint', () => {
+    it('on entry, with the new open line: the hand, see-through, over every piece', async () => {
+      const s = fakeSounds(wholeMs)
+      const g = await mountGame('critters', {
+        words: BLENDING_WORDS,
+        sounds: s.sounds,
+      })
+      await advance(CRITTERS_OPEN_DELAY_MS - 10)
+      expect(hint()).toBe(false)
+      await advance(10)
+      expect(hint()).toBe(true)
+      expect(g.lines).toEqual(['guide.play.critters.open'])
+      expect(openText).toBe(
+        "Drag three letters up to the log. If they make a word, I'll say it!",
+      )
+      const hand = screen.getByTestId('critter-drag-hint', HIDDEN)
+      expect(StyleSheet.flatten(hand.props.style).pointerEvents).toBe('none')
+      expect(hand.props.accessibilityElementsHidden).toBe(true)
+      expect(zOf(hand)).toBeGreaterThan(topPieceZ())
+      await advance(DRAG_HINT_MS - 10)
+      expect(hint()).toBe(true)
+      await advance(10)
+      expect(hint()).toBe(false)
+    })
+
+    it('again after ~8 s with no drag: the line once more, then the hand alone', async () => {
+      const s = fakeSounds(wholeMs)
+      const g = await mountGame('critters', {
+        words: BLENDING_WORDS,
+        sounds: s.sounds,
+      })
+      await advance(CRITTERS_OPEN_DELAY_MS + DRAG_HINT_MS)
+      expect(hint()).toBe(false)
+      await advance(HINT_IDLE_MS - 10)
+      expect(hint()).toBe(false)
+      await advance(20)
+      expect(hint()).toBe(true)
+      expect(g.lines).toEqual([
+        'guide.play.critters.open',
+        'guide.play.critters.open',
+      ])
+      for (let k = 0; k < 2; k++) {
+        await advance(DRAG_HINT_MS)
+        expect(hint()).toBe(false)
+        await advance(HINT_IDLE_MS)
+        expect(hint()).toBe(true)
+      }
+      // The coordinator's call (2026-10-23): the line twice a visit at most.
+      expect(g.lines).toHaveLength(2)
+    })
+
+    it('a tap does not put the hint off; a drag does, and ends the hand', async () => {
+      const s = fakeSounds(wholeMs)
+      await mountGame('critters', { words: BLENDING_WORDS, sounds: s.sounds })
+      await advance(CRITTERS_OPEN_DELAY_MS)
+      await dragStart(byId('critter-b'), { x: 5, y: 5 })
+      await advance(STORY_TAP_CUE_CANCEL_OUT_MS)
+      expect(hint()).toBe(false)
+      await dragRelease(byId('critter-b'), { x: 5, y: 5 })
+      await advance(HINT_IDLE_MS - 1000)
+      await tap(byId('critter-b'))
+      await advance(1010)
+      expect(hint()).toBe(true)
+      await advance(DRAG_HINT_MS + HINT_IDLE_MS - 1000)
+      await dragTo(byId('critter-b'), { x: 5, y: 5 })
+      await advance(1010)
+      expect(hint()).toBe(false)
+      await advance(HINT_IDLE_MS - 1010 - 10)
+      expect(hint()).toBe(false)
+      await advance(20)
+      expect(hint()).toBe(true)
+    })
+
+    it('never again that visit once she has made her first run of three', async () => {
+      const g = await mount()
+      expect(hint()).toBe(true)
+      await run('hag')
+      expect(hint()).toBe(false)
+      for (let t = 0; t < 2 * (HINT_IDLE_MS + DRAG_HINT_MS); t += 500) {
+        await advance(500)
+        expect(hint()).toBe(false)
+      }
+      expect(g.lines).toEqual(['guide.play.critters.open'])
+    })
   })
 })

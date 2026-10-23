@@ -15,6 +15,15 @@
  * never a mistake, and no run is spoken as a word unless it is a picture
  * word or a said word.
  *
+ * Every run of three ends with the shelf cleared (Thomas 2026-10-23,
+ * Marian's play test): from its first sound the board waits; once the
+ * outcome is over (the said word, the picture's leave, the tumble and the
+ * line, or the sounds) the three drop home to their burrows and the log is
+ * empty. A drag hint (the story cue's hand, dragging a critter up to the
+ * log) comes with the open line, and again after `HINT_IDLE_MS` without a
+ * drag, until her first run of three; Emma says the line with it twice at
+ * most.
+ *
  * Every sound is a bundled Word Song blend clip (`/native/blend/<word>.mp3`,
  * marks straight from `BLEND_MARKS`, K2): a word plays its whole clip; a
  * letter plays the lesson's tap window of its `CRITTER_SOUND_SOURCE`
@@ -44,6 +53,7 @@ import {
 } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import Animated, {
+  Easing,
   FadeIn,
   useAnimatedStyle,
   useSharedValue,
@@ -60,6 +70,10 @@ import { createTapClipPlayer, type TapClipPlayer } from '../../audio/tapClip'
 import type { Rect } from '../../layout/layout'
 import { colors, fonts } from '../../theme'
 import {
+  STORY_TAP_CUE_CANCEL_OUT_MS,
+  storyTapCueSize,
+} from '../wordSong/storyTapCueMotion'
+import {
   blendClipPath,
   blendSegments,
   EMPTY_SEATS,
@@ -69,8 +83,17 @@ import {
   unseat,
   type Seats,
 } from './critterModel'
+import { DragHintHand, DRAG_HINT_MS } from './DragHintHand'
+import { OVER_PIECE_Z } from './dragLock'
 import { DragPiece } from './DragPiece'
-import { contains, critterScene, grow, type Point } from './playGeometry'
+import {
+  centre,
+  contains,
+  critterScene,
+  grow,
+  type CritterScene,
+  type Point,
+} from './playGeometry'
 import type { GameKit } from './playKit'
 import { critterLabel, crittersFunnyLine, PLAY_LABELS } from './playLines'
 
@@ -83,6 +106,19 @@ export const SOUND_GAP_MS = 300
 /** A picture word: clip end → the picture floats away (500 ms). */
 export const PICTURE_HOLD_MS = 2400
 export const PICTURE_LEAVE_MS = 500
+/** The three bounce together (0.15 c, 250 ms); a tumble; a dim (§ 3.7). */
+export const BOUNCE_MS = 250
+export const TUMBLE_MS = 500
+export const DIM_MS = 300
+/** A run's outcome is over → the shelf drops home (Thomas 2026-10-23). */
+export const SHELF_HOLD_MS = 400
+/** The three fall to their burrows; Reduce Motion: they fade. */
+export const SHELF_DROP_MS = 400
+export const SHELF_FADE_MS = 300
+/** No drag for this long → the drag hint again, until her first run. */
+export const HINT_IDLE_MS = 8000
+/** Emma says the open line with the hint at most this often a visit. */
+export const HINT_LINES = 2
 
 const HONEY = '#f2c27a'
 const HONEY_LEDGE = '#b27b37'
@@ -145,7 +181,7 @@ export function LetterCritters({
 
   const [seats, setSeatsState] = useState<Seats>(EMPTY_SEATS)
   const seatsRef = useRef<Seats>(EMPTY_SEATS)
-  /** A picture word is up: the board waits; Back stays live. */
+  /** A run of three, until the shelf is clear: the board waits; Back stays live. */
   const [locked, setLocked] = useState(false)
   const lockedRef = useRef(false)
   const [picture, setPicture] = useState<{
@@ -158,10 +194,23 @@ export function LetterCritters({
   const [tumble, setTumble] = useState(0)
   const [lean, setLean] = useState(false)
   const [twin, setTwin] = useState<string | null>(null)
+  /** The shelf dropping home: who falls from which seat. */
+  const [falling, setFalling] = useState<
+    { letter: string; seat: number }[] | null
+  >(null)
+  const [hint, setHint] = useState<{ key: number; leaving: boolean } | null>(
+    null,
+  )
   const draggingRef = useRef(false)
   const songRef = useRef(0)
   const singDueRef = useRef(false)
   const gigglesRef = useRef(0)
+  const droppingRef = useRef(false)
+  /** She has made a run of three: no more hints this visit. */
+  const ranRef = useRef(false)
+  const hintRef = useRef(0)
+  const hintLinesRef = useRef(0)
+  const idleRef = useRef(0)
 
   const setSeats = (next: Seats) => {
     seatsRef.current = next
@@ -172,14 +221,84 @@ export function LetterCritters({
     setLocked(on)
   }
 
-  // The open line; unmount: the sound in flight stops, the player is freed.
-  useEffect(() => {
+  // --- The drag hint (§ 3.3, Thomas 2026-10-23) --------------------------
+
+  /** The hand, with Emma's open line the first `HINT_LINES` times. */
+  const showHint = () => {
+    if (ranRef.current) return
+    const key = ++hintRef.current
+    setHint({ key, leaving: false })
     kit.later(() => {
-      kit.setPose('listening')
-      void kit.speak('guide.play.critters.open').then((ok) => {
-        if (ok) kit.setPose('idle')
-      })
-    }, CRITTERS_OPEN_DELAY_MS)
+      if (hintRef.current !== key) return
+      setHint(null)
+      armIdle()
+    }, DRAG_HINT_MS)
+    if (hintLinesRef.current >= HINT_LINES) return
+    hintLinesRef.current += 1
+    kit.setPose('listening')
+    void kit.speak('guide.play.critters.open').then((ok) => {
+      if (ok) kit.setPose('idle')
+    })
+  }
+  /** Her drag or her run: the hand fades out. */
+  const endHint = () => {
+    const key = ++hintRef.current
+    setHint((h) => (h === null ? h : { ...h, leaving: true }))
+    kit.later(() => {
+      if (hintRef.current === key) setHint(null)
+    }, STORY_TAP_CUE_CANCEL_OUT_MS)
+  }
+  /** `HINT_IDLE_MS` from now with no drag: the hint again. */
+  const armIdle = () => {
+    const token = ++idleRef.current
+    if (ranRef.current) return
+    kit.advance(() => {
+      if (idleRef.current !== token || ranRef.current) return
+      if (draggingRef.current || lockedRef.current) return
+      showHint()
+    }, HINT_IDLE_MS)
+  }
+
+  // --- A run of three and the shelf (Thomas 2026-10-23) -----------------
+
+  /** From the run's first sound the board waits until the shelf is clear. */
+  const startRun = () => {
+    lock(true)
+    ranRef.current = true
+    idleRef.current += 1
+    endHint()
+  }
+  /** The outcome is over: `after` ms on, the shelf drops home. */
+  const settle = (token: number, after = 0) =>
+    kit.advance(() => {
+      if (songRef.current === token) dropShelf()
+    }, after + SHELF_HOLD_MS)
+  /** The seated critters fall to their burrows; the log is empty, ready. */
+  const dropShelf = () => {
+    if (droppingRef.current) return
+    droppingRef.current = true
+    const home = seatsRef.current.flatMap((letter, seat) =>
+      letter === null ? [] : [{ letter, seat }],
+    )
+    setSeats(EMPTY_SEATS)
+    setLean(false)
+    setPicture(null)
+    setSeatBounce([0, 0, 0])
+    setFalling(home)
+    kit.advance(
+      () => {
+        droppingRef.current = false
+        setFalling(null)
+        lock(false)
+      },
+      reducedMotion ? SHELF_FADE_MS : SHELF_DROP_MS,
+    )
+  }
+
+  // The hint and its open line; unmount: the sound in flight stops, the
+  // player is freed.
+  useEffect(() => {
+    kit.later(showHint, CRITTERS_OPEN_DELAY_MS)
     return () => {
       songRef.current += 1
       player.release()
@@ -188,12 +307,21 @@ export function LetterCritters({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // The app goes to the background: the sound stops (it never resumes).
+  // The app goes to the background: the sound stops (it never resumes). A
+  // run cut short still ends with the log empty, once she is back.
   useEffect(() => {
     if (kit.cancelKey.endsWith('hidden')) {
       songRef.current += 1
       player.cut()
+      if (lockedRef.current) {
+        kit.advance(() => {
+          kit.setPose('idle')
+          dropShelf()
+        }, 0)
+      }
     }
+    // Only a new key cancels.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kit.cancelKey, player])
 
   const bounceSeat = (i: number) =>
@@ -215,6 +343,8 @@ export function LetterCritters({
     setLean(false)
     songRef.current += 1
     player.cut()
+    endHint()
+    armIdle()
     scheduleSing()
   }
   const scheduleSing = () => {
@@ -235,6 +365,7 @@ export function LetterCritters({
     const letters = run.map((i) => current[i]!)
     const word = letters.join('')
     const kind = run.length === 3 ? critterRun(word, { funny }) : null
+    if (kind !== null) startRun()
     if (kind === 'picture') {
       pictureWord(word, run)
       return
@@ -258,7 +389,6 @@ export function LetterCritters({
       return
     }
     const token = ++songRef.current
-    lock(true)
     kit.cutLine()
     kit.setPose('listening')
     const at = (ms: number, fn: () => void) =>
@@ -278,12 +408,14 @@ export function LetterCritters({
     player.play(clip, 0, null, () => {
       if (songRef.current !== token) return
       kit.advance(() => {
+        if (songRef.current !== token) return
         setPicture({ word, leaving: true })
         kit.advance(
           () => {
+            if (songRef.current !== token) return
             setPicture(null)
             kit.setPose('idle')
-            lock(false)
+            settle(token)
           },
           reducedMotion ? 300 : PICTURE_LEAVE_MS,
         )
@@ -298,7 +430,7 @@ export function LetterCritters({
     const next = (k: number) => {
       if (songRef.current !== token) return
       if (k === letters.length) {
-        after(run, letters.join(''), outcome)
+        after(run, letters.join(''), outcome, token)
         return
       }
       bounceSeat(run[k]!)
@@ -310,8 +442,16 @@ export function LetterCritters({
     next(0)
   }
 
-  /** Called `SOUND_GAP_MS` after the last sound ends. */
-  const after = (run: number[], word: string, outcome: Outcome) => {
+  /**
+   * Called `SOUND_GAP_MS` after the last sound ends. A run of three then
+   * settles: the shelf drops home once its outcome is over.
+   */
+  const after = (
+    run: number[],
+    word: string,
+    outcome: Outcome,
+    token: number,
+  ) => {
     if (outcome === 'pair') {
       setLean(true)
       kit.setPose('idle')
@@ -323,11 +463,12 @@ export function LetterCritters({
       // A said word (play-place § 3.3, Thomas 2026-10-22): Emma says it,
       // the three bounce together as it starts, then sit. No praise line,
       // no sparkle, no picture (Dave's safeguard 2).
-      const token = songRef.current
       run.forEach(bounceSeat)
       setLean(true)
       player.play(clip, 0, null, () => {
-        if (songRef.current === token) kit.setPose('idle')
+        if (songRef.current !== token) return
+        kit.setPose('idle')
+        settle(token)
       })
       return
     }
@@ -335,6 +476,7 @@ export function LetterCritters({
       run.forEach(bounceSeat)
       setLean(true)
       kit.setPose('idle')
+      settle(token, BOUNCE_MS)
       return
     }
     sfx.boing.play()
@@ -342,10 +484,18 @@ export function LetterCritters({
     // Every non-word gets a line, the three in turn (Thomas 2026-10-22).
     gigglesRef.current = (gigglesRef.current % 3) + 1
     kit.setPose('cheering')
+    // The shelf waits for both the tumble (or the dim) and the line.
+    let left = 2
+    const over = () => {
+      left -= 1
+      if (left === 0) settle(token)
+    }
+    kit.later(over, reducedMotion ? DIM_MS : TUMBLE_MS)
     void kit
       .speak(crittersFunnyLine(gigglesRef.current as 1 | 2 | 3))
       .then((ok) => {
-        if (ok) kit.setPose('idle')
+        if (ok && songRef.current === token) kit.setPose('idle')
+        over()
       })
   }
 
@@ -403,7 +553,7 @@ export function LetterCritters({
   }
 
   const onLogTap = () => {
-    if (lockedRef.current) return
+    if (lockedRef.current || draggingRef.current) return
     kit.cutLine()
     songRef.current += 1
     player.cut()
@@ -413,12 +563,15 @@ export function LetterCritters({
   const dragStart = (letter?: string) => {
     kit.cutLine()
     draggingRef.current = true
+    endHint()
+    armIdle()
     if (letter !== undefined) setTwin(letter)
   }
   const dragEnd = () => {
     draggingRef.current = false
     setTwin(null)
-    if (singDueRef.current) scheduleSing()
+    armIdle()
+    if (singDueRef.current && !lockedRef.current) scheduleSing()
   }
 
   // --- Drawing -----------------------------------------------------------
@@ -553,6 +706,27 @@ export function LetterCritters({
         )
       })}
 
+      {falling?.map(({ letter, seat }) => (
+        <Falling
+          key={`fall-${seat}`}
+          seat={seat}
+          letter={letter}
+          from={scene.seats[seat]!}
+          to={scene.cells[visit.letters.indexOf(letter)]!}
+          reducedMotion={reducedMotion}
+        />
+      ))}
+
+      {hint !== null && (
+        <DragHintHand
+          key={hint.key}
+          {...hintPath(scene, seats)}
+          size={storyTapCueSize(kit.tablet)}
+          reducedMotion={reducedMotion}
+          leaving={hint.leaving}
+        />
+      )}
+
       {picture !== null && (
         <PictureCard
           key={picture.word}
@@ -572,6 +746,89 @@ const rectStyle = (r: Rect) => ({
   width: r.width,
   height: r.height,
 })
+
+/**
+ * The drag hint's path: from the top row's critter nearest the log's
+ * middle up to the first free seat.
+ */
+function hintPath(
+  scene: CritterScene,
+  seats: Seats,
+): { from: Point; to: Point } {
+  const top = Math.min(...scene.cells.map((r) => r.y))
+  const mid = centre(scene.log).x
+  const from = scene.cells
+    .filter((r) => r.y === top)
+    .reduce((a, b) =>
+      Math.abs(centre(b).x - mid) < Math.abs(centre(a).x - mid) ? b : a,
+    )
+  const free = seats.indexOf(null)
+  return { from: centre(from), to: centre(scene.seats[free < 0 ? 1 : free]!) }
+}
+
+/**
+ * A seated critter dropping home when the shelf clears (Thomas 2026-10-23):
+ * it falls from its seat to its burrow and shrinks to the meadow's size
+ * (400 ms, ease-in), landing on the critter that sits there; Reduce Motion:
+ * it fades where it sits (300 ms), the burrow's critter already home.
+ */
+function Falling({
+  seat,
+  letter,
+  from,
+  to,
+  reducedMotion,
+}: {
+  seat: number
+  letter: string
+  from: Rect
+  to: Rect
+  reducedMotion: boolean
+}) {
+  const p = useSharedValue(0)
+  const o = useSharedValue(1)
+  useEffect(() => {
+    if (reducedMotion) o.set(withTiming(0, { duration: SHELF_FADE_MS }))
+    else {
+      p.set(
+        withTiming(1, {
+          duration: SHELF_DROP_MS,
+          easing: Easing.in(Easing.quad),
+        }),
+      )
+    }
+    // Mount-once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  // Reduce Motion fades in place: no move, no shrink.
+  const move = reducedMotion ? 0 : 1
+  const dx = move * (centre(from).x - centre(to).x)
+  const dy = move * (centre(from).y - centre(to).y)
+  const grown = reducedMotion ? 1 : from.width / to.width
+  const style = useAnimatedStyle(() => ({
+    opacity: o.get(),
+    transform: [
+      { translateX: (1 - p.get()) * dx },
+      { translateY: (1 - p.get()) * dy },
+      { scale: grown + (1 - grown) * p.get() },
+    ],
+  }))
+  const at = reducedMotion ? from : to
+  return (
+    <Animated.View
+      testID={`critter-${reducedMotion ? 'fade' : 'drop'}-${seat}`}
+      pointerEvents="none"
+      style={[styles.abs, styles.over, rectStyle(at), style]}
+    >
+      <Critter
+        letter={letter}
+        size={at.width}
+        bounce={0}
+        reducedMotion={reducedMotion}
+      />
+    </Animated.View>
+  )
+}
 
 /**
  * A critter (§ 3.2): a round body, honey for consonants and pink for
@@ -860,6 +1117,7 @@ function PictureCard({
       style={[
         styles.abs,
         styles.card,
+        styles.over,
         rectStyle(rect),
         { borderRadius: 0.12 * rect.width },
         style,
@@ -880,6 +1138,8 @@ const styles = StyleSheet.create({
   fill: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
   fillBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   abs: { position: 'absolute' },
+  // Over every critter, the log and the drag layer (`dragLock.ts`).
+  over: { zIndex: OVER_PIECE_Z },
   log: {
     position: 'absolute',
     backgroundColor: '#c98a55',

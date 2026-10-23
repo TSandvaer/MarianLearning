@@ -56,6 +56,8 @@ import { RaftCrossing } from './RaftCrossing'
 
 /** The game's fade in and out (§ 1.4). */
 export const PLAY_GAME_FADE_MS = 200
+/** A line's caption fades out as the line ends (Thomas 2026-10-23). */
+export const CAPTION_OUT_MS = 200
 
 export interface PlayGameScreenProps {
   layout: MathLayout
@@ -146,6 +148,11 @@ export function PlayGameScreen({
         if (visibility.getIsHidden()) pendingRef.current.push(fn)
         else fn()
       }, ms)
+    // A line's caption goes when the line ends or is cut, and changes when
+    // the next starts (Thomas 2026-10-23, Marian's play test: "Is this a
+    // word? ..." stayed up after Emma had finished).
+    const clearCaption = () =>
+      setCaption((c) => (c.text === '' ? c : { ...c, text: '', revealed: 0 }))
     const speak = (id: PlayLineId): Promise<boolean> => {
       if (exitedRef.current) return Promise.resolve(false)
       player.cancelActive()
@@ -162,11 +169,16 @@ export function PlayGameScreen({
             )
           },
         })
-        .then(() => !exitedRef.current && tokenRef.current === token)
+        .then(() => {
+          const own = !exitedRef.current && tokenRef.current === token
+          if (own) clearCaption()
+          return own
+        })
     }
     const cutLine = () => {
       tokenRef.current += 1
       player.cancelActive()
+      clearCaption()
     }
     return {
       speak,
@@ -261,6 +273,7 @@ export function PlayGameScreen({
             text={caption.text}
             revealedCount={caption.revealed}
             lineKey={`${caption.key}`}
+            exiting={FadeOut.duration(CAPTION_OUT_MS)}
             fontSize={layout.captionFontSize}
             lineHeight={layout.captionLineHeight}
             padding={layout.ribbonPadding}

@@ -306,10 +306,12 @@ function buildLines(): GuidanceLine[] {
   add(RAFT_CLOSE_ID, 'play', 'What a party on the island!')
   // The critters' open line and their three non-word lines (Thomas
   // 2026-10-22): no "sing", and a non-word run asks whether it is a word.
+  // The open line names the move, a drag up to the log (Thomas 2026-10-23,
+  // Marian's play test); the drag hint's hand shows it as she hears it.
   add(
     CRITTERS_OPEN_ID,
     'play',
-    "Join three letters. If they make a word, I'll say it!",
+    "Drag three letters up to the log. If they make a word, I'll say it!",
   )
   add(crittersFunnyId(1), 'play', "Is this a word? I don't know what it means!")
   add(crittersFunnyId(2), 'play', 'Hmm! What could that mean?')

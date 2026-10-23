@@ -21,7 +21,14 @@ import {
   PHONE_P,
   tap,
 } from '../../../test/playHarness'
-import { CRITTERS_OPEN_DELAY_MS, SING_AFTER_MS } from './LetterCritters'
+import { DRAG_HINT_MS } from './DragHintHand'
+import {
+  CRITTERS_OPEN_DELAY_MS,
+  DIM_MS,
+  SHELF_FADE_MS,
+  SHELF_HOLD_MS,
+  SING_AFTER_MS,
+} from './LetterCritters'
 import { centre, playArea, raftScene } from './playGeometry'
 import { REDUCED_SPLASH_END_MS, ROW_AT_MS, SCENE_AT_MS } from './RaftCrossing'
 
@@ -85,4 +92,38 @@ it('critters: a non-word dims instead of tumbling; the boing and the line play',
   expect(has('critter-tumble')).toBe(false)
   expect(has('critter-dim')).toBe(true)
   expect(g.lines.at(-1)).toBe('guide.play.critters.funny.1')
+})
+
+it('critters (Thomas 2026-10-23): the shelf clears with a fade back, no drop; the drag hint still shows', async () => {
+  const s = fakeSounds(() => 2000)
+  await mountGame('critters', { words: BLENDING_WORDS, sounds: s.sounds })
+  await advance(CRITTERS_OPEN_DELAY_MS)
+  // The hand is hidden from VoiceOver; under Reduce Motion it only fades.
+  const hidden = { includeHiddenElements: true } as const
+  expect(screen.queryByTestId('critter-drag-hint', hidden)).not.toBeNull()
+  await advance(DRAG_HINT_MS)
+  expect(screen.queryByTestId('critter-drag-hint', hidden)).toBeNull()
+  for (const letter of ['b', 'g', 'f'])
+    await activate(byId(`critter-${letter}`))
+  const fading = () => screen.queryAllByTestId(/^critter-fade-\d$/).length
+  // To the dim, then on until the shelf starts to clear.
+  let t = 0
+  while (!has('critter-dim') && t < 10_000) {
+    await advance(10)
+    t += 10
+  }
+  expect(has('critter-dim')).toBe(true)
+  await advance(DIM_MS + SHELF_HOLD_MS - 20)
+  expect(fading()).toBe(0)
+  await advance(30)
+  expect(fading()).toBe(3)
+  expect(screen.queryAllByTestId(/^critter-drop-\d$/)).toHaveLength(0)
+  expect(screen.queryAllByTestId(/^critter-seat-\d$/)).toHaveLength(0)
+  await advance(SHELF_FADE_MS)
+  expect(screen.queryAllByTestId(/^critter-fade-\d$/)).toHaveLength(0)
+  // The log is ready.
+  await activate(byId('critter-c'))
+  expect(byId('critter-seat-0').props.accessibilityLabel).toBe(
+    'Letter c, on the log',
+  )
 })
