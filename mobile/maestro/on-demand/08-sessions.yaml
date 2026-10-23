@@ -1,0 +1,63 @@
+# Both worlds' sessions: Number Garden, then Word Song, each from the Hub to
+# Session End, with a screenshot of a problem in each. A pre-check for a
+# change to session start or session audio (no-Claude plan phase 1: the
+# canon clips bundled in the app, `src/audio/sessionAudio.ts`).
+#
+# `cvc-words` seed: Math on a fresh install's start, Word Song on CVC words
+# (flows 02 and 03). With the harness's closed API port both sessions run
+# core's static plans with silent captions; a session with the server's
+# canon lines is the sweep's (`run.sh --sweep <step>`).
+appId: host.exp.Exponent
+name: Number Garden and Word Song sessions
+tags:
+  - sessions
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: cvc-words
+- runFlow: ../subflows/open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 120000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: hub-card-number-garden
+      NEXT: math
+- extendedWaitUntil:
+    visible:
+      id: math-chips
+    timeout: 30000
+- takeScreenshot: sessions-math-problem
+- runFlow: ../subflows/math-session.yaml
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: session-end-cta
+      NEXT: hub
+- extendedWaitUntil:
+    visible:
+      id: hub-card-word-song
+    timeout: 30000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: hub-card-word-song
+      NEXT: word-song
+- extendedWaitUntil:
+    visible:
+      id: word-song-chips
+    timeout: 30000
+- takeScreenshot: sessions-word-song-problem
+- runFlow: ../subflows/word-song-session.yaml
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: session-end-cta
+      NEXT: hub
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 30000
