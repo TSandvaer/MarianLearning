@@ -183,13 +183,13 @@ P  phone portrait (375×667)              L  phone landscape (667×375)
 
 **Route `play-game`; layout `mathLayout(viewport)` as it is** (`mobile/src/layout/mathLayout.ts:477`), so the back disc, Emma and the ribbon sit where a lesson puts them. `layoutForRoute` returns `mathLayout` for `play-game` as it does for `game` (`routeLayout.ts:19-21`).
 
-| Region    | What                                                                                                                                                                               | Source                                             |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| Back      | The lesson's clay back disc, 56 pt on phones, 74.7 pt on tablets                                                                                                                   | `PHONE_BACK`, `TABLET_BACK`, `mathLayout.ts:70-71` |
-| HUD row   | Empty: no beads, no stardust pill, no streak                                                                                                                                       | Decision 4; § 1.6                                  |
-| Emma      | App's `EmmaStage` at `layout.emma`, with a `playPose` like the flower bed's `gamePose`                                                                                             | `EmmaStage.tsx`; `App.tsx`                         |
-| Ribbon    | `CaptionRibbon` at `layout.ribbon`, walking each line by word ticks                                                                                                                | `CaptionRibbon.tsx`                                |
-| Play area | `A` = x `problem.x`, y `problem.y`, width `problem.width`, height `chips.rect.y + chips.rect.height − problem.y`: the problem and chip regions together, since a game has no chips | `mathLayout.ts:121`, `:131`                        |
+| Region    | What                                                                                                                                                                                                                                                                         | Source                                             |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Back      | The lesson's clay back disc, 56 pt on phones, 74.7 pt on tablets                                                                                                                                                                                                             | `PHONE_BACK`, `TABLET_BACK`, `mathLayout.ts:70-71` |
+| HUD row   | Empty: no beads, no stardust pill, no streak                                                                                                                                                                                                                                 | Decision 4; § 1.6                                  |
+| Emma      | App's `EmmaStage` at `layout.emma`, with a `playPose` like the flower bed's `gamePose`                                                                                                                                                                                       | `EmmaStage.tsx`; `App.tsx`                         |
+| Ribbon    | `CaptionRibbon` at `layout.ribbon`, walking each line by word ticks. A line's caption goes when the line ends or is cut (200 ms fade) and changes when the next starts (CHANGE, Thomas 2026-10-23 (Marian's play test): "Is this a word? ..." stayed up after Emma finished) | `CaptionRibbon.tsx`; `PlayGameScreen.tsx`          |
+| Play area | `A` = x `problem.x`, y `problem.y`, width `problem.width`, height `chips.rect.y + chips.rect.height − problem.y`: the problem and chip regions together, since a game has no chips                                                                                           | `mathLayout.ts:121`, `:131`                        |
 
 **`A` at the floors** (from the flower bed's size table, `mini-game-flower-bed.md` § 2.2; hand-computed, AC N13 pins them):
 
@@ -445,7 +445,7 @@ The scene fills `A` (§ 1.7). From the top: **the log** (a bench with 3 seats), 
 
 **The log.** A wood log (Number Garden wood) under 3 seats of `1.25 c`, `g` apart. Its band is `1.25 c + 16` tall; its width `3 × 1.25c + 2g + 32`, centred.
 
-**The picture** (when a word pops): the pack picture on the Word Song picture card (`WordStage`'s card, white, rounded), size `p = min(meadow height, meadow width, 200 phone / 300 tablet)`, centred over the meadow.
+**The picture** (when a word pops): the pack picture on the Word Song picture card (`WordStage`'s card, white, rounded), size `p = min(meadow height, meadow width, 200 phone / 300 tablet)`, centred over the meadow. It draws over every critter, the log and the drag layer (CHANGE, Thomas 2026-10-23 (Marian's play test): on iOS it drew behind the letters, because Fabric flattens the meadow's plain Views and sorts the drag pieces' zIndex 1 above a card without one; the card, the hint's hand and the falling critters take zIndex 2, `OVER_PIECE_Z` in `dragLock.ts`).
 
 **Sizes and fit with 16 critters** (hand-computed from § 1.7's `A`; AC N14 pins them):
 
@@ -474,7 +474,7 @@ Every meadow critter is at least 48 pt and every seat at least 60 pt.
 | 0                     | The word's whole blend clip plays from its start ("f - a - n ... fan"). Meadow taps close until the picture leaves; Back stays live.                                                                                                             |
 | `segments[k][0]` − 40 | Critter k (k = 0, 1, 2) bounces (0.15 c, 250 ms) and its letter lights with the lit pulse (1 → 1.2 → 1, 400 ms), as the lesson's letter row lights on the same marks (`litAt`, `MARK_LEAD_MS` = 40, `mobile/src/audio/blendMarks.ts:25`, `:44`). |
 | `segments[3][0]` − 40 | The word: all three bounce together. The picture springs up over the meadow (the shipped entrance, scale 0 → 1 on a 260 / 16 spring with a 150 ms fade, `real-blending.md` § 5). Sparkle (0.55). Emma `celebration`.                             |
-| clip end + 2400       | The picture floats up 0.3 p and fades (500 ms). The critters stay seated. Emma `idle`. Meadow taps open.                                                                                                                                         |
+| clip end + 2400       | The picture floats up 0.3 p and fades (500 ms). Emma `idle`. Then the shelf clears (below) and meadow taps open.                                                                                                                                 |
 
 No Emma line: the clip already says the word, and the picture says the rest.
 
@@ -486,7 +486,24 @@ No Emma line: the clip already says the word, and the picture says the rest.
 - **Three that are not a word, before blending sounds** (`critterRun(run, { funny: false })` gives `'quiet'`; CHANGE, Thomas 2026-10-22 / Dave's safeguard): blending sounds is neither current nor mastered for the learner (`critterFunnyOpen(progress)` false, read once when the game opens). Exactly the quiet word's outcome above: the three bounce together once and sit, with no boing, no tumble, no line, no `cheering`, every time.
 - **Three that are not a word** (`'funny'`, from blending sounds on): 300 ms after the last sound, `sfx-boing`, and the three tumble (rotate −12° → +12° → 0 with a 0.1 c drop, 500 ms) and sit back up. Emma `cheering` and a non-word line, **every time, the three in turn** (CHANGE, Thomas 2026-10-22): `guide.play.critters.funny.1`, "Is this a word? I don't know what it means!", then `funny.2`, "Hmm! What could that mean?", then `funny.3`, "Hee hee! Is that a word?", then `funny.1` again. The old two-giggle cap and its lines ("Hee hee! What a funny song!", "Ha ha! Silly sounds!") are retired; the ids `funny.1` and `funny.2` keep their names with the new texts.
 
-**Open and leave.** At the start, 300 ms after the fade-in, Emma (`listening`) says `guide.play.critters.open`, "Join three letters. If they make a word, I'll say it!" (Thomas 2026-10-22: it tells her a real word gets said; no "sing"). A critter tap or drag during the line cuts it (`cancelActive()`). Letter critters is a toy: it has no rounds and no end of its own. She leaves with Back (§ 1.4), and the Play place returns silently.
+**The shelf clears after every run of three** (CHANGE, Thomas 2026-10-23 (Marian's play test)). From the run's first sound the board waits (a picture word already did): a drag, a tap or a VoiceOver action on a critter or the log is ignored, Back stays live. Once the outcome is over, 400 ms on (`SHELF_HOLD_MS`), the three drop home and the log is empty and ready:
+
+| Run                                      | The outcome is over                                          |
+| ---------------------------------------- | ------------------------------------------------------------ |
+| A said word                              | when Emma's word clip ends                                   |
+| A picture word                           | when the picture has left (its 500 ms float, 300 ms faded)   |
+| Not a word (`'funny'`)                   | when both the tumble (500 ms; dim 300 ms) and her line ended |
+| Quiet (Dave's lists, or before blending) | when the bounce together ends (250 ms after it starts)       |
+
+The drop: each seated critter falls from its seat to its burrow and shrinks from 1.25 c to c (400 ms, ease-in, `SHELF_DROP_MS`), landing on the critter that sits there (every letter stays on the meadow, § 3.3 Drag). No line, no praise, no sound. A pair is not a run of three: it leans and waits, as before. A run cut short by the background (the sound stops, § 1.7) clears the same way once she is back.
+
+**The drag hint** (CHANGE, Thomas 2026-10-23 (Marian's play test); Marian did not find the drag). The story word-tap cue's hand (`StoryTapCue`: Greet's finger-tap hand, 48 pt on phones, 64 on tablets, the fingertip on the point) shows a drag: it fades in on the top row's critter nearest the log's middle, presses, glides up to the log's first free seat (900 ms, ease in-out), lets go and fades; three loops, 2 s each (`DragHintHand.tsx`). It never takes a touch and VoiceOver skips it.
+
+- **When:** on entry, with the open line; then again whenever 8 s pass (`HINT_IDLE_MS`, from the hand's end or her last drag) with no drag, until her first run of three, after which it never comes back that visit.
+- **Emma's line comes with it twice a visit at most:** on entry and at the first idle return; after that, the hand alone, silent (coordinator 2026-10-23: no nagging).
+- **What puts it off:** a drag start (the hand fades out over 200 ms) or a seat change, a VoiceOver seat included. A plain critter tap does not: she may be tapping without knowing she can drag. A tap still cuts the line, as below.
+
+**Open and leave.** At the start, 300 ms after the fade-in, Emma (`listening`) says `guide.play.critters.open`, "Drag three letters up to the log. If they make a word, I'll say it!" (CHANGE, Thomas 2026-10-23 (Marian's play test): it names the move; was "Join three letters. If they make a word, I'll say it!", Thomas 2026-10-22), with the drag hint. A critter tap or drag during the line cuts it (`cancelActive()`), and its caption goes. Letter critters is a toy: it has no rounds and no end of its own. She leaves with Back (§ 1.4), and the Play place returns silently.
 
 ### 3.4 Which sounds, and which clips (audio)
 
@@ -515,6 +532,7 @@ Derived on 2026-10-20 from § 3.1's 45 words; `CRITTER_SOUND_SOURCE` is computed
 - **A real word is never a mistake** (D5). A real CVC word that is not a picture word ("sat", "hop", "map") sings its sounds and Emma says it, or, on Dave's lists, sits (§ 3.3): it gets no boing, no tumble and no giggle. Only runs that are not words get those, and the three non-word lines are said only of them.
 - **A run is spoken as a word only if it is a picture word (its blend clip) or on `CRITTER_SAID_WORDS`** (CHANGE, Thomas 2026-10-22). A word on `CRITTER_NEVER_SAY` (rude words and the like) or `CRITTER_NOT_SAID` (sounds that don't spell it) is never said back to her, and it gets the quiet sit, not the giggle (§ 3.1).
 - **Pictures** appear only for the 45 picture words, from the shipped pack; a said word has none.
+- **The clear says nothing** (Thomas 2026-10-23 (Marian's play test)): when the shelf clears after a run, Emma says no line and gives no praise, so building a word earns no reward beyond the word itself. The only line she repeats on her own is the open line, with the drag hint, twice a visit at most (§ 3.3).
 
 ### 3.6 Wireframes (phone portrait, "fan" just popped; phone landscape, two seated)
 
@@ -550,6 +568,8 @@ PHONE PORTRAIT  375×667                     PHONE LANDSCAPE  667×375
 - **A real word:** no bounce; the three sit still. Nothing else plays.
 - **Not a word:** no tumble; the three dim (1 → 0.6 → 1, 300 ms). The boing and the line play.
 - **Dragging** still follows the finger.
+- **The shelf clears** (Thomas 2026-10-23 (Marian's play test)): no fall; the seated three fade where they sit (300 ms, `SHELF_FADE_MS`), their burrows' critters already home.
+- **The drag hint:** the fades only, as the story cue's: the hand fades in and out on the critter, then on the seat; it never moves or presses.
 
 ### 3.8 Accessibility
 
@@ -566,27 +586,29 @@ PHONE PORTRAIT  375×667                     PHONE LANDSCAPE  667×375
 
 All lines are Lily, as `GUIDANCE_LINES` rows (`packages/core/src/emmasPath/guidanceLines.ts`) with a new kind `'play'` in `GuidanceLineKind` (`:38-66`), `world: null`, and `src = pathLineSrc(id)`, so the files are `/assets/audio/path/guide-play-*.mp3`. Native plays them through `mobile/src/screens/play/playLines.ts`, the flower bed's `gameLines.ts` pattern (one manifest line player with word ticks). `<N>` is a capitalised number word.
 
-| Id                                                 | Caption text (= Lily input unless noted)                   | When                                         | Lines   | Chars         |
-| -------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------- | ------- | ------------- |
-| `guide.play.open`                                  | "What shall we play?"                                      | The Play place, entered from the Hub         | 1       | 19            |
-| `guide.play.raft.open`                             | "The raft can carry ten!"                                  | Raft: the start                              | 1       | 23            |
-| `guide.play.raft.total.<t>`, t 1-9                 | "<N>!" (input "<N>,", § 4.3)                               | Raft: the total after a boarding or take-off | 9       | 45            |
-| `guide.play.raft.go`                               | "Ten! Off we go!"                                          | Raft: exactly ten                            | 1       | 15            |
-| `guide.play.raft.splash`                           | "Too heavy!" (was "Too heavy! Splash!", Thomas 2026-10-22) | Raft: too heavy                              | 1       | 10            |
-| `guide.play.raft.silly`                            | "Hee hee! Silly animals!"                                  | Raft: the silly scene                        | 1       | 23            |
-| `guide.play.raft.close`                            | "What a party on the island!"                              | Raft: after the third crossing               | 1       | 27            |
-| `guide.play.critters.open`                         | "Join three letters. If they make a word, I'll say it!"    | Critters: the start (Thomas 2026-10-22)      | 1       | 53            |
-| `guide.play.critters.funny.1`                      | "Is this a word? I don't know what it means!"              | Critters: three that are not a word          | 1       | 43            |
-| `guide.play.critters.funny.2`                      | "Hmm! What could that mean?"                               | Critters: the next one                       | 1       | 26            |
-| `guide.play.critters.funny.3`                      | "Hee hee! Is that a word?"                                 | Critters: the one after, then funny.1 again  | 1       | 24            |
-| `guide.play.critters.word.<w>`, kind `'play-word'` | "<W>." (input "<W>,", § 4.3), w in `CRITTER_SAID_WORDS`    | Critters: a said word (Thomas 2026-10-22)    | 156     | 626 (input)   |
-| **Total**                                          |                                                            |                                              | **175** | **308 + 626** |
+| Id                                                 | Caption text (= Lily input unless noted)                                                                                                      | When                                         | Lines   | Chars         |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------- | ------------- |
+| `guide.play.open`                                  | "What shall we play?"                                                                                                                         | The Play place, entered from the Hub         | 1       | 19            |
+| `guide.play.raft.open`                             | "The raft can carry ten!"                                                                                                                     | Raft: the start                              | 1       | 23            |
+| `guide.play.raft.total.<t>`, t 1-9                 | "<N>!" (input "<N>,", § 4.3)                                                                                                                  | Raft: the total after a boarding or take-off | 9       | 45            |
+| `guide.play.raft.go`                               | "Ten! Off we go!"                                                                                                                             | Raft: exactly ten                            | 1       | 15            |
+| `guide.play.raft.splash`                           | "Too heavy!" (was "Too heavy! Splash!", Thomas 2026-10-22)                                                                                    | Raft: too heavy                              | 1       | 10            |
+| `guide.play.raft.silly`                            | "Hee hee! Silly animals!"                                                                                                                     | Raft: the silly scene                        | 1       | 23            |
+| `guide.play.raft.close`                            | "What a party on the island!"                                                                                                                 | Raft: after the third crossing               | 1       | 27            |
+| `guide.play.critters.open`                         | "Drag three letters up to the log. If they make a word, I'll say it!" (was "Join three letters. ...", Thomas 2026-10-23 (Marian's play test)) | Critters: the start, and the first idle hint | 1       | 67            |
+| `guide.play.critters.funny.1`                      | "Is this a word? I don't know what it means!"                                                                                                 | Critters: three that are not a word          | 1       | 43            |
+| `guide.play.critters.funny.2`                      | "Hmm! What could that mean?"                                                                                                                  | Critters: the next one                       | 1       | 26            |
+| `guide.play.critters.funny.3`                      | "Hee hee! Is that a word?"                                                                                                                    | Critters: the one after, then funny.1 again  | 1       | 24            |
+| `guide.play.critters.word.<w>`, kind `'play-word'` | "<W>." (input "<W>,", § 4.3), w in `CRITTER_SAID_WORDS`                                                                                       | Critters: a said word (Thomas 2026-10-22)    | 156     | 626 (input)   |
+| **Total**                                          |                                                                                                                                               |                                              | **175** | **322 + 626** |
 
 The raft's open line plays 300 ms after the game fades in, as the critters' does. The raft's total lines are its only content lines; the critters' content is the shipped blend clips (§ 3.4).
 
 **All 18 are new renders, 250 characters.** How it was counted: a scratch script (2026-10-20, not committed) compared each text, as an exact string, with every `text` in `public/canon/**/*.json`, every `GUIDANCE_LINES` text and input, and every `PATH_LINES` text, on `main` at f1be571f (1,343 canon texts, 336 guidance lines, 851 path lines). None matched. The app has no standalone number-word clip: the nearest are "Seven flowers." and the like.
 
 **Budget:** about 250 characters. `renderGuidanceLinesLily.ts --dry-run` prints the real number before any spend. The one-word inputs ("Seven,") are the same length as their captions. Kevin (K3): the dry run bills only uncached unique inputs (`renderGuidanceLinesLily.ts:88-94`), so expect 250 when the tools worktree's cache holds the 336 shipped inputs; a dry run well above 250 means shipped lines would re-render, so stop there. D5's real-word list is text only and adds no render, and D4's newcomer has no line: the budget is unchanged.
+
+**The open line's re-render** (Thomas 2026-10-23 (Marian's play test)): the dry run in the tools worktree gave 1 uncached input, about 67 characters to bill, and the render took exactly that (a second dry run: 0). The new clip is 4.80 s, which the script flags `LONG` (over 3.5 s): it is the longest play line, and it plays once on entry and once at the first idle hint.
 
 ### 4.2 Labels nobody speaks (VoiceOver only)
 
@@ -616,7 +638,7 @@ They sit in `playLines.ts` beside the spoken rows, so a language version swaps r
 - "Hee hee! Silly animals!" and "Hee hee! Is that a word?": Lily will **read** "hee hee" as two words, /hiː hiː/, not laugh. If Thomas wants a real giggle, it is a sound effect, not a line (T3).
 - The total lines, from "One," and "Seven,", come back as single, falling, stand-alone number words, each under 1 s, with no "and" and no rising tone.
 - "What shall we play?" rises on _play_. _Shall_ is the weak /ʃəl/.
-- "Too heavy!" (re-rendered 2026-10-22 without "Splash!"): the line stays under the 3.5 s flag (`LONG_SECONDS`, `scripts/renderGuidanceLinesLily.ts:39`), as every line here does.
+- "Too heavy!" (re-rendered 2026-10-22 without "Splash!"): the line stays under the 3.5 s flag (`LONG_SECONDS`, `scripts/renderGuidanceLinesLily.ts:39`), as every line here does except the critters' open line since 2026-10-23 (4.80 s, § 4.1).
 - "What a party on the island!": British, non-rhotic _party_ (/ˈpɑːti/), and _island_ with a silent s.
 
 **Bounded convergence:** I rendered and ear-tested nothing, and I played no blend clip for this spec. The 46 clips are reused as the lessons ship them; **not tested:** how a coda g (from "bag") or x (from "box") sounds when it sings alone at the start of a made-up run, and whether two sliced sounds in a row feel like one critter song or two separate taps. The device check V8 covers both.
