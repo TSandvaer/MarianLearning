@@ -8,6 +8,7 @@ pnpm-lock.yaml
 public/icons
 public/splash
 public/canon
+mobile/assets/canon
 e2e/fixtures/canon-web-plain-addition
 
 # React Native app: generated native projects, Expo caches, exports

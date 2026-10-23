@@ -18,6 +18,10 @@
  *                                `/native/blend/<word>.mp3` (play-place spec
  *                                § 3.4: the letter critters play them with no
  *                                network call)
+ * - `assets/canon/cvc-words-probe.json` the cvc-words graduation check's
+ *                                probe lines (`public/canon/word-song/level-1/
+ *                                cvc-words-probe.json`), copied byte for byte:
+ *                                Word Song plays them beside the session audio
  * - `src/audio/audioRegistry.ts` web URL path → `require()`d native module
  *
  * The files are copied byte for byte: the web's voice-QA page is the ear
@@ -112,6 +116,18 @@ for (const [webDir, urlPrefix, filter, subdir] of GROUPS) {
     entries.push([`/native/blend/${file}`, `../../assets/audio/blend/${file}`])
   }
   console.log(`blend: ${clips.size} files`)
+}
+
+// The graduation check's probe lines: a canon file the server never serves.
+{
+  const name = 'cvc-words-probe.json'
+  const dest = join(mobileRoot, 'assets', 'canon')
+  mkdirSync(dest, { recursive: true })
+  copyFileSync(
+    join(repoRoot, 'public', 'canon', 'word-song', 'level-1', name),
+    join(dest, name),
+  )
+  console.log(`canon: ${name}`)
 }
 
 entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
