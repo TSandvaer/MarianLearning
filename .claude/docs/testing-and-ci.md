@@ -64,6 +64,12 @@ Pinning Emma's pose at screen beats (Math/WordSong `emma-pose-beats.test.tsx`) s
 - **Never race a real-timer test wait against a timer the `playUtterance` mock arms itself.** The cold-mount read-aloud calls `playUtterance` from a `queueMicrotask` ([Math.tsx](MarianLearning/src/screens/Math/Math.tsx) read-aloud effect), which runs only after the test's own `setTimeout(resolve, N)` is already scheduled. Real timers are timed from the wall clock, so a >N ms stall on a loaded runner lets the test's wait fire first. Have the mock hand its `resolve`/`reject` to the test, then fire it inside `act` followed by one `setTimeout(0)` drain. Microtasks always drain before the next macrotask, so the result doesn't depend on runner load. **Incident:** `cold-mount real-flow: chips unlock even when playUtterance rejects` failed the fast-gate on unrelated PRs #574/#599/#623/#640/#652/#663 (runs 39073407443, 39295276356, 39376826351, 39491814097, 39834661203). **Cost:** a red fast-gate plus a manual rerun each time, and three triage rounds.
 - **`__testInitiallyAudioUnlocked` pre-arms `spokeReadAloudRef = true`, which short-circuits the read-aloud `speak()` entirely** — so the `listening` beat never fires under that seam. To drive/hold the read-aloud (or any Emma-speaking beat), use `getHowlerRunning={() => true}` + `autoResolve:false` on the speak mock instead of the audio-unlock seam. (Jessica, failing-first authoring)
 
+### 1.6 Native jest (RNTL v14) traps (PR #656, the Play place)
+
+- **`fireEvent(el, 'responderGrant' | 'responderMove' | 'responderRelease')` does not reach a responder-based piece** (7 red raft tests from the harness alone, a throwaway debug test, ~6 extra runs). Call the props directly, each in its own `act`: `el.props.onResponderGrant({ nativeEvent: { pageX, pageY } })`. See `mobile/test/playHarness.tsx` `send()`.
+- **Never `screen.unmount()` mid-file.** Every later test's `screen` then sees an empty tree ("Unable to find …" while the component renders fine alone; cost 2 debug rounds in `PlayPlace.test` / `play.learners.test`). Split the test, or unmount the `render()` result instead.
+- **A line's end is a promise, so jump the fake clock in steps.** One big `advanceTimersByTime` runs every due timer before any `.then`, which shifts each beat chained on a line's end (in PR #656, 400 ms late). The play harness's `advance()` steps 10 ms per `act`.
+
 ---
 
 ## 2. Playwright — e2e browser tests
@@ -237,6 +243,10 @@ gh api repos/TSandvaer/MarianLearning/actions/runs/<run_id> --jq '{status, concl
 ```
 
 The `updated_at` field from the REST response is authoritative for elapsed-time math. Do NOT compute elapsed time from `gh run list` timestamps when the run is recent — the list view may lag by minutes.
+
+**`statusCheckRollup` holds a nameless entry that never completes.** Every PR's rollup carries one entry with `name: null, status: null`. A merge poller of the form "wait until no check has `status != COMPLETED`" therefore never exits. Gate on `mergeStateStatus == CLEAN` plus no `conclusion == FAILURE`, or filter `select(.name != null)` before testing `status`.
+
+> **Incident:** 2026-10-19 — the auto-merge pollers for #622 and #624 hung after both PRs' CI went green (#624 was approved by Thomas to merge on green). — **Cost:** #624 sat CLEAN and unmerged for ~1.5 h until a manual check at session save.
 
 **Session-resume runtime claims need empirical check.** Wall-clock time since a PR was opened is NOT the same as Actions run duration. A session-save file that records "runs took 2.5h" may mean the PR sat open for 2.5h while two sequential 32-min runs completed — not that either run took 2.5h. Always fetch fresh durations via `gh run view <id> --json createdAt,updatedAt` before treating a CI runtime claim as a mystery. Observed 2026-05-22 — save file claimed "2.5h runtimes" on PRs #302/#303; empirical check showed `32m16s` and `32m06s` respectively, single SUCCESS run each.
 
