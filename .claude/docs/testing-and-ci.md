@@ -171,7 +171,7 @@ Two GitHub Actions workflows live at [.github/workflows/](MarianLearning/.github
 | Job         | Budget                                  | Steps                                                                     | Purpose                                                                         |
 | ----------- | --------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `fast-gate` | `timeout-minutes: 10` (target ~3-5 min) | `yarn typecheck` → `yarn lint` → `yarn canon:lint` → `yarn test` (vitest) | Cheap fast-fail signals; runs first                                             |
-| `e2e`       | `timeout-minutes: 70`                   | Playwright install + `yarn e2e` (Chromium + WebKit)                       | Gated by `needs: fast-gate` — no Playwright runner allocated if fast-gate fails |
+| `e2e`       | `timeout-minutes: 70`                   | `yarn e2e` in the Playwright container (Chromium + WebKit)                | Gated by `needs: fast-gate` — no Playwright runner allocated if fast-gate fails |
 
 **A red-by-design fast gate hides every e2e failure.** A content PR whose canon is empty until its Lily render keeps `canonIntegrity (a)` red, so `e2e` reports SKIPPED on every head before the render — its first Playwright run happens only after the render, often after the code review has already approved. Incident: PR #599 (2026-10-17) was approved, rendered, and only then ran e2e (run 39063167198), which surfaced 4 real web-map failures from the new 7th land → an extra fix commit + an extra delta review. Treat "e2e SKIPPED" as "not run", never as covered: run the touched e2e specs locally before the review, or render early.
 
@@ -183,16 +183,18 @@ timeout-minutes: 70
 
 The budget is now 35 min — bumped 25 → 35 in `kevin/playwright-workflow-timeout-bump` (PR #281, 2026-05-17) after PR #279 (4 new sub-to-20 tests) cancelled at exactly 25 min on both attempts, and Jessica's PR #275 hit the cap once + completed on rerun. Prior bump 15 → 25 landed in `infra/86c9nc67b-e2e-timeout-bump` (2026-05-09) after PR #168's e2e run capped at 15 min on two consecutive attempts despite the underlying specs passing locally. Earlier bump 5 → 15 happened during the cvc-words-short-o regression spec landing. Cold-cache runs (no Playwright browser cache, no yarn cache) drove the historical cap pressure on slower runners; the 10-min 25 → 35 headroom restores comfortable budget for the current suite size (sub-to-20 + add-to-20 specs in flight) without splitting the chromium/webkit jobs.
 
+The `e2e` job runs inside `container: mcr.microsoft.com/playwright:v<version>-noble` (`--user 1001 --ipc=host`). The image already holds Chromium + WebKit and their system packages, so there is no browser cache and no `playwright install` step. **The image tag must equal the `@playwright/test` version `yarn.lock` resolves** — bump both in the same PR, or every test fails at browser launch.
+
+> **Incident:** `npx playwright install --with-deps chromium webkit` apt-installed 181 packages (119 MB) from `azure.archive.ubuntu.com` on every run; the browser cache covered only the binaries. A slow mirror (41 kB/s) made the step take 47–53 min, and the suite was cancelled at 70 min: PR #666 run 39938053420 (shard 1, attempts 1 and 2), main runs 39856012129 and 39842405209. — **Cost:** five Playwright jobs cancelled at the 70-min cap across three runs; PR #666 could not merge after two attempts. Fixed by moving the job into the Playwright container.
+
 Steps:
 
 1. `actions/checkout@v4`.
 2. `actions/setup-node@v4` with `node-version: 20`, `cache: yarn`.
 3. `yarn install --frozen-lockfile`.
-4. `actions/cache@v4` for `~/.cache/ms-playwright`, keyed on `package.json` hash. Bump key when the `@playwright/test` version bumps so stale caches don't pin outdated browser bundles.
-5. `npx playwright install --with-deps chromium webkit` — `--with-deps` pulls the system libraries (libgbm, libnss3, etc.) Chromium / WebKit need on Ubuntu. On a cache HIT this is a no-op for the binaries.
-6. `yarn e2e` with `CI=true` — triggers the 2-retry / 2-worker / `[github, list]` reporter shape.
-7. Always-upload `playwright-report/` (7-day retention).
-8. On failure, also upload `test-results/` traces + screenshots (7-day retention).
+4. `yarn e2e --shard=N/2` with `CI=true` — triggers the 2-retry / 2-worker / `[github, list]` reporter shape.
+5. Always-upload `playwright-report/` (7-day retention).
+6. On failure, also upload `test-results/` traces + screenshots (7-day retention).
 
 **Trigger shape (post-PR #187, 2026-05-09).** Each PR push fires e2e ONCE on the `pull_request` event. Each merge to `main` fires e2e ONCE on the `push` event for post-merge regression coverage. The previous configuration fired e2e twice per PR push (once on `push` matching feature-branch globs, once on `pull_request`); that was the cost driver behind today's $5.71/day spend during high-PR-volume sessions, which is why feature-branch globs were dropped.
 
