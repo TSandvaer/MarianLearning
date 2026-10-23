@@ -6,11 +6,17 @@
  *
  * The audio is the baked canon, served by `/api/claude`: letter sounds,
  * blends, words and Emma's lines all arrive as the response's utterances.
- * The payload is exactly the web's, with no render options. That keeps the
+ * The payload is the web's, with no render options. That keeps the
  * runtime-safe split (`.claude/docs/planner-and-canon.md`, blend pass-5):
- * a request that bypasses canon (a graduation session, the letter-sounds
- * vowel map) is rendered live with the safe blend, and the full-fidelity
- * blend only ever comes from the bake.
+ * a request that bypasses canon (the letter-sounds vowel map) is rendered
+ * live with the safe blend, and the full-fidelity blend only ever comes
+ * from the bake.
+ *
+ * Unlike the web, the app never asks the server for a cvc-words graduation
+ * plan: it builds the check itself from the canon plan
+ * (`@marian/core/wordSong/graduationCheck`, Thomas 2026-10-23). Asking ran
+ * the live planner (~15 s), and the 5 s fallback then served canon without
+ * the probe words, so the check never ran (build 20).
  */
 import {
   crossVowelMixingActive,
@@ -31,6 +37,10 @@ import {
   type SessionPlanKind,
 } from '@marian/core/progress/reviewPlan'
 import { readSessionHistory } from '@marian/core/sessionEnd/sessionHistory'
+import {
+  graduationAttempts,
+  graduationProbeWords,
+} from '@marian/core/wordSong/graduationCheck'
 import type {
   IntroGuideLineId,
   PrefetchKey,
@@ -53,6 +63,8 @@ export interface WordSongProgressHints {
   planKind: SessionPlanKind
   /** The focus step's intro lead line (content wave 1 § 6.1), if it plays. */
   intro?: IntroGuideLineId | null
+  /** A due graduation check's probe words (core `graduationProbeWords`). */
+  probeWords?: readonly string[]
 }
 
 const NO_HINTS: WordSongProgressHints = {
@@ -79,16 +91,22 @@ export function readWordSongProgressHints(): WordSongProgressHints {
     localDateKey(now),
     sessionCount,
   )
+  const isGraduationSession = isGraduationSessionPending(
+    progress,
+    node,
+    'word-song',
+  )
   return {
     intro: sessionIntroFor(progress, node, planKind),
     focusNode: node,
     focusMode: mode,
     recentSuccessRate: pickRecentSuccessRate(progress, 'word-song'),
-    isGraduationSession: isGraduationSessionPending(
-      progress,
-      node,
-      'word-song',
-    ),
+    isGraduationSession,
+    ...(isGraduationSession
+      ? {
+          probeWords: graduationProbeWords(graduationAttempts(progress, node)),
+        }
+      : {}),
     lifetimeFirstEncounters: progress.lifetimeFirstEncounters ?? [],
     letterSoundsVowelStates:
       node === 'letter-sounds'
@@ -99,15 +117,13 @@ export function readWordSongProgressHints(): WordSongProgressHints {
 }
 
 /**
- * The graduation probe and the vowel map bypass canon (live planner,
- * slow). A review sends neither, so it never takes the 5 s fallback.
+ * The vowel map bypasses canon (live planner, slow). A graduation check no
+ * longer does (the app builds it), and a review sends no map, so neither
+ * takes the 5 s fallback.
  */
 export function hasCanonBypassingHints(hints: WordSongProgressHints): boolean {
   if (hints.planKind.kind === 'review') return false
-  return (
-    hints.isGraduationSession === true ||
-    hints.letterSoundsVowelStates !== undefined
-  )
+  return hints.letterSoundsVowelStates !== undefined
 }
 
 /**
@@ -141,7 +157,10 @@ function forwardPayload(
   hints: WordSongProgressHints,
   withHints: boolean,
 ): SessionStartPayload {
-  const graduation = withHints ? hints.isGraduationSession : undefined
+  // Never `true`: the app builds a due check itself. `false` keeps a
+  // request with hints byte-identical to one with no check due.
+  const graduation =
+    withHints && hints.isGraduationSession !== undefined ? false : undefined
   const vowels = withHints ? hints.letterSoundsVowelStates : undefined
   const hasProgress =
     hints.focusNode !== undefined ||

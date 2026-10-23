@@ -125,6 +125,21 @@ describe('initialFilterOf (page code)', () => {
   })
 })
 
+describe('groupFilterOf (page code)', () => {
+  it('reads ?group=, alongside ?filter=', () => {
+    expect(defs.groupFilterOf('?filter=new&group=cvc-words-probe')).toBe(
+      'cvc-words-probe',
+    )
+    expect(defs.groupFilterOf('?group=Guidance')).toBe('Guidance')
+  })
+
+  it('shows every group without one', () => {
+    expect(defs.groupFilterOf('')).toBeNull()
+    expect(defs.groupFilterOf('?filter=new')).toBeNull()
+    expect(defs.groupFilterOf('?group=')).toBeNull()
+  })
+})
+
 describe('canonicalItemIdOf (page code)', () => {
   it('keys a dedup group by its alphabetically-first (file, id) member', () => {
     const members = [

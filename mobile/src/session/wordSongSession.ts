@@ -9,8 +9,12 @@
  *   session-start extras (cross-vowel, the th cue) and publishes them at
  *   once, then starts the request.
  * - **Visible-wait fallback** (`startWaitTimer()`): a hinted request
- *   (graduation probe, vowel map: live planner) gets 5 s once Word Song
- *   is on screen and waiting, then a hint-free canon request replaces it.
+ *   (the vowel map: live planner) gets 5 s once Word Song is on screen and
+ *   waiting, then a hint-free canon request replaces it.
+ * - **Graduation check** (Thomas 2026-10-23): when one is due, the canon
+ *   plan's problems 2, 5 and 7 become probe words (core
+ *   `withGraduationProbes`), their lines played from the bundled probe
+ *   audio (`./graduationCheck.ts`). No planner, no wait.
  * - **Settle**: resolve → core's `wordSongSessionPlanFromServer` plan, the
  *   session audio's text-keyed player and the server's letter-sounds
  *   target vowel; reject → no plan, no player (static plan, silent
@@ -30,6 +34,7 @@
  * The Claude key never reaches the app: `/api/claude` is the Vercel function.
  */
 import { WARMUP_PROBLEMS } from '@marian/core/progress/reviewPlan'
+import { withGraduationProbes } from '@marian/core/wordSong/graduationCheck'
 import {
   wordSongSessionPlanFromServer,
   wordSongWarmupFromServer,
@@ -47,6 +52,12 @@ import type {
   ClipFileFn,
   PlayWordSongUtteranceFn,
 } from '../screens/wordSong/wordSongTypes'
+import {
+  GRADUATION_PROBE_PLAN,
+  loadGraduationProbeAudio,
+  withProbeAudio,
+  type RoundAudio,
+} from './graduationCheck'
 import { isReviewPlan } from './reviewSession'
 import {
   startSessionWithFallback,
@@ -120,6 +131,9 @@ export interface WordSongSessionDeps {
   now?: () => number
   timeoutMs?: number
   prefetcher?: SessionPrefetcher
+  /** A graduation check's probe plan and audio (default: the bundled ones). */
+  probePlan?: unknown
+  loadProbeAudio?: (sessionId: string) => LoadedSessionAudio
 }
 
 /** The round a settled response gives: what Word Song plays, in order. */
@@ -184,8 +198,10 @@ export function wordSongRoundFromServer(
 }
 
 interface Loaded extends WordSongRound {
-  audio: LoadedSessionAudio
+  audio: RoundAudio
   vowel: TargetVowel | undefined
+  /** The round is a graduation check (probe words swapped in). */
+  check: boolean
 }
 
 const IDLE: WordSongSessionSnapshot = {
@@ -205,6 +221,8 @@ export function createWordSongSessionController(
   const start = deps.start ?? startSession
   const readHints = deps.readHints ?? readWordSongProgressHints
   const readExtras = deps.readExtras ?? readWordSongSessionExtras
+  const probePlan = deps.probePlan ?? GRADUATION_PROBE_PLAN
+  const loadProbeAudio = deps.loadProbeAudio ?? loadGraduationProbeAudio
   const now = deps.now ?? Date.now
   const listeners = new Set<() => void>()
   let snapshot = IDLE
@@ -265,11 +283,24 @@ export function createWordSongSessionController(
             payload: buildWordSongSessionPayload(hints, withHints),
             signal,
           }))
+        // A due check on a forward session: the canon plan with probe
+        // words swapped in (`null`: the plan is played as it is).
+        const check =
+          hints.planKind.kind === 'forward' && hints.probeWords !== undefined
+            ? withGraduationProbes(prepared.plan, probePlan, hints.probeWords)
+            : null
         try {
           return {
-            ...wordSongRoundFromServer(prepared.plan, hints),
-            audio: prepared.audio,
+            ...wordSongRoundFromServer(check ?? prepared.plan, hints),
+            audio:
+              check === null
+                ? prepared.audio
+                : withProbeAudio(
+                    prepared.audio,
+                    loadProbeAudio(prepared.sessionId),
+                  ),
             vowel: narrowTargetVowel(prepared.currentTargetVowel),
+            check: check !== null,
           }
         } catch (err) {
           // A plan core cannot read: its audio must not stay on disk.
@@ -295,7 +326,7 @@ export function createWordSongSessionController(
           sessionFocus = focus
           vowel = prepared.vowel ?? null
           note(
-            `ready (${prepared.plan.id}${usedFallback ? ', hint-free fallback' : ''}${prepared.warmupCount > 0 ? `, ${prepared.warmupCount} warm-up` : ''})`,
+            `ready (${prepared.plan.id}${usedFallback ? ', hint-free fallback' : ''}${prepared.warmupCount > 0 ? `, ${prepared.warmupCount} warm-up` : ''}${prepared.check ? ', graduation check' : ''})`,
           )
           publish({
             ...extras,

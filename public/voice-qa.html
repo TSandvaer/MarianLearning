@@ -622,7 +622,7 @@
         'other',
       ]
 
-      // Canon files — 17 math + 28 word-song. Iterated in alphabetical
+      // Canon files — 17 math + 29 word-song. Iterated in alphabetical
       // (group, file-stem) order so the dedup canonical-member choice is
       // deterministic across runs. A stem whose file is not baked yet
       // (404) is skipped with a console note, so a new step can be listed
@@ -643,9 +643,11 @@
       // (#621) and snail-words + moon-words + goat-stories add 94 with
       // theirs (#617; 1332). Real blending (design/native/real-blending.md
       // § 13) retires blending-cv's 8 "Tap the <word>." clips and its Lily
-      // render adds its 18 new texts (1342). A line awaiting its render
-      // (empty audio) is not counted.
-      const EXPECTED_CANON_UNIQUE = 1342
+      // render adds its 18 new texts (1342). The cvc-words graduation
+      // check's probe lines (cvc-words-probe, never served as a session;
+      // the native app bundles them) add 20 with their Lily render (1362).
+      // A line awaiting its render (empty audio) is not counted.
+      const EXPECTED_CANON_UNIQUE = 1362
       const CANON_FILES = [
         // math/level-1
         ['math', 'add-to-10'],
@@ -673,6 +675,7 @@
         ['word-song', 'car-words'],
         ['word-song', 'crab-words'],
         ['word-song', 'cvc-words'],
+        ['word-song', 'cvc-words-probe'],
         ['word-song', 'cvc-words-short-e'],
         ['word-song', 'cvc-words-short-i'],
         ['word-song', 'cvc-words-short-o'],
@@ -2546,7 +2549,17 @@
         if (requested && FILTER_KEYS.includes(requested)) return requested
         return newCount > 0 ? 'new' : 'all'
       }
+      // ?group=<label>: show one group's rows only (a canon group's label is
+      // its file stem, e.g. cvc-words-probe); null shows every group.
+      function groupFilterOf(search) {
+        try {
+          return new URLSearchParams(search || '').get('group') || null
+        } catch {
+          return null
+        }
+      }
       // ── Pure helpers END ─────────────────────────────────────────────────
+      const activeGroup = groupFilterOf(location.search)
 
       function loadVerdicts() {
         try {
@@ -2747,6 +2760,7 @@
       }
 
       function rowMatchesFilter(item) {
+        if (activeGroup !== null && item.group !== activeGroup) return false
         if (activeFilter === 'all') return true
         if (activeFilter === 'new') return item.diff != null
         return stateOf(item) === activeFilter
@@ -3303,6 +3317,7 @@
           // Register into the flat item registry.
           const item = {
             itemId: r.itemId,
+            group: label,
             audioHash: r.audioHash,
             text: r.text,
             members: r.members,
@@ -3441,9 +3456,21 @@
                 EXPECTED_CANON_UNIQUE +
                 ')'
               : ''
-          const newNote = baseline
-            ? ' ' + newCount + ' new or changed since the baseline.'
-            : ''
+          const inGroup = items.filter((it) => it.group === activeGroup)
+          const groupNote =
+            activeGroup === null
+              ? ''
+              : inGroup.length === 0
+                ? ' No group named "' + activeGroup + '": nothing shown.'
+                : ' Showing the ' +
+                  activeGroup +
+                  ' group only (' +
+                  inGroup.filter(rowMatchesFilter).length +
+                  ' rows).'
+          const newNote =
+            (baseline
+              ? ' ' + newCount + ' new or changed since the baseline.'
+              : '') + groupNote
           setStatus(
             'Ready — ' +
               items.length +
