@@ -6,15 +6,20 @@
  */
 import { setKeyValueStore } from '@marian/core'
 import { progressAtStep } from '@marian/core/debug/stepProgress'
-import { critterWordLine } from '@marian/core/emmasPath/guidanceLines'
 import {
+  CRITTER_CAP,
+  CRITTER_SAID_PICTURE_WORDS,
+  CRITTER_SAID_WORDS,
   CRITTER_SOUND_SOURCE,
   CRITTER_WORDS_BY_STEP,
   critterRun,
 } from '@marian/core/games/playPlace'
 import { saveProgress, type SkillNode } from '@marian/core/progress'
 import { act, fireEvent, screen } from '@testing-library/react-native'
+import { useRef } from 'react'
 import { StyleSheet } from 'react-native'
+import * as Reanimated from 'react-native-reanimated'
+import { pictureAsset } from '../../assets'
 import { letterWindow, MARK_LEAD_MS } from '../../audio/blendMarks'
 import * as bundledAudio from '../../audio/bundledAudio'
 import { audioForWebPath } from '../../audio/bundledAudio'
@@ -32,6 +37,7 @@ import {
   mountGame,
   PHONE_L,
   PHONE_P,
+  seeded,
   tap,
 } from '../../../test/playHarness'
 import { STORY_TAP_CUE_CANCEL_OUT_MS } from '../wordSong/storyTapCueMotion'
@@ -82,6 +88,38 @@ function own(letter: string) {
   return { uri: clipOf(src.word), from: w.from, to: w.to }
 }
 const ownMs = (letter: string) => own(letter).to - own(letter).from
+
+const ribbon = () => screen.queryByTestId('play-game-ribbon')
+const seated = () => [0, 1, 2].filter((i) => has(`critter-seat-${i}`))
+const dropping = () => screen.queryAllByTestId(/^critter-drop-\d$/).length
+const meadow = () =>
+  screen
+    .queryAllByTestId(/^critter-[a-z]$/)
+    .map((el) => String(el.props.testID).slice(-1))
+
+/**
+ * Counts bounce starts: each critter bounce starts its hop and its letter's
+ * pulse (`withSequence` twice). The jest mock's `useSharedValue` makes a
+ * new value every render, which re-runs every bounce effect on any render;
+ * held per critter, as on a device, the effect runs once per bounce. Call
+ * before mounting; `from()` starts the count.
+ */
+function bounceStarts() {
+  const make = Reanimated.useSharedValue
+  function useHeldSharedValue(init: unknown) {
+    const held = useRef<ReturnType<typeof make> | null>(null)
+    held.current ??= make(init)
+    return held.current
+  }
+  jest
+    .spyOn(Reanimated, 'useSharedValue')
+    .mockImplementation(useHeldSharedValue as typeof make)
+  const seq = jest.spyOn(Reanimated, 'withSequence')
+  return {
+    from: () => seq.mockClear(),
+    count: () => seq.mock.calls.length / 2,
+  }
+}
 
 const seatCentre = (i: number) => {
   const l = mathLayout(PHONE_P)
@@ -242,39 +280,44 @@ describe('N10: songs that are not picture words', () => {
     expect(g.lines.filter((l) => l.includes('funny'))).toHaveLength(4)
   })
 
-  it('a said word (Thomas 2026-10-22): the sounds, a 300 ms gap, then its Lily clip once, the three bounce and sit; no boing, line, sparkle or picture', async () => {
-    const mapClip = audioForWebPath(critterWordLine('map')!.src)
-    const asked = jest.spyOn(bundledAudio, 'audioForWebPath')
+  it('a said word (Thomas 2026-10-23, build 20): the sounds one by one, a 300 ms gap, then Emma says it as her own line, her caption and pose, while the three sit still; no boing, sparkle or picture without a pack picture', async () => {
+    const starts = bounceStarts()
+    const bounces = starts.count
     const g = await mount()
-    expect(critterRun('map')).toBe('word')
-    await seat('m', 'a', 'p')
+    expect(critterRun('cab')).toBe('word')
+    expect(CRITTER_SAID_PICTURE_WORDS).not.toContain('cab')
+    await seat('c', 'a', 'b')
+    starts.from()
     await advance(SING_AFTER_MS)
-    expect(g.calls).toEqual([own('m')])
-    await advance(ownMs('m') + SOUND_GAP_MS)
+    expect(g.calls).toEqual([own('c')])
+    expect(bounces()).toBe(1)
+    await advance(ownMs('c') + SOUND_GAP_MS)
     await advance(ownMs('a') + SOUND_GAP_MS)
-    expect(g.calls).toEqual([own('m'), own('a'), own('p')])
+    expect(g.calls).toEqual([own('c'), own('a'), own('b')])
+    expect(bounces()).toBe(3)
     // At least the blend clips' 300 ms gap after the last sound.
-    await advance(ownMs('p') + SOUND_GAP_MS - 10)
-    expect(g.calls).toHaveLength(3)
+    await advance(ownMs('b') + SOUND_GAP_MS - 10)
+    expect(g.lines).toEqual(['guide.play.critters.open'])
     await advance(10)
-    expect(g.calls.at(-1)).toEqual({
-      uri: mapClip,
-      from: 0,
-      to: null,
-    })
-    expect(wordClipsAsked(asked)).toEqual([
-      '/assets/audio/path/guide-play-critters-word-map.mp3',
+    expect(g.lines).toEqual([
+      'guide.play.critters.open',
+      'guide.play.critters.word.cab',
     ])
-    expect(g.poses.at(-1)).toBe('listening')
-    await advance(WORD_CLIP_MS)
-    expect(whole(g.calls)).toHaveLength(1)
-    expect(g.calls).toHaveLength(4)
+    expect(ribbon()?.props.accessibilityLabel).toBe('Cab.')
+    expect(g.poses.at(-1)).toBe('attentive-pointing')
+    // The word is Emma's, not a critter sound, and the three sit still.
+    expect(g.calls).toHaveLength(3)
+    expect(whole(g.calls)).toEqual([])
+    expect(bounces()).toBe(3)
+    await advance(LINE_MS)
+    expect(ribbon()).toBeNull()
     expect(g.poses.at(-1)).toBe('idle')
+    expect(bounces()).toBe(3)
+    expect(g.calls).toHaveLength(3)
     expect(g.sfx.boing.play).not.toHaveBeenCalled()
     expect(g.sfx.sparkle.play).not.toHaveBeenCalled()
     expect(has('critter-tumble')).toBe(false)
     expect(has('critter-picture')).toBe(false)
-    expect(g.lines).toEqual(['guide.play.critters.open'])
   })
 
   it('a never-say word (sex): the sounds only, no word clip, no boing, line or picture', async () => {
@@ -410,7 +453,6 @@ describe('Dave’s safeguard (Thomas 2026-10-22): a learner before blending soun
 
   it('on letter names, a picture word still pops and a said word is still said', async () => {
     learnerAt('letter-names')
-    const mapClip = audioForWebPath(critterWordLine('map')!.src)
     const g = await mount()
     await seat('f', 'a', 'n')
     await advance(SING_AFTER_MS)
@@ -418,17 +460,14 @@ describe('Dave’s safeguard (Thomas 2026-10-22): a learner before blending soun
     await advance(blendSegments('fan')![3]![0])
     expect(has('critter-picture-fan')).toBe(true)
     await advance(WORD_CLIP_MS + PICTURE_HOLD_MS + PICTURE_LEAVE_MS)
-    await runOf('map')
-    expect(g.calls.at(-1)).toEqual({ uri: mapClip, from: 0, to: null })
+    await runOf('cab')
+    expect(g.lines.at(-1)).toBe('guide.play.critters.word.cab')
     expect(g.sfx.boing.play).not.toHaveBeenCalled()
   })
 })
 
 describe('Thomas 2026-10-23 (Marian’s play test)', () => {
-  const ribbon = () => screen.queryByTestId('play-game-ribbon')
   const openText = PLAY_LINE_MANIFEST['guide.play.critters.open'].text
-  const seated = () => [0, 1, 2].filter((i) => has(`critter-seat-${i}`))
-  const dropping = () => screen.queryAllByTestId(/^critter-drop-\d$/).length
   // The hand is hidden from VoiceOver, like the story cue's.
   const HIDDEN = { includeHiddenElements: true } as const
   const hint = () => screen.queryByTestId('critter-drag-hint', HIDDEN) !== null
@@ -513,20 +552,20 @@ describe('Thomas 2026-10-23 (Marian’s play test)', () => {
   })
 
   describe('3. every run of three ends with the shelf cleared', () => {
-    it('a said word: after Emma says it, the three drop home; no line, no praise', async () => {
+    it('a said word: after Emma says it, the three drop home; no other line, no praise', async () => {
       const g = await mount()
-      await run('map')
-      const said = wholeMs(
-        audioForWebPath(critterWordLine('map')!.src) as number,
-      )
-      await advance(said + SHELF_HOLD_MS - 20)
+      await run('cab')
+      await advance(LINE_MS + SHELF_HOLD_MS - 20)
       expect(seated()).toEqual([0, 1, 2])
       expect(dropping()).toBe(0)
       await advance(30)
       expect(seated()).toEqual([])
       expect(dropping()).toBe(3)
       await advance(SHELF_DROP_MS)
-      expect(g.lines).toEqual(['guide.play.critters.open'])
+      expect(g.lines).toEqual([
+        'guide.play.critters.open',
+        'guide.play.critters.word.cab',
+      ])
       expect(g.sfx.sparkle.play).not.toHaveBeenCalled()
       await expectReady(g)
     })
@@ -691,5 +730,99 @@ describe('Thomas 2026-10-23 (Marian’s play test)', () => {
       }
       expect(g.lines).toEqual(['guide.play.critters.open'])
     })
+  })
+})
+
+describe('Thomas 2026-10-23 (build 20): "No picture for rat and there is no m"', () => {
+  it('the said words with a bundled pack picture are exactly CRITTER_SAID_PICTURE_WORDS', () => {
+    expect(
+      CRITTER_SAID_WORDS.filter((w) => pictureAsset(w) !== undefined),
+    ).toEqual(CRITTER_SAID_PICTURE_WORDS)
+  })
+
+  it.each([
+    ['r-a-t', 'rat', 'Rat.'],
+    ['m-a-p', 'map', 'Map.'],
+  ])(
+    '%s: sounds, Emma says it, then its picture pops, then the shelf clears',
+    async (_, word, caption) => {
+      const starts = bounceStarts()
+      const bounces = starts.count
+      const s = fakeSounds(wholeMs)
+      const g = await mountGame('critters', {
+        words: ['rug', 'cat', 'mop'],
+        sounds: s.sounds,
+      })
+      await advance(CRITTERS_OPEN_DELAY_MS + LINE_MS)
+      expect(critterRun(word)).toBe('word')
+      await seat(...word.split(''))
+      starts.from()
+      await advance(SING_AFTER_MS)
+      for (const l of word) await advance(ownMs(l) + SOUND_GAP_MS)
+      // The sounds, one by one; then Emma's own line, her caption with it.
+      expect(s.calls).toEqual([...word].map(own))
+      expect(g.lines.at(-1)).toBe(`guide.play.critters.word.${word}`)
+      expect(ribbon()?.props.accessibilityLabel).toBe(caption)
+      expect(g.poses.at(-1)).toBe('attentive-pointing')
+      expect(bounces()).toBe(3)
+      expect(has('critter-picture')).toBe(false)
+      // Her line ends: the picture pops, with no sparkle and no praise.
+      await advance(LINE_MS + 10)
+      expect(has(`critter-picture-${word}`)).toBe(true)
+      expect(g.poses.at(-1)).toBe('idle')
+      expect(g.sfx.sparkle.play).not.toHaveBeenCalled()
+      expect(g.poses).not.toContain('celebration')
+      expect(bounces()).toBe(3)
+      expect(seated()).toEqual([0, 1, 2])
+      // It holds and leaves as a picture word's does.
+      await advance(PICTURE_HOLD_MS + PICTURE_LEAVE_MS - 30)
+      expect(has(`critter-picture-${word}`)).toBe(true)
+      await advance(30)
+      expect(has('critter-picture')).toBe(false)
+      expect(seated()).toEqual([0, 1, 2])
+      // Then the shelf clears.
+      await advance(SHELF_HOLD_MS - 30)
+      expect(seated()).toEqual([0, 1, 2])
+      await advance(30)
+      expect(seated()).toEqual([])
+      expect(dropping()).toBe(3)
+      await advance(SHELF_DROP_MS)
+      expect(g.lines).toEqual([
+        'guide.play.critters.open',
+        `guide.play.critters.word.${word}`,
+      ])
+      expect(s.calls).toHaveLength(3)
+    },
+  )
+
+  const MEADOW_22 = [...'aeiou', ...'bcdfghjlmnprstvwx']
+  const T = { top: 24, bottom: 20, left: 0, right: 0 }
+
+  it.each([3, 11])(
+    'an 820×1180 iPad: all 22 letters, vowels first, every visit (rng %i)',
+    async (seed) => {
+      const s = fakeSounds(wholeMs)
+      await mountGame('critters', {
+        viewport: { width: 820, height: 1180, insets: T },
+        rng: seeded(seed),
+        sounds: s.sounds,
+      })
+      expect(meadow()).toEqual(MEADOW_22)
+      expect(meadow()).toContain('m')
+    },
+  )
+
+  it.each([
+    ['an iPad mini (744×1133, landscape 1 pt short)', 744, 1133, T],
+    ['a phone, portrait', PHONE_P.width, PHONE_P.height, PHONE_P.insets],
+    ['a phone, landscape', PHONE_L.width, PHONE_L.height, PHONE_L.insets],
+  ])('%s: the 16 rotating, every vowel', async (_, width, height, insets) => {
+    const s = fakeSounds(wholeMs)
+    await mountGame('critters', {
+      viewport: { width, height, insets },
+      sounds: s.sounds,
+    })
+    expect(meadow()).toHaveLength(CRITTER_CAP)
+    expect(meadow().slice(0, 5)).toEqual([...'aeiou'])
   })
 })

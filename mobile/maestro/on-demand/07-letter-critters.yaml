@@ -1,24 +1,24 @@
 # Letter critters after Marian's play test (Thomas 2026-10-23, play-place
 # § 3.3): the drag hint on entry, a run of three on the log, the caption
-# gone after Emma's line, and the shelf cleared after the run.
+# gone after Emma's line, and the shelf cleared after the run. After build
+# 20 (Thomas 2026-10-23): every letter on a tablet where all 22 fit both
+# ways, and a said word with a pack picture ("rat") pops it after Emma
+# says it.
 #
 # A CVC-words learner (`qaStep: add-to-10` + the `cvc-words` seed, as 05's
 # second learner): past blending sounds, so a non-word boings and gets a
-# line. The visit's letters are random, but the meadow always starts with
-# the five vowels (core `critterSet`, vowels first), so dragging the first
-# three critters (a, e, i) builds "aei", a non-word, on every visit.
+# line.
 #
 # Drags are swipes between points: Maestro can't VoiceOver-activate. The
 # points are for the iPad Pro 11-inch (M5) simulator in portrait (the
-# README's device), from `critterScene` there (c 88, g 16, 7 critters a
-# row, 16 critters): the meadow's first row is at y 760, x 105 + 104 k for
-# cell k; the log's seats are at y 629, x 291, 417 and 543.
+# README's device; 834 x 1210, insets t0 b20), from `critterScene` there
+# with all 22 critters (c 88, g 16, 7 a row, 4 rows), which this screen
+# shows on every visit (`crittersFitBothWays`): the meadow is the vowels,
+# then the consonants alphabetically, so every cell is fixed. Rows at y
+# 707, 811, 915 and 1019, cell k of a row at x 105 + 104 k (the last row,
+# x alone, at 417); the log's seats at y 576, x 291, 417 and 543.
 #
-# Then a picture word, when the visit's letters allow one at a known spot
-# (consonants come alphabetically after the vowels, so their cells vary):
-# with a "b" critter, b is cell 5 and "bib" (cells 5, 2, 5: the burrow's
-# twin lets a letter sit twice); without b, "dad" with d at cell 5 (no c)
-# or 6 (with c). A visit with none of these skips the picture.
+#   a e i o u b c  /  d f g h j l m  /  n p r s t v w  /  x
 #
 # Screenshots go to Maestro's output (run.sh `--debug-output`, under
 # MAESTRO_OUT/07-letter-critters/).
@@ -68,18 +68,40 @@ tags:
     timeout: 1000
 - takeScreenshot: critters-hint-on-entry
 
-# A run of three: a, e, i (cells 0, 1, 2) onto the three seats.
+# Every letter is on the meadow (Thomas: "there is no 'm' letter").
+- assertVisible:
+    id: critter-m
+- assertVisible:
+    id: critter-r
+- assertVisible:
+    id: critter-x
+- assertVisible:
+    id: critter-w
+- assertVisible:
+    id: critter-j
+- assertVisible:
+    id: critter-b
+- assertVisible:
+    id: critter-c
+- assertVisible:
+    id: critter-d
+- assertVisible:
+    id: critter-l
+- assertVisible:
+    id: critter-s
+
+# A run of three: a, e, i (row 1, cells 0, 1, 2) onto the three seats.
 - swipe:
-    start: 105, 760
-    end: 291, 629
+    start: 105, 707
+    end: 291, 576
     duration: 800
 - swipe:
-    start: 209, 760
-    end: 417, 629
+    start: 209, 707
+    end: 417, 576
     duration: 800
 - swipe:
-    start: 313, 760
-    end: 543, 629
+    start: 313, 707
+    end: 543, 576
     duration: 800
 - extendedWaitUntil:
     visible:
@@ -110,94 +132,29 @@ tags:
     id: critter-seat-2
 - waitForAnimationToEnd:
     timeout: 1500
-- takeScreenshot: critters-shelf-clear-after-nonword
+# The whole meadow, hint gone: all 22 letters.
+- takeScreenshot: critters-meadow-22-portrait
 
-# A picture word, where the letters allow one (see the header). Exactly
-# one case runs: the letters it checks are still there afterwards.
-# "bib": b is cell 5.
-- runFlow:
-    when:
-      visible:
-        id: critter-b
-    commands:
-      - swipe:
-          start: 625, 760
-          end: 291, 629
-          duration: 800
-      - swipe:
-          start: 313, 760
-          end: 417, 629
-          duration: 800
-      - swipe:
-          start: 625, 760
-          end: 543, 629
-          duration: 800
-      - extendedWaitUntil:
-          visible:
-            id: critter-picture
-          timeout: 15000
-      - takeScreenshot: critters-picture-on-top
-# No b: "dad", d at cell 6 after a c, else at cell 5; no d, no picture.
-- runFlow:
-    when:
-      notVisible:
-        id: critter-b
-    commands:
-      - runFlow:
-          when:
-            visible:
-              id: critter-c
-          commands:
-            - runFlow:
-                when:
-                  visible:
-                    id: critter-d
-                commands:
-                  - swipe:
-                      start: 729, 760
-                      end: 291, 629
-                      duration: 800
-                  - swipe:
-                      start: 105, 760
-                      end: 417, 629
-                      duration: 800
-                  - swipe:
-                      start: 729, 760
-                      end: 543, 629
-                      duration: 800
-                  - extendedWaitUntil:
-                      visible:
-                        id: critter-picture
-                      timeout: 15000
-                  - takeScreenshot: critters-picture-on-top
-      - runFlow:
-          when:
-            notVisible:
-              id: critter-c
-          commands:
-            - runFlow:
-                when:
-                  visible:
-                    id: critter-d
-                commands:
-                  - swipe:
-                      start: 625, 760
-                      end: 291, 629
-                      duration: 800
-                  - swipe:
-                      start: 105, 760
-                      end: 417, 629
-                      duration: 800
-                  - swipe:
-                      start: 625, 760
-                      end: 543, 629
-                      duration: 800
-                  - extendedWaitUntil:
-                      visible:
-                        id: critter-picture
-                      timeout: 15000
-                  - takeScreenshot: critters-picture-on-top
-# The picture leaves and the shelf drops home (at once when no case ran).
+# A picture word: "bib" (b is row 1 cell 5, i cell 2; the burrow's twin
+# lets a letter sit twice).
+- swipe:
+    start: 625, 707
+    end: 291, 576
+    duration: 800
+- swipe:
+    start: 313, 707
+    end: 417, 576
+    duration: 800
+- swipe:
+    start: 625, 707
+    end: 543, 576
+    duration: 800
+- extendedWaitUntil:
+    visible:
+      id: critter-picture
+    timeout: 15000
+- takeScreenshot: critters-picture-on-top
+# The picture leaves and the shelf drops home.
 - extendedWaitUntil:
     notVisible:
       id: critter-picture
@@ -209,6 +166,66 @@ tags:
 - waitForAnimationToEnd:
     timeout: 1500
 - takeScreenshot: critters-shelf-clear-after-picture
+
+# A said word with a pack picture: "rat" (r row 3 cell 2, a row 1 cell 0,
+# t row 3 cell 4). The sounds; Emma says "Rat." (her caption, if the
+# short line is caught); then the rat picture; then the shelf clears.
+- swipe:
+    start: 313, 915
+    end: 291, 576
+    duration: 800
+- swipe:
+    start: 105, 707
+    end: 417, 576
+    duration: 800
+- swipe:
+    start: 521, 915
+    end: 543, 576
+    duration: 800
+- extendedWaitUntil:
+    visible:
+      id: critter-seat-2
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: play-game-ribbon
+    timeout: 15000
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: play-game-ribbon
+    commands:
+      - takeScreenshot: critters-rat-emma-says
+- extendedWaitUntil:
+    visible:
+      id: critter-picture
+    timeout: 15000
+- takeScreenshot: critters-rat-picture
+- extendedWaitUntil:
+    notVisible:
+      id: critter-picture
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: critter-seat-0
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: critters-shelf-clear-after-rat
+
+# Landscape: the same 22 (the visit keeps its letters; 9 a row, 3 rows).
+- setOrientation: LANDSCAPE_LEFT
+- extendedWaitUntil:
+    visible:
+      id: critter-x
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: critters-meadow-22-landscape
+- setOrientation: PORTRAIT
+- waitForAnimationToEnd:
+    timeout: 2000
 - runFlow:
     file: ../subflows/tap-and-confirm.yaml
     env:

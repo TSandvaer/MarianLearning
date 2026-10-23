@@ -1,12 +1,17 @@
 /**
  * Letter critters (play-place spec § 3): the letters the learner knows are
  * round creatures in burrows on a meadow; she drags 2-3 of them onto a
- * log's seats and they sing their sounds. Three that spell one of her
+ * log's seats and they sing their sounds. A phone's meadow holds 16 (every
+ * vowel, rotating consonants); a tablet where all of them fit both ways
+ * holds every letter (Thomas 2026-10-23, build 20, `crittersFitBothWays`).
+ * Three that spell one of her
  * picture words play that word's tuned blend clip, each critter bouncing on
  * its sound, and the picture pops. Three that make another real word sing,
- * then, 300 ms after the last sound, Emma says the word (its Lily clip,
- * `critterWordLine`) and they bounce and sit together, with no praise,
- * sparkle or picture (Thomas 2026-10-22; Dave's safeguards). A word on
+ * then, 300 ms after the last sound, Emma says the word as her own line,
+ * her caption with it, while they sit still; a said word with a pack
+ * picture (`CRITTER_SAID_PICTURE_WORDS`) then pops it as a picture word
+ * does (Thomas 2026-10-23, build 20). No praise or sparkle for a said
+ * word (Thomas 2026-10-22; Dave's safeguards). A word on
  * Dave's never-say or not-said list sings and sits, quietly (D5). Three
  * that make no word sing, boing and tumble, and Emma says one of three
  * non-word lines, in turn, every time (Thomas 2026-10-22); before blending
@@ -34,9 +39,10 @@
  * letter lights, the picture fades, a non-word dims. Dragging still
  * follows the finger.
  */
-import { critterWordLine } from '@marian/core/emmasPath/guidanceLines'
 import {
+  CRITTER_CAP,
   CRITTER_PICTURE_WORDS,
+  CRITTER_SAID_PICTURE_WORDS,
   CRITTER_SOUND_SOURCE,
   critterFunnyOpen,
   critterRun,
@@ -90,12 +96,18 @@ import {
   centre,
   contains,
   critterScene,
+  crittersFitBothWays,
   grow,
   type CritterScene,
   type Point,
 } from './playGeometry'
 import type { GameKit } from './playKit'
-import { critterLabel, crittersFunnyLine, PLAY_LABELS } from './playLines'
+import {
+  critterLabel,
+  crittersFunnyLine,
+  crittersWordLine,
+  PLAY_LABELS,
+} from './playLines'
 
 /** The open line: 300 ms after the 200 ms fade-in (§ 3.3). */
 export const CRITTERS_OPEN_DELAY_MS = 500
@@ -163,7 +175,14 @@ export function LetterCritters({
   words = CRITTER_PICTURE_WORDS,
 }: LetterCrittersProps) {
   const { reducedMotion, sfx } = kit
-  const [visit] = useState(() => critterSet(words, kit.rng))
+  // Every letter where all of them fit both ways (a tablet), else the cap.
+  const [visit] = useState(() =>
+    critterSet(words, kit.rng, {
+      cap: crittersFitBothWays(kit.viewport, new Set(words.join('')).size)
+        ? Infinity
+        : CRITTER_CAP,
+    }),
+  )
   const [funny] = useState(readFunny)
   const [player] = useState<TapClipPlayer>(
     () => sounds ?? createTapClipPlayer(audioEngine),
@@ -406,22 +425,25 @@ export function LetterCritters({
       kit.setPose('celebration')
     })
     player.play(clip, 0, null, () => {
-      if (songRef.current !== token) return
-      kit.advance(() => {
-        if (songRef.current !== token) return
-        setPicture({ word, leaving: true })
-        kit.advance(
-          () => {
-            if (songRef.current !== token) return
-            setPicture(null)
-            kit.setPose('idle')
-            settle(token)
-          },
-          reducedMotion ? 300 : PICTURE_LEAVE_MS,
-        )
-      }, PICTURE_HOLD_MS)
+      if (songRef.current === token) pictureLeaves(word, token)
     })
   }
+
+  /** The picture is up: it holds, floats away, then the shelf clears. */
+  const pictureLeaves = (word: string, token: number) =>
+    kit.advance(() => {
+      if (songRef.current !== token) return
+      setPicture({ word, leaving: true })
+      kit.advance(
+        () => {
+          if (songRef.current !== token) return
+          setPicture(null)
+          kit.setPose('idle')
+          settle(token)
+        },
+        reducedMotion ? 300 : PICTURE_LEAVE_MS,
+      )
+    }, PICTURE_HOLD_MS)
 
   const song = (run: number[], letters: string[], outcome: Outcome) => {
     const token = ++songRef.current
@@ -457,18 +479,24 @@ export function LetterCritters({
       kit.setPose('idle')
       return
     }
-    const line = outcome === 'word' ? critterWordLine(word) : undefined
-    const clip = line === undefined ? null : audioForWebPath(line.src)
-    if (typeof clip === 'number') {
-      // A said word (play-place § 3.3, Thomas 2026-10-22): Emma says it,
-      // the three bounce together as it starts, then sit. No praise line,
-      // no sparkle, no picture (Dave's safeguard 2).
-      run.forEach(bounceSeat)
+    const line = outcome === 'word' ? crittersWordLine(word) : undefined
+    if (line !== undefined) {
+      // A said word (play-place § 3.3, Thomas 2026-10-23, build 20): Emma
+      // says it as her own line, her caption with it, as the lesson's Emma
+      // says a blend's word (`attentive-pointing`), while the three sit
+      // still. Then a word with a pack picture pops it. No praise line, no
+      // sparkle (Dave's safeguard 2).
       setLean(true)
-      player.play(clip, 0, null, () => {
+      kit.setPose('attentive-pointing')
+      void kit.speak(line).then(() => {
         if (songRef.current !== token) return
         kit.setPose('idle')
-        settle(token)
+        if (CRITTER_SAID_PICTURE_WORDS.includes(word)) {
+          setPicture({ word, leaving: false })
+          pictureLeaves(word, token)
+        } else {
+          settle(token)
+        }
       })
       return
     }
@@ -1069,7 +1097,8 @@ function Tumble({
 }
 
 /**
- * The picture word's card (§ 3.2, § 3.3): the pack picture on Word Song's
+ * The picture's card (§ 3.2, § 3.3), a picture word's or, after Emma says
+ * it, a said word's with a pack picture: the pack picture on Word Song's
  * white card, springing up over the meadow (scale 0 → 1 on a 260 / 16
  * spring with a 150 ms fade); leaving, it floats up 0.3 p and fades over
  * 500 ms. Reduce Motion: fades in over 200 ms and out over 300 ms.

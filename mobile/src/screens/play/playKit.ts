@@ -4,7 +4,7 @@
  * clears on Back and that wait while the app is hidden (play-place § 1.7).
  */
 import type { EmmaPose } from '@marian/core/character/emmaPose'
-import type { Rect } from '../../layout/layout'
+import type { Rect, Viewport } from '../../layout/layout'
 import { createSfx, SFX_SOURCES, type Sfx } from '../../audio'
 import type { PlayLineId } from './playLines'
 
@@ -46,6 +46,8 @@ export interface GameKit {
   area: Rect
   tablet: boolean
   landscape: boolean
+  /** The screen the frame is laid out from (the critters' fit, § 3.2). */
+  viewport: Viewport
   reducedMotion: boolean
   /**
    * Plays a line, cutting the one before it; resolves `true` when it ended

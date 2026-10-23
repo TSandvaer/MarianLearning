@@ -1,14 +1,17 @@
 /**
  * The Play place's words (play-place spec `design/native/play-place.md`
  * § 4): every spoken line is a core `GUIDANCE_LINES` row of kind `'play'`
- * (`guide.play.*`, Lily, `/assets/audio/path/guide-play-*.mp3`), played
+ * or `'play-word'` (`guide.play.*`, Lily, `/assets/audio/path/guide-play-*.mp3`), played
  * through one manifest line player (`play`) with word ticks for the bubble
  * and the ribbon. The player never rejects; without a clip it walks the
  * caption at 165 wpm, so nothing waits on audio. The labels nobody speaks
  * (VoiceOver only, § 4.2) sit here too, so a language version swaps rows,
  * not screens.
  */
-import { GUIDANCE_LINES } from '@marian/core/emmasPath/guidanceLines'
+import {
+  critterWordLine,
+  GUIDANCE_LINES,
+} from '@marian/core/emmasPath/guidanceLines'
 import type { PlayGameId, RaftWeight } from '@marian/core/games/playPlace'
 import {
   createManifestLinePlayer,
@@ -28,13 +31,13 @@ export type PlayLineId =
   | 'guide.play.critters.funny.1'
   | 'guide.play.critters.funny.2'
   | 'guide.play.critters.funny.3'
+  | `guide.play.critters.word.${string}`
 
 export const PLAY_LINE_MANIFEST: Readonly<Record<PlayLineId, ManifestLine>> =
   Object.fromEntries(
-    GUIDANCE_LINES.filter((l) => l.kind === 'play').map((l) => [
-      l.id,
-      { src: l.src, text: l.text },
-    ]),
+    GUIDANCE_LINES.filter(
+      (l) => l.kind === 'play' || l.kind === 'play-word',
+    ).map((l) => [l.id, { src: l.src, text: l.text }]),
   ) as Record<PlayLineId, ManifestLine>
 
 export type PlayLinePlayer = ManifestLinePlayer<PlayLineId>
@@ -50,6 +53,13 @@ export const raftTotalLine = (t: number) =>
 /** The three non-word lines, in turn, every time (§ 3.3, Thomas 2026-10-22). */
 export const crittersFunnyLine = (n: 1 | 2 | 3) =>
   `guide.play.critters.funny.${n}` as PlayLineId
+
+/**
+ * A said word, Emma's own line ("Map.", § 3.3, Thomas 2026-10-23, build
+ * 20), or undefined for a word she does not say.
+ */
+export const crittersWordLine = (word: string) =>
+  critterWordLine(word)?.id as PlayLineId | undefined
 
 /** § 4.2: the labels nobody speaks. */
 export const PLAY_LABELS = {

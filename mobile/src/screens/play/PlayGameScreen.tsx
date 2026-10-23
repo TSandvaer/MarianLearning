@@ -31,6 +31,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import type { TapClipPlayer } from '../../audio/tapClip'
 import { CaptionRibbon } from '../../components/CaptionRibbon'
+import type { Viewport } from '../../layout/layout'
 import type { MathLayout } from '../../layout/mathLayout'
 import {
   appVisibility,
@@ -60,7 +61,9 @@ export const PLAY_GAME_FADE_MS = 200
 export const CAPTION_OUT_MS = 200
 
 export interface PlayGameScreenProps {
+  /** The Math frame, and the screen it is laid out from. */
   layout: MathLayout
+  viewport: Viewport
   game: PlayGameId
   /** Back, or the natural stop: App returns to the Play place, silent. */
   onExit: () => void
@@ -79,6 +82,7 @@ export interface PlayGameScreenProps {
 
 export function PlayGameScreen({
   layout,
+  viewport,
   game,
   onExit,
   onPoseChange,
@@ -234,6 +238,7 @@ export function PlayGameScreen({
     area: A,
     tablet: layout.tablet,
     landscape: layout.landscape,
+    viewport,
     reducedMotion,
     sfx,
     rng,

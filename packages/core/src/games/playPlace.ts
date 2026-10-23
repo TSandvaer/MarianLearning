@@ -282,7 +282,8 @@ export const CRITTER_NOT_SAID: ReadonlySet<string> = new Set([
  * The words Emma says after the critters sing them, sorted: every real word
  * that is not a picture word, not on `CRITTER_NEVER_SAY` and not on
  * `CRITTER_NOT_SAID`. Each has a whole-word Lily clip
- * (`critterWordLine(word)` in `emmasPath/guidanceLines.ts`), no picture.
+ * (`critterWordLine(word)` in `emmasPath/guidanceLines.ts`); the nine on
+ * `CRITTER_SAID_PICTURE_WORDS` also have a pack picture.
  */
 export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
   .filter(
@@ -292,6 +293,25 @@ export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
       !CRITTER_NOT_SAID.has(w),
   )
   .sort()
+
+/**
+ * The said words with a bundled pack picture, sorted: after Emma says one,
+ * its picture pops, holds and leaves as a picture word's does (Thomas
+ * 2026-10-23, build 20: "No picture for 'rat'"). Pinned here, since core
+ * never reads the app's registry; `playPlace.test.ts` checks them against
+ * it.
+ */
+export const CRITTER_SAID_PICTURE_WORDS: readonly string[] = [
+  'bun',
+  'gum',
+  'hut',
+  'map',
+  'nap',
+  'pop',
+  'rat',
+  'tap',
+  'top',
+]
 
 /**
  * What a 3-letter run does: `'picture'` pops its clip and picture, `'word'`
@@ -326,7 +346,10 @@ export function critterRun(
     : 'word'
 }
 
-/** Most critters on the meadow at once (Decision 8). */
+/**
+ * Most critters on a phone's meadow at once (Decision 8). A tablet where
+ * every letter fits shows them all (Thomas 2026-10-23, build 20).
+ */
 export const CRITTER_CAP = 16
 
 const VOWELS: ReadonlySet<string> = new Set(['a', 'e', 'i', 'o', 'u'])
@@ -341,24 +364,26 @@ const meadowOrder = (letters: Iterable<string>) => {
 }
 
 /**
- * This visit's letters (meadow order) and the words they spell. With 16
- * letters or fewer, all of them and all the words. Otherwise every vowel
- * the words use, then consonants word by word in `rng` order, a word added
- * only when all its letters still fit in 16; `words` is then every word
- * the chosen letters spell, so each critter can make at least one.
+ * This visit's letters (meadow order) and the words they spell. With `cap`
+ * letters or fewer (default `CRITTER_CAP`; `Infinity`, no cap, on a tablet
+ * where every letter fits), all of them and all the words. Otherwise every
+ * vowel the words use, then consonants word by word in `rng` order, a word
+ * added only when all its letters still fit in `cap`; `words` is then every
+ * word the chosen letters spell, so each critter can make at least one.
  */
 export function critterSet(
   words: readonly string[],
   rng: () => number,
+  { cap = CRITTER_CAP }: { cap?: number } = {},
 ): { letters: string[]; words: string[] } {
   const used = new Set(words.join(''))
-  if (used.size <= CRITTER_CAP) {
+  if (used.size <= cap) {
     return { letters: meadowOrder(used), words: [...words] }
   }
   const chosen = new Set([...used].filter((l) => VOWELS.has(l)))
   for (const word of shuffled(words, rng)) {
     const fresh = new Set([...word].filter((l) => !chosen.has(l)))
-    if (chosen.size + fresh.size <= CRITTER_CAP) {
+    if (chosen.size + fresh.size <= cap) {
       for (const l of fresh) chosen.add(l)
     }
   }
