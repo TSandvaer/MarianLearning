@@ -13,9 +13,14 @@ import {
   GRADUATION_PROBE_PROBLEMS,
   graduationAttempts,
   graduationProbeWords,
+  renderedProbeWords,
   withGraduationProbes,
 } from './graduationCheck'
-import { NOVEL_PROBE_WORDS } from './novelProbeWords'
+import {
+  GRADUATION_PROBE_WORDS,
+  NOVEL_PROBE_WORDS,
+  PROBE_RESERVE_WORDS,
+} from './novelProbeWords'
 import { wordSongSessionPlanFromServer } from './planFromServer'
 import { buildWordChipOrder } from './wordChips'
 import { isForbiddenPair } from './wordPack'
@@ -121,14 +126,33 @@ describe('withGraduationProbes', () => {
 })
 
 describe('the probe canon', () => {
-  it('holds one rendered five-line block per novel probe word', () => {
-    expect(PROBE.utterances).toHaveLength(NOVEL_PROBE_WORDS.length * 5)
-    expect(
-      PROBE_DOC.utterances.filter(
-        (u: { audio: { base64: string } }) => u.audio.base64 === '',
+  it('holds one five-line block per probe word: today’s four rendered, the reserve’s five new words awaiting their render', () => {
+    expect(GRADUATION_PROBE_WORDS).toEqual([
+      'nap',
+      'rat',
+      'map',
+      'tap',
+      'ham',
+      'cab',
+      'rag',
+      'ram',
+      'pad',
+    ])
+    expect(PROBE.utterances).toHaveLength(GRADUATION_PROBE_WORDS.length * 5)
+    const unrendered = PROBE_DOC.utterances
+      .filter((u: { audio: { base64: string } }) => u.audio.base64 === '')
+      .map((u: { id: string }) => u.id)
+    expect(unrendered).toEqual(
+      [5, 6, 7, 8, 9].flatMap((i) =>
+        ['read', 'correct', 'hint', 'giveAnswer', 'blend'].map(
+          (slot) => `word.p${i}.${slot}`,
+        ),
       ),
-    ).toEqual([])
-    for (const w of NOVEL_PROBE_WORDS) {
+    )
+    expect([...renderedProbeWords(PROBE_DOC)].sort()).toEqual(
+      [...NOVEL_PROBE_WORDS].sort(),
+    )
+    for (const w of GRADUATION_PROBE_WORDS) {
       expect(
         withGraduationProbes(CANON, PROBE, [w, w, w])?.utterances.some(
           (u) => u.text === `Read the ${w}.`,
@@ -166,5 +190,58 @@ describe('graduationProbeWords', () => {
       ],
     }
     expect(graduationAttempts(progress, 'cvc-words')).toBe(1)
+  })
+})
+
+describe('renderedProbeWords', () => {
+  const withAudio = (
+    doc: typeof PROBE_DOC,
+    base64: (id: string) => string,
+  ) => ({
+    ...doc,
+    utterances: doc.utterances.map(
+      (u: { id: string; audio: { base64: string } }) => ({
+        ...u,
+        audio: { ...u.audio, base64: base64(u.id) },
+      }),
+    ),
+  })
+
+  it('every line rendered: all 9 words', () => {
+    expect([...renderedProbeWords(withAudio(PROBE_DOC, () => 'AA=='))]).toEqual(
+      [...GRADUATION_PROBE_WORDS],
+    )
+  })
+
+  it('one missing line leaves its word out; a stale line (text changed) counts as missing', () => {
+    const noHamBlend = withAudio(PROBE_DOC, (id) =>
+      id === 'word.p5.blend' ? '' : 'AA==',
+    )
+    expect(renderedProbeWords(noHamBlend).has('ham')).toBe(false)
+    expect(renderedProbeWords(noHamBlend).has('cab')).toBe(true)
+    const stale = {
+      ...withAudio(PROBE_DOC, () => 'AA=='),
+      plan: {
+        ...PROBE,
+        utterances: PROBE.utterances.map((u: { id: string; text: string }) =>
+          u.id === 'word.p1.hint' ? { ...u, text: 'Look again. Nap.' } : u,
+        ),
+      },
+    }
+    expect(renderedProbeWords(stale).has('nap')).toBe(false)
+  })
+
+  it('a malformed doc: none', () => {
+    expect(renderedProbeWords(null).size).toBe(0)
+    expect(renderedProbeWords({ plan: PROBE }).size).toBe(0)
+    expect(renderedProbeWords({ utterances: [] }).size).toBe(0)
+  })
+
+  it('the reserve words swap in like today’s (the allow-list is every probe word)', () => {
+    const plan = withGraduationProbes(CANON, PROBE, ['ham', 'cab', 'rag'])
+    expect(words(plan)).toEqual(expect.arrayContaining(['ham', 'cab', 'rag']))
+    expect(
+      PROBE_RESERVE_WORDS.every((w) => GRADUATION_PROBE_WORDS.includes(w)),
+    ).toBe(true)
   })
 })

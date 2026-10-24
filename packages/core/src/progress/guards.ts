@@ -158,8 +158,10 @@ function isLeitnerBox(v: unknown): v is LeitnerBox<unknown> {
 /**
  * A seen-record map (`Progress.seenItems`): every value an object with a
  * string `day`, a whole `count` ≥ 0, a boolean-or-null `correct` and, when
- * present, a string `promoted`. Keys are not checked (an item a newer
- * build knows is inert), nor are a record's extra keys.
+ * present, a string `promoted` and a string `check` (a word's check result;
+ * any string, so a newer build's value is inert). Keys are not checked (an
+ * item a newer build knows is inert, a `word:` key on an older build), nor
+ * are a record's extra keys.
  */
 function isSeenItems(v: unknown): v is SeenItems {
   if (!isObject(v)) return false
@@ -170,6 +172,7 @@ function isSeenItems(v: unknown): v is SeenItems {
     if (r.count < 0) return false
     if (r.correct !== null && typeof r.correct !== 'boolean') return false
     if (r.promoted !== undefined && typeof r.promoted !== 'string') return false
+    if (r.check !== undefined && typeof r.check !== 'string') return false
   }
   return true
 }

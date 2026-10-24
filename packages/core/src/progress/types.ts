@@ -232,10 +232,22 @@ export interface SeenItem {
   /** Math facts: the local day it last moved up a Leitner box (§ 2.2
    *  rule 4: at most once a day). Absent = not since the field exists. */
   promoted?: string
+  /** Words: how she did in the graduation checks that showed it, `'right'`
+   *  or `'missed'` (a miss stays). Absent = never in a check. Another
+   *  string (a newer build's) is read as absent. */
+  check?: string
 }
 
-/** Seen-records by item key (`seenItems.ts` `mathSeenKey`: `math:3+4`). */
+/** Seen-records by item key (`seenItems.ts`: `math:3+4`, `word:ham`). */
 export type SeenItems = Record<string, SeenItem>
+
+/** A two-session reserve check's first half (`SessionHistoryEntry`). */
+export interface NovelPoolPart {
+  /** Its probe words, in problem order. */
+  words: string[]
+  /** How many of them she read right at first tap. */
+  correct: number
+}
 
 export interface LeitnerBox<T> {
   items: LeitnerItem<T>[]
@@ -336,8 +348,21 @@ export interface SessionHistoryEntry {
    * `novelPoolSuccessRate`) before the engine reflags graduation —
    * matches the AC contract that a failed graduation doesn't
    * immediately re-trigger another attempt.
+   *
+   * The reserve check (Dave 2026-10-24, `mastery.ts`
+   * `graduationCheckFirstHalf`) spreads 6 probe words over two sessions:
+   * the second session's entry carries the rate over all 6, the first
+   * carries `novelPoolPart` instead and no rate.
    */
   novelPoolSuccessRate?: number
+  /**
+   * The first session of a two-session reserve check: its probe words and
+   * how many she read right at first tap. No `novelPoolSuccessRate`, so
+   * the graduation gate and an older build read the entry as a regular
+   * session; the check's second session pools it into its rate. Optional +
+   * additive — no `schemaVersion` bump.
+   */
+  novelPoolPart?: NovelPoolPart
   /**
    * Per-problem first-tap latency in milliseconds (ticket 86c9pwgc8 — M4
    * Leitner wiring). Length matches the number of problems Marian saw

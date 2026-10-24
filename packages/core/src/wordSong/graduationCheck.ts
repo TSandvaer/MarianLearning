@@ -14,10 +14,16 @@
  * parser as a canon one (`wordSongSessionPlanFromServer`), and its chips
  * are dealt from `TARGET_PAIRINGS` by position like any other target.
  * Session End's split (`computeGraduationSplit`) then scores the
- * `NOVEL_PROBE_WORDS` apart.
+ * probe words apart.
+ *
+ * Two checks share this swap. Today's: 3 of `NOVEL_PROBE_WORDS` in one
+ * session ({@link graduationProbeWords}). The reserve's (Dave 2026-10-24,
+ * `probeReserve.ts`): 6 of `PROBE_RESERVE_WORDS` across two sessions. The
+ * device serves the reserve's only once every reserve word's lines have
+ * their audio in the bundled probe canon ({@link renderedProbeWords}).
  */
 import type { Progress, SkillNode } from '../progress/types'
-import { NOVEL_PROBE_WORDS } from './novelProbeWords'
+import { GRADUATION_PROBE_WORDS, NOVEL_PROBE_WORDS } from './novelProbeWords'
 import {
   isServerPlan,
   parseReadTarget,
@@ -95,7 +101,7 @@ export function withGraduationProbes(
 ): ServerPlan | null {
   if (!isServerPlan(serverPlan) || !isServerPlan(probePlan)) return null
   if (words.length !== GRADUATION_PROBE_PROBLEMS.length) return null
-  if (!words.every((w) => NOVEL_PROBE_WORDS.includes(w))) return null
+  if (!words.every((w) => GRADUATION_PROBE_WORDS.includes(w))) return null
   const blocks = probeBlocks(probePlan)
   const swaps = new Map<number, Map<string, string>>()
   for (const [i, n] of GRADUATION_PROBE_PROBLEMS.entries()) {
@@ -116,4 +122,62 @@ export function withGraduationProbes(
   })
   if (replaced !== swaps.size * PROBE_SLOTS.length) return null
   return { id: serverPlan.id, label: serverPlan.label, utterances }
+}
+
+/**
+ * The probe words whose five lines (read, correct, hint, giveAnswer,
+ * blend) all have audio in `probeDoc`, the bundled probe canon
+ * (`{ plan, utterances: [{ id, text, audio: { base64 } }] }`), each line's
+ * audio row matching its plan text. A line still awaiting its Lily render
+ * has an empty `base64`
+ * (`scripts/spliceGraduationProbeCanon.ts`), so its word is left out.
+ * Empty for a malformed doc.
+ */
+export function renderedProbeWords(probeDoc: unknown): Set<string> {
+  const out = new Set<string>()
+  if (typeof probeDoc !== 'object' || probeDoc === null) return out
+  const { plan, utterances } = probeDoc as {
+    plan?: unknown
+    utterances?: unknown
+  }
+  if (!isServerPlan(plan) || !Array.isArray(utterances)) return out
+  const audible = new Set<string>()
+  for (const u of utterances as unknown[]) {
+    const { id, text, audio } = (u ?? {}) as {
+      id?: unknown
+      text?: unknown
+      audio?: { base64?: unknown }
+    }
+    if (
+      typeof id === 'string' &&
+      typeof text === 'string' &&
+      typeof audio?.base64 === 'string' &&
+      audio.base64 !== ''
+    ) {
+      audible.add(`${id}|${text}`)
+    }
+  }
+  const byProblem = new Map<string, Map<string, { id: string; text: string }>>()
+  for (const u of plan.utterances) {
+    const m = PROBLEM_ID.exec(u.id)
+    if (m === null) continue
+    const slots = byProblem.get(m[1]!) ?? new Map()
+    slots.set(m[2]!, u)
+    byProblem.set(m[1]!, slots)
+  }
+  for (const slots of byProblem.values()) {
+    const read = slots.get('read')
+    if (read === undefined) continue
+    const heard = (slot: string) => {
+      const u = slots.get(slot)
+      return u !== undefined && audible.has(`${u.id}|${u.text}`)
+    }
+    if (!PROBE_SLOTS.every(heard)) continue
+    try {
+      out.add(parseReadTarget(read.text).word)
+    } catch {
+      // Not a "Read the <word>." block: not a probe.
+    }
+  }
+  return out
 }

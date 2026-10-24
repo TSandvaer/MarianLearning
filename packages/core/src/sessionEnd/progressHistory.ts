@@ -44,6 +44,7 @@
 import {
   applyMasteryRule,
   getOrCreateDeviceId,
+  graduationCheckFirstHalf,
   loadProgress,
   markFirstEncounterSeen,
   pushProgressToCloud,
@@ -58,7 +59,12 @@ import {
   type WordSongNode,
 } from '../progress'
 import { startProgressForActive } from '../learners/startDoc'
-import { applyMathOutcomes, seenItemsOf } from '../progress/seenItems'
+import {
+  applyMathOutcomes,
+  recordProbeResults,
+  seenItemsOf,
+  type ProbeResult,
+} from '../progress/seenItems'
 import { withPaceHold, withSecureDay } from '../progress/fastTrackRecord'
 import { seedUnlocksCelebrated } from '../progress/pathBeats'
 import {
@@ -102,6 +108,21 @@ export interface GraduationSessionSplit {
   novelCorrect: number
   /** Number of novel-pool problems in the session (2 or 3). */
   novelCount: number
+  /**
+   * Each probe word's first tap, in problem order. The session end writes
+   * them to the seen-record (`seenItems.ts` `recordProbeResults`), which
+   * the probe reserve ranks by.
+   */
+  probes?: ReadonlyArray<ProbeResult>
+  /**
+   * The reserve check (Dave 2026-10-24): 6 probe words across two
+   * sessions, passed at 5 of 6. Needs `probes`. When the node's last entry
+   * holds no part record (`mastery.ts` `graduationCheckFirstHalf`), this is
+   * the check's first session: the entry gets `novelPoolPart` (its words
+   * and right count) and no `novelPoolSuccessRate`. Otherwise it is the
+   * second: the entry's `novelPoolSuccessRate` is the rate over both.
+   */
+  twoSessions?: boolean
 }
 
 /**
@@ -341,7 +362,7 @@ export function recordProgressOnSessionEnd(
 ): Progress {
   const existing = loadProgress() ?? startProgressForActive()
 
-  const entry = buildEntry(input)
+  const entry = buildEntry(input, existing)
 
   // M4 Leitner update (ticket 86c9pwgc8), once a day since no-Claude
   // phase 3 (`progress/seenItems.ts`). Math-surface sessions that ship
@@ -427,6 +448,7 @@ export function recordProgressOnSessionEnd(
     },
     history: [...existing.history, entry],
     ...math,
+    ...probeResultsApplied(existing, math, input),
     cvcGraduationSessionFired: nextCvcGraduationSessionFired,
     // Emma's Path 9/10 (ticket 123jpnbc3dt): seed the unlock seen-marker
     // from the PRE-session doc, so everything unlocked before this session
@@ -520,7 +542,10 @@ export function recordReviewOnSessionEnd(input: RecordReviewInput): Progress {
  * conservative behaviour — better to under-promote than to feed garbage
  * into the mastery rule.
  */
-function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
+function buildEntry(
+  input: RecordProgressInput,
+  existing: Pick<Progress, 'history'>,
+): SessionHistoryEntry {
   const { graduationSplit, latencyMs, mathFacts } = input
   const useSplit =
     graduationSplit !== undefined &&
@@ -604,7 +629,7 @@ function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
     dateISO: input.dateISO,
     skillFocus: [input.focusNode],
     successRate: split.canonicalCorrect / split.canonicalCount,
-    novelPoolSuccessRate: split.novelCorrect / split.novelCount,
+    ...novelPoolFields(split, existing, input.focusNode),
     ...(latencyClone !== undefined ? { latencyMs: latencyClone } : {}),
     ...(mathFactsClone !== undefined ? { mathFacts: mathFactsClone } : {}),
     ...(answerValueClone !== undefined
@@ -617,6 +642,56 @@ function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
       ? { perProblemDistractorClass: distractorClassClone }
       : {}),
     ...(currentTargetVowel !== undefined ? { currentTargetVowel } : {}),
+  }
+}
+
+/**
+ * A graduation entry's novel-pool fields. A one-session check: the rate
+ * over its probe words. The reserve check's first session: its part
+ * record, no rate. Its second: the rate over both sessions' words.
+ */
+function novelPoolFields(
+  split: GraduationSessionSplit,
+  existing: Pick<Progress, 'history'>,
+  node: SkillNode,
+): Pick<SessionHistoryEntry, 'novelPoolSuccessRate' | 'novelPoolPart'> {
+  const own = { novelPoolSuccessRate: split.novelCorrect / split.novelCount }
+  if (split.twoSessions !== true || split.probes === undefined) return own
+  const first = graduationCheckFirstHalf(existing, node)
+  if (first === null) {
+    return {
+      novelPoolPart: {
+        words: split.probes.map((p) => p.word),
+        correct: split.novelCorrect,
+      },
+    }
+  }
+  return {
+    novelPoolSuccessRate:
+      (first.correct + split.novelCorrect) /
+      (first.words.length + split.novelCount),
+  }
+}
+
+/**
+ * The seen-record after a check session's probe words
+ * (`seenItems.ts` `recordProbeResults`), from the math update's record
+ * when there is one, else the doc's (or its seed). `{}` for a session
+ * without probe results.
+ */
+function probeResultsApplied(
+  existing: Progress,
+  math: Partial<Pick<Progress, 'seenItems'>>,
+  input: RecordProgressInput,
+): Partial<Pick<Progress, 'seenItems'>> {
+  const probes = input.graduationSplit?.probes
+  if (probes === undefined || probes.length === 0) return {}
+  return {
+    seenItems: recordProbeResults(
+      math.seenItems ?? seenItemsOf(existing),
+      probes,
+      new Date(input.dateISO).getTime(),
+    ),
   }
 }
 

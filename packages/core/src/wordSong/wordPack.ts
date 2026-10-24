@@ -327,6 +327,46 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     category: 'household',
     isTarget: true,
   },
+  // The probe reserve's five new words (Dave 2026-10-24, run
+  // run_3d3d82fb3b65 message msg_135871ebd91e;
+  // `novelProbeWords.ts` `PROBE_RESERVE_WORDS`): short-a CVC words in no
+  // canon plan, served only by the app-built cvc-words check
+  // (`probeReserve.ts`). Each has a pack picture (batch 18).
+  {
+    word: 'ham',
+    pictureKey: 'ham',
+    vowel: 'a',
+    category: 'food',
+    isTarget: true,
+  },
+  {
+    word: 'cab',
+    pictureKey: 'cab',
+    vowel: 'a',
+    category: 'vehicle',
+    isTarget: true,
+  },
+  {
+    word: 'rag',
+    pictureKey: 'rag',
+    vowel: 'a',
+    category: 'household',
+    isTarget: true,
+  },
+  {
+    word: 'ram',
+    pictureKey: 'ram',
+    vowel: 'a',
+    category: 'animal',
+    isTarget: true,
+  },
+  {
+    word: 'pad',
+    pictureKey: 'pad',
+    vowel: 'a',
+    category: 'stationery',
+    isTarget: true,
+  },
   // ── Short-o pool (ticket 86c9m3ae3, v2 vowel tier) ──────────────────
   // Per `design/word-song/short-o-pool-expansion.md` §1 with Thomas's
   // 2026-05-04 lock: 8 short-o words drawn from a mix of promoted v1
@@ -1862,6 +1902,24 @@ export const FORBIDDEN_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['roof', 'tent'], // both a pointed roof shape
   ['roof', 'barn'], // both a pointed roof over a building
   ['coat', 'cape'], // both garments worn over the body (D7)
+  // The probe reserve (Dave 2026-10-24). rat's pair is
+  // `design/word-song/probe-word-picture-pack.md:49` (§ 3), proposed with
+  // the probes and never landed; rat's trap row drops bat for it. cab is
+  // a taxi, told apart from car and van (and, as every vehicle here, the
+  // bus, jeep and train); ram is a horned sheep, told apart from sheep
+  // and goat (and, as every four-legged animal here, dog, pig and cat).
+  ['rat', 'cat'], // both small four-legged mammals in side profile
+  ['rat', 'bat'], // both small, round-bodied friendly creatures
+  ['cab', 'car'], // both small cars in side view
+  ['cab', 'van'], // both vehicles in side view
+  ['cab', 'bus'], // both vehicles in side view
+  ['cab', 'jeep'], // both vehicles in side view
+  ['cab', 'train'], // both vehicles in side view
+  ['ram', 'sheep'], // both woolly sheep in side view
+  ['ram', 'goat'], // both horned farm animals in side view
+  ['ram', 'dog'], // both four-legged animals in side view
+  ['ram', 'pig'], // both four-legged animals in side view
+  ['ram', 'cat'], // both four-legged animals in side view
 ] as const
 
 /** True if `a` and `b` are a forbidden silhouette-similar pair. */
@@ -1921,9 +1979,17 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   // `pickDistractors` reads `wordDistractors.pickTier(problemIndex)`
   // — the same path the canonical pack uses.
   nap: { gentle: ['bus', 'sun'], trap: ['fan', 'pan'] }, // /æn/ trap
-  rat: { gentle: ['bus', 'cup'], trap: ['bat', 'mat'] }, // /æt/ trap
+  rat: { gentle: ['bus', 'cup'], trap: ['mat', 'hat'] }, // /æt/ trap; bat and cat are forbidden pairs
   map: { gentle: ['dog', 'sun'], trap: ['cap', 'mat'] }, // /æp/ + /æt/ trap
   tap: { gentle: ['dog', 'cup'], trap: ['cap', 'pan'] }, // /æp/ + /p/-alliteration
+  // The probe reserve's new words (Dave 2026-10-24): the same shape, a
+  // gentle pair of another category and a trap pair on the rime or the
+  // onset. cab's chips hold no vehicle, ram's no animal (FORBIDDEN_PAIRS).
+  ham: { gentle: ['bus', 'cup'], trap: ['jam', 'hat'] }, // /æm/ rime + /h/ onset
+  cab: { gentle: ['sun', 'dog'], trap: ['cap', 'can'] }, // /kæ/ onset, one sound off
+  rag: { gentle: ['cup', 'pen'], trap: ['bag', 'tag'] }, // /æɡ/ rime
+  ram: { gentle: ['pen', 'sun'], trap: ['jam', 'man'] }, // /æm/ rime + /m/
+  pad: { gentle: ['dog', 'sun'], trap: ['dad', 'pan'] }, // /æd/ rime + /p/ onset
   // ── Short-o pool (ticket 86c9m3ae3) ───────────────────────────────
   // Per `design/word-song/short-o-pool-expansion.md` §8: same-vowel
   // only — every distractor for a short-o target is drawn from the

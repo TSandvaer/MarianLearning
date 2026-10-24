@@ -36,6 +36,17 @@ export function mathSeenKey(f: Pick<MathFact, 'a' | 'b' | 'op'>): string {
   return `math:${f.a}${f.op}${f.b}`
 }
 
+/**
+ * A word's seen-record key: `word:ham`. The `word:` prefix never starts a
+ * `mathSeenKey`, so the two kinds share the map without colliding. Words
+ * are written by Letter Critters (the words Emma says) and by the cvc-words
+ * check (each probe word's result); the probe reserve ranks by them
+ * (`wordSong/probeReserve.ts`, Dave 2026-10-24).
+ */
+export function wordSeenKey(word: string): string {
+  return `word:${word}`
+}
+
 /** The Leitner box's key, `3+4` (as `sessionEnd/progressHistory.ts`). */
 const leitnerKey = (f: MathFact): string => `${f.a}${f.op}${f.b}`
 
@@ -143,4 +154,78 @@ export function applyMathOutcomes(
     }
   }
   return { box: nextBox, seen: nextSeen }
+}
+
+/**
+ * Words she met where nothing is scored (Letter Critters: the words Emma
+ * says): each record's day is today and its count goes up once per call,
+ * however often the word repeats in it. Its first-tap result and check
+ * result stay as they were. Pure: returns a new record.
+ */
+export function recordWordsMet(
+  seen: SeenItems,
+  words: readonly string[],
+  now: number,
+): SeenItems {
+  const today = localDateKey(new Date(now))
+  const next: SeenItems = { ...seen }
+  for (const word of new Set(words)) {
+    const key = wordSeenKey(word)
+    const before = next[key]
+    next[key] = {
+      ...before,
+      day: today,
+      count: (before?.count ?? 0) + 1,
+      correct: before?.correct ?? null,
+    }
+  }
+  return next
+}
+
+/** One probe word's first tap in a cvc-words check. */
+export interface ProbeResult {
+  word: string
+  correct: boolean
+}
+
+/**
+ * A check's probe words: each record gets today, a count, the first tap,
+ * and `check` `'right'` or `'missed'`. A miss stays a miss: Emma read the
+ * word to her (giveAnswer and blend), so it is never a fresh probe again.
+ * Pure: returns a new record.
+ */
+export function recordProbeResults(
+  seen: SeenItems,
+  results: ReadonlyArray<ProbeResult>,
+  now: number,
+): SeenItems {
+  const next = recordWordsMet(
+    seen,
+    results.map((r) => r.word),
+    now,
+  )
+  for (const { word, correct } of results) {
+    const key = wordSeenKey(word)
+    const record = next[key]!
+    next[key] = {
+      ...record,
+      correct,
+      check: seen[key]?.check === 'missed' || !correct ? 'missed' : 'right',
+    }
+  }
+  return next
+}
+
+/**
+ * `p` with `words` met (`recordWordsMet`), starting from its seen-record or,
+ * for a doc written before the field, its seed, so the first word never
+ * drops the math history (`seenItemsOf`). `p` itself when `words` is empty.
+ */
+export function withWordsMet(
+  p: Progress,
+  words: readonly string[],
+  now: number,
+): Progress {
+  if (words.length === 0) return p
+  return { ...p, seenItems: recordWordsMet(seenItemsOf(p), words, now) }
 }
