@@ -368,9 +368,10 @@ function rank(
       cmp(y.overdue!, x.overdue!) || cmp(x.box, y.box) || cmpStr(x.key, y.key),
     dueCapOf(warmup),
   )
+  // A slow fact that is also due in box 1-2 already leads as a due one.
   const slowOrder = r.slow
     .map(factKey)
-    .filter((k) => base.some((b) => b.key === k && !b.warm))
+    .filter((k) => base.some((b) => b.key === k && !b.warm && !b.dueLow))
     .slice(0, MATH_PICK_SLOW_DOSE)
   const newCapped = firstKeys(
     base.filter((b) => b.isNew && !b.warm),
