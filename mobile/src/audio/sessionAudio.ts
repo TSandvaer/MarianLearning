@@ -31,11 +31,10 @@
  * bytes" is the same length and the same `clipHash` of the base64: a
  * re-take can keep its length (PR #558's "Read the fig." stayed 11492
  * bytes). Only a text's first line is hashed, and only when its length
- * matches. Cost, measured in two JIT-less interpreters as a stand-in for
- * Hermes: for `cvc-words.json`'s 61 distinct lines (1.47 M base64
- * characters), 31 ms in V8's (`node --jitless`, ~21 ns per character) and
- * 39 ms in JavaScriptCore's (`jsc --useJIT=false`); each match saves a
- * file write.
+ * matches. The `session-files` log row gives the time ("ms matching"): a
+ * cvc-words session (62 lines, ~1.5 M base64 characters) took 57–69 ms on
+ * the iOS 27 iPad simulator (Expo Go development bundle); each match saves
+ * a file write.
  *
  * Duplicate texts (e.g. "Hmm... try again?" rendered once per problem)
  * resolve to their first id, exactly like `mathPathA.ts`, and every id of
@@ -225,6 +224,7 @@ export function loadSessionAudio(
   const bundledClips = new Map<string, BundledClip>()
   const uris = new Map<string, string>()
   const fileBytes = new Map<string, number>()
+  const matchStart = now()
   for (const u of utterances) {
     // A duplicate's own inline audio is never played (its text's first id
     // owns the file), so only a first id is hashed.
@@ -246,6 +246,8 @@ export function loadSessionAudio(
       else pending.set(u.id, base64)
     }
   }
+  /** Time spent matching lines to bundled clips (the hashing, see header). */
+  const matchMs = now() - matchStart
   const fileCount = pending.size
 
   let unloaded = false
@@ -303,7 +305,9 @@ export function loadSessionAudio(
       detail:
         `${uris.size} files ${bytesWritten} bytes, ${Math.round(busyMs)} ms writing` +
         (failed.size > 0 ? `, ${failed.size} failed` : '') +
-        (bundledClips.size > 0 ? `, ${bundledClips.size} bundled` : ''),
+        (bundledClips.size > 0
+          ? `, ${bundledClips.size} bundled (${Math.round(matchMs)} ms matching)`
+          : ''),
     })
     resolveReady()
   }

@@ -480,7 +480,7 @@ describe('session audio: bundled canon clips (no-Claude plan phase 1)', () => {
     expect(s.filesWritten).toBe(0)
     expect(s.bundledCount).toBe(3)
     expect((readAudioLog()[0] as { detail: string }).detail).toMatch(
-      /^0 files 0 bytes, .*3 bundled$/,
+      /^0 files 0 bytes, .*3 bundled \(\d+ ms matching\)$/,
     )
     const done = s.playUtterance('Hmm... try again?')
     expect(fakePlayers[0].source).toBe(102)
