@@ -17,9 +17,11 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  _resetCanonAudioIndexForTesting,
   _resetCanonCacheForTesting,
   canonCacheKey,
   canonFilePath,
+  getCanonAudioIndex,
   getCanonEntry,
 } from './_canon.js'
 import type { SessionStartResponse } from './_types.js'
@@ -252,4 +254,101 @@ describe('getCanonEntry — key isolation', () => {
     )
     expect(level2).toBeNull()
   })
+})
+
+describe("getCanonEntry — a step's pool (no-Claude plan phase 5a)", () => {
+  const audio = (base64: string) =>
+    ({ kind: 'inline', base64, mime: 'audio/mpeg' }) as const
+
+  it('serves the file without its pool: problems 9+ never leave the server', () => {
+    writeFixture(
+      tempRoot,
+      { track: 'math', level: 1, focusNode: 'add-to-10' },
+      {
+        ...FIXTURE,
+        plan: {
+          id: 'add-to-10-canon',
+          label: 'add-to-10',
+          utterances: [
+            { id: 'math.p1.read', text: 'Three plus two. How many?' },
+            { id: 'math.p9.read', text: 'Nine plus one. How many?' },
+            { id: 'session.end.opener', text: 'You did it!' },
+          ],
+        },
+        utterances: [
+          ...FIXTURE.utterances,
+          {
+            id: 'math.p9.read',
+            text: 'Nine plus one. How many?',
+            audio: audio(''),
+          },
+          { id: 'session.end.opener', text: 'You did it!', audio: audio('AQ') },
+        ],
+      },
+    )
+    const result = getCanonEntry(
+      { track: 'math', level: 1, focusNode: 'add-to-10' },
+      tempRoot,
+    )
+    expect(result?.utterances.map((u) => u.id)).toEqual([
+      'math.p1.read',
+      'session.end.opener',
+    ])
+    expect(
+      (result?.plan as { utterances: { id: string }[] }).utterances.map(
+        (u) => u.id,
+      ),
+    ).toEqual(['math.p1.read', 'session.end.opener'])
+  })
+
+  it("indexes no pool clip for live renders: a rendered pool line stays the device's", () => {
+    writeFixture(
+      tempRoot,
+      { track: 'math', level: 1, focusNode: 'add-to-10' },
+      {
+        ...FIXTURE,
+        utterances: [
+          ...FIXTURE.utterances,
+          {
+            id: 'math.p9.read',
+            text: 'Nine plus one. How many?',
+            audio: audio('CQE'),
+          },
+        ],
+      },
+    )
+    _resetCanonAudioIndexForTesting()
+    const index = getCanonAudioIndex(tempRoot)
+    _resetCanonAudioIndexForTesting()
+    expect([...index]).toEqual([['Three plus two. How many?', 'AAEC']])
+  })
+
+  it('serves each committed pool step its 8 problems and session-end lines, every one voiced', () => {
+    for (const focusNode of [
+      'add-to-10',
+      'add-to-20',
+      'sub-to-10',
+      'sub-to-20',
+      'two-digit-addsub-no-regroup',
+      'two-digit-addsub-with-regroup',
+      'mult-2-5-10',
+      'mult-3-4',
+      'mult-6-9',
+    ]) {
+      const entry = getCanonEntry({ track: 'math', level: 1, focusNode })
+      expect(entry, focusNode).not.toBeNull()
+      const problems = new Set(
+        entry!.utterances.flatMap((u) => {
+          const m = /^math\.p(\d+)\./.exec(u.id)
+          return m === null ? [] : [Number(m[1])]
+        }),
+      )
+      expect(
+        [...problems].sort((a, b) => a - b),
+        focusNode,
+      ).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
+      expect(entry!.utterances).toHaveLength(76)
+      expect(entry!.utterances.filter((u) => u.audio.base64 === '')).toEqual([])
+    }
+  }, 30_000) // reads the committed canon (~87 MB): testing-and-ci.md § 1.1
 })

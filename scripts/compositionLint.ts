@@ -128,12 +128,16 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { SessionStartResponse } from '../api/_types.js'
 import { isSessionStartResponse } from '../api/_types.js'
 import {
+  ADD_TO_TEN_POOL as CORE_ADD_TO_TEN_POOL,
   ADD_TO_TEN_RULES,
+  SUB_TO_TEN_POOL as CORE_SUB_TO_TEN_POOL,
   SUB_TO_TEN_RULES,
   lintAddToTenComposition,
   lintMissingNumbers,
   lintSubToTenComposition,
+  parseAddToTenReadLine as coreParseAddToTenReadLine,
   parseMissingNumberReadLine,
+  parseSubToTenReadLine as coreParseSubToTenReadLine,
   splitMissing,
   type AddToTenRulesConfig,
   type CompositionViolation as CoreCompositionViolation,
@@ -142,6 +146,12 @@ import {
   type ParsedMissingNumber,
   type SubToTenRulesConfig,
 } from '../packages/core/src/math/compositionRules.js'
+import {
+  SERVED_CANON_PROBLEMS,
+  canonProblemOf,
+  servedCanon,
+} from '../packages/core/src/wire/canonPool.js'
+import { missingNumberFits } from '../packages/core/src/wire/missingNumbers.js'
 
 // ── CanonFileTier (Wave 5 PR B — ticket 86c9y1p99 schema-literal rename) ──
 //
@@ -4409,6 +4419,158 @@ export function resolveTierBinding(canonFilePath: string): TierLintBinding {
   return null
 }
 
+// ── a step's pool (no-Claude plan phase 5a) ──────────────────────────────
+//
+// A canon file holds the served session (problems 1–8, linted above as
+// served: `servedCanon`) and the step's pool (problems 9..N,
+// `packages/core/src/wire/canonPool.ts`), the blocks the device's picker
+// composes sessions from. A session rule (caps, bands, slots, coverage)
+// binds a session, not a pool: the picker holds every session it composes
+// to those (`packages/core/src/session/mathPicker.ts`). A pool block is held
+// to the item rules: its read line parses, its fact is in the step's pool,
+// a missing number's bond keeps to the step's range, and no fact is in the
+// file twice.
+
+/** A read line's fact for the item rules: `null` = unparseable. */
+type PoolItem = {
+  key: string
+  factId: string
+  rule: 'pool-membership' | 'missing-number-range' | null
+}
+
+const plainItem = (
+  fact: { a: number; b: number; op: string } | null,
+  inPool: (f: { a: number; b: number; op: string }) => boolean,
+): PoolItem | null =>
+  fact === null
+    ? null
+    : {
+        key: `${fact.a}${fact.op}${fact.b}`,
+        factId: `${fact.a}${fact.op}${fact.b}`,
+        rule: inPool(fact) ? null : 'pool-membership',
+      }
+
+const addingItem = (
+  step: 'add-to-10' | 'add-to-20',
+  text: string,
+  plain: (text: string) => PoolItem | null,
+): PoolItem | null => {
+  const m = parseMissingNumberReadLine(text)
+  if (m === null) return plain(text)
+  const id = `${m.given}+?=${m.total}`
+  return {
+    key: id,
+    factId: id,
+    rule: missingNumberFits(step, m.given, m.missing)
+      ? null
+      : 'missing-number-range',
+  }
+}
+
+const has =
+  (pool: readonly { a: number; b: number; op?: string }[], op: string) =>
+  (f: { a: number; b: number; op: string }) =>
+    f.op === op &&
+    pool.some((p) => p.a === f.a && p.b === f.b && (p.op ?? op) === f.op)
+
+function poolItemOf(tier: CanonFileTier, text: string): PoolItem | null {
+  const sign = (f: ParsedFact | null, op: string) =>
+    f === null ? null : { ...f, op }
+  switch (tier) {
+    case 'sub-to-10':
+      return plainItem(
+        sign(coreParseSubToTenReadLine(text), '-'),
+        has(CORE_SUB_TO_TEN_POOL, '-'),
+      )
+    case 'sub-to-20':
+      return plainItem(
+        sign(parseSubToTwentyReadLine(text), '-'),
+        has(SUB_TO_TWENTY_POOL, '-'),
+      )
+    case 'add-to-10':
+      return addingItem('add-to-10', text, (t) =>
+        plainItem(
+          sign(coreParseAddToTenReadLine(t), '+'),
+          has(CORE_ADD_TO_TEN_POOL, '+'),
+        ),
+      )
+    case 'add-to-20':
+      return addingItem('add-to-20', text, (t) =>
+        plainItem(
+          sign(parseAddToTwentyReadLine(t), '+'),
+          has(ADD_TO_TWENTY_POOL, '+'),
+        ),
+      )
+    case 'two-digit-addsub':
+    case 'two-digit-addsub-with-regroup': {
+      const f = parseTwoDigitAddsubReadLine(text)
+      const pool =
+        tier === 'two-digit-addsub'
+          ? TWO_DIGIT_ADDSUB_POOL
+          : TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL
+      return plainItem(f, (x) => has(pool, x.op)(x))
+    }
+    case 'letter-sounds':
+    case 'letter-names':
+      // No pool for these tiers: any pool block is off the pool.
+      return { key: text, factId: text, rule: 'pool-membership' }
+  }
+}
+
+/**
+ * The item-rule violations of `response`'s pool blocks (problems 9+), in
+ * problem order; `[]` when the file has no pool. The served session's
+ * facts count for the no-duplicates rule.
+ */
+export function lintPoolBlocks(
+  tier: CanonFileTier,
+  response: Pick<SessionStartResponse, 'utterances'>,
+): CompositionViolation[] {
+  const reads = response.utterances
+    .flatMap((u) => {
+      const problem = /\.read$/.test(u.id) ? canonProblemOf(u.id) : null
+      return problem === null ? [] : [{ problem, text: u.text }]
+    })
+    .sort((x, y) => x.problem - y.problem)
+  const seen = new Set<string>()
+  for (const r of reads) {
+    if (r.problem > SERVED_CANON_PROBLEMS) continue
+    const item = poolItemOf(tier, r.text)
+    if (item !== null) seen.add(item.key)
+  }
+  const violations: CompositionViolation[] = []
+  for (const r of reads) {
+    if (r.problem <= SERVED_CANON_PROBLEMS) continue
+    const item = poolItemOf(tier, r.text)
+    if (item === null) {
+      violations.push({
+        rule: 'unparseable-problem',
+        problemIndex: r.problem,
+        message: `pool block P${r.problem} read line does not match the ${tier} read templates: ${JSON.stringify(r.text)}`,
+        factId: null,
+      })
+      continue
+    }
+    if (item.rule !== null) {
+      violations.push({
+        rule: item.rule,
+        problemIndex: r.problem,
+        message: `pool block P${r.problem} (${item.factId}) is not a fact of the ${tier} pool.`,
+        factId: item.factId,
+      })
+    } else if (seen.has(item.key)) {
+      violations.push({
+        rule: 'no-duplicates',
+        problemIndex: r.problem,
+        message: `pool block P${r.problem} repeats ${item.factId}, which the file already has.`,
+        factId: item.factId,
+      })
+    }
+    seen.add(item.key)
+  }
+  return violations
+}
+
 // ── disk walker (CI mode) ────────────────────────────────────────────────
 
 export interface CompositionFileFinding {
@@ -4482,6 +4644,9 @@ export function runCompositionLint(
     }
 
     result.filesLinted++
+    // The session rules hold the served session (problems 1–8) as the
+    // server serves it; the pool blocks get the item rules below.
+    const served = servedCanon(parsed as SessionStartResponse)
 
     // Source the 8 problem utterances. Per current canon shape they live
     // on the top-level `utterances` array. (We deliberately don't read
@@ -4490,54 +4655,36 @@ export function runCompositionLint(
     let violations: CompositionViolation[]
     switch (binding.tier) {
       case 'sub-to-10':
-        violations = lintSubToTenComposition(
-          parsed as SessionStartResponse,
-          binding.config,
-        )
+        violations = lintSubToTenComposition(served, binding.config)
         break
       case 'add-to-10':
-        violations = lintAddToTenComposition(
-          parsed as SessionStartResponse,
-          binding.config,
-        )
+        violations = lintAddToTenComposition(served, binding.config)
         break
       case 'sub-to-20':
-        violations = lintSubToTwentyComposition(
-          parsed as SessionStartResponse,
-          binding.config,
-        )
+        violations = lintSubToTwentyComposition(served, binding.config)
         break
       case 'add-to-20':
-        violations = lintAddToTwentyComposition(
-          parsed as SessionStartResponse,
-          binding.config,
-        )
+        violations = lintAddToTwentyComposition(served, binding.config)
         break
       case 'two-digit-addsub':
-        violations = lintTwoDigitAddsubComposition(
-          parsed as SessionStartResponse,
-          binding.config,
-        )
+        violations = lintTwoDigitAddsubComposition(served, binding.config)
         break
       case 'two-digit-addsub-with-regroup':
         violations = lintTwoDigitAddsubWithRegroupComposition(
-          parsed as SessionStartResponse,
+          served,
           binding.config,
         )
         break
       case 'letter-sounds':
-        violations = lintLetterSoundsComposition(
-          parsed as SessionStartResponse,
-          binding.config,
-        )
+        violations = lintLetterSoundsComposition(served, binding.config)
         break
       case 'letter-names':
-        violations = lintLetterNamesComposition(
-          parsed as SessionStartResponse,
-          binding.config,
-        )
+        violations = lintLetterNamesComposition(served, binding.config)
         break
     }
+    violations.push(
+      ...lintPoolBlocks(binding.tier, parsed as SessionStartResponse),
+    )
     if (violations.length > 0) {
       result.findings.push({
         filePath,

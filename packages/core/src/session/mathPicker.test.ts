@@ -11,6 +11,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { servedCanon } from '../wire/canonPool'
 import {
   ADD_TO_TEN_POOL,
   SUB_TO_TEN_POOL,
@@ -32,7 +33,10 @@ import {
 const CANON = JSON.parse(
   readFileSync('mobile/assets/canon/canon-text.json', 'utf8'),
 ) as Record<string, CanonText>
-const canonOf = (step: ComposedMathStep) => CANON[`math/level-1/${step}`]!
+// The served 8 of each step: what the device draws until a pool block
+// (problem 9+) is voiced (no-Claude plan phase 5a, composeSession.pool.test.ts).
+const canonOf = (step: ComposedMathStep) =>
+  servedCanon(CANON[`math/level-1/${step}`]!)
 
 const NOW = '2026-10-24T09:00:00.000Z'
 const DAY = 86_400_000

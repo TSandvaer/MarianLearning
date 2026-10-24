@@ -130,7 +130,7 @@ import { test, expect } from '@playwright/test'
 import type { Page, Request } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { installClaudeMock } from './_helpers/mockClaude'
+import { installClaudeMock, servedCanonBody } from './_helpers/mockClaude'
 import {
   buildSeedProgress,
   buildSeedSessionHistory,
@@ -481,7 +481,7 @@ function readMathCanon(path: string): string {
         `a silent-MP3 placeholder — see the on-disk-canon-mock header.`,
     )
   }
-  return readFileSync(path, 'utf-8')
+  return servedCanonBody(readFileSync(path, 'utf-8'))
 }
 
 /**

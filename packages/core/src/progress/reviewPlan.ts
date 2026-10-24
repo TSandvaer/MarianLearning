@@ -61,7 +61,12 @@ export const WARMUP_PROBLEMS = 2
 /** The wire's cap on warm-up refs; never exceeded. */
 export const WARMUP_MAX = WARMUP_BLOCK_MAX
 
-/** One canon problem: step `node`, problem `problem` (1..8) of its canon file. */
+/**
+ * One canon problem: step `node`, problem `problem` (1..N) of its canon
+ * file. Problems 1–8 are the served session, the ones the server copies
+ * (`../wire/types.ts` `CanonBlockRef`); 9..N are the step's pool (no-Claude
+ * plan phase 5a, `../wire/canonPool.ts`), which only the device draws.
+ */
 export interface CanonBlockRef extends WireCanonBlockRef {
   node: SkillNode
   problem: number

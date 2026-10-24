@@ -43,6 +43,11 @@ import { CANON_MATH_FACTS } from '../progress/canonMathFacts.generated'
 import { LITERACY_TREE, MATH_TREE } from '../progress/mastery'
 import type { MathFact, NumberGardenNode } from '../progress/types'
 import { leitnerFactAllowedForFocus } from '../wire/leitnerFocus'
+import {
+  SERVED_CANON_PROBLEMS,
+  canonProblemOf,
+  servedCanon,
+} from '../wire/canonPool'
 import { pickMathProblems, type MathPickRequest } from './mathPicker'
 import {
   LETTER_SOUNDS_VOWEL_LADDER,
@@ -91,6 +96,39 @@ export interface CanonKey {
 }
 
 export type CanonTextResolver = (key: CanonKey) => CanonText | null
+
+/**
+ * `entry` with only the pool blocks the device can play (no-Claude plan
+ * phase 5a): a pool block (problem 9+, `../wire/canonPool.ts`) stays only
+ * when `hasClip` says every one of its lines has a bundled clip, so a block
+ * awaiting its Lily render is never drawn. The served session (problems
+ * 1–8, `session.end.*`) is kept as it is. Every block playable: `entry`
+ * itself.
+ */
+export function playablePoolText(
+  entry: CanonText,
+  hasClip: (text: string) => boolean,
+): CanonText {
+  const unplayable = new Set<number>()
+  for (const u of entry.utterances) {
+    const problem = canonProblemOf(u.id)
+    if (problem !== null && problem > SERVED_CANON_PROBLEMS && !hasClip(u.text))
+      unplayable.add(problem)
+  }
+  if (unplayable.size === 0) return entry
+  const keep = (u: unknown) => {
+    const id = (u as { id?: unknown } | null)?.id
+    const problem = typeof id === 'string' ? canonProblemOf(id) : null
+    return problem === null || !unplayable.has(problem)
+  }
+  const plan = entry.plan as { utterances?: unknown } | null
+  return {
+    plan: Array.isArray(plan?.utterances)
+      ? { ...plan, utterances: plan.utterances.filter(keep) }
+      : entry.plan,
+    utterances: entry.utterances.filter(keep),
+  }
+}
 
 /** The server's response without audio. */
 export interface LocalSession {
@@ -646,11 +684,14 @@ const local = (
   session: LocalSession,
 ): ComposedSession => ({ kind: 'local', served, session })
 
-/** A canon entry as a session (a fresh copy: callers may not mutate canon). */
+/** A canon entry's served session (`servedCanon`: without the step's
+ *  pool, as `getCanonEntry` serves it), a fresh copy: callers may not
+ *  mutate canon. */
 function sessionOf(entry: CanonText): LocalSession {
+  const served = servedCanon(entry)
   return {
-    plan: entry.plan,
-    utterances: entry.utterances.map((u) => ({ id: u.id, text: u.text })),
+    plan: served.plan,
+    utterances: served.utterances.map((u) => ({ id: u.id, text: u.text })),
   }
 }
 

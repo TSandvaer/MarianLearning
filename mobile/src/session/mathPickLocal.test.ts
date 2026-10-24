@@ -18,7 +18,6 @@ import {
   type SkillNode,
 } from '@marian/core/progress'
 import type { CanonTextResolver } from '@marian/core/session/composeSession'
-import canonText from '../../assets/canon/canon-text.json'
 import { fakePlayerFactory, resetFakePlayers } from '../../test/fakeAudio'
 import { _resetAudioLogForTests, readAudioLog } from '../audio/audioLog'
 import { createAudioEngine } from '../audio/engine'
@@ -178,18 +177,16 @@ describe('a pick that cannot be built', () => {
   it('asks the server with the hint-free request, and says so', async () => {
     seed('add-to-10', [[{ a: 6, b: 4, op: '+' }, 1]])
     const hints = readMathProgressHints()
-    const canon = canonText as unknown as Record<
-      string,
-      { plan: unknown; utterances: { id: string; text: string }[] }
-    >
-    // This build's add-to-10 canon lost a block: the pick throws.
+    // This build's add-to-10 canon (what the device draws: the served 8,
+    // its pool unrendered) lost a block: the pick throws.
     const broken: CanonTextResolver = (key) => {
       const entry = bundledCanonText(key)
       if (entry === null || key.focusNode !== 'add-to-10') return entry
-      const file = canon['math/level-1/add-to-10']!
       return {
-        plan: file.plan,
-        utterances: file.utterances.filter((u) => !u.id.startsWith('math.p3.')),
+        plan: entry.plan,
+        utterances: entry.utterances.filter(
+          (u) => !u.id.startsWith('math.p3.'),
+        ),
       }
     }
     const server = jest.fn(async () => ({

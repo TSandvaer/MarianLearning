@@ -247,6 +247,7 @@ import {
   buildSeedSessionHistory,
   seedLocalStorage,
 } from './_helpers/seedStorage'
+import { servedCanonBody } from './_helpers/mockClaude'
 
 // ── WebKit-headless skip ─────────────────────────────────────────────────
 function skipOnWebkitHeadless(testInfo: {
@@ -385,7 +386,7 @@ function readMathCanon(path: string): string {
         `silently masks the regression. See the file header.`,
     )
   }
-  return readFileSync(path, 'utf-8')
+  return servedCanonBody(readFileSync(path, 'utf-8'))
 }
 
 /**

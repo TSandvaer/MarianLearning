@@ -56,6 +56,7 @@ import {
   assertTwoDigitAddsubWithRegroupCompositionClean,
   formatCompositionLintReport,
   lintAddToTenComposition,
+  lintPoolBlocks,
   lintAddToTwentyComposition,
   lintLetterNamesComposition,
   lintLetterSoundsComposition,
@@ -8767,4 +8768,81 @@ describe('resolveTierBinding — letter-names canon file path', () => {
       resolveTierBinding('public/canon/word-song/level-1/cvc-words.json'),
     ).toBeNull()
   })
+})
+
+// ── a step's pool (no-Claude plan phase 5a) ──────────────────────────────
+
+describe('lintPoolBlocks — the pool blocks (problems 9+) of a canon file', () => {
+  const block = (p: number, read: string): Utterance[] =>
+    ['read', 'correct'].map((slot, i) => ({
+      id: `math.p${p}.${slot}`,
+      text: i === 0 ? read : 'Yes!',
+      audio: { kind: 'inline', base64: '', mime: 'audio/mpeg' },
+    }))
+  const withPool = (
+    served: readonly [number, number][],
+    pool: Utterance[],
+  ): SessionStartResponse => {
+    const base = buildCanonResponse([...served])
+    return { ...base, utterances: [...base.utterances, ...pool] }
+  }
+
+  it('passes a pool of facts of the step, each once, beside a clean session', () => {
+    const doc = withPool(CLEAN_FACTS_PR_244, [
+      ...block(9, 'Eight take away eight. How many are left?'),
+      ...block(10, 'Nine take away zero. How many are left?'),
+    ])
+    expect(lintPoolBlocks('sub-to-10', doc)).toEqual([])
+  })
+
+  it('flags a block off the pool, one the file already has, and an unparseable one', () => {
+    const doc = withPool(CLEAN_FACTS_PR_244, [
+      ...block(9, 'Six take away five. How many are left?'),
+      ...block(10, doc0Read()),
+      ...block(11, 'What is six take away one?'),
+    ])
+    expect(
+      lintPoolBlocks('sub-to-10', doc).map((v) => [v.rule, v.problemIndex]),
+    ).toEqual([
+      ['pool-membership', 9],
+      ['no-duplicates', 10],
+      ['unparseable-problem', 11],
+    ])
+  })
+
+  it('holds an add-to-10 bond to the bonds to ten', () => {
+    const doc = withPool(
+      [],
+      [
+        ...block(9, 'Seven and what make ten?'),
+        ...block(10, 'Two and what make five?'),
+        ...block(11, 'Seven plus three. How many?'),
+      ],
+    )
+    expect(
+      lintPoolBlocks('add-to-10', doc).map((v) => [v.rule, v.problemIndex]),
+    ).toEqual([['missing-number-range', 10]])
+  })
+
+  it('finds no pool block on a tier with no pool', () => {
+    const doc = withPool([], block(9, 'Tap the letter B.'))
+    expect(lintPoolBlocks('letter-names', doc).map((v) => v.rule)).toEqual([
+      'pool-membership',
+    ])
+  })
+
+  function doc0Read(): string {
+    return buildCanonResponse([...CLEAN_FACTS_PR_244]).utterances.find(
+      (u) => u.id === 'math.p1.read',
+    )!.text
+  }
+})
+
+describe('runCompositionLint — the committed canon with its pools', () => {
+  it('is clean: each served session by the session rules, each pool block by the item rules', () => {
+    const r = runCompositionLint(join(process.cwd(), 'public', 'canon'))
+    expect(r.unparseable).toEqual([])
+    expect(r.findings).toEqual([])
+    expect(r.filesLinted).toBeGreaterThanOrEqual(8)
+  }, 30_000) // reads the committed canon (~87 MB): testing-and-ci.md § 1.1
 })

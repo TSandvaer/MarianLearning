@@ -5,6 +5,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { servedCanon } from '../wire/canonPool'
 import { applyDebugSeed } from '../debug/seeds'
 import { localDateKey } from '../progress/clock'
 import { defaultProgress } from '../progress/defaults'
@@ -163,8 +164,11 @@ describe('the add-to-10-due debug seed (the simulator pre-check and device check
     const canon = JSON.parse(
       readFileSync('mobile/assets/canon/canon-text.json', 'utf8'),
     ) as Record<string, CanonText>
-    const resolve: CanonTextResolver = (key) =>
-      canon[`${key.track}/level-${key.level}/${key.focusNode}`] ?? null
+    // The served 8: what the device draws until a pool block is voiced.
+    const resolve: CanonTextResolver = (key) => {
+      const entry = canon[`${key.track}/level-${key.level}/${key.focusNode}`]
+      return entry === undefined ? null : servedCanon(entry)
+    }
     const out = composeSession(
       {
         track: 'math',
