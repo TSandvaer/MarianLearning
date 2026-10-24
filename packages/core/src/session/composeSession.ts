@@ -10,12 +10,14 @@
  * Out, one of:
  * - `local`: what the server answers, without audio: `plan` and the
  *   spoken lines (`{ id, text }`) in the server's order. The caller plays
- *   each line's bundled clip (phase 1).
+ *   each line's bundled clip (phase 1). A letter-sounds vowel map past
+ *   greenfield, which the server sends to the planner, is built here too
+ *   (phase 4, `./letterSoundsSession.ts`), with the server's
+ *   `currentTargetVowel`.
  * - `server`: the server would not answer from canon. A hint the planner
  *   uses (the add-to-10 Leitner box, a slow fact on add-to-10 or
- *   sub-to-10, a letter-sounds vowel map past greenfield, a graduation
- *   flag), a step without a canon file, or a payload without a track.
- *   Phases 3–4 move the hints onto the device.
+ *   sub-to-10, a graduation flag), a step without a canon file, or a
+ *   payload without a track. Phase 3 moves the math hints onto the device.
  * - `invalid`: the server would answer 400 (a review, peek, replay or mix
  *   it cannot serve, or a client-built plan).
  *
@@ -31,6 +33,12 @@
 import { LITERACY_TREE, MATH_TREE } from '../progress/mastery'
 import { leitnerFactAllowedForFocus } from '../wire/leitnerFocus'
 import {
+  LETTER_SOUNDS_VOWEL_LADDER,
+  deriveCurrentTargetVowel,
+  type LetterSoundsVowelSlash,
+  type VowelSubMasteryState,
+} from '../wire/letterSoundsVowel'
+import {
   MIX_BLOCK_COUNT,
   MIX_PLAN_ID_PREFIX,
   MIX_SOURCE_STEPS,
@@ -43,6 +51,7 @@ import {
   WARMUP_BLOCK_MAX,
   type CanonBlockRef,
 } from '../wire/types'
+import { composeLetterSoundsSession } from './letterSoundsSession'
 
 export type SessionTrack = 'math' | 'word-song'
 
@@ -77,11 +86,24 @@ export interface LocalSession {
   utterances: CanonLine[]
 }
 
-/** Which server branch the session copies. */
-export type LocalSessionKind = 'canon' | 'review' | 'peek' | 'replay' | 'mix'
+/** Which server branch the session copies (`vowel`: the planner's). */
+export type LocalSessionKind =
+  | 'canon'
+  | 'review'
+  | 'peek'
+  | 'replay'
+  | 'mix'
+  | 'vowel'
 
 export type ComposedSession =
-  | { kind: 'local'; served: LocalSessionKind; session: LocalSession }
+  | {
+      kind: 'local'
+      served: LocalSessionKind
+      session: LocalSession
+      /** The letter-sounds vowel the server stamps (`SessionStartResponse`
+       *  `currentTargetVowel`); absent wherever the server omits it. */
+      currentTargetVowel?: LetterSoundsVowelSlash
+    }
   | { kind: 'server'; reason: string }
   | { kind: 'invalid'; message: string }
 
@@ -110,14 +132,15 @@ interface TrackPayload {
   lifetimeFirstEncounters?: readonly string[]
   leitner?: readonly { op: string }[]
   slowFacts?: readonly unknown[]
-  letterSoundsVowelStates?: Readonly<Record<string, string>>
+  letterSoundsVowelStates?: Readonly<
+    Record<LetterSoundsVowelSlash, VowelSubMasteryState>
+  >
 }
 
 const TRACKS: readonly SessionTrack[] = ['math', 'word-song']
 const OPS: ReadonlySet<string> = new Set(['+', '-', '*'])
 const LEITNER_MAX_ITEMS = 60
 const SLOW_FACT_MAX_ITEMS = 16
-const VOWEL_LADDER = ['/o/', '/u/', '/i/', '/e/'] as const
 const VOWEL_STATES: ReadonlySet<string> = new Set([
   'intro',
   'practicing',
@@ -167,14 +190,16 @@ function parseSlowFacts(raw: unknown[]): unknown[] | null {
 }
 
 /** `api/_planner.ts` `parseLetterSoundsVowelStates`: all four vowels. */
-function parseVowelStates(raw: unknown): Record<string, string> | null {
+function parseVowelStates(
+  raw: unknown,
+): Record<LetterSoundsVowelSlash, VowelSubMasteryState> | null {
   if (typeof raw !== 'object' || raw === null) return null
   const r = raw as Record<string, unknown>
-  const out: Record<string, string> = {}
-  for (const vowel of VOWEL_LADDER) {
+  const out = {} as Record<LetterSoundsVowelSlash, VowelSubMasteryState>
+  for (const vowel of LETTER_SOUNDS_VOWEL_LADDER) {
     const state = r[vowel]
     if (typeof state !== 'string' || !VOWEL_STATES.has(state)) return null
-    out[vowel] = state
+    out[vowel] = state as VowelSubMasteryState
   }
   return out
 }
@@ -236,9 +261,9 @@ function defaultFocusNode(track: SessionTrack): string {
 /**
  * Why the server would run the live planner for this forward request
  * instead of its canon (`bypassCanonAndCache`), or `null`. The predicates
- * are `api/_planner.ts` `isLeitnerDirectiveActive`,
- * `isSlowFactDirectiveActive` and `letterSoundsStatesAreNonFallback`; the
- * Leitner box is narrowed to its focus first (`withLeitnerForFocus`).
+ * are `api/_planner.ts` `isLeitnerDirectiveActive` and
+ * `isSlowFactDirectiveActive`; the Leitner box is narrowed to its focus
+ * first (`withLeitnerForFocus`). The vowel map is `vowelMapTarget`'s.
  */
 function plannerHint(p: TrackPayload, focus: string): string | null {
   if (p.isGraduationSession === true) return 'graduation flag'
@@ -255,16 +280,38 @@ function plannerHint(p: TrackPayload, focus: string): string | null {
   ) {
     return 'slow-fact hint'
   }
-  const states = p.letterSoundsVowelStates
-  if (
-    p.track === 'word-song' &&
-    focus === 'letter-sounds' &&
-    states !== undefined &&
-    VOWEL_LADDER.some((v) => states[v] !== 'intro')
-  ) {
-    return 'letter-sounds vowel map'
-  }
   return null
+}
+
+/**
+ * A letter-sounds request whose vowel map is past greenfield: the vowel
+ * the server asks the planner for (`api/claude.ts`, `api/_planner.ts`
+ * `letterSoundsStatesAreNonFallback`), as `{ vowel }`. `vowel: null`: the
+ * derivation names none (a mastered tier, or the /e/ guard with nothing
+ * mastered), so the planner uses its default /o/ and nothing is stamped.
+ * `null`: no such map (all-intro derives the canon's own /o/, so canon
+ * serves it).
+ */
+function vowelMapTarget(
+  p: TrackPayload,
+  focus: string,
+): { vowel: LetterSoundsVowelSlash | null } | null {
+  const states = p.letterSoundsVowelStates
+  if (p.track !== 'word-song' || focus !== 'letter-sounds') return null
+  if (states === undefined) return null
+  if (LETTER_SOUNDS_VOWEL_LADDER.every((v) => states[v] === 'intro')) {
+    return null
+  }
+  return { vowel: deriveCurrentTargetVowel(states) }
+}
+
+/**
+ * The payload's `seed` (the session count at kick time, as the review
+ * picker's): it varies a vowel session's letters. The server ignores it.
+ */
+function seedOf(payload: unknown): number {
+  const seed = (payload as Record<string, unknown>).seed
+  return isInt(seed, 0, Number.MAX_SAFE_INTEGER) ? seed : 0
 }
 
 // --- Canon blocks (`api/_review.ts`) -------------------------------------
@@ -530,7 +577,9 @@ function sessionOf(entry: CanonText): LocalSession {
  * receives it, after a JSON round trip. Same branch order as the handler:
  * a client plan, the track payload, review, peek, replay, mix, the
  * planner hints, the canon hit with its first-encounter gate, and the
- * warm-up blocks on a mix or a canon hit.
+ * warm-up blocks on a mix or a canon hit. The vowel map, the one planner
+ * hint built here, comes after the others, as `bypassCanonAndCache` ORs
+ * them: any other hint still goes to the server.
  */
 export function composeSession(
   sent: unknown,
@@ -577,6 +626,28 @@ export function composeSession(
   const focus = p.focusNode ?? defaultFocusNode(track)
   const hint = plannerHint(p, focus)
   if (hint !== null) return { kind: 'server', reason: hint }
+  const target = vowelMapTarget(p, focus)
+  if (target !== null) {
+    const built = composeLetterSoundsSession(
+      target.vowel ?? '/o/',
+      seedOf(payload),
+      resolve,
+      p.level,
+    )
+    if (built === null) {
+      return { kind: 'server', reason: 'no letter-sounds canon' }
+    }
+    const gated = applyFirstEncounterGate(
+      built,
+      focus,
+      p.lifetimeFirstEncounters,
+      resolve,
+    )
+    return {
+      ...local('vowel', withWarmupBlocks(gated, payload, track, resolve)),
+      ...(target.vowel !== null ? { currentTargetVowel: target.vowel } : {}),
+    }
+  }
   const entry = resolve({ track, level: p.level, focusNode: focus })
   if (entry === null) return { kind: 'server', reason: `no canon for ${focus}` }
   const gated = applyFirstEncounterGate(

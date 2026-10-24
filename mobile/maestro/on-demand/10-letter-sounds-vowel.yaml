@@ -1,0 +1,60 @@
+# A letter-sounds session past greenfield, built on the device (no-Claude
+# plan phase 4): the `letter-sounds-short-u` seed has short o mastered and
+# short u practising, so the app builds a short-u session from the bundled
+# letter-sounds canon (`packages/core/src/session/letterSoundsSession.ts`)
+# with the closed API port. Before phase 4 this session asked the server's
+# planner, failed on the closed port and played the silent static plan.
+#
+# Screenshots: the first problem on screen (a warm-up block when the
+# review picker adds one, else the gentle ramp's consonant) and the short-u
+# problem (P6, Emma's caption "Which letter says uh?"). Metro's log has
+# `[audio] session-local word-song <ms> ms vowel letter-sounds, <n>
+# utterances` and `ready (letter-sounds-short-u, ...)`.
+appId: host.exp.Exponent
+name: Letter sounds past greenfield
+tags:
+  - sessions
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      debug: 1
+      seed: letter-sounds-short-u
+- runFlow: ../subflows/open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 120000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: hub-card-word-song
+      NEXT: word-song
+- extendedWaitUntil:
+    visible:
+      id: word-song-chips
+    timeout: 30000
+- takeScreenshot: vowel-session-problem-1
+- extendedWaitUntil:
+    visible:
+      id: word-song-ribbon
+      text: '.*says uh.*'
+    timeout: 240000
+- takeScreenshot: vowel-session-short-u-problem
+- extendedWaitUntil:
+    visible:
+      id: session-end
+    timeout: 300000
+- extendedWaitUntil:
+    visible:
+      id: session-end-cta
+    timeout: 420000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: session-end-cta
+      NEXT: hub
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 30000

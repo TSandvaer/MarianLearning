@@ -89,6 +89,10 @@
  *   in-app — the ear-test clips were hand-rendered standalone, so this
  *   seed exercises the full canon path end-to-end. Brought onto the
  *   production branch from the abandoned PR #354 (Devon's seed).
+ * - `letter-sounds-short-u`: `letter-sounds` as above, past greenfield:
+ *   the vowel map has /o/ mastered and /u/ practising, so the session
+ *   practises short u. The app builds it on the device (no-Claude plan
+ *   phase 4); this seed is how a simulator or an iPad reaches it.
  * - `cvc-words`: Marian as if she's mastered everything through
  *   `blending-cv` and is now practicing `cvc-words`. Skips Greet (sets
  *   sessionCount to 1) so the app deep-routes to Hub on first mount,
@@ -200,8 +204,10 @@ import {
   type Progress,
   type SessionHistoryEntry,
   type SkillLevel,
+  type LetterSoundsVowel,
   type SkillLevels,
   type SkillNode,
+  type VowelSubMasteryState,
 } from '../progress'
 import { startProgressForActive } from '../learners/startDoc'
 import {
@@ -223,6 +229,10 @@ interface SeedRecipe {
    * picker lands on an earlier node and the seed misses its target.
    */
   readonly skillLevels: Readonly<Partial<Record<SkillNode, SkillLevel>>>
+  /** Optional letter-sounds vowel map, written over the stored one. */
+  readonly letterSoundsVowelStates?: Readonly<
+    Record<LetterSoundsVowel, VowelSubMasteryState>
+  >
   /**
    * Whether to bump session-history's `sessionCount` to 1 (if currently
    * 0) so Splash routes to Hub instead of Greet on the next mount.
@@ -291,6 +301,21 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
     skillLevels: {
       'letter-names': 'mastered',
       'letter-sounds': 'practicing',
+    },
+    skipGreet: true,
+  },
+  // Letter sounds past greenfield (no-Claude plan phase 4): short o
+  // mastered, short u practising, so the device builds a short-u session.
+  'letter-sounds-short-u': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'practicing',
+    },
+    letterSoundsVowelStates: {
+      '/o/': 'mastered',
+      '/u/': 'practicing',
+      '/i/': 'intro',
+      '/e/': 'intro',
     },
     skipGreet: true,
   },
@@ -694,6 +719,9 @@ export function applyDebugSeed(value: string): boolean {
   }
 
   applySkillLevelsPatch(recipe.skillLevels)
+  if (recipe.letterSoundsVowelStates) {
+    applyVowelStates(recipe.letterSoundsVowelStates)
+  }
   if (recipe.historyFactory) {
     applyHistorySeed(recipe.historyFactory())
   }
@@ -701,6 +729,17 @@ export function applyDebugSeed(value: string): boolean {
     bumpSessionCountIfZero()
   }
   return true
+}
+
+/** Write `states` as the stored progress's letter-sounds vowel map. */
+function applyVowelStates(
+  states: Readonly<Record<LetterSoundsVowel, VowelSubMasteryState>>,
+): void {
+  const existing = loadProgress() ?? startProgressForActive()
+  saveProgress({
+    ...existing,
+    literacy: { ...existing.literacy, letterSoundsVowelStates: { ...states } },
+  })
 }
 
 /**

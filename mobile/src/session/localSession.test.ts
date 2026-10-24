@@ -181,21 +181,6 @@ describe('startSessionLocalFirst', () => {
       }),
       'math/level-1/add-to-10',
     ],
-    [
-      'a practising letter-sounds vowel map',
-      payload('word-song', {
-        progress: {
-          focusNode: 'letter-sounds',
-          letterSoundsVowelStates: {
-            '/o/': 'practicing',
-            '/u/': 'intro',
-            '/i/': 'intro',
-            '/e/': 'intro',
-          },
-        },
-      }),
-      'word-song/level-1/letter-sounds',
-    ],
   ])(
     'a hinted session (%s) still goes to the server',
     async (_name, sent, path) => {

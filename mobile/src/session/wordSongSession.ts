@@ -8,9 +8,9 @@
  *   effect (QA route, Session End's "Again"). Reads the hints, freezes the
  *   session-start extras (cross-vowel, the th cue) and publishes them at
  *   once, then starts the request.
- * - **Visible-wait fallback** (`startWaitTimer()`): a hinted request
- *   (the vowel map: live planner) gets 5 s once Word Song is on screen and
- *   waiting, then a hint-free canon request replaces it.
+ * - **No visible-wait fallback** (`startWaitTimer()` is a no-op): no Word
+ *   Song request bypasses canon any more. The app builds the letter-sounds
+ *   vowel session (no-Claude plan phase 4) and the graduation check itself.
  * - **Graduation check** (Thomas 2026-10-23): when one is due, the canon
  *   plan's problems 2, 5 and 7 become probe words (core
  *   `withGraduationProbes`), their lines played from the bundled probe
@@ -68,7 +68,7 @@ import {
 } from './sessionStartFallback'
 import {
   buildWordSongSessionPayload,
-  hasCanonBypassingHints,
+  carriesVowelMap,
   narrowTargetVowel,
   NO_EXTRAS,
   readWordSongProgressHints,
@@ -119,7 +119,8 @@ export interface WordSongSessionController {
   tearDown(): void
   /** Focus picked at kick time, frozen at settle (`null` without progress). */
   readonly sessionFocus: WordSongSessionFocus | null
-  /** The server's letter-sounds target vowel, frozen at settle. */
+  /** The letter-sounds target vowel (the server's stamp, built on the
+   *  device since phase 4), frozen at settle. */
   readonly currentTargetVowel: TargetVowel | null
   getSnapshot(): WordSongSessionSnapshot
   subscribe(listener: () => void): () => void
@@ -269,12 +270,9 @@ export function createWordSongSessionController(
       const sessionId = sessionIdNow()
       let firstRun = true
 
-      const run = async (
-        withHints: boolean,
-        signal: AbortSignal,
-      ): Promise<Loaded> => {
+      const run = async (signal: AbortSignal): Promise<Loaded> => {
         // The prefetch stands in for the first request only; its signal is
-        // linked, so the fallback and a tear-down abort it too.
+        // linked, so a tear-down aborts it too.
         const adopted = firstRun
           ? (deps.prefetcher?.take(prefetchKey, signal) ?? null)
           : null
@@ -282,8 +280,8 @@ export function createWordSongSessionController(
         if (adopted !== null) note('adopting the Hub prefetch')
         const prepared = await (adopted ??
           start({
-            sessionId: withHints ? sessionId : `${sessionId}-fallback`,
-            payload: buildWordSongSessionPayload(hints, withHints),
+            sessionId,
+            payload: buildWordSongSessionPayload(hints, carriesVowelMap(hints)),
             signal,
           }))
         // A due check on a forward session: the canon plan with probe
@@ -312,12 +310,13 @@ export function createWordSongSessionController(
         }
       }
 
+      // No hint sends a Word Song request to the planner any more, so there
+      // is no fallback to arm: one request, the full payload.
       handle = startSessionWithFallback({
-        hasHints: hasCanonBypassingHints(hints),
+        hasHints: false,
         timeoutMs: deps.timeoutMs,
         signal: abort.signal,
-        run,
-        onFallback: () => note('slow; re-requesting without planner hints'),
+        run: (_hinted, signal) => run(signal),
       })
       handle.promise.then(
         ({ prepared, usedFallback }) => {

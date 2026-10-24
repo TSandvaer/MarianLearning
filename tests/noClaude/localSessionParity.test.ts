@@ -195,6 +195,30 @@ async function expectServer(payload: unknown): Promise<void> {
   )
 }
 
+/**
+ * A letter-sounds vowel map past greenfield (phase 4): the server runs the
+ * planner, the device builds the session. Which vowel it practises and
+ * the `currentTargetVowel` it returns are `letterSoundsVowelParity.test.ts`.
+ */
+async function expectVowelSession(payload: unknown): Promise<void> {
+  const composed = composeSession(payload, bundled)
+  expect(composed.kind, JSON.stringify(payload)).toBe('local')
+  expect(
+    composed.kind === 'local' ? composed.served : null,
+    JSON.stringify(payload),
+  ).toBe('vowel')
+  const calls = plannerCalls.mock.calls.length
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    await serve(payload)
+  } finally {
+    log.mockRestore()
+  }
+  expect(plannerCalls.mock.calls.length, JSON.stringify(payload)).toBe(
+    calls + 1,
+  )
+}
+
 /** Both answer the request as invalid (the server: a 400). */
 async function expectInvalid(payload: unknown): Promise<void> {
   const served = await serve(payload)
@@ -557,6 +581,27 @@ describe('sessions the device leaves to the server (phases 3–4)', () => {
       }),
     ],
     [
+      'a graduation flag',
+      base('word-song', { focusNode: 'cvc-words', isGraduationSession: true }),
+    ],
+    [
+      'a level without canon',
+      { ...base('math', { focusNode: 'add-to-10' }), level: 2 },
+    ],
+  ])('%s', async (_name, payload) => {
+    await expectServer(payload)
+  })
+
+  it('a payload without a track (the legacy stub)', async () => {
+    const served = await serve({ childName: 'friend' })
+    expect(served.body.stub).toBe(true)
+    expect(composeSession({ childName: 'friend' }, bundled).kind).toBe('server')
+  })
+})
+
+describe('a vowel map past greenfield: the server plans, the device builds (phase 4)', () => {
+  it.each([
+    [
       'a practising vowel map on letter-sounds',
       base('word-song', {
         focusNode: 'letter-sounds',
@@ -575,22 +620,8 @@ describe('sessions the device leaves to the server (phases 3–4)', () => {
         ),
       }),
     ],
-    [
-      'a graduation flag',
-      base('word-song', { focusNode: 'cvc-words', isGraduationSession: true }),
-    ],
-    [
-      'a level without canon',
-      { ...base('math', { focusNode: 'add-to-10' }), level: 2 },
-    ],
   ])('%s', async (_name, payload) => {
-    await expectServer(payload)
-  })
-
-  it('a payload without a track (the legacy stub)', async () => {
-    const served = await serve({ childName: 'friend' })
-    expect(served.body.stub).toBe(true)
-    expect(composeSession({ childName: 'friend' }, bundled).kind).toBe('server')
+    await expectVowelSession(payload)
   })
 })
 
@@ -706,7 +737,10 @@ describe('a seeded sweep of mixed payloads', () => {
         }
       }
       const composed = composeSession(payload, bundled)
-      if (composed.kind === 'local') {
+      if (composed.kind === 'local' && composed.served === 'vowel') {
+        local += 1
+        await expectVowelSession(payload)
+      } else if (composed.kind === 'local') {
         local += 1
         await expectSame(payload)
       } else if (composed.kind === 'server') {

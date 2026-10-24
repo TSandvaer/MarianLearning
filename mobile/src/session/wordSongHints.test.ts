@@ -14,8 +14,10 @@ import {
   type Progress,
   type SkillLevel,
 } from '@marian/core/progress'
+import { recordSessionEnd } from '@marian/core/sessionEnd/sessionHistory'
 import {
   NO_EXTRAS,
+  buildWordSongSessionPayload,
   readWordSongProgressHints,
   readWordSongSessionExtras,
   type WordSongProgressHints,
@@ -320,5 +322,41 @@ describe('the step intro lead line (content wave 1 § 6.1)', () => {
       { planKind: { kind: 'review', blocks: [] }, intro },
     )
     expect(review.intro).toBeNull()
+  })
+})
+
+describe('letter sounds: the vowel map and its seed (no-Claude plan phase 4)', () => {
+  it('reads the vowel map and the session count, and only the device payload carries them', () => {
+    const vowels = {
+      '/o/': 'mastered',
+      '/u/': 'practicing',
+      '/i/': 'intro',
+      '/e/': 'intro',
+    } as const
+    const base = defaultProgress()
+    seed(
+      { 'letter-names': 'mastered', 'letter-sounds': 'practicing' },
+      { literacy: { ...base.literacy, letterSoundsVowelStates: vowels } },
+    )
+    recordSessionEnd(3)
+    recordSessionEnd(5)
+    const h = readWordSongProgressHints()
+    expect(h.focusNode).toBe('letter-sounds')
+    expect(h.letterSoundsVowelStates).toEqual(vowels)
+    expect(h.seed).toBe(2)
+    const sent = buildWordSongSessionPayload(h, true)
+    expect(sent.seed).toBe(2)
+    expect(sent.progress).toMatchObject({ letterSoundsVowelStates: vowels })
+    const bare = buildWordSongSessionPayload(h, false)
+    expect(bare).not.toHaveProperty('seed')
+    expect(bare.progress).not.toHaveProperty('letterSoundsVowelStates')
+  })
+
+  it('another step carries neither', () => {
+    seed({ 'letter-names': 'mastered', 'letter-sounds': 'mastered' })
+    const h = readWordSongProgressHints()
+    expect(h.focusNode).not.toBe('letter-sounds')
+    expect(h.seed).toBeUndefined()
+    expect(buildWordSongSessionPayload(h, true)).not.toHaveProperty('seed')
   })
 })
