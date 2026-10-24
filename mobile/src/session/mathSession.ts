@@ -8,12 +8,12 @@
  *   hides the request, or on Math for a returning child. The payload is the
  *   web's shape, `{ track: 'math', level: 1, childName, progress? }`, with
  *   `childName: 'friend'` for every learner (learner profiles P7, T8: no
- *   child's name goes in a session request) and the focus node, recent success rate, Leitner and slow-fact hints
- *   and the lifetime first encounters from the persisted progress.
- * - **Visible-wait fallback** (`startWaitTimer()`, Emma's Path 1/10): once
- *   Math is on screen and still waiting, a hinted request (Leitner /
- *   slow facts: live planner, ~15 s) gets 5 s, then a hint-free canon
- *   request replaces it.
+ *   child's name goes in a session request) and the focus node, recent
+ *   success rate and the lifetime first encounters from the persisted
+ *   progress. No Leitner or slow-fact hint (no-Claude plan phase 3, below).
+ * - **Visible-wait fallback** (`startWaitTimer()`, Emma's Path 1/10): kept
+ *   for the shape Word Song shares; a math request carries no planner hint
+ *   since phase 3, so it never races the 5 s budget.
  * - **Settle**: resolve → the server plan (core's
  *   `mathSessionPlanFromServer`) and the session audio's text-keyed
  *   `playUtterance`; reject (network, server error, a plan core cannot
@@ -35,17 +35,23 @@
  * - **Review and warm-up** (native spec
  *   `design/native/review-mode-and-warmup-native.md` §§ 2, 7.4): the hints
  *   carry core's `sessionPlanKind`. A review asks for 8 canon blocks
- *   (`payload.review`; no hints, so no 5 s fallback) and is accepted only
- *   when the plan id starts `review-` and the plan reads; anything else is a
- *   failure (the static same-step plan, recorded as a forward session). A
- *   warm-up's refs ride on the forward request (both of its requests), its
- *   facts leave the Leitner hint (one shared cap of 3), and its blocks come
- *   back as `math.w<i>.*`, parsed into the round ahead of the 8 scored
- *   problems; a block that is missing or unreadable is dropped.
+ *   (`payload.review`) and is accepted only when the plan id starts
+ *   `review-` and the plan reads; anything else is a failure (the static
+ *   same-step plan, recorded as a forward session). A warm-up's refs ride
+ *   on the forward request, its facts share the picker's cap of 3, and its
+ *   blocks come back as `math.w<i>.*`, parsed into the round ahead of the
+ *   8 scored problems; a block that is missing, unreadable or dropped (a
+ *   picked session's dual exposure) is left out.
  *
  * - **Local first** (no-Claude plan phase 2, `./localSession.ts`): a
  *   request the server answers from canon (no planner hint) is built on the
  *   device from the bundled canon, with no network call and no wait.
+ * - **Picked on the device** (phase 3, `design/native/no-claude-sizing.md`
+ *   § 1 rows 1–2): the sessions whose request used to carry the Leitner
+ *   hint (add-to-10) or the slow-fact hint (add-to-10, sub-to-10) are
+ *   picked by core (`mathPickRequestFor` → `composeSession`'s `mathPick`),
+ *   the request without either hint; a pick that cannot be built is
+ *   logged and the server serves the hint-free request (the step's canon).
  *
  * The Claude key never reaches the app: `/api/claude` is the Vercel
  * function. App subscribes with `useSyncExternalStore`.
@@ -64,22 +70,20 @@ import {
   shouldScaffoldThisSession,
 } from '@marian/core/math/subitisingScaffold'
 import {
-  buildSlowFactSessionHint,
   loadProgress,
   pickFocusNode,
   pickRecentSuccessRate,
   type FocusMode,
-  type LeitnerSessionHintItem,
   type SkillNode,
-  type SlowFactHint,
 } from '@marian/core/progress'
 import { localDateKey, now as progressNow } from '@marian/core/progress/clock'
 import {
-  forwardLeitnerHint,
   sessionPlanKind,
   WARMUP_PROBLEMS,
   type SessionPlanKind,
 } from '@marian/core/progress/reviewPlan'
+import type { MathPickRequest } from '@marian/core/session/mathPicker'
+import { mathPickRequestFor } from '@marian/core/session/mathPickRequest'
 import { readSessionHistory } from '@marian/core/sessionEnd/sessionHistory'
 import {
   recordAudio,
@@ -108,9 +112,10 @@ export interface MathProgressHints {
   focusNode: SkillNode | undefined
   focusMode: FocusMode | undefined
   recentSuccessRate: number | null | undefined
-  leitner: LeitnerSessionHintItem[] | undefined
-  slowFacts: SlowFactHint[] | undefined
   lifetimeFirstEncounters: readonly string[] | undefined
+  /** Phase 3: the device picks this session (core `mathPickRequestFor`);
+   *  `undefined` = the step's canon session (or a review / times mix). */
+  mathPick?: MathPickRequest
   /** Review, or forward with its warm-up refs (core `sessionPlanKind`). */
   planKind: SessionPlanKind
   /** The focus step's intro lead line (content wave 1 § 6.1), if it plays. */
@@ -130,8 +135,6 @@ export function readMathProgressHints(): MathProgressHints {
       focusNode: undefined,
       focusMode: undefined,
       recentSuccessRate: undefined,
-      leitner: undefined,
-      slowFacts: undefined,
       lifetimeFirstEncounters: undefined,
       planKind: FORWARD,
     }
@@ -147,51 +150,35 @@ export function readMathProgressHints(): MathProgressHints {
     sessionCount,
     node,
   )
-  // A times mix (content wave 1 § 2.4) sends no Leitner or slow-fact hint:
-  // its blocks already carry the due facts.
-  const mix = planKind.kind === 'forward' && planKind.mix !== undefined
-  // The due box without the warm-up's facts, then the multiplication rule
-  // (core `leitnerBoxForFocus`: the planner's add-to-10 Leitner directive
-  // would plan "Two times three" into an addition session), capped at 3
-  // minus the warm-up's facts (core `forwardLeitnerHint`, § 7.4).
-  const leitner = forwardLeitnerHint(
-    progress.mathFactsLeitner,
-    now.getTime(),
+  // The sessions that sent the Leitner / slow-fact hint are picked on the
+  // device (phase 3): core decides which (a review, a times mix and every
+  // other step: none) and reads the picker's input from this doc.
+  const mathPick = mathPickRequestFor(
+    progress,
     node,
-    planKind.kind === 'forward' ? planKind.warmup : [],
+    planKind,
+    now.getTime(),
+    localDateKey(now),
+    sessionCount,
   )
-  const slowFacts = mix ? [] : buildSlowFactSessionHint(progress)
   return {
     intro: sessionIntroFor(progress, node, planKind),
     focusNode: node,
     focusMode: mode,
     recentSuccessRate: pickRecentSuccessRate(progress, 'math'),
-    leitner: !mix && leitner.length > 0 ? leitner : undefined,
-    slowFacts: slowFacts.length > 0 ? slowFacts : undefined,
     lifetimeFirstEncounters: progress.lifetimeFirstEncounters ?? [],
     planKind,
+    ...(mathPick !== null ? { mathPick } : {}),
   }
 }
 
 /**
- * Leitner or slow-fact hints bypass canon (live planner, slow). A review
- * sends neither, so it never takes the 5 s fallback.
- */
-export function hasCanonBypassingHints(hints: MathProgressHints): boolean {
-  if (hints.planKind.kind === 'review') return false
-  if (hints.planKind.mix !== undefined) return false
-  return (hints.leitner?.length ?? 0) > 0 || (hints.slowFacts?.length ?? 0) > 0
-}
-
-/**
- * The `session-start` payload (web `prepareMathPathA`). `withHints: false`
- * strips the canon-bypassing hints (the visible-wait fallback request); the
- * warm-up refs ride on both. A review sends its 8 blocks and the focus node
- * (the sweep reads it); the server ignores every other hint for it.
+ * The `session-start` payload (web `prepareMathPathA`), never with a
+ * planner hint (phase 3): the warm-up and times-mix refs ride on it. A
+ * review sends its 8 blocks and the focus node (the sweep reads it).
  */
 export function buildMathSessionPayload(
   hints: MathProgressHints,
-  withHints: boolean,
 ): SessionStartPayload {
   if (hints.planKind.kind === 'review') {
     return {
@@ -205,25 +192,16 @@ export function buildMathSessionPayload(
     }
   }
   return {
-    ...forwardPayload(hints, withHints),
+    ...forwardPayload(hints),
     ...planKindFields(hints.planKind),
   }
 }
 
-function forwardPayload(
-  hints: MathProgressHints,
-  withHints: boolean,
-): SessionStartPayload {
-  const leitner = withHints ? hints.leitner : undefined
-  const slowFacts = withHints ? hints.slowFacts : undefined
-  const hasLeitner = leitner !== undefined && leitner.length > 0
-  const hasSlowFacts = slowFacts !== undefined && slowFacts.length > 0
+function forwardPayload(hints: MathProgressHints): SessionStartPayload {
   const hasFirstEncounters = hints.lifetimeFirstEncounters !== undefined
   const progressBlock =
     hints.focusNode !== undefined ||
     hints.recentSuccessRate !== undefined ||
-    hasLeitner ||
-    hasSlowFacts ||
     hasFirstEncounters
       ? {
           progress: {
@@ -233,8 +211,6 @@ function forwardPayload(
             ...(hints.recentSuccessRate !== undefined
               ? { recentSuccessRate: hints.recentSuccessRate }
               : {}),
-            ...(hasLeitner ? { leitner } : {}),
-            ...(hasSlowFacts ? { slowFacts } : {}),
             ...(hasFirstEncounters
               ? { lifetimeFirstEncounters: [...hints.lifetimeFirstEncounters!] }
               : {}),
@@ -452,7 +428,8 @@ export function createMathSessionController(
       const hints = readHints()
       deps.prefetcher.prefetch(mathPrefetchKey(hints), {
         sessionId: sessionIdNow(),
-        payload: buildMathSessionPayload(hints, true),
+        payload: buildMathSessionPayload(hints),
+        ...(hints.mathPick !== undefined ? { mathPick: hints.mathPick } : {}),
       })
     },
     kick() {
@@ -493,8 +470,11 @@ export function createMathSessionController(
         const prepared = await (adopted ??
           start({
             sessionId: withHints ? sessionId : `${sessionId}-fallback`,
-            payload: buildMathSessionPayload(hints, withHints),
+            payload: buildMathSessionPayload(hints),
             signal,
+            ...(hints.mathPick !== undefined
+              ? { mathPick: hints.mathPick }
+              : {}),
           }))
         try {
           return {
@@ -509,7 +489,8 @@ export function createMathSessionController(
       }
 
       handle = startSessionWithFallback({
-        hasHints: hasCanonBypassingHints(hints),
+        // No math request carries a planner hint (phase 3): no 5 s race.
+        hasHints: false,
         timeoutMs: deps.timeoutMs,
         signal: abort.signal,
         run,

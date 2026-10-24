@@ -23,7 +23,6 @@ import { problemChips } from '../screens/math/problemChips'
 import type { MathSessionResult } from '../screens/math/mathTypes'
 import {
   buildMathSessionPayload,
-  hasCanonBypassingHints,
   mathPrefetchKey,
   mathRoundFromServer,
   readMathProgressHints,
@@ -135,14 +134,13 @@ describe('the times-mix request (AC 12)', () => {
     expect(warmup.length).toBeGreaterThan(0)
     expect(mix).toEqual(pickMixBlocks(p, at(13, 8).getTime(), 0, warmup))
     expect(mix).toHaveLength(8)
-    for (const withHints of [true, false]) {
-      const payload = buildMathSessionPayload(hints, withHints)
-      expect(payload.mix).toEqual({ blocks: mix })
-      expect(
-        (payload as { progress?: { leitner?: unknown } }).progress?.leitner,
-      ).toBeUndefined()
-    }
-    expect(hasCanonBypassingHints(hints)).toBe(false)
+    const payload = buildMathSessionPayload(hints)
+    expect(payload.mix).toEqual({ blocks: mix })
+    expect(
+      (payload as { progress?: { leitner?: unknown } }).progress?.leitner,
+    ).toBeUndefined()
+    // A times mix is not a picked session (its blocks are core's mix).
+    expect(hints.mathPick).toBeUndefined()
     expect(mathPrefetchKey(hints)).toEqual({
       track: 'math',
       node: 'mult-mix',
@@ -154,7 +152,7 @@ describe('the times-mix request (AC 12)', () => {
     saveProgress(progressAtStep('mult-6-9'))
     const hints = readMathProgressHints()
     expect(hints.planKind).toEqual({ kind: 'forward', warmup: [] })
-    expect(buildMathSessionPayload(hints, true)).not.toHaveProperty('mix')
+    expect(buildMathSessionPayload(hints)).not.toHaveProperty('mix')
   })
 })
 

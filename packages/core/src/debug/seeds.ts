@@ -201,6 +201,8 @@
 import {
   loadProgress,
   saveProgress,
+  type LeitnerItem,
+  type MathFact,
   type Progress,
   type SessionHistoryEntry,
   type SkillLevel,
@@ -246,6 +248,13 @@ interface SeedRecipe {
    * omitting the field.
    */
   readonly historyFactory?: () => SessionHistoryEntry[]
+  /**
+   * Optional Leitner items, merged into the box after the skillLevels
+   * patch (an item already there by fact is replaced). No-Claude phase
+   * 3: a box with due facts makes the next add-to-10 session one the
+   * device picks.
+   */
+  readonly leitner?: readonly LeitnerItem<MathFact>[]
 }
 
 /**
@@ -694,6 +703,24 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
     },
     skipGreet: true,
   },
+
+  // No-Claude phase 3 pre-check and device check: add-to-10 with three of
+  // its facts due in box 1 (never answered: `lastSeen: 0`), so the next
+  // add-to-10 session is picked on the device (`session/mathPicker.ts`).
+  // As the first session of a day, its warm-up plays two of them (2 + 2,
+  // 4 + 5) and the third, 6 + ? = 10, leads P4.
+  'add-to-10-due': {
+    skillLevels: {
+      'number-recog': 'mastered',
+      'add-to-10': 'practicing',
+    },
+    skipGreet: true,
+    leitner: [
+      { item: { a: 2, b: 2, op: '+' }, box: 1, lastSeen: 0 },
+      { item: { a: 4, b: 5, op: '+' }, box: 1, lastSeen: 0 },
+      { item: { a: 6, b: 4, op: '+' }, box: 1, lastSeen: 0 },
+    ],
+  },
 }
 
 /** Every recognized seed name, in table order. */
@@ -724,6 +751,9 @@ export function applyDebugSeed(value: string): boolean {
   }
   if (recipe.historyFactory) {
     applyHistorySeed(recipe.historyFactory())
+  }
+  if (recipe.leitner) {
+    applyLeitnerSeed(recipe.leitner)
   }
   if (recipe.skipGreet) {
     bumpSessionCountIfZero()
@@ -759,6 +789,24 @@ function applyHistorySeed(entries: SessionHistoryEntry[]): void {
   saveProgress({
     ...existing,
     history: [...existing.history, ...entries],
+  })
+}
+
+/** Merge `items` into the persisted Leitner box (by fact). */
+function applyLeitnerSeed(items: readonly LeitnerItem<MathFact>[]): void {
+  const existing = loadProgress() ?? startProgressForActive()
+  const key = (f: MathFact) => `${f.a}${f.op}${f.b}`
+  const seeded = new Set(items.map((i) => key(i.item)))
+  saveProgress({
+    ...existing,
+    mathFactsLeitner: {
+      items: [
+        ...existing.mathFactsLeitner.items.filter(
+          (i) => !seeded.has(key(i.item)),
+        ),
+        ...items.map((i) => ({ ...i, item: { ...i.item } })),
+      ],
+    },
   })
 }
 

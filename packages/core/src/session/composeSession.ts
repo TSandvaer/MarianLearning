@@ -17,9 +17,17 @@
  * - `server`: the server would not answer from canon. A hint the planner
  *   uses (the add-to-10 Leitner box, a slow fact on add-to-10 or
  *   sub-to-10, a graduation flag), a step without a canon file, or a
- *   payload without a track. Phase 3 moves the math hints onto the device.
+ *   payload without a track.
  * - `invalid`: the server would answer 400 (a review, peek, replay or mix
  *   it cannot serve, or a client-built plan).
+ *
+ * Phase 3: with `options.mathPick` (`./mathPickRequest.ts`) an add-to-10 or
+ * sub-to-10 forward session is the device's own pick (`./mathPicker.ts`):
+ * the step's canon blocks in the picker's order, renamed `math.p1..p8`,
+ * with the step's `session.end.*` lines, the first-encounter gate and the
+ * warm-up as for its canon session. The server has no such branch (its
+ * answer to that hint-free payload is the step's canon). A pick that
+ * cannot be built throws, and the caller asks the server.
  *
  * The server is the reference. `api/` imports nothing from core, so this
  * is a port of its canon branches (`api/claude.ts` `handler`,
@@ -30,8 +38,12 @@
  *
  * Pure: no I/O, no clock.
  */
+import { mathCompositionViolations } from '../math/compositionRules'
+import { CANON_MATH_FACTS } from '../progress/canonMathFacts.generated'
 import { LITERACY_TREE, MATH_TREE } from '../progress/mastery'
+import type { MathFact, NumberGardenNode } from '../progress/types'
 import { leitnerFactAllowedForFocus } from '../wire/leitnerFocus'
+import { pickMathProblems, type MathPickRequest } from './mathPicker'
 import {
   LETTER_SOUNDS_VOWEL_LADDER,
   deriveCurrentTargetVowel,
@@ -86,7 +98,8 @@ export interface LocalSession {
   utterances: CanonLine[]
 }
 
-/** Which server branch the session copies (`vowel`: the planner's). */
+/** Which server branch the session copies (`vowel`: the planner's;
+ *  `pick`: none, the device's own). */
 export type LocalSessionKind =
   | 'canon'
   | 'review'
@@ -94,6 +107,17 @@ export type LocalSessionKind =
   | 'replay'
   | 'mix'
   | 'vowel'
+  | 'pick'
+
+/** A picked session's `plan.id` starts with this (the device's own; no
+ *  server answers it). */
+export const PICK_PLAN_ID_PREFIX = 'pick-'
+
+export interface ComposeOptions {
+  /** Phase 3: pick this add-to-10 / sub-to-10 forward session on the
+   *  device (`./mathPickRequest.ts` `mathPickRequestFor`). */
+  mathPick?: MathPickRequest
+}
 
 export type ComposedSession =
   | {
@@ -479,14 +503,15 @@ function buildMix(
 
 /**
  * `session` with `payload.warmup`'s blocks appended as `<ns>.w<i>.<slot>`
- * (i = the ref's 1-based position; a ref that can't be served leaves its
- * number unused). A malformed `warmup` is ignored.
+ * (i = the ref's 1-based position; a ref that can't be served, or that
+ * `skip` drops, leaves its number unused). A malformed `warmup` is ignored.
  */
 function withWarmupBlocks(
   session: LocalSession,
   payload: unknown,
   track: SessionTrack,
   resolve: CanonTextResolver,
+  skip: (ref: CanonBlockRef) => boolean = () => false,
 ): LocalSession {
   const raw = (payload as Record<string, unknown>).warmup
   if (raw === undefined) return session
@@ -495,6 +520,7 @@ function withWarmupBlocks(
   const ns = namespaceOf(track)
   const added: Lines = { plan: [], utterances: [] }
   refs.forEach((ref, i) => {
+    if (skip(ref)) return
     const entry = resolve({ track, level: 1, focusNode: ref.node })
     if (entry === null) return
     const block = copyBlock(entry, ns, ref.problem, `w${i + 1}`)
@@ -556,6 +582,63 @@ function applyFirstEncounterGate(
   }
 }
 
+// --- Phase 3: a picked math session (`./mathPicker.ts`) -----------------
+
+const factKey = (f: MathFact) => `${f.a}${f.op}${f.b}`
+
+/**
+ * The step's canon session with the picker's 8 blocks as `math.p1..p8`,
+ * its `session.end.*` lines, and the warm-up refs the pick drops (dual
+ * exposure). Throws when a block cannot be copied or the session breaks a
+ * composition rule: never played, the caller asks the server.
+ */
+function pickedMathSession(
+  entry: CanonText,
+  request: MathPickRequest,
+): { session: LocalSession; dropWarmup: (ref: CanonBlockRef) => boolean } {
+  const pick = pickMathProblems(request, entry)
+  const lines: Lines = { plan: [], utterances: [] }
+  pick.problems.forEach((problem, i) => {
+    const block = copyBlock(entry, 'math', problem, `p${i + 1}`)
+    if (block.plan.length === 0 || block.utterances.length === 0) {
+      throw new Error(`${request.step} block p${problem} has no lines`)
+    }
+    lines.plan.push(...block.plan)
+    lines.utterances.push(...block.utterances)
+  })
+  const isEnd = (u: CanonLine) => u.id.startsWith('session.end.')
+  const canonPlan = (entry.plan ?? {}) as { label?: unknown }
+  const session: LocalSession = {
+    plan: {
+      id: `${PICK_PLAN_ID_PREFIX}${request.step}`,
+      label: typeof canonPlan.label === 'string' ? canonPlan.label : '',
+      utterances: [...lines.plan, ...planLinesOf(entry).filter(isEnd)],
+    },
+    utterances: [
+      ...lines.utterances,
+      ...entry.utterances
+        .filter(isEnd)
+        .map((u) => ({ id: u.id, text: u.text })),
+    ],
+  }
+  const violations = mathCompositionViolations(request.step, session)
+  if (violations.length > 0) {
+    throw new Error(
+      `picked ${request.step} session breaks ${violations[0]!.rule}: ${violations[0]!.message}`,
+    )
+  }
+  const dropped = new Set(
+    pick.dropWarmup.map((i) => factKey(request.warmup[i]!)),
+  )
+  const dropWarmup = (ref: CanonBlockRef) => {
+    const fact = (
+      CANON_MATH_FACTS as Record<string, readonly (MathFact | null)[]>
+    )[ref.node as NumberGardenNode]?.[ref.problem - 1]
+    return fact != null && dropped.has(factKey(fact))
+  }
+  return { session, dropWarmup }
+}
+
 // --- The handler's session-start branches ----------------------------------
 
 const local = (
@@ -577,13 +660,16 @@ function sessionOf(entry: CanonText): LocalSession {
  * receives it, after a JSON round trip. Same branch order as the handler:
  * a client plan, the track payload, review, peek, replay, mix, the
  * planner hints, the canon hit with its first-encounter gate, and the
- * warm-up blocks on a mix or a canon hit. The vowel map, the one planner
- * hint built here, comes after the others, as `bypassCanonAndCache` ORs
- * them: any other hint still goes to the server.
+ * warm-up blocks on a mix or a canon hit. `options.mathPick` (phase 3)
+ * goes before the hints: the device's own pick of that step's session.
+ * The vowel map, the one planner hint built here, comes after the others,
+ * as `bypassCanonAndCache` ORs them: any other hint still goes to the
+ * server.
  */
 export function composeSession(
   sent: unknown,
   resolve: CanonTextResolver,
+  options: ComposeOptions = {},
 ): ComposedSession {
   if (sent === undefined) return { kind: 'server', reason: 'no payload' }
   const payload: unknown = JSON.parse(JSON.stringify(sent))
@@ -624,6 +710,24 @@ export function composeSession(
       : local('mix', withWarmupBlocks(mix, payload, track, resolve))
   }
   const focus = p.focusNode ?? defaultFocusNode(track)
+  const mathPick = options.mathPick
+  if (mathPick !== undefined && track === 'math' && focus === mathPick.step) {
+    const entry = resolve({ track, level: p.level, focusNode: focus })
+    if (entry === null) {
+      return { kind: 'server', reason: `no canon for ${focus}` }
+    }
+    const { session, dropWarmup } = pickedMathSession(entry, mathPick)
+    const gated = applyFirstEncounterGate(
+      session,
+      focus,
+      p.lifetimeFirstEncounters,
+      resolve,
+    )
+    return local(
+      'pick',
+      withWarmupBlocks(gated, payload, track, resolve, dropWarmup),
+    )
+  }
   const hint = plannerHint(p, focus)
   if (hint !== null) return { kind: 'server', reason: hint }
   const target = vowelMapTarget(p, focus)

@@ -1,7 +1,9 @@
 /**
  * No-Claude plan phase 2 on the device: a hint-free session is built from
- * the bundled canon with no network call and no wait, a hinted one still
- * goes to the server, and a local build that throws falls back to it.
+ * the bundled canon with no network call and no wait, and a local build
+ * that throws falls back to the server. Phase 3's picked math sessions
+ * (the Leitner / slow-fact ones, which no longer send a hint):
+ * `./mathPickLocal.test.ts`.
  * The plan and lines equal the server's: `tests/noClaude/
  * localSessionParity.test.ts` (root vitest) runs the real handler.
  */
@@ -310,8 +312,6 @@ const MATH: MathProgressHints = {
   focusNode: 'sub-to-20',
   focusMode: 'forward',
   recentSuccessRate: 0.8,
-  leitner: undefined,
-  slowFacts: undefined,
   lifetimeFirstEncounters: ['add-to-10'],
   planKind: { kind: 'forward', warmup: [] },
 }
@@ -381,22 +381,6 @@ describe('the session controllers start local sessions with no wait', () => {
     expect(snap.plan?.problems).toHaveLength(8)
     expect(offline).not.toHaveBeenCalled()
     words.tearDown()
-  })
-
-  it('a hinted Number Garden session still asks the server (offline here: the static plan)', async () => {
-    const math = createMathSessionController({
-      readHints: () => ({
-        ...MATH,
-        focusNode: 'add-to-10',
-        leitner: [{ a: 3, b: 4, op: '+', box: 1 }],
-      }),
-      fallbackPlanId: () => 'x',
-    })
-    math.kick()
-    await microtasks()
-    expect(offline).toHaveBeenCalledTimes(1)
-    expect(math.getSnapshot()).toMatchObject({ audioReady: true, plan: null })
-    math.tearDown()
   })
 
   it('the Map peek and replay: built on the device', async () => {

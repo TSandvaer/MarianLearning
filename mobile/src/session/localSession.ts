@@ -14,23 +14,27 @@
  * with the `currentTargetVowel` the server stamps for the session-end
  * write.
  *
+ * Phase 3: a math session the device picks (`args.mathPick`, the add-to-10
+ * / sub-to-10 sessions that used to send the Leitner or slow-fact hint) is
+ * built here too, from core's picker (`composeSession`'s `mathPick`).
+ *
  * The rest goes to the server as today (`startSession`):
- * - a hint the planner uses (the add-to-10 Leitner box, a slow fact on
- *   add-to-10 or sub-to-10), until phase 3 moves them; their 5 s fallback
- *   is hint-free, so it is built here;
  * - a step this build has no canon for;
  * - a request the bundled canon cannot serve (a review naming a block the
  *   build lacks; the server may have it, else it answers 400 as before);
  * - a local build that throws (logged), so a bug here costs a request,
- *   not a session.
- * A server request never carries the vowel map or the seed (`toServer`):
- * the device builds vowel sessions, so the server answers from canon.
+ *   not a session. A pick that throws sends its hint-free payload: the
+ *   server answers with the step's canon session.
+ * A server request never carries the vowel map or the seed (`toServer`),
+ * a pick's fallback included: the device builds vowel sessions, so the
+ * server answers from canon.
  */
 import {
   canonTextKey,
   composeSession,
   type CanonText,
   type CanonTextResolver,
+  type ComposeOptions,
   type ComposedSession,
 } from '@marian/core/session/composeSession'
 import type { PlayableUtterance } from '@marian/core/wire/types'
@@ -60,7 +64,11 @@ export interface LocalSessionDeps extends SessionStartDeps {
   /** The canon text (default: the app's bundle). */
   resolveCanon?: CanonTextResolver
   /** The builder (default core's `composeSession`); a test seam. */
-  compose?: (payload: unknown, resolve: CanonTextResolver) => ComposedSession
+  compose?: (
+    payload: unknown,
+    resolve: CanonTextResolver,
+    options?: ComposeOptions,
+  ) => ComposedSession
   /** The server path (default `startSession`). */
   startServer?: typeof startSession
 }
@@ -102,6 +110,7 @@ export async function startSessionLocalFirst(
     composed = (deps.compose ?? composeSession)(
       args.payload,
       deps.resolveCanon ?? bundledCanonText,
+      args.mathPick !== undefined ? { mathPick: args.mathPick } : {},
     )
   } catch (err) {
     recordAudio({
