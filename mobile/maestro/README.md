@@ -120,7 +120,7 @@ One full run on 2026-10-13 (a dedicated iPad Pro 11-inch (M5) simulator, iOS 27)
 
 ### Writing the sweep flow
 
-`sweep/step.yaml` does not use the shared `subflows/*-session.yaml`. Maestro 2.11.0 counts an `extendedWaitUntil` timeout from the last interaction (the card tap), not from the start of the wait, so their 60 s wait for "All done" is used up by the session. With the server plan's audio, Session End's lines are still playing when it shows (seen on `digraphs-sh`), so the sweep's waits add up the budgets of the waits before them.
+Maestro 2.11.0 counts an `extendedWaitUntil` timeout from the last interaction (the card tap), not from the start of the wait. With the canon plan's audio, Session End's lines are still playing when it shows (seen on `digraphs-sh`), so the sweep's waits add up the budgets of the waits before them: 300 s for Session End, 420 s for "All done". Since no-Claude phase 2 the per-PR flows play canon sessions too (built on the device), so the shared `subflows/*-session.yaml` use the same budgets; their old 60 s for "All done" ran out on 08's Word Song session (2026-10-24).
 
 ## Timing
 
