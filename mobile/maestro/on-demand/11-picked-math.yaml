@@ -1,0 +1,62 @@
+# An add-to-10 session the device picks (no-Claude plan phase 3): the
+# `add-to-10-due` seed puts three add-to-10 facts due in box 1, so the
+# session is core's pick (`src/session/localSession.ts` with core's
+# `mathPicker`), built on the device with the closed API port: no request.
+# As the first session of the day it opens with a 2-heart warm-up (2 + 2,
+# 4 + 5), and the third due fact, 6 + ? = 10, leads the scored P4.
+#
+# Screenshots: the first problem (heart 1), and P4 once three scored
+# problems are done (`math-problem-dot-completed`, index 2). Metro's log
+# has `[audio] session-local math <ms> ms pick add-to-10, ...` and
+# `ready (pick-add-to-10, 2 warm-up)`.
+appId: host.exp.Exponent
+name: Picked add-to-10 session
+tags:
+  - sessions
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: add-to-10-due
+- runFlow: ../subflows/open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 120000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: hub-card-number-garden
+      NEXT: math
+- extendedWaitUntil:
+    visible:
+      id: math-chips
+    timeout: 30000
+- takeScreenshot: picked-math-first-problem
+- extendedWaitUntil:
+    visible:
+      id: math-problem-dot-completed
+      index: 2
+    timeout: 300000
+- extendedWaitUntil:
+    visible:
+      id: math-chips
+    timeout: 30000
+- takeScreenshot: picked-math-p4
+- extendedWaitUntil:
+    visible:
+      id: session-end
+    timeout: 300000
+- extendedWaitUntil:
+    visible:
+      id: session-end-cta
+    timeout: 420000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: session-end-cta
+      NEXT: hub
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 30000
