@@ -30,6 +30,8 @@ test: {
 
 The `e2e/**` exclude is **load-bearing**. Playwright specs use `.spec.ts` (same suffix Vitest defaults to picking up); without the exclude, `vitest run` tries to import `@playwright/test`'s test fixture API in jsdom and crashes. Run e2e via `yarn e2e` (Playwright runner) instead.
 
+**Loop/sweep tests need an explicit timeout budget when written.** `vite.config.ts` sets no `testTimeout`, so vitest's 5 s default applies, and hosted runners under the full root suite run loop-heavy tests several times slower than a Mac. Any sweep or loop test over about 0.5 s locally ends with `}, 30_000)` (as `src/screens/Math/Math.test.tsx:3467`); native jest likewise (`App.test` got 15 s in PR #674). **Incident:** PR #675's `localSessionParity` 300-payload sweep took 864 ms locally and 5629 ms on CI, so the fast-gate failed with "Test timed out in 5000ms" (run 40079734601) and the Playwright shards were skipped. **Cost:** a REQUEST_CHANGES round, a fix worker, a re-check and a full CI re-run (~1 h).
+
 ### 1.2 How to run
 
 | Command              | Purpose                                                 |
