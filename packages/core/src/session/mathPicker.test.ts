@@ -159,6 +159,20 @@ describe('pickMathProblems on today’s canon (8 blocks: all play, the rules set
     expect([facts[4], facts[6]]).toEqual(['4+4', '4+5'])
   })
 
+  it('the not-yet-due facts play lowest box first (§ 2.2.2.iv)', () => {
+    const facts = picked(
+      'add-to-10',
+      request('add-to-10', {
+        leitner: box([
+          [f(7, '+', 3), 2, daysAgo(0)], // not due, box 2
+          [f(8, '+', 2), 3, daysAgo(1)], // not due, box 3
+          [f(6, '+', 4), 4, daysAgo(1)], // not due, box 4
+        ]),
+      }),
+    )
+    expect([facts[3], facts[5], facts[7]]).toEqual(['7+3', '8+2', '6+4'])
+  })
+
   it('the due cap is shared with the warm-up: over-cap due facts play after the not-due ones', () => {
     const leitner = box([
       [f(6, '+', 4), 1, daysAgo(5)],
@@ -318,6 +332,20 @@ describe('pickMathProblems: Dave’s rulings', () => {
       }),
     )
     expect(noOpener.slice(0, 3)).toEqual(['5-5', '6-3', '9-1'])
+  })
+
+  it('Q1: a box-2 fact that is not due opens the session too', () => {
+    const facts = picked(
+      'add-to-10',
+      request('add-to-10', {
+        leitner: box([
+          [f(1, '+', 2), 1, daysAgo(1)], // due, would open the ramp
+          [f(2, '+', 2), 2, daysAgo(0)], // box 2, met today: not due
+          // 3+2: never answered (no entry) = new.
+        ]),
+      }),
+    )
+    expect(facts.slice(0, 3)).toEqual(['2+2', '1+2', '3+2'])
   })
 
   it('Q1: Leitner decides what gets in: a capped due easy fact plays in P2-P3 and counts toward the cap', () => {

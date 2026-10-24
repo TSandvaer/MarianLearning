@@ -151,6 +151,13 @@ const OTHER: MathFact[] = [
   { a: 12, b: 2, op: '-' },
 ]
 
+/** Facts no block of add-to-10 or sub-to-10 asks. */
+const NO_BLOCK: MathFact[] = [
+  { a: 1, b: 1, op: '+' },
+  { a: 9, b: 2, op: '+' },
+  { a: 12, b: 2, op: '-' },
+]
+
 type Kind = 'empty' | 'all-due' | 'all-new' | 'random'
 
 function entry(
@@ -168,9 +175,9 @@ function docOf(s: Step, kind: Kind, r: () => number): Progress {
   if (kind === 'all-due') {
     items = s.facts.map((f) => entry(f, pickBox(), 20))
   } else if (kind === 'all-new') {
-    // Only other steps' facts: every block of this step is new, and the
+    // Only facts with no block: every block of this step is new, and the
     // box still holds a due fact (so today's request would be hinted).
-    items = OTHER.map((f) => entry(f, 1, 1))
+    items = NO_BLOCK.map((f) => entry(f, 1, 1))
   } else if (kind === 'random') {
     items = [...s.facts, ...OTHER].flatMap((f) =>
       r() < 0.2 ? [] : [entry(f, pickBox(), Math.floor(r() * 12) - 1)],
