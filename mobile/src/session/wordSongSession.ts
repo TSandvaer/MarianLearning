@@ -31,6 +31,8 @@
  *   problems; the warm-up's `word.w<i>` blocks that parse go in front of
  *   the 8 scored problems.
  *
+ * - **Local first** (no-Claude plan phase 2, `./localSession.ts`), as Math's.
+ *
  * The Claude key never reaches the app: `/api/claude` is the Vercel function.
  */
 import { WARMUP_PROBLEMS } from '@marian/core/progress/reviewPlan'
@@ -58,6 +60,7 @@ import {
   withProbeAudio,
   type RoundAudio,
 } from './graduationCheck'
+import { startSessionLocalFirst } from './localSession'
 import { isReviewPlan } from './reviewSession'
 import {
   startSessionWithFallback,
@@ -218,7 +221,7 @@ const IDLE: WordSongSessionSnapshot = {
 export function createWordSongSessionController(
   deps: WordSongSessionDeps,
 ): WordSongSessionController {
-  const start = deps.start ?? startSession
+  const start = deps.start ?? startSessionLocalFirst
   const readHints = deps.readHints ?? readWordSongProgressHints
   const readExtras = deps.readExtras ?? readWordSongSessionExtras
   const probePlan = deps.probePlan ?? GRADUATION_PROBE_PLAN

@@ -1,8 +1,9 @@
 # One Math session, from Math's mount to Session End's "All done" button.
 # The QA autotap answers (problem 1: three wrong, then the guided answer;
 # problem 2: one wrong; the rest right), so the session is 7 of 8: a good
-# day. With the API unreachable, Math runs core's static plan with silent
-# captions.
+# day. With the API unreachable, Math plays the step's canon session, built
+# on the device (`src/session/localSession.ts`); a session with a planner
+# hint fails over to core's static plan with silent captions.
 appId: host.exp.Exponent
 ---
 - extendedWaitUntil:

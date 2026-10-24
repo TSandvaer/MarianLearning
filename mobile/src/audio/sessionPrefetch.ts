@@ -19,6 +19,7 @@
  *   fallback, a tear-down) aborts it exactly like a request of its own.
  * - `discard()` aborts an in-flight prefetch and unloads a settled one.
  */
+import { startSessionLocalFirst } from '../session/localSession'
 import {
   startSession,
   type PreparedSession,
@@ -62,7 +63,7 @@ export function createSessionPrefetcher(
     start?: typeof startSession
   } = {},
 ): SessionPrefetcher {
-  const start = deps.start ?? startSession
+  const start = deps.start ?? startSessionLocalFirst
   let pending: Pending | null = null
 
   function discard(): void {

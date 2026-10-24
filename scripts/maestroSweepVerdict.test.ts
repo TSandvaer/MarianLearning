@@ -27,6 +27,9 @@ const READY = (label: string, id: string) =>
   ` LOG  [audio] ${label} ready (${id})`
 const FALLBACK = (label: string, why: string) =>
   ` LOG  [audio] ${label} unavailable, silent fallback: ${why}`
+/** `mobile/src/session/localSession.ts`'s row: `<kind> <focus>`. */
+const LOCAL = (world: string, kindAndFocus: string) =>
+  ` LOG  [audio] session-local ${world} 3 ms ${kindAndFocus}, 76 utterances`
 
 function req(
   track: string,
@@ -131,7 +134,44 @@ describe('classifyStep', () => {
       evidence({ apiRecords: [req('word-song', 'cvc-words')] }),
     )
     expect(result.verdict).toBe('FAIL')
-    expect(result.detail).toBe('no math session-start reached the sweep API')
+    expect(result.detail).toBe(
+      'no math session-start reached the sweep API or was built on the device',
+    )
+  })
+
+  it('PASS for a session built on the device: no request reaches the API', () => {
+    const result = classifyStep(
+      evidence({
+        metroLog: [
+          JUMP('add-to-20'),
+          LOCAL('math', 'canon add-to-20'),
+          READY('math-session', 'add-to-20-balanced-intro'),
+        ].join('\n'),
+        apiRecords: [],
+      }),
+    )
+    expect(result).toEqual({
+      verdict: 'PASS',
+      detail: 'device plan add-to-20-balanced-intro',
+    })
+  })
+
+  it('FAIL when the device built another step, and ignores the other world', () => {
+    const result = classifyStep(
+      evidence({
+        metroLog: [
+          JUMP('add-to-20'),
+          LOCAL('word-song', 'canon cvc-words'),
+          LOCAL('math', 'canon add-to-10'),
+          READY('math-session', 'add-to-10-balanced-intro'),
+        ].join('\n'),
+        apiRecords: [],
+      }),
+    )
+    expect(result).toEqual({
+      verdict: 'FAIL',
+      detail: 'session-start asked for add-to-10, not add-to-20',
+    })
   })
 
   it('FAIL when the qaStep jump is not in the log (the flag did not apply)', () => {

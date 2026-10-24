@@ -1,7 +1,8 @@
 # One Word Song session, from Word Song's mount to Session End's "All
 # done" button. The QA autotap answers as in Math (7 of 8: a good day).
-# With the API unreachable, Word Song runs one of core's static plans
-# (picked by the clock's minute) with silent captions.
+# With the API unreachable, Word Song plays the step's canon session, built
+# on the device (`src/session/localSession.ts`); a session with a planner
+# hint fails over to one of core's static plans with silent captions.
 appId: host.exp.Exponent
 ---
 - extendedWaitUntil:

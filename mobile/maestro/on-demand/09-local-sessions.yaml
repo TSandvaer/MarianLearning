@@ -1,0 +1,118 @@
+# Sessions with no server (no-Claude plan phase 2): Number Garden, Word Song
+# and a same-day Number Garden review, each built on the device from the
+# bundled canon (`src/session/localSession.ts`), with a screenshot of a
+# problem in each.
+#
+# "No network" here is the harness's closed API port (`run.sh`: every
+# `/api/claude` request fails at once). The simulator's own network can't be
+# switched off from simctl or Maestro (Maestro's airplane mode is Android
+# only), and Expo Go needs Metro on the Mac. Metro's log shows each
+# session's `[audio] session-local <world> ...` row and its `ready (<plan
+# id>)` line: `review-math` for the third.
+#
+# `qaStep: sub-to-20` (core `progressAtStep`): Number Garden's earlier steps
+# mastered, so after a good day (the QA autotap's 7 of 8) its flower sleeps
+# and the next Number Garden session is a review of those steps (core
+# `sessionPlanKind`). Word Song keeps its start. `qaStep` rewrites the
+# progress on every launch, so the flow launches once. The waits are the
+# sweep's (sweep/step.yaml): with the canon plan's audio, Session End's
+# lines still play when it shows.
+appId: host.exp.Exponent
+name: Sessions with no server
+tags:
+  - sessions
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      debug: 1
+      qaStep: sub-to-20
+- runFlow: ../subflows/open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 120000
+# Number Garden: the sub-to-20 canon session.
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: hub-card-number-garden
+      NEXT: math
+- extendedWaitUntil:
+    visible:
+      id: math-chips
+    timeout: 30000
+- takeScreenshot: local-math-problem
+- extendedWaitUntil:
+    visible:
+      id: session-end
+    timeout: 300000
+- extendedWaitUntil:
+    visible:
+      id: session-end-cta
+    timeout: 420000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: session-end-cta
+      NEXT: hub
+# Word Song: its start step's canon session.
+- extendedWaitUntil:
+    visible:
+      id: hub-card-word-song
+    timeout: 30000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: hub-card-word-song
+      NEXT: word-song
+- extendedWaitUntil:
+    visible:
+      id: word-song-chips
+    timeout: 30000
+- takeScreenshot: local-word-song-problem
+- extendedWaitUntil:
+    visible:
+      id: session-end
+    timeout: 300000
+- extendedWaitUntil:
+    visible:
+      id: session-end-cta
+    timeout: 420000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: session-end-cta
+      NEXT: hub
+# Number Garden again the same day: the review.
+- extendedWaitUntil:
+    visible:
+      id: hub-card-number-garden
+    timeout: 30000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: hub-card-number-garden
+      NEXT: math
+- extendedWaitUntil:
+    visible:
+      id: math-chips
+    timeout: 30000
+- takeScreenshot: local-review-problem
+- extendedWaitUntil:
+    visible:
+      id: session-end
+    timeout: 300000
+- extendedWaitUntil:
+    visible:
+      id: session-end-cta
+    timeout: 420000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: session-end-cta
+      NEXT: hub
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 30000

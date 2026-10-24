@@ -20,8 +20,9 @@
  * problems (the step's canon P1–P8), with the same 5 s budget, the same
  * `alongside` audio and the same failure path (the stop's name).
  *
- * Nothing here reads or writes progress. The Claude key never reaches the
- * app: `/api/claude` is the Vercel function.
+ * Both are built on the device from the bundled canon (no-Claude plan phase
+ * 2, `./localSession.ts`). Nothing here reads or writes progress. The Claude
+ * key never reaches the app: `/api/claude` is the Vercel function.
  */
 import type { ExtendedMathSessionPlan } from '@marian/core/math/extendedProblems'
 import { mathSessionPlanFromServer } from '@marian/core/math/planFromServer'
@@ -41,6 +42,7 @@ import {
   type LoadedSessionAudio,
   type SessionStartPayload,
 } from '../audio'
+import { startSessionLocalFirst } from './localSession'
 import { wireRef } from './reviewSession'
 
 /** § 6.1: no answer within this long is the failure path. */
@@ -202,7 +204,7 @@ async function requestMapSession(
     world,
     node,
     signal,
-    start = startSession,
+    start = startSessionLocalFirst,
     timeoutMs = PEEK_TIMEOUT_MS,
     now = Date.now,
   }: RequestPeekArgs,
