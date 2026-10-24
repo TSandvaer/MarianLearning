@@ -14,8 +14,12 @@ import { CRITTER_SAID_WORDS } from '@marian/core/games/playPlace'
 import { HUB_LINES } from '@marian/core/hub/hubLines'
 import { WEB_AUDIO_MODULES } from './audioRegistry'
 import { BLEND_MARKS } from './blendMarks.generated'
-import { canonClipFor } from './bundledAudio'
-import { CANON_AUDIO_BYTES, CANON_AUDIO_MODULES } from './canonAudioRegistry'
+import { canonClipFor, clipHash } from './bundledAudio'
+import {
+  CANON_AUDIO_BYTES,
+  CANON_AUDIO_HASHES,
+  CANON_AUDIO_MODULES,
+} from './canonAudioRegistry'
 import { GREET_LINE_SOURCES } from './greetAudio'
 import { SFX_SOURCES } from './sfx'
 
@@ -148,6 +152,8 @@ describe('bundled critter word clips (Thomas 2026-10-22)', () => {
 describe('bundled canon clips (no-Claude plan phase 1, design/native/no-claude-sizing.md § 4)', () => {
   /** Every canon clip by its text, decoded from `public/canon/**`. */
   const canon = new Map<string, Buffer>()
+  /** Every canon line's base64, as the server sends it (one per text). */
+  const canonBase64: [text: string, base64: string][] = []
   const walk = (dir: string) => {
     for (const name of readdirSync(dir, { withFileTypes: true })) {
       const p = join(dir, name.name)
@@ -159,6 +165,7 @@ describe('bundled canon clips (no-Claude plan phase 1, design/native/no-claude-s
         for (const u of json.utterances ?? []) {
           if (!u.audio?.base64) continue
           canon.set(u.text, Buffer.from(u.audio.base64, 'base64'))
+          canonBase64.push([u.text, u.audio.base64])
         }
       }
     }
@@ -196,11 +203,21 @@ describe('bundled canon clips (no-Claude plan phase 1, design/native/no-claude-s
     expect(Object.keys(CANON_AUDIO_BYTES)).toHaveLength(canon.size)
   })
 
-  it('looks a line up by its text: the module and its byte length', () => {
+  it("stores every canon line's content hash: the app's clipHash of the base64 the server sends", () => {
+    expect(canonBase64.length).toBeGreaterThanOrEqual(canon.size)
+    const wrong = canonBase64.filter(
+      ([text, base64]) => CANON_AUDIO_HASHES[text] !== clipHash(base64),
+    )
+    expect(wrong.map(([text]) => text)).toEqual([])
+    expect(Object.keys(CANON_AUDIO_HASHES)).toHaveLength(canon.size)
+  })
+
+  it('looks a line up by its text: the module, its byte length and hash', () => {
     const [text, mp3] = [...canon][0]!
     expect(canonClipFor(text)).toEqual({
       module: CANON_AUDIO_MODULES[text],
       bytes: mp3.length,
+      hash: clipHash(mp3.toString('base64')),
     })
     expect(canonClipFor('Not a canon line.')).toBeUndefined()
     expect(canonClipFor('constructor')).toBeUndefined()

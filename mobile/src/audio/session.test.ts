@@ -9,7 +9,7 @@ import {
 } from '../../test/fakeAudio'
 import { _resetAudioLogForTests, readAudioLog } from './audioLog'
 import { blendMarksFor } from './blendMarks'
-import type { BundledClip } from './bundledAudio'
+import { clipHash, type BundledClip } from './bundledAudio'
 import { createAudioEngine, type AudioEngine } from './engine'
 import {
   currentSessionAudio,
@@ -452,7 +452,7 @@ describe('session audio: eager files, lazy players', () => {
 })
 
 describe('session audio: bundled canon clips (no-Claude plan phase 1)', () => {
-  /** A fake bundled-canon lookup: text → module and byte length. */
+  /** A fake bundled-canon lookup: text → module, byte length and hash. */
   const bundledOf =
     (clips: Record<string, BundledClip>) =>
     (text: string): BundledClip | undefined =>
@@ -460,10 +460,11 @@ describe('session audio: bundled canon clips (no-Claude plan phase 1)', () => {
         ? clips[text]
         : undefined
   // `utt`'s base64 ('SUQzBAAAAAAA') decodes to 9 bytes.
+  const hash = clipHash('SUQzBAAAAAAA')
   const ALL_BUNDLED = bundledOf({
-    'Three plus two. How many?': { module: 101, bytes: 9 },
-    'Hmm... try again?': { module: 102, bytes: 9 },
-    'One plus one. How many?': { module: 103, bytes: 9 },
+    'Three plus two. How many?': { module: 101, bytes: 9, hash },
+    'Hmm... try again?': { module: 102, bytes: 9, hash },
+    'One plus one. How many?': { module: 103, bytes: 9, hash },
   })
 
   it('a session with every line bundled writes no file and plays the bundled clips', async () => {
@@ -500,7 +501,9 @@ describe('session audio: bundled canon clips (no-Claude plan phase 1)', () => {
       engine,
       files,
       yieldThen: sync,
-      bundled: bundledOf({ 'Hmm... try again?': { module: 102, bytes: 9 } }),
+      bundled: bundledOf({
+        'Hmm... try again?': { module: 102, bytes: 9, hash },
+      }),
     })
     await s.ready
     expect([...files.dirs.get('s1')!.keys()]).toEqual(['p1.read', 'p2.read'])
@@ -519,7 +522,9 @@ describe('session audio: bundled canon clips (no-Claude plan phase 1)', () => {
       engine,
       files,
       yieldThen: sync,
-      bundled: bundledOf({ 'Hmm... try again?': { module: 102, bytes: 4096 } }),
+      bundled: bundledOf({
+        'Hmm... try again?': { module: 102, bytes: 4096, hash },
+      }),
     })
     await s.ready
     expect(s.bundledCount).toBe(0)
@@ -527,6 +532,33 @@ describe('session audio: bundled canon clips (no-Claude plan phase 1)', () => {
       uri: 'file:///cache/session-audio/s1/p1.reprompt.mp3',
       bytes: 9,
     })
+  })
+
+  it('a server clip of the same length but other bytes (a re-take after this build) plays the server bytes', async () => {
+    // PR #558 re-took "Read the fig." at exactly the old 11492 bytes.
+    const retake = 'SUQzBAAAAAAB'
+    expect(clipHash(retake)).not.toBe(hash)
+    const s = loadSessionAudio(
+      's1',
+      UTTERANCES.map((u) =>
+        u.text === 'Hmm... try again?'
+          ? { ...u, audio: { ...u.audio, base64: retake } }
+          : u,
+      ),
+      { engine, files, yieldThen: sync, bundled: ALL_BUNDLED },
+    )
+    await s.ready
+    expect(s.bundledCount).toBe(2)
+    expect(files.dirs.get('s1')!.get('p1.reprompt')).toBe(retake)
+    expect(s.fileFor('Hmm... try again?')).toEqual({
+      uri: 'file:///cache/session-audio/s1/p1.reprompt.mp3',
+      bytes: 9,
+    })
+    expect(s.fileFor('One plus one. How many?')).toEqual({
+      uri: 103,
+      bytes: 9,
+    })
+    s.unload()
   })
 
   it('a bundled ref plays its clip; one this build does not bundle walks its caption', async () => {

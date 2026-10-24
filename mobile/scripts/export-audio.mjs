@@ -30,8 +30,9 @@
  *                                cvc-words-probe.json`), copied byte for byte:
  *                                Word Song plays them beside the session audio
  * - `src/audio/audioRegistry.ts` web URL path → `require()`d native module
- * - `src/audio/canonAudioRegistry.ts` canon line text → its bundled module
- *                                and the clip's byte length
+ * - `src/audio/canonAudioRegistry.ts` canon line text → its bundled module,
+ *                                the clip's byte length and its content hash
+ *                                (`clipHash` below)
  *
  * The files are copied byte for byte: the web's voice-QA page is the ear
  * gate for every clip, so the native app must play the same bytes.
@@ -139,8 +140,22 @@ const blendPaths = new Map()
   console.log(`blend: ${clips.size} files`)
 }
 
+/**
+ * A clip's content hash: 32-bit FNV-1a over its base64 string. The same
+ * function as `clipHash` in `src/audio/bundledAudio.ts`, which hashes the
+ * base64 the server sends to tell a re-take of the same length from the
+ * bundled clip (`audioRegistry.test.ts` checks the two agree).
+ */
+function clipHash(base64) {
+  let h = 0x811c9dc5
+  for (let i = 0; i < base64.length; i++) {
+    h = Math.imul(h ^ base64.charCodeAt(i), 0x01000193)
+  }
+  return h >>> 0
+}
+
 // Every canon clip, one per text, named by its hash (no-Claude plan phase 1).
-const canonEntries = [] // [text, require path, bytes]
+const canonEntries = [] // [text, require path, bytes, clipHash]
 {
   const clips = new Map() // text -> mp3
   for (const file of jsonFilesUnder(join(repoRoot, 'public', 'canon'))) {
@@ -170,7 +185,12 @@ const canonEntries = [] // [text, require path, bytes]
       written += 1
       bytes += mp3.length
     }
-    canonEntries.push([text, path, mp3.length])
+    canonEntries.push([
+      text,
+      path,
+      mp3.length,
+      clipHash(mp3.toString('base64')),
+    ])
   }
   console.log(
     `canon: ${clips.size} lines, ${written} files (${bytes} bytes) + ` +
@@ -238,6 +258,15 @@ ${canonEntries.map(([text, path]) => `  ${literal(text)}: require('${path}'),`).
 /** Canon line text → its clip's byte length (Word Song's measured marks). */
 export const CANON_AUDIO_BYTES: Readonly<Record<string, number>> = {
 ${canonEntries.map(([text, , n]) => `  ${literal(text)}: ${n},`).join('\n')}
+}
+
+/**
+ * Canon line text → its clip's content hash (\`clipHash\` in
+ * \`./bundledAudio.ts\`): a server line of the same length but other bytes
+ * is a re-take this build does not have.
+ */
+export const CANON_AUDIO_HASHES: Readonly<Record<string, number>> = {
+${canonEntries.map(([text, , , h]) => `  ${literal(text)}: ${h},`).join('\n')}
 }
 `
 writeFileSync(

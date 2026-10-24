@@ -25,9 +25,17 @@
  * Bundled lines (no-Claude plan phase 1, `design/native/no-claude-sizing.md`
  * § 4): the app ships every canon clip, one per text (`npm run
  * export-audio`, `./canonAudioRegistry.ts`). A server line whose text the
- * app bundles, at the same byte length, plays the bundled clip and writes
- * no file; so does a `bundled` AudioRef. Another length is a re-render
- * this build does not have, so the server's bytes play, as before.
+ * app bundles, with the same bytes, plays the bundled clip and writes no
+ * file; so does a `bundled` AudioRef. Other bytes are a re-render this
+ * build does not have, so the server's bytes play, as before. "The same
+ * bytes" is the same length and the same `clipHash` of the base64: a
+ * re-take can keep its length (PR #558's "Read the fig." stayed 11492
+ * bytes). Only a text's first line is hashed, and only when its length
+ * matches. Cost, measured in two JIT-less interpreters as a stand-in for
+ * Hermes: for `cvc-words.json`'s 61 distinct lines (1.47 M base64
+ * characters), 31 ms in V8's (`node --jitless`, ~21 ns per character) and
+ * 39 ms in JavaScriptCore's (`jsc --useJIT=false`); each match saves a
+ * file write.
  *
  * Duplicate texts (e.g. "Hmm... try again?" rendered once per problem)
  * resolve to their first id, exactly like `mathPathA.ts`, and every id of
@@ -40,7 +48,7 @@
 import { Directory, File, Paths } from 'expo-file-system'
 import type { PlayableUtterance } from '@marian/core/wire/types'
 import { recordAudio } from './audioLog'
-import { canonClipFor, type BundledClip } from './bundledAudio'
+import { canonClipFor, clipHash, type BundledClip } from './bundledAudio'
 import { audioEngine, type AudioEngine } from './engine'
 import type { LineCallbacks } from './linePlayback'
 import type { PlayerSource } from './playerPort'
@@ -171,14 +179,16 @@ function base64Bytes(base64: string): number {
   return Math.floor((base64.length * 3) / 4) - pad
 }
 
-/** `u`'s bundled clip: its `bundled` ref, or the same text at the same length. */
+/** `u`'s bundled clip: its `bundled` ref, or the same text with the same bytes. */
 function bundledClipOf(
   u: PlayableUtterance,
   bundled: (text: string) => BundledClip | undefined,
 ): BundledClip | undefined {
   if (u.audio.kind === 'bundled') return bundled(u.audio.key)
   const clip = bundled(u.text)
-  return clip !== undefined && clip.bytes === base64Bytes(u.audio.base64)
+  return clip !== undefined &&
+    clip.bytes === base64Bytes(u.audio.base64) &&
+    clip.hash === clipHash(u.audio.base64)
     ? clip
     : undefined
 }
@@ -216,7 +226,13 @@ export function loadSessionAudio(
   const uris = new Map<string, string>()
   const fileBytes = new Map<string, number>()
   for (const u of utterances) {
-    const clip = bundledClipOf(u, bundled)
+    // A duplicate's own inline audio is never played (its text's first id
+    // owns the file), so only a first id is hashed.
+    const first = !textToId.has(u.text)
+    const clip =
+      first || u.audio.kind === 'bundled'
+        ? bundledClipOf(u, bundled)
+        : undefined
     const base64 = u.audio.kind === 'inline' ? u.audio.base64 : ''
     // A line whose audio is not rendered yet (an empty clip in the canon,
     // e.g. content wave 1 before its Lily render) or a bundled ref this
@@ -224,7 +240,7 @@ export function loadSessionAudio(
     // silently, as for any unknown text.
     if (clip === undefined && base64 === '') continue
     texts.set(u.id, u.text)
-    if (!textToId.has(u.text)) {
+    if (first) {
       textToId.set(u.text, u.id)
       if (clip !== undefined) bundledClips.set(u.id, clip)
       else pending.set(u.id, base64)
