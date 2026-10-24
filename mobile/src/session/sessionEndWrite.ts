@@ -279,10 +279,30 @@ export function forwardLeitnerOutcomes(
 }
 
 /**
+ * How a check scores its probe words: the one switch (Dave 2026-10-24,
+ * run run_3d3d82fb3b65 message msg_a4e2ea6ad291).
+ *
+ * - `'first-tap'` (the ruling): a probe word is right only when her first
+ *   tap was (`firstTapCorrect`, WordSong's scored problems). A session
+ *   without first taps is no check session (no fall-back). At 5 of 6, a
+ *   90% decoder passes 0.89 and a pure guesser 0.018.
+ * - `'any-tap'` (before the ruling): `perProblemCorrect`, right unless Emma
+ *   gave the answer at the 3rd wrong tap, so a child who taps each chip
+ *   once always passes.
+ *
+ * The practised words keep `perProblemCorrect` either way (the canonical
+ * slice and its 90% rule), as do regular sessions and the 90/3 score.
+ */
+export type ProbeScoring = 'first-tap' | 'any-tap'
+export const PROBE_SCORING: ProbeScoring = 'first-tap'
+
+/**
  * Word Song graduation split (web `computeGraduationSplit`, ticket
  * 86c9m3aec): only when the engine flagged this session as graduation AND
- * the plan used novel-pool words; else `null`. It carries each probe
- * word's first tap and, with `twoSessions` (the reserve check), marks the
+ * the plan used novel-pool words; else `null`. The probe words score by
+ * `scoring` ({@link PROBE_SCORING}), the practised ones by
+ * `perProblemCorrect`. It carries each probe word's score for the
+ * seen-record and, with `twoSessions` (the reserve check), marks the
  * session as one of a two-session check (core `progressHistory.ts`).
  */
 export function computeGraduationSplit(
@@ -292,11 +312,15 @@ export function computeGraduationSplit(
   payload: SessionEndPayload,
   novelProbeWords: readonly string[] | undefined,
   twoSessions = false,
+  scoring: ProbeScoring = PROBE_SCORING,
 ): GraduationSessionSplit | null {
   if (track !== 'word-song' || novelProbeWords === undefined) return null
   const { targetWords, perProblemCorrect } = payload
   if (!targetWords || !perProblemCorrect) return null
   if (targetWords.length !== perProblemCorrect.length) return null
+  const probeScores =
+    scoring === 'first-tap' ? payload.firstTapCorrect : perProblemCorrect
+  if (!probeScores || probeScores.length !== targetWords.length) return null
   if (!isGraduationSessionPending(progress, focusNode, track)) return null
   const novel = new Set(novelProbeWords)
   let canonicalCount = 0
@@ -305,14 +329,14 @@ export function computeGraduationSplit(
   let novelCorrect = 0
   const probes: { word: string; correct: boolean }[] = []
   targetWords.forEach((word, i) => {
-    const correct = perProblemCorrect[i] === true
     if (novel.has(word)) {
+      const correct = probeScores[i] === true
       novelCount += 1
       if (correct) novelCorrect += 1
       probes.push({ word, correct })
     } else {
       canonicalCount += 1
-      if (correct) canonicalCorrect += 1
+      if (perProblemCorrect[i] === true) canonicalCorrect += 1
     }
   })
   if (novelCount === 0) return null

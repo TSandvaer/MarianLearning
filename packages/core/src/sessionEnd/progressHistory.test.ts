@@ -1723,7 +1723,7 @@ describe('recordProgressOnSessionEnd: the two-session reserve check (Dave 2026-1
       },
     })
 
-  it('the first session keeps its part (words, right count) and no rate; the second pools all 6 into its rate', () => {
+  it('the first session keeps its part (words, right count, the attempt’s other 3) and no rate; the second pools all 6 into its rate', () => {
     const first = checkSession('2026-10-24T09:00:00.000Z', [
       { word: 'map', correct: true },
       { word: 'nap', correct: true },
@@ -1731,7 +1731,11 @@ describe('recordProgressOnSessionEnd: the two-session reserve check (Dave 2026-1
     ])
     expect(first.history.at(-1)).toMatchObject({
       successRate: 1,
-      novelPoolPart: { words: ['map', 'nap', 'rat'], correct: 3 },
+      novelPoolPart: {
+        words: ['map', 'nap', 'rat'],
+        correct: 3,
+        next: ['ham', 'cab', 'rag'],
+      },
     })
     expect(first.history.at(-1)!.novelPoolSuccessRate).toBeUndefined()
 
@@ -1746,7 +1750,7 @@ describe('recordProgressOnSessionEnd: the two-session reserve check (Dave 2026-1
     expect(last.novelPoolPart).toBeUndefined()
   })
 
-  it('each probe word’s result lands in the seen-record (the miss sticks)', () => {
+  it('each probe word’s result lands in the seen-record with its day', () => {
     const p = checkSession('2026-10-24T09:00:00.000Z', [
       { word: 'map', correct: true },
       { word: 'nap', correct: false },
@@ -1754,9 +1758,27 @@ describe('recordProgressOnSessionEnd: the two-session reserve check (Dave 2026-1
     ])
     const day = localDateKey(new Date('2026-10-24T09:00:00.000Z'))
     expect(p.seenItems).toEqual({
-      'word:map': { day, count: 1, correct: true, check: 'right' },
-      'word:nap': { day, count: 1, correct: false, check: 'missed' },
-      'word:rat': { day, count: 1, correct: true, check: 'right' },
+      'word:map': {
+        day,
+        count: 1,
+        correct: true,
+        check: 'right',
+        checkDay: day,
+      },
+      'word:nap': {
+        day,
+        count: 1,
+        correct: false,
+        check: 'missed',
+        checkDay: day,
+      },
+      'word:rat': {
+        day,
+        count: 1,
+        correct: true,
+        check: 'right',
+        checkDay: day,
+      },
     })
   })
 

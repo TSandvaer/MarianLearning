@@ -1,9 +1,9 @@
 /**
- * The cvc-words probe reserve (Dave 2026-10-24, msg_135871ebd91e;
- * `design/research/no-claude-variety-2026-10-23.md` § 2.4): per learner,
- * the best 6 of 8 words across two check sessions, ranked never met, then
- * met only in Letter Critters, then read right in a check; never a word
- * missed in a check while 6 others remain (coordinator 2026-10-24).
+ * The cvc-words probe reserve (Dave 2026-10-24, msg_135871ebd91e and
+ * msg_cb57033a73c9; `design/research/no-claude-variety-2026-10-23.md`
+ * § 2.4): each attempt chooses its 6 of 8 words once, by tier (never met,
+ * met only in Letter Critters, last check right, last check missed with the
+ * oldest miss first), ties in reserve order; two sessions of 3.
  */
 import { describe, expect, it } from 'vitest'
 import { defaultProgress } from '../progress/defaults'
@@ -16,20 +16,21 @@ import type {
 import { PROBE_RESERVE_WORDS } from './novelProbeWords'
 import {
   GRADUATION_CHECK_WORDS,
+  chooseCheckWords,
   graduationCheckWords,
   probeStanding,
-  rankProbeReserve,
-  readmitMissedWords,
+  remainingCheckWords,
   reserveCheckReady,
   reserveCheckWords,
 } from './probeReserve'
 
 const met = (day = '2026-10-20') => ({ day, count: 1, correct: null })
-const checked = (check: 'right' | 'missed', day = '2026-10-21') => ({
-  day,
+const checked = (check: 'right' | 'missed', checkDay = '2026-10-21') => ({
+  day: checkDay,
   count: 1,
   correct: check === 'right',
   check,
+  checkDay,
 })
 const seenOf = (records: Record<string, object>): SeenItems =>
   Object.fromEntries(
@@ -66,7 +67,7 @@ describe('the reserve', () => {
 })
 
 describe('probeStanding', () => {
-  it('reads the word’s seen-record: none, met, right, missed; a newer value counts as met', () => {
+  it('reads the word’s seen-record: none, met, last check right, last check missed; a newer value counts as met', () => {
     const seen = seenOf({
       ham: met(),
       cab: checked('right'),
@@ -81,42 +82,62 @@ describe('probeStanding', () => {
   })
 })
 
-describe('rankProbeReserve', () => {
-  it('a learner who met none: Dave’s order', () => {
-    expect(rankProbeReserve({})).toEqual(PROBE_RESERVE_WORDS)
+describe('chooseCheckWords (Dave’s ruling, msg_cb57033a73c9)', () => {
+  it('tier 1, never met: in reserve order (a learner who met none gets the first 6)', () => {
+    expect(chooseCheckWords({})).toEqual([
+      'map',
+      'nap',
+      'rat',
+      'ham',
+      'cab',
+      'rag',
+    ])
   })
 
-  it('never met first, then met only in Critters, then read right; a missed word is left out', () => {
-    const seen = seenOf({
-      map: met(),
-      nap: met(),
-      rat: checked('right'),
-      ham: checked('missed'),
-      cab: met(),
-    })
-    expect(rankProbeReserve(seen)).toEqual([
+  it('tier 2, met only in Letter Critters, after every never-met word', () => {
+    const seen = seenOf({ map: met(), nap: met(), rat: met() })
+    expect(chooseCheckWords(seen)).toEqual([
+      'ham',
+      'cab',
       'rag',
       'ram',
       'pad',
       'map',
-      'nap',
-      'cab',
-      'rat',
     ])
   })
-})
 
-describe('readmitMissedWords (the rule when fewer than 6 remain; coordinator 2026-10-24, Dave asked)', () => {
-  it('6 or more eligible: the ranking as it is, no missed word', () => {
-    const seen = seenOf({ ham: checked('missed'), cab: checked('missed') })
-    const ranked = rankProbeReserve(seen)
-    expect(ranked).toHaveLength(6)
-    expect(readmitMissedWords(ranked, PROBE_RESERVE_WORDS, seen, 6)).toEqual(
-      ranked,
-    )
+  it('tier 3, last check right, after tier 2; ties keep reserve order', () => {
+    const seen = seenOf({
+      map: checked('right'),
+      nap: met(),
+      rat: checked('right'),
+      ham: met(),
+      cab: met(),
+      rag: met(),
+      ram: met(),
+    })
+    expect(chooseCheckWords(seen)).toEqual([
+      'pad',
+      'nap',
+      'ham',
+      'cab',
+      'rag',
+      'ram',
+    ])
+    const rights = seenOf({
+      map: checked('right'),
+      nap: checked('right'),
+      rat: checked('right'),
+      ham: checked('right'),
+      cab: checked('right'),
+      rag: checked('right'),
+      ram: checked('right'),
+      pad: checked('right'),
+    })
+    expect(chooseCheckWords(rights)).toEqual(PROBE_RESERVE_WORDS.slice(0, 6))
   })
 
-  it('fewer than 6: missed words come back after the ranked ones, the one met longest ago first', () => {
+  it('tier 4, last check missed, only when tiers 1-3 hold fewer than 6: the oldest most-recent miss first', () => {
     const seen = seenOf({
       map: checked('missed', '2026-10-22'),
       nap: checked('missed', '2026-10-10'),
@@ -125,9 +146,7 @@ describe('readmitMissedWords (the rule when fewer than 6 remain; coordinator 202
       cab: checked('right'),
       rag: checked('right'),
     })
-    const ranked = rankProbeReserve(seen)
-    expect(ranked).toEqual(['ram', 'pad', 'cab', 'rag'])
-    expect(readmitMissedWords(ranked, PROBE_RESERVE_WORDS, seen, 6)).toEqual([
+    expect(chooseCheckWords(seen)).toEqual([
       'ram',
       'pad',
       'cab',
@@ -135,40 +154,43 @@ describe('readmitMissedWords (the rule when fewer than 6 remain; coordinator 202
       'nap',
       'ham',
     ])
-  })
-})
-
-describe('reserveCheckWords', () => {
-  it('a first check: the best 3 of the best 6', () => {
-    expect(reserveCheckWords(progressWith({}), 'cvc-words')).toEqual([
-      'map',
+    // Same miss day: reserve order.
+    const sameDay = seenOf({
+      map: checked('missed', '2026-10-22'),
+      nap: checked('right'),
+      rat: checked('missed', '2026-10-22'),
+      ham: checked('right'),
+      cab: checked('missed', '2026-10-22'),
+      rag: checked('right'),
+      ram: checked('right'),
+      pad: checked('missed', '2026-10-22'),
+    })
+    expect(chooseCheckWords(sameDay)).toEqual([
       'nap',
-      'rat',
-    ])
-    const seen = seenOf({ map: met(), nap: met(), rat: met(), ham: met() })
-    expect(reserveCheckWords(progressWith(seen), 'cvc-words')).toEqual([
-      'cab',
+      'ham',
       'rag',
       'ram',
+      'map',
+      'rat',
     ])
   })
 
-  it('the check’s second session: the best 3 not shown in the first (its part record)', () => {
+  it('a missed word later read right is tier 3 again (the most recent result counts)', () => {
     const seen = seenOf({
       map: checked('right', '2026-10-24'),
-      nap: checked('missed', '2026-10-24'),
-      rat: checked('right', '2026-10-24'),
+      nap: met(),
+      rat: met(),
+      ham: met(),
+      cab: met(),
+      rag: met(),
+      ram: met(),
+      pad: met(),
     })
-    const first = entry({
-      successRate: 1,
-      novelPoolPart: { words: ['map', 'nap', 'rat'], correct: 2 },
-    })
-    expect(reserveCheckWords(progressWith(seen, [first]), 'cvc-words')).toEqual(
-      ['ham', 'cab', 'rag'],
-    )
+    expect(chooseCheckWords(seen).at(-1)).toBe('ram')
+    expect(chooseCheckWords(seen)).not.toContain('map')
   })
 
-  it('a retake after a failed check (2 missed): 2 fresh words plus 4 she read right', () => {
+  it('a retake after a check with 2 misses: 2 fresh words plus 4 she read right', () => {
     const seen = seenOf({
       map: checked('right'),
       nap: checked('missed'),
@@ -177,58 +199,100 @@ describe('reserveCheckWords', () => {
       cab: checked('missed'),
       rag: checked('right'),
     })
-    const failed = entry({ novelPoolSuccessRate: 4 / 6 })
-    const p = progressWith(seen, [failed, entry(), entry(), entry()])
-    const firstHalf = reserveCheckWords(p, 'cvc-words')!
-    expect(firstHalf).toEqual(['ram', 'pad', 'map'])
-    const second = reserveCheckWords(
-      progressWith(seen, [
-        ...p.history,
-        entry({ novelPoolPart: { words: firstHalf, correct: 3 } }),
-      ]),
-      'cvc-words',
-    )
-    expect(second).toEqual(['rat', 'ham', 'rag'])
+    expect(chooseCheckWords(seen)).toEqual([
+      'ram',
+      'pad',
+      'map',
+      'rat',
+      'ham',
+      'rag',
+    ])
   })
 
-  it('a second failed retake: the check is still 6 words (the readmit rule), never stuck', () => {
+  it('a second failed retake: still 6 words, the oldest misses come back', () => {
     const seen = seenOf({
-      map: checked('missed'),
-      nap: checked('missed'),
+      map: checked('missed', '2026-10-28'),
+      nap: checked('missed', '2026-10-21'),
       rat: checked('right'),
-      ham: checked('missed'),
-      cab: checked('missed'),
+      ham: checked('missed', '2026-10-28'),
+      cab: checked('missed', '2026-10-21'),
       rag: checked('right'),
       ram: checked('right'),
       pad: checked('right'),
     })
-    const words = reserveCheckWords(progressWith(seen), 'cvc-words')
-    expect(words).toEqual(['rat', 'rag', 'ram'])
-    const second = reserveCheckWords(
-      progressWith(seen, [
-        entry({ novelPoolPart: { words: words!, correct: 3 } }),
-      ]),
-      'cvc-words',
-    )
-    expect(second).toHaveLength(3)
-    expect(second![0]).toBe('pad')
+    expect(chooseCheckWords(seen)).toEqual([
+      'rat',
+      'rag',
+      'ram',
+      'pad',
+      'nap',
+      'cab',
+    ])
   })
+})
 
-  it('a part record on another step, or under a later session, is not this check’s first half', () => {
-    const part = { words: ['map', 'nap', 'rat'], correct: 3 }
-    const otherStep = entry({
-      skillFocus: ['cvc-words-short-o'],
-      novelPoolPart: part,
-    })
-    expect(
-      reserveCheckWords(progressWith({}, [otherStep]), 'cvc-words'),
-    ).toEqual(['map', 'nap', 'rat'])
-    const broken = [entry({ novelPoolPart: part }), entry()]
-    expect(reserveCheckWords(progressWith({}, broken), 'cvc-words')).toEqual([
+describe('reserveCheckWords and remainingCheckWords: the attempt is chosen once', () => {
+  it('a new attempt: the first 3 of the 6; the session end keeps the other 3', () => {
+    expect(reserveCheckWords(progressWith({}), 'cvc-words')).toEqual([
       'map',
       'nap',
       'rat',
     ])
+    expect(remainingCheckWords({}, ['map', 'nap', 'rat'])).toEqual([
+      'ham',
+      'cab',
+      'rag',
+    ])
+  })
+
+  it('the second session serves the 3 chosen at the start, whatever the first session’s results did to the ranking', () => {
+    const afterFirst = seenOf({
+      map: checked('missed', '2026-10-24'),
+      nap: checked('missed', '2026-10-24'),
+      rat: checked('missed', '2026-10-24'),
+    })
+    const first = entry({
+      novelPoolPart: {
+        words: ['map', 'nap', 'rat'],
+        correct: 0,
+        next: ['ham', 'cab', 'rag'],
+      },
+    })
+    expect(
+      reserveCheckWords(progressWith(afterFirst, [first]), 'cvc-words'),
+    ).toEqual(['ham', 'cab', 'rag'])
+  })
+
+  it('a part record without next: a fresh choice minus the words shown', () => {
+    const first = entry({
+      novelPoolPart: { words: ['map', 'nap', 'rat'], correct: 3 },
+    })
+    expect(reserveCheckWords(progressWith({}, [first]), 'cvc-words')).toEqual([
+      'ham',
+      'cab',
+      'rag',
+    ])
+  })
+
+  it('a part record on another step, under a later session, or malformed, is no first half', () => {
+    const part = {
+      words: ['map', 'nap', 'rat'],
+      correct: 3,
+      next: ['ram', 'pad', 'ham'],
+    }
+    for (const history of [
+      [entry({ skillFocus: ['cvc-words-short-o'], novelPoolPart: part })],
+      [entry({ novelPoolPart: part }), entry()],
+      [
+        entry({
+          novelPoolPart: { words: 'map' } as unknown as typeof part,
+        }),
+      ],
+    ]) {
+      expect(reserveCheckWords(progressWith({}, history), 'cvc-words')).toEqual(
+        ['map', 'nap', 'rat'],
+      )
+    }
   })
 
   it('a doc without the seen-record (older builds, the web) ranks as never met', () => {

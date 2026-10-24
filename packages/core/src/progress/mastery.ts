@@ -955,7 +955,8 @@ export function isGraduationGated(node: SkillNode): boolean {
  * session is a check again; the second session's entry carries the rate
  * over all 6 (`sessionEnd/progressHistory.ts`), which the gate and the
  * cooldown read as a one-session check's. An older build or the frozen
- * web reads the pair the same way: a regular session, then one check.
+ * web reads the pair the same way: a regular session, then one check. The
+ * guard does not check the field, so a malformed part record reads as none.
  */
 export function graduationCheckFirstHalf(
   progress: Pick<Progress, 'history'>,
@@ -964,7 +965,24 @@ export function graduationCheckFirstHalf(
   const focused = progress.history.filter((entry) =>
     entry.skillFocus.includes(node),
   )
-  return focused[focused.length - 1]?.novelPoolPart ?? null
+  const part: unknown = focused[focused.length - 1]?.novelPoolPart
+  return isNovelPoolPart(part) ? part : null
+}
+
+const isWordList = (v: unknown): v is string[] =>
+  Array.isArray(v) && v.every((w) => typeof w === 'string')
+
+function isNovelPoolPart(v: unknown): v is NovelPoolPart {
+  if (typeof v !== 'object' || v === null) return false
+  const { words, correct, next } = v as Record<string, unknown>
+  return (
+    isWordList(words) &&
+    typeof correct === 'number' &&
+    Number.isInteger(correct) &&
+    correct >= 0 &&
+    correct <= words.length &&
+    (next === undefined || isWordList(next))
+  )
 }
 
 /**

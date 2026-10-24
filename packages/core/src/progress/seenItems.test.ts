@@ -392,6 +392,7 @@ describe('seenItems: words (the cvc-words probe reserve, Dave 2026-10-24)', () =
             count: 2,
             correct: true,
             check: 'right',
+            checkDay: '2026-10-22',
           },
           'word:rag': {
             day: '2026-10-24',
@@ -412,6 +413,19 @@ describe('seenItems: words (the cvc-words probe reserve, Dave 2026-10-24)', () =
       isProgressV1(
         withSeen({
           'word:ham': { day: '2026-10-24', count: 1, correct: null, check: 1 },
+        }),
+      ),
+    ).toBe(false)
+    expect(
+      isProgressV1(
+        withSeen({
+          'word:ham': {
+            day: '2026-10-24',
+            count: 1,
+            correct: false,
+            check: 'missed',
+            checkDay: 20261024,
+          },
         }),
       ),
     ).toBe(false)
@@ -441,7 +455,7 @@ describe('seenItems: words (the cvc-words probe reserve, Dave 2026-10-24)', () =
     expect(checked['word:ham']!.count).toBe(1)
   })
 
-  it('a check writes each probe word’s first tap; a miss stays a miss', () => {
+  it('a check writes each probe word’s first tap and its most recent result with the day (Dave 2026-10-24)', () => {
     const seen = recordProbeResults(
       { 'word:cab': { day: '2026-10-20', count: 3, correct: null } },
       [
@@ -456,12 +470,14 @@ describe('seenItems: words (the cvc-words probe reserve, Dave 2026-10-24)', () =
         count: 4,
         correct: true,
         check: 'right',
+        checkDay: dayOf(MORNING),
       },
       'word:ham': {
         day: dayOf(MORNING),
         count: 1,
         correct: false,
         check: 'missed',
+        checkDay: dayOf(MORNING),
       },
     })
     const later = recordProbeResults(
@@ -473,7 +489,15 @@ describe('seenItems: words (the cvc-words probe reserve, Dave 2026-10-24)', () =
       day: dayOf(EVENING),
       count: 2,
       correct: true,
-      check: 'missed',
+      check: 'right',
+      checkDay: dayOf(EVENING),
+    })
+    // Letter Critters later keeps the check result and its day.
+    const metAgain = recordWordsMet(later, ['ham'], at('2026-10-26T09:00:00'))
+    expect(metAgain['word:ham']).toMatchObject({
+      check: 'right',
+      checkDay: dayOf(EVENING),
+      count: 3,
     })
   })
 

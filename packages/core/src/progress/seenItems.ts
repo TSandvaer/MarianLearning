@@ -190,9 +190,10 @@ export interface ProbeResult {
 
 /**
  * A check's probe words: each record gets today, a count, the first tap,
- * and `check` `'right'` or `'missed'`. A miss stays a miss: Emma read the
- * word to her (giveAnswer and blend), so it is never a fresh probe again.
- * Pure: returns a new record.
+ * and its most recent check result, `check` `'right'` or `'missed'` with
+ * `checkDay` today. The probe reserve ranks by them (Dave 2026-10-24,
+ * `wordSong/probeReserve.ts` `chooseCheckWords`: a missed word comes last,
+ * the oldest miss first). Pure: returns a new record.
  */
 export function recordProbeResults(
   seen: SeenItems,
@@ -210,7 +211,8 @@ export function recordProbeResults(
     next[key] = {
       ...record,
       correct,
-      check: seen[key]?.check === 'missed' || !correct ? 'missed' : 'right',
+      check: correct ? 'right' : 'missed',
+      checkDay: record.day,
     }
   }
   return next

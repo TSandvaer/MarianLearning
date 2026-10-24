@@ -66,6 +66,7 @@ import {
   type ProbeResult,
 } from '../progress/seenItems'
 import { withPaceHold, withSecureDay } from '../progress/fastTrackRecord'
+import { remainingCheckWords } from '../wordSong/probeReserve'
 import { seedUnlocksCelebrated } from '../progress/pathBeats'
 import {
   SCAFFOLD_FOCUS_NODE,
@@ -118,9 +119,10 @@ export interface GraduationSessionSplit {
    * The reserve check (Dave 2026-10-24): 6 probe words across two
    * sessions, passed at 5 of 6. Needs `probes`. When the node's last entry
    * holds no part record (`mastery.ts` `graduationCheckFirstHalf`), this is
-   * the check's first session: the entry gets `novelPoolPart` (its words
-   * and right count) and no `novelPoolSuccessRate`. Otherwise it is the
-   * second: the entry's `novelPoolSuccessRate` is the rate over both.
+   * the check's first session: the entry gets `novelPoolPart` (its words,
+   * their right count, and the attempt's other 3 words, `next`) and no
+   * `novelPoolSuccessRate`. Otherwise it is the second: the entry's
+   * `novelPoolSuccessRate` is the rate over both.
    */
   twoSessions?: boolean
 }
@@ -544,7 +546,7 @@ export function recordReviewOnSessionEnd(input: RecordReviewInput): Progress {
  */
 function buildEntry(
   input: RecordProgressInput,
-  existing: Pick<Progress, 'history'>,
+  existing: Progress,
 ): SessionHistoryEntry {
   const { graduationSplit, latencyMs, mathFacts } = input
   const useSplit =
@@ -648,21 +650,26 @@ function buildEntry(
 /**
  * A graduation entry's novel-pool fields. A one-session check: the rate
  * over its probe words. The reserve check's first session: its part
- * record, no rate. Its second: the rate over both sessions' words.
+ * record, no rate; `next` is the attempt's choice (`chooseCheckWords`) on
+ * the seen-record the session started from (no session writes it before
+ * its end) minus the words shown. Its second: the rate over both sessions'
+ * words.
  */
 function novelPoolFields(
   split: GraduationSessionSplit,
-  existing: Pick<Progress, 'history'>,
+  existing: Progress,
   node: SkillNode,
 ): Pick<SessionHistoryEntry, 'novelPoolSuccessRate' | 'novelPoolPart'> {
   const own = { novelPoolSuccessRate: split.novelCorrect / split.novelCount }
   if (split.twoSessions !== true || split.probes === undefined) return own
   const first = graduationCheckFirstHalf(existing, node)
   if (first === null) {
+    const words = split.probes.map((p) => p.word)
     return {
       novelPoolPart: {
-        words: split.probes.map((p) => p.word),
+        words,
         correct: split.novelCorrect,
+        next: remainingCheckWords(seenItemsOf(existing), words),
       },
     }
   }

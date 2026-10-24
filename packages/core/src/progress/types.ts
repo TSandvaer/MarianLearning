@@ -232,10 +232,12 @@ export interface SeenItem {
   /** Math facts: the local day it last moved up a Leitner box (§ 2.2
    *  rule 4: at most once a day). Absent = not since the field exists. */
   promoted?: string
-  /** Words: how she did in the graduation checks that showed it, `'right'`
-   *  or `'missed'` (a miss stays). Absent = never in a check. Another
-   *  string (a newer build's) is read as absent. */
+  /** Words: her most recent cvc-words check result on it, `'right'` or
+   *  `'missed'` (scored on her first tap). Absent = never in a check.
+   *  Another string (a newer build's) is read as absent. */
   check?: string
+  /** Words: the local day of that most recent check result. */
+  checkDay?: string
 }
 
 /** Seen-records by item key (`seenItems.ts`: `math:3+4`, `word:ham`). */
@@ -247,6 +249,9 @@ export interface NovelPoolPart {
   words: string[]
   /** How many of them she read right at first tap. */
   correct: number
+  /** The attempt's other 3 words, chosen with these at the attempt's start
+   *  (`wordSong/probeReserve.ts` `chooseCheckWords`): the second session's. */
+  next?: string[]
 }
 
 export interface LeitnerBox<T> {

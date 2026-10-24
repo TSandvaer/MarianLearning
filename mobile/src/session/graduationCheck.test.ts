@@ -475,6 +475,7 @@ describe('the probe reserve on the device (Dave 2026-10-24)', () => {
     expect(after.history.at(-1)!.novelPoolPart).toEqual({
       words: ['map', 'nap', 'rat'],
       correct: 3,
+      next: ['ham', 'cab', 'rag'],
     })
     expect(after.history.at(-1)!.novelPoolSuccessRate).toBeUndefined()
     expect(after.skillLevels['cvc-words']).toBe('practicing')
