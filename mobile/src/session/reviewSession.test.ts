@@ -21,7 +21,6 @@ import type { MathSessionResult } from '../screens/math/mathTypes'
 import {
   buildMathSessionPayload,
   createMathSessionController,
-  hasCanonBypassingHints,
   mathPrefetchKey,
   mathRoundFromServer,
   readMathProgressHints,
@@ -134,7 +133,7 @@ const leitnerOf = (payload: unknown): Leitner =>
     []) as Leitner
 
 describe('warm-up request (§ 7.4, AC 6)', () => {
-  it('the refs ride on both requests; the Leitner hint keeps 1 fact, neither warm-up fact', () => {
+  it('the refs ride on the request, which carries no hint; the pick shares the cap with the warm-up facts', () => {
     seedWarmupExample()
     const hints = readMathProgressHints()
     expect(hints.planKind).toEqual({
@@ -144,20 +143,22 @@ describe('warm-up request (§ 7.4, AC 6)', () => {
         { node: 'add-to-10', problem: 3 },
       ],
     })
-    const withHints = buildMathSessionPayload(hints, true)
-    const fallback = buildMathSessionPayload(hints, false)
-    for (const p of [withHints, fallback]) {
-      expect(p.warmup).toEqual({
-        blocks: [
-          { node: 'add-to-10', problem: 4 },
-          { node: 'add-to-10', problem: 3 },
-        ],
-      })
-      expect(p).not.toHaveProperty('review')
-    }
-    const leitner = leitnerOf(withHints)
-    expect(leitner).toHaveLength(1)
-    expect(leitner).toEqual([{ a: 4, b: 5, op: '+', box: 1 }])
+    const payload = buildMathSessionPayload(hints)
+    expect(payload.warmup).toEqual({
+      blocks: [
+        { node: 'add-to-10', problem: 4 },
+        { node: 'add-to-10', problem: 3 },
+      ],
+    })
+    expect(payload).not.toHaveProperty('review')
+    expect(leitnerOf(payload)).toEqual([])
+    // The due box minus the warm-up's facts still holds 4 + 5 (the hint
+    // this used to send), so the device picks the session; the picker
+    // counts the two warm-up facts against the cap of 3.
+    expect(hints.mathPick?.warmup).toEqual([
+      { a: 7, b: 3, op: '+' },
+      { a: 3, b: 2, op: '+' },
+    ])
     expect(mathPrefetchKey(hints)).toEqual({
       track: 'math',
       node: 'add-to-10',
@@ -165,7 +166,7 @@ describe('warm-up request (§ 7.4, AC 6)', () => {
     })
   })
 
-  it('a second session today sends no warm-up and the usual hint', () => {
+  it('a second session today sends no warm-up and no hint, and is picked', () => {
     seedWarmupExample()
     saveProgress({
       ...defaultProgress(),
@@ -177,9 +178,11 @@ describe('warm-up request (§ 7.4, AC 6)', () => {
         ],
       },
     })
-    const payload = buildMathSessionPayload(readMathProgressHints(), true)
+    const hints = readMathProgressHints()
+    const payload = buildMathSessionPayload(hints)
     expect(payload).not.toHaveProperty('warmup')
-    expect(leitnerOf(payload)).toHaveLength(2)
+    expect(leitnerOf(payload)).toEqual([])
+    expect(hints.mathPick).toMatchObject({ step: 'add-to-10', warmup: [] })
   })
 })
 
@@ -197,7 +200,7 @@ describe('review request', () => {
     seedReview()
     const hints = readMathProgressHints()
     expect(hints.planKind.kind).toBe('review')
-    const payload = buildMathSessionPayload(hints, true)
+    const payload = buildMathSessionPayload(hints)
     expect(payload).toEqual({
       track: 'math',
       level: 1,
@@ -208,7 +211,7 @@ describe('review request', () => {
       },
     })
     expect((payload.review as { blocks: unknown[] }).blocks).toHaveLength(8)
-    expect(hasCanonBypassingHints(hints)).toBe(false)
+    expect(hints.mathPick).toBeUndefined()
     expect(mathPrefetchKey(hints).mode).toBe('review')
   })
 

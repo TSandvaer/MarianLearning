@@ -27,8 +27,6 @@ const NO_HINTS: MathProgressHints = {
   focusNode: undefined,
   focusMode: undefined,
   recentSuccessRate: undefined,
-  leitner: undefined,
-  slowFacts: undefined,
   lifetimeFirstEncounters: undefined,
   planKind: { kind: 'forward', warmup: [] },
 }
@@ -37,10 +35,22 @@ const HINTS: MathProgressHints = {
   focusNode: 'add-to-10',
   focusMode: 'forward',
   recentSuccessRate: 0.75,
-  leitner: [{ a: 3, b: 4, op: '+', box: 1 }],
-  slowFacts: undefined,
   lifetimeFirstEncounters: ['add-to-10'],
   planKind: { kind: 'forward', warmup: [] },
+  // No-Claude phase 3: the device picks it (core `mathPickRequestFor`).
+  mathPick: {
+    step: 'add-to-10',
+    leitner: {
+      items: [{ item: { a: 3, b: 4, op: '+' }, box: 1, lastSeen: 0 }],
+    },
+    seen: {},
+    previous: null,
+    slow: [],
+    warmup: [],
+    nowMs: 0,
+    today: '2026-10-24',
+    seed: 0,
+  },
 }
 
 function fakeAudio(): LoadedSessionAudio & {
@@ -108,26 +118,15 @@ const settle = () => new Promise((r) => setImmediate(r))
 
 describe('payload (web prepareMathPathA)', () => {
   it('no progress: track, level 1 and the name only', () => {
-    expect(buildMathSessionPayload(NO_HINTS, true)).toEqual({
+    expect(buildMathSessionPayload(NO_HINTS)).toEqual({
       track: 'math',
       level: 1,
       childName: 'friend',
     })
   })
 
-  it('with progress: the progress block; the fallback request drops leitner/slowFacts', () => {
-    expect(buildMathSessionPayload(HINTS, true)).toEqual({
-      track: 'math',
-      level: 1,
-      childName: 'friend',
-      progress: {
-        focusNode: 'add-to-10',
-        recentSuccessRate: 0.75,
-        leitner: [{ a: 3, b: 4, op: '+', box: 1 }],
-        lifetimeFirstEncounters: ['add-to-10'],
-      },
-    })
-    expect(buildMathSessionPayload(HINTS, false)).toEqual({
+  it('with progress: the progress block, never a Leitner or slow-fact hint (phase 3)', () => {
+    expect(buildMathSessionPayload(HINTS)).toEqual({
       track: 'math',
       level: 1,
       childName: 'friend',
@@ -238,36 +237,19 @@ describe('the session start', () => {
     })
   })
 
-  it('timeoutMs overrides the visible-wait budget', async () => {
+  it('a picked session asks once, with its pick, and never races the 5 s budget', async () => {
     jest.useFakeTimers()
     try {
-      const { calls, session } = harness(HINTS, 100)
+      const { calls, session, prepared } = harness(HINTS, 100)
       session.kick()
-      session.startWaitTimer()
-      jest.advanceTimersByTime(99)
-      expect(calls).toHaveLength(1)
-      jest.advanceTimersByTime(1)
-      expect(calls).toHaveLength(2)
-      expect(calls[1].args.sessionId).toBe('math-sums-to-10-B-1000-fallback')
-    } finally {
-      jest.useRealTimers()
-    }
-  })
-
-  it('hinted + 5 s visible wait: a hint-free request replaces it', async () => {
-    jest.useFakeTimers()
-    try {
-      const { calls, session, prepared } = harness(HINTS)
-      session.kick()
-      expect(calls[0].args.sessionId).toBe('math-sums-to-10-B-1000')
-      expect(calls[0].args.payload).toHaveProperty('progress.leitner')
       session.startWaitTimer()
       jest.advanceTimersByTime(SESSION_START_WAIT_TIMEOUT_MS)
-      expect(calls).toHaveLength(2)
-      expect(calls[0].args.signal?.aborted).toBe(true)
-      expect(calls[1].args.sessionId).toBe('math-sums-to-10-B-1000-fallback')
-      expect(calls[1].args.payload).not.toHaveProperty('progress.leitner')
-      calls[1].resolve(prepared().value)
+      expect(calls).toHaveLength(1)
+      // The hint-free request's id, as for every hint-free session.
+      expect(calls[0].args.sessionId).toBe('math-sums-to-10-B-1000-fallback')
+      expect(calls[0].args.mathPick).toEqual(HINTS.mathPick)
+      expect(calls[0].args.payload).not.toHaveProperty('progress.leitner')
+      calls[0].resolve(prepared().value)
       await Promise.resolve()
       await Promise.resolve()
       await Promise.resolve()
