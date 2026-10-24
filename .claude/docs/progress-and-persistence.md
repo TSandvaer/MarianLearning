@@ -468,7 +468,7 @@ If `pendingPromotion` is set AND `autoPromote === true` on entry, the rule appli
 
 Per Dave's developmental review (`design/research/cvc-words-developmental-review.md` § P1.2), a 90/3 mastery threshold over a fixed 8-word canonical pool can reflect item familiarity rather than decoding ability. The novel-pool gate verifies that Marian generalises her decoding to 2–3 novel short-a words she has not seen in the canonical pool.
 
-`isGraduationSessionPending(progress, node, track)` ([`mastery.ts:528`](MarianLearning/packages/core/src/progress/mastery.ts#L528)) is the predicate the planner reads at session-start to decide whether to mix novel-probe words into the 8-problem set. All four conditions must hold:
+`isGraduationSessionPending(progress, node, track)` ([`mastery.ts:528`](MarianLearning/packages/core/src/progress/mastery.ts#L528)) is the predicate the planner reads at session-start to decide whether to mix novel-probe words into the 8-problem set (web only; on native the app reads it itself and swaps in the bundled probe words, no planner involved, see `planner-and-canon.md` § Graduation-session bypass). All four conditions must hold:
 
 1. `node` is in `WORD_SONG_GRADUATION_GATED_NODES`.
 2. `node` is currently at `'practicing'`.
@@ -511,7 +511,7 @@ Untuned tier coverage today: `letter-sounds`, `digraphs`, `sight-words`, `simple
 | `demote(box, key, target, now)`  | Reset to box 1; updates `lastSeen`.                                     |
 | `emptyLeitner()`                 | Empty box constant for fresh profiles.                                  |
 
-Promotion rule: a correct answer advances one box (cap at 5). A wrong answer demotes back to box 1. Box 1 = seen most often; box 5 = long review.
+Promotion rule: a correct answer advances one box (cap at 5), but only when the fact is due and at most once per learner-local day (no-Claude phase 3, PR #677). A wrong answer demotes back to box 1. Box 1 = seen most often; box 5 = long review.
 
 `Progress.mathFactsLeitner` is the only Leitner box in the model — literacy uses sight-word lists later.
 
@@ -533,10 +533,11 @@ Schedule (named const `LEITNER_REVIEW_INTERVAL_DAYS`, calendar days, deliberatel
 
 ### Session-end promotion
 
-`progressHistory.ts#applyLeitnerOutcomes` runs inside `recordProgressOnSessionEnd` whenever `surface === 'math'` AND the caller supplies `leitnerOutcomes: { fact, correct }[]`. For each outcome:
+`progressHistory.ts#mathOutcomesApplied` runs inside `recordProgressOnSessionEnd` whenever `surface === 'math'` AND the caller supplies `leitnerOutcomes: { fact, correct }[]`; it calls [`seenItems.ts`](MarianLearning/packages/core/src/progress/seenItems.ts) `applyMathOutcomes`. For each outcome:
 
 - `addItem` runs first so brand-new facts land at box 1 before the rank step (otherwise `promote` / `demote` would be no-ops on missing items per the existing `leitner.ts` contract).
-- `correct === true` → `promote` (cap 5). `correct === false` → `demote` (back to box 1). `correct === undefined` → fact added at box 1, rank unchanged. The `undefined` sentinel handles screen-abandonment cases.
+- `correct === true` → `promote` (cap 5) only if the fact is due (`leitnerOverdueDays >= 0`) AND `seenItems[key].promoted` is not today's local date; otherwise box and `lastSeen` stay as they are (PR #677, Dave's ruling Q4: a fact answered right twice in one afternoon no longer jumps two boxes). `correct === false` → `demote` (back to box 1). `correct === undefined` → fact added at box 1, rank unchanged. The `undefined` sentinel handles screen-abandonment cases.
+- `Progress.seenItems[key]` (`{day, count, correct, promoted?}`) updates on every answered outcome, promoted or not. The web session end shares this code, so the web adopts the same rule from its next release.
 
 The screen-side wiring runs inside `Math.tsx`'s `onChipTap`: a once-per-problem latch (`firstTapRecordedRef`) records the FIRST tap's correctness against `perProblemCorrectRef`. Subsequent retry taps within the same problem don't update the array — matches the streak counter's "consecutive clean wins" semantics. The `MathSessionResult` carries the array; `App.tsx#handleMathComplete` zips it with the active math plan's facts (read from `activeMathPlanRef`) into `SessionEndPayload.mathFacts` + `perProblemCorrect`, which `SessionEnd.tsx` then converts to `LeitnerOutcome[]` for `recordProgressOnSessionEnd`.
 
