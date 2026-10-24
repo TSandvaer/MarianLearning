@@ -272,7 +272,9 @@ describe('pickMathProblems on today’s canon (8 blocks: all play, the rules set
       }),
       canonOf('add-to-10'),
     )
-    expect(relaxed).toEqual(['new-cap', 'due-cap', 'known-floor'])
+    // No new fact, so the new cap holds; the due cap and the known floor
+    // come as close as 8 due box-1 blocks allow (Dave, Q2).
+    expect(relaxed).toEqual(['due-cap', 'known-floor'])
     expect(MATH_PICK_SOFT_RULES).toEqual([
       'new-cap',
       'due-cap',
@@ -289,6 +291,121 @@ describe('pickMathProblems on today’s canon (8 blocks: all play, the rules set
       utterances: canon.utterances.filter((u) => !u.id.startsWith('math.p5.')),
     }
     expect(() => pickMathProblems(request('add-to-10'), broken)).toThrow()
+  })
+})
+
+// ── Dave's rulings, 2026-10-24 (Q1–Q3) ────────────────────────────────────
+
+describe('pickMathProblems: Dave’s rulings', () => {
+  it('Q1: a due fact the band keeps out of P4-P8 never opens the session while a box >= 2 fact can', () => {
+    // sub-to-10's easy facts: 5-5 (answer 0), 6-3 (3), 9-1 (8).
+    const dueFirst = picked(
+      'sub-to-10',
+      request('sub-to-10', {
+        leitner: box([
+          [f(5, '-', 5), 1, daysAgo(1)], // due, would open the ramp
+          [f(6, '-', 3), 3, daysAgo(1)],
+          [f(9, '-', 1), 2, daysAgo(0)],
+        ]),
+      }),
+    )
+    expect(dueFirst.slice(0, 3)).toEqual(['6-3', '5-5', '9-1'])
+    // No box >= 2 fact to open with: the ramp stands.
+    const noOpener = picked(
+      'sub-to-10',
+      request('sub-to-10', {
+        leitner: box([[f(5, '-', 5), 1, daysAgo(1)]]),
+      }),
+    )
+    expect(noOpener.slice(0, 3)).toEqual(['5-5', '6-3', '9-1'])
+  })
+
+  it('Q1: Leitner decides what gets in: a capped due easy fact plays in P2-P3 and counts toward the cap', () => {
+    const pool = wholePool('sub-to-10')
+    const known = (x: MathFact): [MathFact, LeitnerBoxIndex, number] => [
+      x,
+      4,
+      daysAgo(1),
+    ]
+    const due: [MathFact, LeitnerBoxIndex, number][] = [
+      [f(9, '-', 1), 1, daysAgo(6)], // easy: barred from P4-P8
+      [f(10, '-', 3), 1, daysAgo(5)],
+      [f(10, '-', 7), 1, daysAgo(4)],
+      [f(8, '-', 3), 1, daysAgo(3)],
+    ]
+    const dueKeys = new Set(due.map(([x]) => key(x)))
+    const req = request('sub-to-10', {
+      leitner: box([
+        ...SUB_TO_TEN_POOL.map((p) => f(p.a, '-', p.b))
+          .filter((x) => !dueKeys.has(key(x)))
+          .map(known),
+        ...due,
+      ]),
+    })
+    const { problems, relaxed } = pickMathProblems(req, pool)
+    expect(relaxed).toEqual([])
+    const facts = problems.map((p) => key(factOf(pool, p)))
+    expect(['9-1']).toContain(facts[1] === '9-1' ? facts[1] : facts[2])
+    expect(facts.filter((k) => dueKeys.has(k))).toHaveLength(3)
+    expect(facts).not.toContain('8-3') // the 4th due fact waits
+  })
+
+  it('Q2: a floor the learner cannot meet comes as close as the pool allows; box-2 facts then count', () => {
+    const pool = wholePool('sub-to-10')
+    const req = request('sub-to-10', {
+      leitner: box([
+        [f(10, '-', 1), 4, daysAgo(1)], // known
+        [f(9, '-', 4), 4, daysAgo(1)], // known
+        [f(8, '-', 2), 2, daysAgo(0)], // box 2, not due
+        [f(7, '-', 1), 2, daysAgo(0)], // box 2, not due
+      ]),
+    })
+    const { problems, relaxed } = pickMathProblems(req, pool)
+    expect(relaxed).toEqual(['known-floor'])
+    const facts = problems.map((p) => key(factOf(pool, p)))
+    expect(facts).toEqual(expect.arrayContaining(['10-1', '9-4']))
+    expect(
+      facts.filter((k) => ['10-1', '9-4', '8-2', '7-1'].includes(k)).length,
+    ).toBeGreaterThanOrEqual(3)
+  })
+
+  it('Q2: slow facts count as known', () => {
+    const req = request('sub-to-10', {
+      leitner: box([
+        [f(5, '-', 5), 2, daysAgo(0)],
+        [f(6, '-', 3), 2, daysAgo(0)],
+        [f(9, '-', 1), 2, daysAgo(0)],
+      ]),
+      slow: [f(5, '-', 5), f(6, '-', 3), f(9, '-', 1)],
+    })
+    expect(pickMathProblems(req, canonOf('sub-to-10')).relaxed).not.toContain(
+      'known-floor',
+    )
+  })
+
+  it('Q3 dual exposure: the 8 avoid a warm-up fact’s inverse when they can', () => {
+    const pool = wholePool('sub-to-10')
+    const { problems, dropWarmup } = pickMathProblems(
+      request('sub-to-10', { warmup: [f(3, '+', 5)] }),
+      pool,
+    )
+    expect(dropWarmup).toEqual([])
+    const facts = problems.map((p) => key(factOf(pool, p)))
+    expect(facts).not.toContain('8-3') // 3 + 5 = 8
+  })
+
+  it('Q3 dual exposure: with today’s 8 blocks the warm-up fact gives way instead', () => {
+    // 7 + 3 is the inverse of sub-to-10's 10 - 3 and 10 - 7.
+    const { dropWarmup } = pickMathProblems(
+      request('sub-to-10', { warmup: [f(9, '-', 2), f(7, '+', 3)] }),
+      canonOf('sub-to-10'),
+    )
+    expect(dropWarmup).toEqual([1])
+  })
+
+  it('Q3: on − only the same fact is barred: 10 - 3 and 10 - 7 share a session', () => {
+    const facts = picked('sub-to-10', request('sub-to-10'))
+    expect(facts).toEqual(expect.arrayContaining(['10-3', '10-7']))
   })
 })
 
@@ -388,7 +505,9 @@ describe('pickMathProblems on a whole pool (selection)', () => {
       ]),
     })
     const { problems, relaxed } = pickMathProblems(req, subPool)
-    expect(relaxed).toEqual([])
+    // 9-1 (due) and 10-1 (known) share subtract-one's cap of 1: the due
+    // rule gives way before the known floor (Dave, Q2).
+    expect(relaxed).toEqual(['due-cap'])
     expect(
       mathCompositionViolations('sub-to-10', readLines(subPool, problems)),
     ).toEqual([])
@@ -396,9 +515,7 @@ describe('pickMathProblems on a whole pool (selection)', () => {
     expect(
       facts.filter((k) => ['10-1', '9-4', '7-4'].includes(k)),
     ).toHaveLength(3)
-    expect(
-      facts.slice(3).filter((k) => !['10-1', '9-4', '7-4'].includes(k)),
-    ).toHaveLength(2)
+    expect(facts).not.toContain('9-1')
   })
 
   it('doses a slow fact the learner answers right but slowly', () => {
