@@ -22,6 +22,20 @@
  *   engine's LRU (`MAX_LIVE_VOICE_PLAYERS`); on Android each live player
  *   holds an MP3 decoder, and 53 at once failed to initialise.
  *
+ * Bundled lines (no-Claude plan phase 1, `design/native/no-claude-sizing.md`
+ * § 4): the app ships every canon clip, one per text (`npm run
+ * export-audio`, `./canonAudioRegistry.ts`). A server line whose text the
+ * app bundles, with the same bytes, plays the bundled clip and writes no
+ * file; so does a `bundled` AudioRef. Other bytes are a re-render this
+ * build does not have, so the server's bytes play, as before. "The same
+ * bytes" is the same length and the same `clipHash` of the base64: a
+ * re-take can keep its length (PR #558's "Read the fig." stayed 11492
+ * bytes). Only a text's first line is hashed, and only when its length
+ * matches. The `session-files` log row gives the time ("ms matching"): a
+ * cvc-words session (62 lines, ~1.5 M base64 characters) took 57–69 ms on
+ * the iOS 27 iPad simulator (Expo Go development bundle); each match saves
+ * a file write.
+ *
  * Duplicate texts (e.g. "Hmm... try again?" rendered once per problem)
  * resolve to their first id, exactly like `mathPathA.ts`, and every id of
  * that text plays the same file.
@@ -31,10 +45,12 @@
  * deletes directories left by a killed app (called at boot).
  */
 import { Directory, File, Paths } from 'expo-file-system'
-import type { Utterance } from '@marian/core/wire/types'
+import type { PlayableUtterance } from '@marian/core/wire/types'
 import { recordAudio } from './audioLog'
+import { canonClipFor, clipHash, type BundledClip } from './bundledAudio'
 import { audioEngine, type AudioEngine } from './engine'
 import type { LineCallbacks } from './linePlayback'
+import type { PlayerSource } from './playerPort'
 
 /** File-system seam: the jest suite uses an in-memory store. */
 export interface SessionFileStore {
@@ -112,15 +128,18 @@ export interface LoadedSessionAudio {
   /** Write (if needed) and create a line's player ahead of its first play. */
   prewarm(text: string): void
   /**
-   * A line's MP3 on disk (written now if needed) and its byte length, for
-   * players outside the voice channel (Word Song's tap sounds) and for
-   * matching a clip to its measured marks. `undefined`: no such line.
+   * A line's MP3, on disk (written now if needed) or bundled (its module),
+   * and its byte length, for players outside the voice channel (Word Song's
+   * tap sounds) and for matching a clip to its measured marks. `undefined`:
+   * no such line.
    */
-  fileFor(text: string): { uri: string; bytes: number } | undefined
+  fileFor(text: string): { uri: string | number; bytes: number } | undefined
   readonly textToId: ReadonlyMap<string, string>
   readonly utteranceCount: number
-  /** Distinct texts = files this session writes. */
+  /** Distinct texts this session writes as files (not bundled). */
   readonly fileCount: number
+  /** Distinct texts played from the app's bundled clips (no file). */
+  readonly bundledCount: number
   readonly filesWritten: number
   readonly bytesWritten: number
   /** Resolves once every file is written (or the session is unloaded). */
@@ -145,11 +164,33 @@ export interface SessionAudioDeps {
    * leaves the Hub's prefetched session alone. Its owner unloads it.
    */
   alongside?: boolean
+  /** The app's bundled canon clips by text (default `canonClipFor`). */
+  bundled?: (text: string) => BundledClip | undefined
 }
 
 let defaultFiles: SessionFileStore | null = null
 const filesOrDefault = (files?: SessionFileStore) =>
   files ?? (defaultFiles ??= createExpoSessionFileStore())
+
+/** The byte length `base64` decodes to. */
+function base64Bytes(base64: string): number {
+  const pad = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
+  return Math.floor((base64.length * 3) / 4) - pad
+}
+
+/** `u`'s bundled clip: its `bundled` ref, or the same text with the same bytes. */
+function bundledClipOf(
+  u: PlayableUtterance,
+  bundled: (text: string) => BundledClip | undefined,
+): BundledClip | undefined {
+  if (u.audio.kind === 'bundled') return bundled(u.audio.key)
+  const clip = bundled(u.text)
+  return clip !== undefined &&
+    clip.bytes === base64Bytes(u.audio.base64) &&
+    clip.hash === clipHash(u.audio.base64)
+    ? clip
+    : undefined
+}
 
 /** The session whose files are on disk right now (one at a time). */
 let current: LoadedSessionAudio | null = null
@@ -161,11 +202,12 @@ let current: LoadedSessionAudio | null = null
  */
 export function loadSessionAudio(
   sessionId: string,
-  utterances: readonly Utterance[],
+  utterances: readonly PlayableUtterance[],
   deps: SessionAudioDeps = {},
 ): LoadedSessionAudio {
   const engine = deps.engine ?? audioEngine
   const files = filesOrDefault(deps.files)
+  const bundled = deps.bundled ?? canonClipFor
   const now = deps.now ?? Date.now
   const yieldThen = deps.yieldThen ?? ((fn: () => void) => setTimeout(fn, 0))
   if (!deps.alongside && current && current.sessionId !== sessionId) {
@@ -178,19 +220,34 @@ export function loadSessionAudio(
   const textToId = new Map<string, string>()
   /** First id → base64 still to write, in plan order. */
   const pending = new Map<string, string>()
+  /** First id → its bundled clip (nothing to write). */
+  const bundledClips = new Map<string, BundledClip>()
   const uris = new Map<string, string>()
   const fileBytes = new Map<string, number>()
+  const matchStart = now()
   for (const u of utterances) {
+    // A duplicate's own inline audio is never played (its text's first id
+    // owns the file), so only a first id is hashed.
+    const first = !textToId.has(u.text)
+    const clip =
+      first || u.audio.kind === 'bundled'
+        ? bundledClipOf(u, bundled)
+        : undefined
+    const base64 = u.audio.kind === 'inline' ? u.audio.base64 : ''
     // A line whose audio is not rendered yet (an empty clip in the canon,
-    // e.g. content wave 1 before its Lily render): no file and no id, so
-    // `playUtterance` walks its caption silently, as for any unknown text.
-    if (u.audio.base64 === '') continue
+    // e.g. content wave 1 before its Lily render) or a bundled ref this
+    // build lacks: no file and no id, so `playUtterance` walks its caption
+    // silently, as for any unknown text.
+    if (clip === undefined && base64 === '') continue
     texts.set(u.id, u.text)
-    if (!textToId.has(u.text)) {
+    if (first) {
       textToId.set(u.text, u.id)
-      pending.set(u.id, u.audio.base64)
+      if (clip !== undefined) bundledClips.set(u.id, clip)
+      else pending.set(u.id, base64)
     }
   }
+  /** Time spent matching lines to bundled clips (the hashing, see header). */
+  const matchMs = now() - matchStart
   const fileCount = pending.size
 
   let unloaded = false
@@ -247,7 +304,10 @@ export function loadSessionAudio(
       ms: now() - t0,
       detail:
         `${uris.size} files ${bytesWritten} bytes, ${Math.round(busyMs)} ms writing` +
-        (failed.size > 0 ? `, ${failed.size} failed` : ''),
+        (failed.size > 0 ? `, ${failed.size} failed` : '') +
+        (bundledClips.size > 0
+          ? `, ${bundledClips.size} bundled (${Math.round(matchMs)} ms matching)`
+          : ''),
     })
     resolveReady()
   }
@@ -261,8 +321,25 @@ export function loadSessionAudio(
     }
     if (pending.size > 0) yieldThen(slice)
   }
-  if (fileCount === 0) resolveReady()
+  if (fileCount === 0) finishWrites()
   else yieldThen(slice)
+
+  /**
+   * A file id's clip: its bundled module, or its file (written now if
+   * needed). `undefined`: the write failed.
+   */
+  function clipOf(
+    fileId: string,
+  ): { uri: string | number; bytes: number } | undefined {
+    const clip = bundledClips.get(fileId)
+    if (clip !== undefined) return { uri: clip.module, bytes: clip.bytes }
+    const uri = writeOne(fileId)
+    return uri === undefined
+      ? undefined
+      : { uri, bytes: fileBytes.get(fileId) ?? 0 }
+  }
+  const sourceOf = (uri: string | number): PlayerSource =>
+    typeof uri === 'number' ? uri : { uri }
 
   /** The file id for an utterance id (duplicates share the first id's). */
   const fileIdOf = (id: string): string | undefined => {
@@ -282,26 +359,22 @@ export function loadSessionAudio(
         ),
       )
     }
-    const uri = writeOne(fileId)
-    if (uri === undefined) {
+    const clip = clipOf(fileId)
+    if (clip === undefined) {
       return Promise.reject(
         new Error(
           `[sessionAudio] no audio file for "${id}" in session ${sessionId} (write failed)`,
         ),
       )
     }
-    return engine.speak(
-      `${keyPrefix}${fileId}`,
-      { uri },
-      {
-        text: texts.get(id) ?? '',
-        label: `session:${id}`,
-        onPlay: opts.onPlay,
-        onWordTick: opts.onWordTick,
-        onTime: opts.onTime,
-        endAtMs: opts.endAtMs,
-      },
-    )
+    return engine.speak(`${keyPrefix}${fileId}`, sourceOf(clip.uri), {
+      text: texts.get(id) ?? '',
+      label: `session:${id}`,
+      onPlay: opts.onPlay,
+      onWordTick: opts.onWordTick,
+      onTime: opts.onTime,
+      endAtMs: opts.endAtMs,
+    })
   }
 
   const session: LoadedSessionAudio = {
@@ -310,7 +383,7 @@ export function loadSessionAudio(
       const id = textToId.get(text)
       // Unknown text, an unloaded session or a file that could not be
       // written: caption only, resolve silently (web mathPathA.ts:415-429).
-      if (id === undefined || unloaded || writeOne(id) === undefined) {
+      if (id === undefined || unloaded || clipOf(id) === undefined) {
         opts.onPlay?.()
         const words = text.split(/\s+/).filter(Boolean)
         for (let i = 0; i < words.length; i++) opts.onWordTick?.(i)
@@ -322,19 +395,20 @@ export function loadSessionAudio(
     prewarm(text) {
       const id = textToId.get(text)
       if (unloaded || id === undefined) return
-      const uri = writeOne(id)
-      if (uri !== undefined) engine.preload(`${keyPrefix}${id}`, { uri })
+      const clip = clipOf(id)
+      if (clip !== undefined) {
+        engine.preload(`${keyPrefix}${id}`, sourceOf(clip.uri))
+      }
     },
     fileFor(text) {
       const id = textToId.get(text)
       if (unloaded || id === undefined) return undefined
-      const uri = writeOne(id)
-      if (uri === undefined) return undefined
-      return { uri, bytes: fileBytes.get(id) ?? 0 }
+      return clipOf(id)
     },
     textToId,
     utteranceCount: utterances.length,
     fileCount,
+    bundledCount: bundledClips.size,
     get filesWritten() {
       return uris.size
     },

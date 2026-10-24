@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { setApiBase } from '@marian/core/platform/apiUrl'
 import type { Utterance } from '@marian/core/wire/types'
 import {
@@ -6,6 +8,8 @@ import {
   resetFakePlayers,
 } from '../../test/fakeAudio'
 import { _resetAudioLogForTests, readAudioLog } from './audioLog'
+import { blendMarksFor } from './blendMarks'
+import { clipHash, type BundledClip } from './bundledAudio'
 import { createAudioEngine, type AudioEngine } from './engine'
 import {
   currentSessionAudio,
@@ -444,6 +448,199 @@ describe('session audio: eager files, lazy players', () => {
     loadSessionAudio('s1', UTTERANCES, { engine, files, yieldThen: sync })
     expect(sweepSessionAudioCache(files)).toBe(2)
     expect(Array.from(files.dirs.keys())).toEqual(['s1'])
+  })
+})
+
+describe('session audio: bundled canon clips (no-Claude plan phase 1)', () => {
+  /** A fake bundled-canon lookup: text → module, byte length and hash. */
+  const bundledOf =
+    (clips: Record<string, BundledClip>) =>
+    (text: string): BundledClip | undefined =>
+      Object.prototype.hasOwnProperty.call(clips, text)
+        ? clips[text]
+        : undefined
+  // `utt`'s base64 ('SUQzBAAAAAAA') decodes to 9 bytes.
+  const hash = clipHash('SUQzBAAAAAAA')
+  const ALL_BUNDLED = bundledOf({
+    'Three plus two. How many?': { module: 101, bytes: 9, hash },
+    'Hmm... try again?': { module: 102, bytes: 9, hash },
+    'One plus one. How many?': { module: 103, bytes: 9, hash },
+  })
+
+  it('a session with every line bundled writes no file and plays the bundled clips', async () => {
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files,
+      yieldThen: sync,
+      bundled: ALL_BUNDLED,
+    })
+    await s.ready
+    expect(files.dirs.has('s1')).toBe(false)
+    expect(s.fileCount).toBe(0)
+    expect(s.filesWritten).toBe(0)
+    expect(s.bundledCount).toBe(3)
+    expect((readAudioLog()[0] as { detail: string }).detail).toMatch(
+      /^0 files 0 bytes, .*3 bundled \(\d+ ms matching\)$/,
+    )
+    const done = s.playUtterance('Hmm... try again?')
+    expect(fakePlayers[0].source).toBe(102)
+    fakePlayers[0].start(1)
+    fakePlayers[0].finish()
+    await done
+    // A duplicate id plays the same clip on the same player.
+    const again = s.playUtteranceById('p2.reprompt')
+    expect(fakePlayers).toHaveLength(1)
+    s.unload()
+    await expect(again).rejects.toThrow('cancelled')
+    expect(fakePlayers[0].removed).toBe(true)
+    expect(files.dirs.has('s1')).toBe(false)
+  })
+
+  it('writes only the lines the app does not bundle', async () => {
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files,
+      yieldThen: sync,
+      bundled: bundledOf({
+        'Hmm... try again?': { module: 102, bytes: 9, hash },
+      }),
+    })
+    await s.ready
+    expect([...files.dirs.get('s1')!.keys()]).toEqual(['p1.read', 'p2.read'])
+    expect(s.fileCount).toBe(2)
+    expect(s.bundledCount).toBe(1)
+    const done = s.playUtterance('Three plus two. How many?')
+    expect(fakePlayers[0].source).toEqual({
+      uri: 'file:///cache/session-audio/s1/p1.read.mp3',
+    })
+    s.unload()
+    await expect(done).rejects.toThrow('cancelled')
+  })
+
+  it('a server clip of another length (re-rendered after this build) plays the server bytes', async () => {
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files,
+      yieldThen: sync,
+      bundled: bundledOf({
+        'Hmm... try again?': { module: 102, bytes: 4096, hash },
+      }),
+    })
+    await s.ready
+    expect(s.bundledCount).toBe(0)
+    expect(s.fileFor('Hmm... try again?')).toEqual({
+      uri: 'file:///cache/session-audio/s1/p1.reprompt.mp3',
+      bytes: 9,
+    })
+  })
+
+  it('a server clip of the same length but other bytes (a re-take after this build) plays the server bytes', async () => {
+    // PR #558 re-took "Read the fig." at exactly the old 11492 bytes.
+    const retake = 'SUQzBAAAAAAB'
+    expect(clipHash(retake)).not.toBe(hash)
+    const s = loadSessionAudio(
+      's1',
+      UTTERANCES.map((u) =>
+        u.text === 'Hmm... try again?'
+          ? { ...u, audio: { ...u.audio, base64: retake } }
+          : u,
+      ),
+      { engine, files, yieldThen: sync, bundled: ALL_BUNDLED },
+    )
+    await s.ready
+    expect(s.bundledCount).toBe(2)
+    expect(files.dirs.get('s1')!.get('p1.reprompt')).toBe(retake)
+    expect(s.fileFor('Hmm... try again?')).toEqual({
+      uri: 'file:///cache/session-audio/s1/p1.reprompt.mp3',
+      bytes: 9,
+    })
+    expect(s.fileFor('One plus one. How many?')).toEqual({
+      uri: 103,
+      bytes: 9,
+    })
+    s.unload()
+  })
+
+  it('a bundled ref plays its clip; one this build does not bundle walks its caption', async () => {
+    const write = jest.spyOn(files, 'write')
+    const s = loadSessionAudio(
+      's1',
+      [
+        {
+          id: 'p1.read',
+          text: 'Three plus two. How many?',
+          audio: { kind: 'bundled', key: 'Three plus two. How many?' },
+        },
+        {
+          id: 'p2.read',
+          text: 'Not in this build.',
+          audio: { kind: 'bundled', key: 'Not in this build.' },
+        },
+      ],
+      { engine, files, yieldThen: sync, bundled: ALL_BUNDLED },
+    )
+    await s.ready
+    const first = s.playUtterance('Three plus two. How many?')
+    expect(fakePlayers[0].source).toBe(101)
+    fakePlayers[0].start(1)
+    fakePlayers[0].finish()
+    await first
+    const ticks: number[] = []
+    await expect(
+      s.playUtterance('Not in this build.', {
+        onWordTick: (i) => ticks.push(i),
+      }),
+    ).resolves.toBeUndefined()
+    expect(ticks).toEqual([0, 1, 2, 3])
+    expect(fakePlayers).toHaveLength(1)
+    expect(write).not.toHaveBeenCalled()
+    s.unload()
+  })
+
+  it('fileFor and prewarm on a bundled line: the module and its byte length', () => {
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files,
+      yieldThen: sync,
+      bundled: ALL_BUNDLED,
+    })
+    expect(s.fileFor('Hmm... try again?')).toEqual({ uri: 102, bytes: 9 })
+    s.prewarm('One plus one. How many?')
+    expect(fakePlayers).toHaveLength(1)
+    expect(fakePlayers[0].source).toBe(103)
+    s.unload()
+    expect(s.fileFor('Hmm... try again?')).toBeUndefined()
+  })
+
+  it("a real canon session plays every line from the app's bundle, with no base64 written", async () => {
+    const write = jest.spyOn(files, 'write')
+    const canon = JSON.parse(
+      readFileSync(
+        resolve(
+          __dirname,
+          '../../../public/canon/word-song/level-1/cvc-words.json',
+        ),
+        'utf8',
+      ),
+    ) as { utterances: Utterance[] }
+    // The default lookup: the app's bundled canon registry.
+    const s = loadSessionAudio('s1', canon.utterances, {
+      engine,
+      files,
+      yieldThen: sync,
+    })
+    await s.ready
+    expect(write).not.toHaveBeenCalled()
+    expect(s.fileCount).toBe(0)
+    expect(s.bundledCount).toBe(
+      new Set(canon.utterances.map((u) => u.text)).size,
+    )
+    // A blend line's bundled bytes are the ones its marks were measured on.
+    const blend = canon.utterances.find((u) => u.id.endsWith('.blend'))!
+    expect(
+      blendMarksFor(blend.text, s.fileFor(blend.text)?.bytes),
+    ).not.toBeNull()
+    s.unload()
   })
 })
 

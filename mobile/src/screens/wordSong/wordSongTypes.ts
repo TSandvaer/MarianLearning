@@ -51,10 +51,13 @@ export interface PlayWordSongUtteranceOptions {
   endAtMs?: number
 }
 
-/** A session line's MP3 on disk and its byte length (`fileFor`). */
+/**
+ * A session line's MP3, on disk or bundled (its module), and its byte
+ * length (`fileFor`).
+ */
 export type ClipFileFn = (
   text: string,
-) => { uri: string; bytes: number } | undefined
+) => { uri: string | number; bytes: number } | undefined
 
 /**
  * Plays one Word Song line by its text. Resolves at the line's end; rejects
