@@ -13,7 +13,14 @@
  * Ticket 86c9kwhbc (D — pre-baked session canon).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import {
+  mkdtempSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+  rmSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -25,6 +32,8 @@ import {
   getCanonEntry,
 } from './_canon.js'
 import type { SessionStartResponse } from './_types.js'
+import { renderElevenLabsText } from './_tts_elevenlabs.js'
+import { servedCanon } from '../packages/core/src/wire/canonPool.js'
 
 let tempRoot: string
 
@@ -351,4 +360,52 @@ describe("getCanonEntry — a step's pool (no-Claude plan phase 5a)", () => {
       expect(entry!.utterances.filter((u) => u.audio.base64 === '')).toEqual([])
     }
   }, 30_000) // reads the committed canon (~87 MB): testing-and-ci.md § 1.1
+
+  it("serves and indexes every canon line but a math step's problems 9+: a word.p9+ line is no pool", () => {
+    // Guard: the pool rule once matched `word.p9+` too, so
+    // letter-sounds-audit's p9..p12 (the /u/ /i/ /e/ vowel blocks) left the
+    // served file and this index, and a live session re-rendered 16
+    // ear-tested lines through ElevenLabs. The index is main's: every
+    // voiced line of every canon file, a math file's problems 9+ left out.
+    const root = join(process.cwd(), 'public', 'canon')
+    const expected = new Set<string>()
+    for (const track of readdirSync(root)) {
+      for (const level of readdirSync(join(root, track))) {
+        for (const file of readdirSync(join(root, track, level))) {
+          if (!file.endsWith('.json')) continue
+          const base = file.replace(/\.json$/, '')
+          const doc = JSON.parse(
+            readFileSync(join(root, track, level, file), 'utf8'),
+          ) as {
+            plan?: unknown
+            utterances: Array<{
+              id: string
+              text: string
+              audio?: { base64?: string }
+            }>
+          }
+          if (track !== 'math') {
+            expect.soft(servedCanon(doc) === doc, `${track}/${base}`).toBe(true)
+          }
+          const tier =
+            track === 'math'
+              ? undefined
+              : base.startsWith('letter-sounds')
+                ? 'letter-sounds'
+                : base
+          for (const u of doc.utterances) {
+            const problem = /^math\.p(\d+)\./.exec(u.id)
+            if (track === 'math' && problem !== null && Number(problem[1]) > 8)
+              continue
+            if (u.audio?.base64)
+              expected.add(renderElevenLabsText(u.text, tier))
+          }
+        }
+      }
+    }
+    _resetCanonAudioIndexForTesting()
+    const index = getCanonAudioIndex(root)
+    _resetCanonAudioIndexForTesting()
+    expect([...index.keys()].sort()).toEqual([...expected].sort())
+  }, 60_000) // reads the committed canon twice: testing-and-ci.md § 1.1
 })

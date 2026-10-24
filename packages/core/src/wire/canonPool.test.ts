@@ -10,6 +10,7 @@ import {
   SERVED_CANON_PROBLEMS,
   canonProblemOf,
   hasCanonPool,
+  isCanonPoolLineId,
   servedCanon,
 } from './canonPool.js'
 
@@ -22,10 +23,10 @@ const doc = (ids: readonly string[]) => ({
 })
 
 describe('canonProblemOf', () => {
-  it('reads the problem of a math or word line, null for the rest', () => {
+  it('reads the problem of a math line, null for the rest', () => {
     expect(canonProblemOf('math.p1.read')).toBe(1)
     expect(canonProblemOf('math.p53.giveAnswer')).toBe(53)
-    expect(canonProblemOf('word.p12.blend')).toBe(12)
+    expect(canonProblemOf('word.p12.blend')).toBeNull()
     expect(canonProblemOf('session.end.recap.3')).toBeNull()
     expect(canonProblemOf('math.w1.read')).toBeNull()
     expect(canonProblemOf('mathp9.read')).toBeNull()
@@ -53,6 +54,15 @@ describe('servedCanon', () => {
     expect(hasCanonPool(served)).toBe(false)
     // The file itself is untouched.
     expect(full.utterances).toHaveLength(6)
+  })
+
+  it('never takes a word line for pool: letter-sounds-audit serves word.p1..p12', () => {
+    expect(isCanonPoolLineId('math.p9.read')).toBe(true)
+    for (const id of ['word.p9.read', 'word.p12.correct', 'word.p40.blend'])
+      expect(isCanonPoolLineId(id), id).toBe(false)
+    const audit = doc(['word.p1.read', 'word.p9.read', 'word.p12.correct'])
+    expect(hasCanonPool(audit)).toBe(false)
+    expect(servedCanon(audit)).toBe(audit)
   })
 
   it('returns a file with no pool as it is, the same object', () => {

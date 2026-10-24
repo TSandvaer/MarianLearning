@@ -17,10 +17,14 @@
 /** The problems of the served session: 1..this. */
 export const SERVED_CANON_PROBLEMS = 8
 
-const PROBLEM_ID = /^(?:math|word)\.p(\d+)\./
+// Math only: Word Song's `word.p*` lines are no pool. letter-sounds-audit
+// serves `word.p1..p12` (p9..p12 are the /u/ /i/ /e/ vowel blocks
+// `composeLetterSoundsSession` uses), every one of them served and indexed.
+const PROBLEM_ID = /^math\.p(\d+)\./
 
-/** The canon problem a line belongs to (`math.p12.read` → 12), or `null`
- *  for a line of no problem (`session.end.*`, a renamed `w1` block). */
+/** The math problem a line belongs to (`math.p12.read` → 12), or `null`
+ *  for a line of no pool step (`session.end.*`, a renamed `w1` block, any
+ *  `word.*` line). */
 export function canonProblemOf(id: string): number | null {
   const m = PROBLEM_ID.exec(id)
   return m === null ? null : Number(m[1])
