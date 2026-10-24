@@ -4,9 +4,9 @@
 # canon clips bundled in the app, `src/audio/sessionAudio.ts`).
 #
 # `cvc-words` seed: Math on a fresh install's start, Word Song on CVC words
-# (flows 02 and 03). With the harness's closed API port both sessions run
-# core's static plans with silent captions; a session with the server's
-# canon lines is the sweep's (`run.sh --sweep <step>`).
+# (flows 02 and 03). With the harness's closed API port both sessions are
+# built on the device from the bundled canon (no-Claude plan phase 2,
+# `src/session/localSession.ts`): the step's canon problems, bundled audio.
 appId: host.exp.Exponent
 name: Number Garden and Word Song sessions
 tags:

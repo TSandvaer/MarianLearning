@@ -65,6 +65,13 @@ import { CHIME_TAIL_MS, LEAVE_DELAY_MS } from './screens/sessionEnd/SessionEnd'
 import { unlockTimeline } from '@marian/core/map/unlockBeat'
 import { SPLASH_FADE_OUT_MS } from './screens/Splash'
 
+// These flows play core's static plan on an offline device and read each
+// session start from its request. The canon text is left out of the app
+// here, so every session start goes to the (offline) server as it did
+// before no-Claude phase 2 (`./session/localSession.ts`); sessions built on
+// the device are `App.localSessions.test.tsx`'s.
+jest.mock('../assets/canon/canon-text.json', () => ({}))
+
 /** Every write to the progress doc since the last `boot()`. */
 let progressWrites = 0
 /** Writes per storage key since the last `boot()`. */

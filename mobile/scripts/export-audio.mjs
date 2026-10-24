@@ -29,6 +29,10 @@
  *                                probe lines (`public/canon/word-song/level-1/
  *                                cvc-words-probe.json`), copied byte for byte:
  *                                Word Song plays them beside the session audio
+ * - `assets/canon/canon-text.json` every canon file's plan and lines without
+ *                                audio, by path: the device builds hint-free
+ *                                sessions from it (no-Claude plan phase 2,
+ *                                `src/session/localSession.ts`)
  * - `src/audio/audioRegistry.ts` web URL path → `require()`d native module
  * - `src/audio/canonAudioRegistry.ts` canon line text → its bundled module,
  *                                the clip's byte length and its content hash
@@ -53,7 +57,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -208,6 +212,57 @@ const canonEntries = [] // [text, require path, bytes, clipHash]
     join(dest, name),
   )
   console.log(`canon: ${name}`)
+}
+
+/**
+ * `api/_types.ts` `isSessionStartResponse`: the server serves a canon file
+ * only when it passes this (`api/_canon.ts` `getCanonEntry`).
+ */
+function isServedCanon(json) {
+  return (
+    typeof json === 'object' &&
+    json !== null &&
+    json.ok === true &&
+    json.kind === 'session-start' &&
+    Array.isArray(json.utterances) &&
+    json.utterances.every(
+      (u) =>
+        typeof u === 'object' &&
+        u !== null &&
+        typeof u.id === 'string' &&
+        typeof u.text === 'string' &&
+        u.audio?.kind === 'inline' &&
+        typeof u.audio.base64 === 'string' &&
+        u.audio.mime === 'audio/mpeg',
+    )
+  )
+}
+
+// Every canon file's text, without audio, keyed by its path under
+// public/canon/ (no `.json`): the device builds a hint-free session from it
+// and plays the clips above (no-Claude plan phase 2, `src/session/
+// localSession.ts`).
+{
+  const canonRoot = join(repoRoot, 'public', 'canon')
+  const text = {}
+  for (const file of jsonFilesUnder(canonRoot)) {
+    const json = JSON.parse(readFileSync(file, 'utf8'))
+    if (!isServedCanon(json)) continue
+    const key = relative(canonRoot, file)
+      .replace(/\.json$/, '')
+      .split(sep)
+      .join('/')
+    text[key] = {
+      plan: json.plan,
+      utterances: json.utterances.map(({ id, text }) => ({ id, text })),
+    }
+  }
+  const name = 'canon-text.json'
+  writeFileSync(
+    join(mobileRoot, 'assets', 'canon', name),
+    `${JSON.stringify(text)}\n`,
+  )
+  console.log(`canon: ${name} (${Object.keys(text).length} files)`)
 }
 
 entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))

@@ -43,6 +43,10 @@
  *   back as `math.w<i>.*`, parsed into the round ahead of the 8 scored
  *   problems; a block that is missing or unreadable is dropped.
  *
+ * - **Local first** (no-Claude plan phase 2, `./localSession.ts`): a
+ *   request the server answers from canon (no planner hint) is built on the
+ *   device from the bundled canon, with no network call and no wait.
+ *
  * The Claude key never reaches the app: `/api/claude` is the Vercel
  * function. App subscribes with `useSyncExternalStore`.
  */
@@ -93,6 +97,7 @@ import {
   planModeOf,
   sessionIntroFor,
 } from './reviewSession'
+import { startSessionLocalFirst } from './localSession'
 import {
   startSessionWithFallback,
   type SessionStartFallbackHandle,
@@ -423,7 +428,7 @@ const FAILED: MathSessionSnapshot = { ...IDLE, audioReady: true }
 export function createMathSessionController(
   deps: MathSessionDeps,
 ): MathSessionController {
-  const start = deps.start ?? startSession
+  const start = deps.start ?? startSessionLocalFirst
   const readHints = deps.readHints ?? readMathProgressHints
   const now = deps.now ?? Date.now
   const listeners = new Set<() => void>()

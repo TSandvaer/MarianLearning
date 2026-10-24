@@ -6,12 +6,11 @@
 # it opens the peek prompt (#657): the stop's name, then the question and
 # the round button `map-peek-button` (`useMapVisit.ts` `openPrompt`).
 #
-# The button starts the peek: `requestPeek` asks the API for the step's 3
-# problems (`src/session/peekSession.ts`). With the harness's closed API
-# port the request fails at once, the request rejects, and the map says the
-# stop's name again and stays (`useMapVisit.ts` `startPeek`: "Failure: the
-# stop's name, and taps resume"), so the flow asserts that line's caption,
-# `map-line-path.stop.<node>`, not the peek screen.
+# The button starts the peek: `requestPeek` builds the step's 3 problems on
+# the device from the bundled canon (no-Claude plan phase 2,
+# `src/session/localSession.ts`), so it plays with the harness's closed API
+# port: Word Song shows the step's problem 1, the QA autotap answers the
+# three, and the peek's end goes back to the map.
 appId: host.exp.Exponent
 name: Map peek
 tags:
@@ -50,14 +49,16 @@ tags:
     file: ../subflows/tap-and-confirm.yaml
     env:
       TARGET: map-peek-button
-      NEXT: map-line-path.stop.cvc-words-short-u
+      NEXT: word-song
 - extendedWaitUntil:
     visible:
-      id: map-line-path.stop.cvc-words-short-u
-    timeout: 15000
-- assertNotVisible:
-    id: map-peek-button
-- takeScreenshot: map-peek-fallback
+      id: word-song-chips
+    timeout: 30000
+- takeScreenshot: map-peek-problem
+- extendedWaitUntil:
+    visible:
+      id: map-stop-cvc-words-short-u
+    timeout: 180000
 - runFlow:
     file: ../subflows/tap-and-confirm.yaml
     env:

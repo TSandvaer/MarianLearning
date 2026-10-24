@@ -18,17 +18,20 @@
  *      that never comes fails it),
  *   2. Metro's log has `[qaStep] jumped to "<step>"` (the launch flag
  *      applied, `mobile/src/platform/native.ts`),
- *   3. every session-start of the step's world asked the API for this
- *      step (`progress.focusNode`), and at least one did,
+ *   3. every session-start of the step's world was for this step, and at
+ *      least one was made: a request to the API (`progress.focusNode`), or
+ *      a session the device built from its bundled canon (no-Claude plan
+ *      phase 2: `[audio] session-local <track> <ms> ms <kind> <focus>, ...`,
+ *      `mobile/src/session/localSession.ts`), which reaches no API,
  *   4. no ` ERROR ` line in Metro's log,
- *   5. the session played the server's plan: `[audio] <track>-session
+ *   5. the session played the canon plan: `[audio] <track>-session
  *      ready (<plan id>)`, not `... unavailable, silent fallback: <why>`
  *      (`mobile/src/session/mathSession.ts`, `wordSongSession.ts`).
  *
  * An expected-fail step is XFAIL when its ONLY problem is the silent
- * fallback and the API did serve the step (HTTP 200 from canon): the
- * known gap is "the server answers, the app can't read the plan". If it
- * has no problem at all it is XPASS, which fails the sweep, so the list
+ * fallback and the step was served (HTTP 200 from canon, or built on the
+ * device): the known gap is "the plan exists, the app can't read it". If
+ * it has no problem at all it is XPASS, which fails the sweep, so the list
  * can't go stale. Anything else is FAIL.
  */
 
@@ -101,6 +104,20 @@ function sessionOutcome(
 
 const ERROR_LINE = /^\s*ERROR\s+(.*)$/
 
+/** The focus steps of the session starts the device built (rule 3). */
+function localStartFocuses(
+  lines: readonly string[],
+  world: SweepWorld,
+): string[] {
+  const row = new RegExp(
+    `\\[audio\\] session-local ${world} \\d+ ms \\S+ (\\S+), `,
+  )
+  return lines.flatMap((l) => {
+    const m = row.exec(l)
+    return m === null ? [] : [m[1]!]
+  })
+}
+
 export function classifyStep(e: StepEvidence): StepResult {
   const lines = e.metroLog.split(/\r?\n/)
   const problems: string[] = []
@@ -114,16 +131,14 @@ export function classifyStep(e: StepEvidence): StepResult {
   const starts = e.apiRecords.filter(
     (r) => r.kind === 'session-start' && r.track === e.world,
   )
-  if (starts.length === 0) {
-    problems.push(`no ${e.world} session-start reached the sweep API`)
+  const local = localStartFocuses(lines, e.world)
+  const asked = [...starts.map((r) => r.focusNode ?? '(none)'), ...local]
+  if (asked.length === 0) {
+    problems.push(
+      `no ${e.world} session-start reached the sweep API or was built on the device`,
+    )
   } else {
-    const wrong = [
-      ...new Set(
-        starts
-          .filter((r) => r.focusNode !== e.node)
-          .map((r) => r.focusNode ?? '(none)'),
-      ),
-    ]
+    const wrong = [...new Set(asked.filter((node) => node !== e.node))]
     if (wrong.length > 0) {
       problems.push(
         `session-start asked for ${wrong.join(', ')}, not ${e.node}`,
@@ -149,8 +164,11 @@ export function classifyStep(e: StepEvidence): StepResult {
     problems.push(fallbackProblem)
   }
 
+  const builtHere = local.includes(e.node)
   const planDetail =
-    outcome?.kind === 'ready' ? `server plan ${outcome.planId}` : ''
+    outcome?.kind === 'ready'
+      ? `${builtHere ? 'device' : 'server'} plan ${outcome.planId}`
+      : ''
 
   if (!e.expectedFail) {
     return problems.length === 0
@@ -166,9 +184,9 @@ export function classifyStep(e: StepEvidence): StepResult {
   }
   if (problems.length === 1 && fallbackProblem !== null) {
     const forStep = starts.filter((r) => r.focusNode === e.node)
-    const served = forStep.some(
-      (r) => r.status === 200 && r.source === 'canon-hit',
-    )
+    const served =
+      builtHere ||
+      forStep.some((r) => r.status === 200 && r.source === 'canon-hit')
     if (served) return { verdict: 'XFAIL', detail: fallbackProblem }
     const last = forStep[forStep.length - 1]
     problems.push(
