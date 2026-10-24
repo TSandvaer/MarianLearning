@@ -5,10 +5,11 @@
 # As the first session of the day it opens with a 2-heart warm-up (2 + 2,
 # 4 + 5), and the third due fact, 6 + ? = 10, leads the scored P4.
 #
-# Screenshots: the first problem (heart 1), and P4 once three scored
-# problems are done (`math-problem-dot-completed`, index 2). Metro's log
-# has `[audio] session-local math <ms> ms pick add-to-10, ...` and
-# `ready (pick-add-to-10, 2 warm-up)`.
+# Screenshots: the first problem on screen (a warm-up heart), and P4 once
+# Emma's caption reads its line ("Six and what make ten?": the session's
+# only line starting "Six"; the HUD's beads are not visible to Maestro).
+# Metro's log has `[audio] session-local math <ms> ms pick add-to-10, ...`
+# and `ready (pick-add-to-10, 2 warm-up)`.
 appId: host.exp.Exponent
 name: Picked add-to-10 session
 tags:
@@ -35,8 +36,7 @@ tags:
 - takeScreenshot: picked-math-first-problem
 - extendedWaitUntil:
     visible:
-      id: math-problem-dot-completed
-      index: 2
+      text: 'Six.*'
     timeout: 300000
 - extendedWaitUntil:
     visible:
