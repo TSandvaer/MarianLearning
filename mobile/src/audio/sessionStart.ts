@@ -16,6 +16,7 @@
  * never reaches the app: `/api/claude` is the Vercel function.
  */
 import { apiUrl } from '@marian/core/platform/apiUrl'
+import type { MathPickRequest } from '@marian/core/session/mathPicker'
 import {
   isSessionStartResponse,
   type ClaudeRequest,
@@ -43,6 +44,12 @@ export interface SessionStartArgs {
   sessionId: string
   payload: SessionStartPayload
   signal?: AbortSignal
+  /**
+   * No-Claude plan phase 3: the device picks this math session
+   * (`session/localSession.ts`). Never sent: this module posts `payload`
+   * only, so the server serves the hint-free request (the step's canon).
+   */
+  mathPick?: MathPickRequest
 }
 
 export interface PreparedSession {

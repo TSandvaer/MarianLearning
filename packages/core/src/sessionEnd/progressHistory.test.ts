@@ -18,7 +18,11 @@ import {
   type Progress,
   type SessionHistoryEntry,
 } from '../progress'
-import { recordProgressOnSessionEnd } from './progressHistory'
+import { localDateKey } from '../progress/clock'
+import {
+  recordProgressOnSessionEnd,
+  recordReviewOnSessionEnd,
+} from './progressHistory'
 
 describe('recordProgressOnSessionEnd', () => {
   beforeEach(() => {
@@ -574,14 +578,12 @@ describe('recordProgressOnSessionEnd', () => {
       expect(sixPlusSeven?.box).toBe(2)
     })
 
-    it('idempotent under React StrictMode double-invocation (two identical calls)', () => {
-      // applyLeitnerOutcomes is pure but the writer wraps it; two back-
-      // to-back calls (the worst-case React strict-mode double-mount)
-      // would otherwise stack two promotes per fact. We don't currently
-      // de-duplicate on the dateISO key — so each call DOES advance the
-      // box one step. The test pins the EXPECTED current behaviour so
-      // any future de-dup change is visible. If this becomes a UX
-      // problem, add dateISO-based dedup at the writer.
+    it('two identical calls (React StrictMode double-invocation) promote once', () => {
+      // Two back-to-back calls (the worst-case React strict-mode
+      // double-mount) used to stack two promotes per fact. Since the
+      // once-a-day rule (Dave, no-claude-variety § 2.2 rule 4) a fact
+      // moves up at most once a day, so the second call keeps the box.
+      // Both calls still append a history entry (no dateISO dedup).
       recordProgressOnSessionEnd({
         surface: 'math',
         totalCorrect: 1,
@@ -598,15 +600,150 @@ describe('recordProgressOnSessionEnd', () => {
       })
 
       const after = loadProgress()!
-      // After 2 identical calls: addItem (box 1) + promote → 2; then
-      // addItem no-op + promote → 3. This is double-counted but
-      // intentional for the current contract. SessionEnd's mount
-      // effect already runs once per actual session-end via its
-      // `[]` deps; React strict-mode double-mount in dev would
-      // produce this state but is acceptable per the spec.
-      expect(after.mathFactsLeitner.items[0].box).toBe(3)
+      // addItem (box 1) + promote → 2; the second call finds it in box 2,
+      // moved today, so not due: it stays.
+      expect(after.mathFactsLeitner.items[0].box).toBe(2)
       // Two history entries also recorded.
       expect(after.history).toHaveLength(2)
+    })
+  })
+
+  // ── Once-a-day promotion + the seen-record (no-Claude phase 3) ─────────
+  describe('once-a-day promotion and the seen-record', () => {
+    const f = { a: 3, b: 4, op: '+' as const }
+
+    it('a fact answered right in two sessions on one afternoon moves up one box', () => {
+      saveProgress({
+        ...defaultProgress(),
+        mathFactsLeitner: { items: [{ item: f, box: 2, lastSeen: 100 }] },
+      })
+      for (const dateISO of [
+        '2026-10-23T13:00:00.000Z',
+        '2026-10-23T15:00:00.000Z',
+      ]) {
+        recordProgressOnSessionEnd({
+          surface: 'math',
+          totalCorrect: 8,
+          dateISO,
+          focusNode: 'add-to-10',
+          leitnerOutcomes: [{ fact: f, correct: true }],
+        })
+      }
+      const after = loadProgress()!
+      expect(after.mathFactsLeitner.items).toEqual([
+        {
+          item: f,
+          box: 3,
+          lastSeen: new Date('2026-10-23T13:00:00.000Z').getTime(),
+        },
+      ])
+    })
+
+    it('a right answer on a fact that is not due keeps its box and due date', () => {
+      // Box 4 (7 days), moved two days ago.
+      const lastSeen = new Date('2026-10-21T09:00:00.000Z').getTime()
+      saveProgress({
+        ...defaultProgress(),
+        mathFactsLeitner: { items: [{ item: f, box: 4, lastSeen }] },
+      })
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 8,
+        dateISO: '2026-10-23T13:00:00.000Z',
+        focusNode: 'add-to-10',
+        leitnerOutcomes: [{ fact: f, correct: true }],
+      })
+      expect(loadProgress()!.mathFactsLeitner.items).toEqual([
+        { item: f, box: 4, lastSeen },
+      ])
+    })
+
+    it('writes each fact’s seen-record (day, sessions met, last result) to the doc', () => {
+      const dateISO = '2026-10-23T13:00:00.000Z'
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 1,
+        dateISO,
+        focusNode: 'add-to-10',
+        leitnerOutcomes: [
+          { fact: f, correct: true },
+          { fact: { a: 7, b: 3, op: '+' }, correct: false },
+        ],
+      })
+      const day = localDateKey(new Date(dateISO))
+      expect(loadProgress()!.seenItems).toEqual({
+        'math:3+4': { day, count: 1, correct: true, promoted: day },
+        'math:7+3': { day, count: 1, correct: false },
+      })
+    })
+
+    it('a doc written before the field is seeded from its history, then updated', () => {
+      saveProgress({
+        ...defaultProgress(),
+        mathFactsLeitner: { items: [{ item: f, box: 2, lastSeen: 100 }] },
+        history: [
+          {
+            dateISO: '2026-10-20T09:00:00.000Z',
+            skillFocus: ['add-to-10'],
+            successRate: 1,
+            mathFacts: [f, { a: 1, b: 2, op: '+' }],
+          },
+        ],
+      })
+      const dateISO = '2026-10-23T13:00:00.000Z'
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 8,
+        dateISO,
+        focusNode: 'add-to-10',
+        leitnerOutcomes: [{ fact: f, correct: true }],
+      })
+      const day = localDateKey(new Date(dateISO))
+      expect(loadProgress()!.seenItems).toEqual({
+        'math:3+4': { day, count: 2, correct: true, promoted: day },
+        'math:1+2': {
+          day: localDateKey(new Date('2026-10-20T09:00:00.000Z')),
+          count: 1,
+          correct: null,
+        },
+      })
+    })
+
+    it('a Word Song session end carries the record through unchanged', () => {
+      const seenItems = {
+        'math:3+4': { day: '2026-10-22', count: 4, correct: true },
+      }
+      saveProgress({ ...defaultProgress(), seenItems })
+      recordProgressOnSessionEnd({
+        surface: 'word-song',
+        totalCorrect: 8,
+        dateISO: '2026-10-23T13:00:00.000Z',
+        focusNode: 'blending-cv',
+      })
+      expect(loadProgress()!.seenItems).toEqual(seenItems)
+    })
+
+    it('a review’s session end follows the same rule', () => {
+      saveProgress({
+        ...defaultProgress(),
+        mathFactsLeitner: { items: [{ item: f, box: 2, lastSeen: 100 }] },
+      })
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 8,
+        dateISO: '2026-10-23T13:00:00.000Z',
+        focusNode: 'add-to-10',
+        leitnerOutcomes: [{ fact: f, correct: true }],
+      })
+      const sessionsBefore = loadProgress()!.seenItems?.['math:3+4']?.count
+      recordReviewOnSessionEnd({
+        surface: 'math',
+        dateISO: '2026-10-23T16:00:00.000Z',
+        leitnerOutcomes: [{ fact: f, correct: true }],
+      })
+      const after = loadProgress()!
+      expect(after.mathFactsLeitner.items[0]!.box).toBe(3)
+      expect(after.seenItems?.['math:3+4']?.count).toBe(sessionsBefore! + 1)
     })
   })
 

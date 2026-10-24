@@ -30,8 +30,6 @@ const ADD_10: MathProgressHints = {
   focusNode: 'add-to-10',
   focusMode: 'forward',
   recentSuccessRate: 0.75,
-  leitner: undefined,
-  slowFacts: undefined,
   lifetimeFirstEncounters: ['add-to-10'],
   planKind: { kind: 'forward', warmup: [] },
 }
@@ -156,22 +154,31 @@ it('no prefetch while a session is latched', () => {
   expect(h.prefetcher.pendingKey).toBeNull()
 })
 
-it('a slow adopted hinted request is aborted by the 5 s fallback on Math', async () => {
+it('a picked session (phase 3) rides the prefetch with its pick and never races a 5 s fallback', async () => {
   jest.useFakeTimers()
   try {
     const h = harness(5000)
-    h.setHints({ ...ADD_10, leitner: [{ a: 3, b: 4, op: '+', box: 1 }] })
+    const mathPick = {
+      step: 'add-to-10' as const,
+      leitner: { items: [] },
+      seen: {},
+      previous: null,
+      slow: [],
+      warmup: [],
+      nowMs: 0,
+      today: '2026-10-24',
+      seed: 0,
+    }
+    h.setHints({ ...ADD_10, mathPick })
     h.session.prefetch()
     h.session.kick()
     h.session.startWaitTimer()
-    expect(h.calls[0]!.aborted).toBe(false)
     jest.advanceTimersByTime(5000)
-    // Given up on, exactly like a request of its own: it can no longer
-    // land and replace the fallback's session audio.
-    expect(h.calls[0]!.aborted).toBe(true)
-    expect(h.calls).toHaveLength(2)
-    expect(h.calls[1]!.args.sessionId).toMatch(/-fallback$/)
-    expect(h.calls[1]!.args.payload).not.toHaveProperty('progress.leitner')
+    expect(h.calls).toHaveLength(1)
+    expect(h.calls[0]!.aborted).toBe(false)
+    expect(h.calls[0]!.args.mathPick).toEqual(mathPick)
+    expect(h.calls[0]!.args.payload).not.toHaveProperty('progress.leitner')
+    expect(h.calls[0]!.args.payload).not.toHaveProperty('mathPick')
   } finally {
     jest.useRealTimers()
   }

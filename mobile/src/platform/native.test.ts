@@ -496,7 +496,7 @@ describe('bootNative', () => {
       expect(currentStepOf(loadProgress()!, world)).toBe(node)
       const payload =
         world === 'math'
-          ? buildMathSessionPayload(readMathProgressHints(), true)
+          ? buildMathSessionPayload(readMathProgressHints())
           : buildWordSongSessionPayload(readWordSongProgressHints(), true)
       expect(payload.track).toBe(world)
       expect((payload.progress as { focusNode?: string }).focusNode).toBe(node)

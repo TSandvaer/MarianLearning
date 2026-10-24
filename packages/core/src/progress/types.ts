@@ -206,9 +206,36 @@ export interface LeitnerItem<T> {
   item: T
   /** Current box, 1..5. */
   box: LeitnerBoxIndex
-  /** ms since epoch the item was last shown. 0 = never shown. */
+  /**
+   * ms since epoch the item last moved box (promoted or demoted): its due
+   * date counts from here. 0 = never answered. A right answer on an item
+   * that is not due leaves it (Dave's once-a-day rule, `seenItems.ts`);
+   * the day the learner last met an item is `Progress.seenItems`'.
+   */
   lastSeen: number
 }
+
+/**
+ * One item's seen-record (no-Claude variety,
+ * `design/research/no-claude-variety-2026-10-23.md` § 2.1 rule 5): when
+ * this learner last met it, how many sessions she met it in, and her last
+ * first-tap result. Kept per item, across steps and session kinds.
+ */
+export interface SeenItem {
+  /** Local day (`YYYY-MM-DD`) of the last session she met it in. */
+  day: string
+  /** Sessions she met it in. */
+  count: number
+  /** Her last first tap: right, wrong, or `null` (not known: the record
+   *  was seeded from data older than the field). */
+  correct: boolean | null
+  /** Math facts: the local day it last moved up a Leitner box (§ 2.2
+   *  rule 4: at most once a day). Absent = not since the field exists. */
+  promoted?: string
+}
+
+/** Seen-records by item key (`seenItems.ts` `mathSeenKey`: `math:3+4`). */
+export type SeenItems = Record<string, SeenItem>
 
 export interface LeitnerBox<T> {
   items: LeitnerItem<T>[]
@@ -822,6 +849,16 @@ export interface Progress {
    * no `schemaVersion` bump.
    */
   learner?: { syncId?: string; avatarId?: string; language?: string }
+  /**
+   * The learner's seen-record per item (no-Claude plan phase 3; Dave
+   * `design/research/no-claude-variety-2026-10-23.md` § 2.1 rule 5): the
+   * device's math picker ranks by it and the once-a-day promotion keeps
+   * its day in it. Written at every math session end; carried in the
+   * cloud blob like every field. Optional + additive — no `schemaVersion`
+   * bump. Absent (a doc written before it, the web) = seeded from the
+   * history and the Leitner box when read (`seenItems.ts` `seenItemsOf`).
+   */
+  seenItems?: SeenItems
 }
 
 /**

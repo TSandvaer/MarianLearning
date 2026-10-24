@@ -43,17 +43,13 @@
 
 import {
   applyMasteryRule,
-  addItem,
-  demote,
   getOrCreateDeviceId,
   loadProgress,
   markFirstEncounterSeen,
-  promote,
   pushProgressToCloud,
   saveProgress,
   WORD_SONG_NODES_IN_ORDER,
   type FocusMode,
-  type LeitnerBox,
   type LetterSoundsVowel,
   type MathFact,
   type Progress,
@@ -62,6 +58,7 @@ import {
   type WordSongNode,
 } from '../progress'
 import { startProgressForActive } from '../learners/startDoc'
+import { applyMathOutcomes, seenItemsOf } from '../progress/seenItems'
 import { withPaceHold, withSecureDay } from '../progress/fastTrackRecord'
 import { seedUnlocksCelebrated } from '../progress/pathBeats'
 import {
@@ -346,18 +343,17 @@ export function recordProgressOnSessionEnd(
 
   const entry = buildEntry(input)
 
-  // M4 Leitner update (ticket 86c9pwgc8). Math-surface sessions that
-  // ship per-problem outcomes get their facts promoted / demoted.
-  // Other surfaces (word-song) and math sessions without outcomes
-  // (legacy / test fixtures) leave the box unchanged.
-  const nextLeitner =
-    input.surface === 'math' && input.leitnerOutcomes !== undefined
-      ? applyLeitnerOutcomes(
-          existing.mathFactsLeitner,
-          input.leitnerOutcomes,
-          new Date(input.dateISO).getTime(),
-        )
-      : existing.mathFactsLeitner
+  // M4 Leitner update (ticket 86c9pwgc8), once a day since no-Claude
+  // phase 3 (`progress/seenItems.ts`). Math-surface sessions that ship
+  // per-problem outcomes get their facts promoted / demoted and their
+  // seen-records written. Other surfaces (word-song) and math sessions
+  // without outcomes (legacy / test fixtures) leave both unchanged.
+  const math = mathOutcomesApplied(
+    existing,
+    input.surface,
+    input.leitnerOutcomes,
+    input.dateISO,
+  )
 
   // Subitising scaffold counter (ticket 86c9ur1zr §2.2). Bump
   // profile.subitisingScaffoldSessionsObserved by 1 if (a) the
@@ -430,7 +426,7 @@ export function recordProgressOnSessionEnd(
       subitisingScaffoldSubSessionsObserved: nextScaffoldSubCounter,
     },
     history: [...existing.history, entry],
-    mathFactsLeitner: nextLeitner,
+    ...math,
     cvcGraduationSessionFired: nextCvcGraduationSessionFired,
     // Emma's Path 9/10 (ticket 123jpnbc3dt): seed the unlock seen-marker
     // from the PRE-session doc, so everything unlocked before this session
@@ -498,18 +494,15 @@ export interface RecordReviewInput {
  */
 export function recordReviewOnSessionEnd(input: RecordReviewInput): Progress {
   const existing = loadProgress() ?? startProgressForActive()
-  const mathFactsLeitner =
-    input.surface === 'math' && input.leitnerOutcomes !== undefined
-      ? applyLeitnerOutcomes(
-          existing.mathFactsLeitner,
-          input.leitnerOutcomes,
-          new Date(input.dateISO).getTime(),
-        )
-      : existing.mathFactsLeitner
   const next: Progress = {
     ...existing,
     profile: { ...existing.profile, lastPlayedISO: input.dateISO },
-    mathFactsLeitner,
+    ...mathOutcomesApplied(
+      existing,
+      input.surface,
+      input.leitnerOutcomes,
+      input.dateISO,
+    ),
   }
   saveProgress(next)
   void pushProgressToCloud(getOrCreateDeviceId(), next)
@@ -628,48 +621,32 @@ function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
 }
 
 /**
- * Update `mathFactsLeitner` from a session's per-problem outcomes
- * (ticket 86c9pwgc8 — M4). For each problem:
- *   - First-tap correct  → promote (cap 5).
- *   - First-tap wrong    → demote to box 1.
- *   - No measurement (`undefined`) → fact added to box 1 if missing,
- *     existing rank unchanged.
+ * The doc's `mathFactsLeitner` and `seenItems` after a session's
+ * per-problem outcomes (ticket 86c9pwgc8 — M4; once a day since no-Claude
+ * phase 3): `progress/seenItems.ts` `applyMathOutcomes` — a fact moves up
+ * one box at most once a calendar day and only when due, a wrong first
+ * tap sends it to box 1, and a new fact lands at box 1 first. The
+ * seen-record starts from the doc's (or, for a doc written before the
+ * field, its seed).
  *
- * `addItem` runs first for every outcome so brand-new facts land in
- * the box at box 1 before the promote / demote step. Without this
- * the very first session-end after a new fact is introduced wouldn't
- * be able to promote it (promote / demote are no-ops on missing
- * items by the existing leitner.ts contract).
- *
- * Pure — returns a new box, never mutates input. Mirrors the helper
- * conventions in `lib/progress/leitner.ts`.
+ * `{}` (both fields as they are) for a non-math surface or without
+ * outcomes.
  */
-function applyLeitnerOutcomes(
-  box: LeitnerBox<MathFact>,
-  outcomes: ReadonlyArray<LeitnerOutcome>,
-  now: number,
-): LeitnerBox<MathFact> {
-  let next = box
-  for (const { fact, correct } of outcomes) {
-    next = addItem(next, mathFactKey, fact)
-    if (correct === true) {
-      next = promote(next, mathFactKey, fact, now)
-    } else if (correct === false) {
-      next = demote(next, mathFactKey, fact, now)
-    }
-    // correct === undefined: addItem already ran; no rank change.
-  }
-  return next
+function mathOutcomesApplied(
+  existing: Progress,
+  surface: SessionEndSurface,
+  outcomes: ReadonlyArray<LeitnerOutcome> | undefined,
+  dateISO: string,
+): Partial<Pick<Progress, 'mathFactsLeitner' | 'seenItems'>> {
+  if (surface !== 'math' || outcomes === undefined) return {}
+  const { box, seen } = applyMathOutcomes(
+    existing.mathFactsLeitner,
+    seenItemsOf(existing),
+    outcomes,
+    new Date(dateISO).getTime(),
+  )
+  return { mathFactsLeitner: box, seenItems: seen }
 }
-
-/**
- * Stable key for math facts in the Leitner box. Mirrors the test
- * fixture `progress.test.ts` (`${a}${op}${b}`) so the on-disk fact
- * key is invariant across promote / demote calls. Local because the
- * Leitner public surface uses caller-supplied key fns by design — no
- * other module should pluck this without explicit thought.
- */
-const mathFactKey = (f: MathFact): string => `${f.a}${f.op}${f.b}`
 
 /**
  * Narrow a `SkillNode` to the `WordSongNode` subset for the
