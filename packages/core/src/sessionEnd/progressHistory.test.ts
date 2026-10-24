@@ -735,6 +735,7 @@ describe('recordProgressOnSessionEnd', () => {
         focusNode: 'add-to-10',
         leitnerOutcomes: [{ fact: f, correct: true }],
       })
+      const sessionsBefore = loadProgress()!.seenItems?.['math:3+4']?.count
       recordReviewOnSessionEnd({
         surface: 'math',
         dateISO: '2026-10-23T16:00:00.000Z',
@@ -742,7 +743,7 @@ describe('recordProgressOnSessionEnd', () => {
       })
       const after = loadProgress()!
       expect(after.mathFactsLeitner.items[0]!.box).toBe(3)
-      expect(after.seenItems?.['math:3+4']?.count).toBe(2)
+      expect(after.seenItems?.['math:3+4']?.count).toBe(sessionsBefore! + 1)
     })
   })
 

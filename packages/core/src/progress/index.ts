@@ -18,6 +18,8 @@ export type {
   PerTrackMasteryThreshold,
   Profile,
   Progress,
+  SeenItem,
+  SeenItems,
   SessionHistory,
   SessionHistoryEntry,
   SessionModePicker,
@@ -35,6 +37,14 @@ export {
 } from './parentSettings'
 
 export { CURRENT_SCHEMA_VERSION } from './types'
+
+export {
+  applyMathOutcomes,
+  mathSeenKey,
+  seedSeenItems,
+  seenItemsOf,
+  type MathOutcome,
+} from './seenItems'
 
 export {
   LEITNER_DUE_PER_SESSION_CAP,

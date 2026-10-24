@@ -11,6 +11,7 @@ import type {
   LeitnerItem,
   LetterSoundsVowel,
   Progress,
+  SeenItems,
   SessionHistoryEntry,
   SkillLevel,
   SkillLevels,
@@ -152,6 +153,25 @@ function isLeitnerItem(v: unknown): v is LeitnerItem<unknown> {
 function isLeitnerBox(v: unknown): v is LeitnerBox<unknown> {
   if (!isObject(v)) return false
   return Array.isArray(v.items) && v.items.every(isLeitnerItem)
+}
+
+/**
+ * A seen-record map (`Progress.seenItems`): every value an object with a
+ * string `day`, a whole `count` ≥ 0, a boolean-or-null `correct` and, when
+ * present, a string `promoted`. Keys are not checked (an item a newer
+ * build knows is inert), nor are a record's extra keys.
+ */
+function isSeenItems(v: unknown): v is SeenItems {
+  if (!isObject(v)) return false
+  for (const r of Object.values(v)) {
+    if (!isObject(r)) return false
+    if (typeof r.day !== 'string') return false
+    if (typeof r.count !== 'number' || !Number.isInteger(r.count)) return false
+    if (r.count < 0) return false
+    if (r.correct !== null && typeof r.correct !== 'boolean') return false
+    if (r.promoted !== undefined && typeof r.promoted !== 'string') return false
+  }
+  return true
 }
 
 function isHistoryEntry(v: unknown): v is SessionHistoryEntry {
@@ -542,6 +562,14 @@ export function isProgressV1(v: unknown): v is Progress {
       const value = v.learner[field]
       if (value !== undefined && typeof value !== 'string') return false
     }
+  }
+  // seenItems is optional (no-Claude plan phase 3, the per-learner
+  // seen-record; additive, no schemaVersion bump). When present it must
+  // pass isSeenItems; a malformed one rejects the blob like every other
+  // optional field. Absent is every doc written before it (and the web's);
+  // `seenItems.ts:seenItemsOf` seeds it from the history when read.
+  if ('seenItems' in v && v.seenItems !== undefined) {
+    if (!isSeenItems(v.seenItems)) return false
   }
   return true
 }
