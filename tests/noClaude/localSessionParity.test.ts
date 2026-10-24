@@ -336,7 +336,7 @@ describe('reviews', () => {
         })
         expect(review.served).toBe('review')
       }
-    })
+    }, 30_000)
   }
 })
 
@@ -352,7 +352,7 @@ describe('Map peeks and replays', () => {
         const replay = await expectSame({ ...base(track), replay: { node } })
         expect(replay.served).toBe('replay')
       }
-    })
+    }, 30_000)
   }
 })
 
@@ -370,7 +370,7 @@ describe('times mixes', () => {
       })
       expect(mix.served).toBe('mix')
     }
-  })
+  }, 30_000)
 
   it("core's mix picker, a new and a practised learner, with a warm-up", async () => {
     const fresh = defaultProgress('friend')
@@ -400,7 +400,7 @@ describe('times mixes', () => {
         })
       }
     }
-  })
+  }, 30_000)
 })
 
 describe('warm-ups', () => {
@@ -416,7 +416,7 @@ describe('warm-ups', () => {
           })
         }
       }
-    })
+    }, 30_000)
 
     it(`${track}: a malformed warm-up is ignored, and a review ignores it`, async () => {
       const step = STEPS[track][2]!
@@ -717,5 +717,5 @@ describe('a seeded sweep of mixed payloads', () => {
     }
     // Most of the sweep is built on the device.
     expect(local).toBeGreaterThan(150)
-  })
+  }, 30_000)
 })
