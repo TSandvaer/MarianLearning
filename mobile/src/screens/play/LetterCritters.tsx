@@ -32,8 +32,11 @@
  * Every sound is a bundled Word Song blend clip (`/native/blend/<word>.mp3`,
  * marks straight from `BLEND_MARKS`, K2): a word plays its whole clip; a
  * letter plays the lesson's tap window of its `CRITTER_SOUND_SOURCE`
- * segment. The game makes no network call and writes nothing. It has no
- * rounds and no end of its own: she leaves with Back.
+ * segment. The game makes no network call. Its one write is each word
+ * Emma says, a picture word's or a said word's, to the learner's
+ * seen-record (`./critterSeen.ts`; the cvc-words probe reserve skips a word
+ * she met here). It has no rounds and no end of its own: she leaves with
+ * Back.
  *
  * Reduce Motion (§ 3.7): no bounce, hop, spring or tumble; the singing
  * letter lights, the picture fades, a non-word dims. Dragging still
@@ -89,6 +92,7 @@ import {
   unseat,
   type Seats,
 } from './critterModel'
+import { recordCritterWord } from './critterSeen'
 import { DragHintHand, DRAG_HINT_MS } from './DragHintHand'
 import { OVER_PIECE_Z } from './dragLock'
 import { DragPiece } from './DragPiece'
@@ -410,6 +414,7 @@ export function LetterCritters({
     const token = ++songRef.current
     kit.cutLine()
     kit.setPose('listening')
+    recordCritterWord(word)
     const at = (ms: number, fn: () => void) =>
       kit.later(
         () => {
@@ -488,6 +493,7 @@ export function LetterCritters({
       // sparkle (Dave's safeguard 2).
       setLean(true)
       kit.setPose('attentive-pointing')
+      recordCritterWord(word)
       void kit.speak(line).then(() => {
         if (songRef.current !== token) return
         kit.setPose('idle')

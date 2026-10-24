@@ -3,7 +3,8 @@
 # gone after Emma's line, and the shelf cleared after the run. After build
 # 20 (Thomas 2026-10-23): every letter on a tablet where all 22 fit both
 # ways, and a said word with a pack picture ("rat") pops it after Emma
-# says it.
+# says it. The probe reserve (Thomas 2026-10-24): "ham", one of its new
+# pack pictures, pops by the same rule.
 #
 # A CVC-words learner (`qaStep: add-to-10` + the `cvc-words` seed, as 05's
 # second learner): past blending sounds, so a non-word boings and gets a
@@ -202,6 +203,38 @@ tags:
 - waitForAnimationToEnd:
     timeout: 1500
 - takeScreenshot: critters-shelf-clear-after-rat
+
+# A probe-reserve word with its new pack picture: "ham" (h row 2 cell 3,
+# a row 1 cell 0, m row 2 cell 6). The sounds, Emma says "Ham.", then the
+# ham picture, then the shelf clears, as for rat.
+- swipe:
+    start: 417, 811
+    end: 291, 576
+    duration: 800
+- swipe:
+    start: 105, 707
+    end: 417, 576
+    duration: 800
+- swipe:
+    start: 729, 811
+    end: 543, 576
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    visible:
+      id: critter-picture-ham
+    timeout: 15000
+- takeScreenshot: critters-ham-picture
+- extendedWaitUntil:
+    notVisible:
+      id: critter-picture
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: critter-seat-0
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 1500
 
 # Landscape: the same 22 (the visit keeps its letters; 9 a row, 3 rows).
 - setOrientation: LANDSCAPE_LEFT

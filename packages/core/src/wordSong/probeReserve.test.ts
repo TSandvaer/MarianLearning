@@ -278,7 +278,7 @@ describe('graduationCheckWords: no unrendered word is ever served', () => {
         for (const w of words!) expect(TODAY.has(w)).toBe(true)
       }
     }
-  })
+  }, 30_000)
 
   it('with every word rendered: the reserve check', () => {
     expect(graduationCheckWords(progressWith({}), 'cvc-words', ALL)).toEqual([

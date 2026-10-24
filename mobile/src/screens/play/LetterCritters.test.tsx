@@ -14,7 +14,11 @@ import {
   CRITTER_WORDS_BY_STEP,
   critterRun,
 } from '@marian/core/games/playPlace'
-import { saveProgress, type SkillNode } from '@marian/core/progress'
+import {
+  loadProgress,
+  saveProgress,
+  type SkillNode,
+} from '@marian/core/progress'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 import { useRef } from 'react'
 import { StyleSheet } from 'react-native'
@@ -284,16 +288,16 @@ describe('N10: songs that are not picture words', () => {
     const starts = bounceStarts()
     const bounces = starts.count
     const g = await mount()
-    expect(critterRun('cab')).toBe('word')
-    expect(CRITTER_SAID_PICTURE_WORDS).not.toContain('cab')
-    await seat('c', 'a', 'b')
+    expect(critterRun('tab')).toBe('word')
+    expect(CRITTER_SAID_PICTURE_WORDS).not.toContain('tab')
+    await seat('t', 'a', 'b')
     starts.from()
     await advance(SING_AFTER_MS)
-    expect(g.calls).toEqual([own('c')])
+    expect(g.calls).toEqual([own('t')])
     expect(bounces()).toBe(1)
-    await advance(ownMs('c') + SOUND_GAP_MS)
+    await advance(ownMs('t') + SOUND_GAP_MS)
     await advance(ownMs('a') + SOUND_GAP_MS)
-    expect(g.calls).toEqual([own('c'), own('a'), own('b')])
+    expect(g.calls).toEqual([own('t'), own('a'), own('b')])
     expect(bounces()).toBe(3)
     // At least the blend clips' 300 ms gap after the last sound.
     await advance(ownMs('b') + SOUND_GAP_MS - 10)
@@ -301,9 +305,9 @@ describe('N10: songs that are not picture words', () => {
     await advance(10)
     expect(g.lines).toEqual([
       'guide.play.critters.open',
-      'guide.play.critters.word.cab',
+      'guide.play.critters.word.tab',
     ])
-    expect(ribbon()?.props.accessibilityLabel).toBe('Cab.')
+    expect(ribbon()?.props.accessibilityLabel).toBe('Tab.')
     expect(g.poses.at(-1)).toBe('attentive-pointing')
     // The word is Emma's, not a critter sound, and the three sit still.
     expect(g.calls).toHaveLength(3)
@@ -460,8 +464,8 @@ describe('Dave’s safeguard (Thomas 2026-10-22): a learner before blending soun
     await advance(blendSegments('fan')![3]![0])
     expect(has('critter-picture-fan')).toBe(true)
     await advance(WORD_CLIP_MS + PICTURE_HOLD_MS + PICTURE_LEAVE_MS)
-    await runOf('cab')
-    expect(g.lines.at(-1)).toBe('guide.play.critters.word.cab')
+    await runOf('tab')
+    expect(g.lines.at(-1)).toBe('guide.play.critters.word.tab')
     expect(g.sfx.boing.play).not.toHaveBeenCalled()
   })
 })
@@ -554,7 +558,7 @@ describe('Thomas 2026-10-23 (Marian’s play test)', () => {
   describe('3. every run of three ends with the shelf cleared', () => {
     it('a said word: after Emma says it, the three drop home; no other line, no praise', async () => {
       const g = await mount()
-      await run('cab')
+      await run('tab')
       await advance(LINE_MS + SHELF_HOLD_MS - 20)
       expect(seated()).toEqual([0, 1, 2])
       expect(dropping()).toBe(0)
@@ -564,7 +568,7 @@ describe('Thomas 2026-10-23 (Marian’s play test)', () => {
       await advance(SHELF_DROP_MS)
       expect(g.lines).toEqual([
         'guide.play.critters.open',
-        'guide.play.critters.word.cab',
+        'guide.play.critters.word.tab',
       ])
       expect(g.sfx.sparkle.play).not.toHaveBeenCalled()
       await expectReady(g)
@@ -795,6 +799,29 @@ describe('Thomas 2026-10-23 (build 20): "No picture for rat and there is no m"',
     },
   )
 
+  it.each(['ham', 'cab', 'pad', 'ram'])(
+    'the probe reserve’s pictured said word %s (Thomas 2026-10-24): Emma says it, then its picture pops',
+    async (word) => {
+      const s = fakeSounds(wholeMs)
+      const g = await mountGame('critters', {
+        words: ['hut', 'cab', 'pad', 'mop', 'rug'],
+        sounds: s.sounds,
+      })
+      await advance(CRITTERS_OPEN_DELAY_MS + LINE_MS)
+      expect(critterRun(word)).toBe('word')
+      await seat(...word.split(''))
+      await advance(SING_AFTER_MS)
+      for (const l of word) await advance(ownMs(l) + SOUND_GAP_MS)
+      expect(g.lines.at(-1)).toBe(`guide.play.critters.word.${word}`)
+      expect(has('critter-picture')).toBe(false)
+      await advance(LINE_MS + 10)
+      expect(has(`critter-picture-${word}`)).toBe(true)
+      expect(
+        JSON.stringify(byId(`critter-picture-${word}`).props.source),
+      ).toContain(`pictures/${word}.webp`)
+    },
+  )
+
   const MEADOW_22 = [...'aeiou', ...'bcdfghjlmnprstvwx']
   const T = { top: 24, bottom: 20, left: 0, right: 0 }
 
@@ -824,5 +851,38 @@ describe('Thomas 2026-10-23 (build 20): "No picture for rat and there is no m"',
     })
     expect(meadow()).toHaveLength(CRITTER_CAP)
     expect(meadow().slice(0, 5)).toEqual([...'aeiou'])
+  })
+})
+
+describe('the seen-record (Dave 2026-10-24: the probe reserve skips a word she met here)', () => {
+  const seen = () => loadProgress()!.seenItems ?? {}
+
+  it('a picture word and a said word go into it as Emma says them; a non-word, a quiet word and a pair do not', async () => {
+    const g = await mount()
+    await seat('f', 'a', 'n')
+    await advance(SING_AFTER_MS)
+    expect(Object.keys(seen())).toEqual(['word:fan'])
+    await advance(WORD_CLIP_MS + PICTURE_HOLD_MS + PICTURE_LEAVE_MS + CLEAR_MS)
+    await seat('t', 'a', 'b')
+    await advance(SING_AFTER_MS)
+    for (const l of 'tab') await advance(ownMs(l) + SOUND_GAP_MS)
+    expect(g.lines.at(-1)).toBe('guide.play.critters.word.tab')
+    expect(seen()['word:tab']).toMatchObject({ count: 1, correct: null })
+    await advance(LINE_MS + CLEAR_MS)
+    for (const word of ['bab', 'hag']) {
+      await seat(...word.split(''))
+      await advance(SING_AFTER_MS)
+      for (const l of word) await advance(ownMs(l) + SOUND_GAP_MS)
+      await advance(LINE_MS + TUMBLE_MS + CLEAR_MS)
+    }
+    expect(Object.keys(seen()).sort()).toEqual(['word:fan', 'word:tab'])
+  })
+
+  it('no learner doc: the game still plays and writes nothing', async () => {
+    setKeyValueStore(null)
+    const g = await mount()
+    await seat('f', 'a', 'n')
+    await advance(SING_AFTER_MS)
+    expect(g.calls.at(-1)).toEqual({ uri: clipOf('fan'), from: 0, to: null })
   })
 })

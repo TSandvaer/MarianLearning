@@ -115,6 +115,14 @@ describe('WordPicture', () => {
     'plum',
     'clock',
     'frog',
+    // The cvc-words probe reserve's new words (Dave 2026-10-24): the app's
+    // check serves them with native pack pictures; the frozen web's planner
+    // probes only nap, rat, map and tap.
+    'ham',
+    'cab',
+    'rag',
+    'ram',
+    'pad',
     // Land 6, content wave 2 (tent and cake words): the same.
     'tent',
     'hand',
@@ -220,8 +228,8 @@ describe('WordPicture', () => {
     // (7 th targets + 3 t-contrast distractor-only entries) + 32 land-6
     // words (16 per content wave) + 14 land-8 words (content wave 4; sheep
     // and shark are counted with the sh keys) + 16 land-9 words (content
-    // wave 5).
-    expect(fallbackCount).toBe(90)
+    // wave 5) + the probe reserve's 5 new words.
+    expect(fallbackCount).toBe(95)
   })
 
   it('falls back to the unknown-picture text shape for an unknown key', () => {
