@@ -114,6 +114,38 @@ describe('composeSession', () => {
     })
   })
 
+  it('a vowel map past greenfield with no letter-sounds canon goes to the server', () => {
+    const vowelMap = {
+      track: 'word-song',
+      level: 1,
+      childName: 'friend',
+      seed: 3,
+      progress: {
+        focusNode: 'letter-sounds',
+        letterSoundsVowelStates: {
+          '/o/': 'mastered',
+          '/u/': 'practicing',
+          '/i/': 'intro',
+          '/e/': 'intro',
+        },
+      },
+    }
+    expect(composeSession(vowelMap, resolve)).toEqual({
+      kind: 'server',
+      reason: 'no letter-sounds canon',
+    })
+    // The graduation flag, a planner hint the device does not build, wins.
+    expect(
+      composeSession(
+        {
+          ...vowelMap,
+          progress: { ...vowelMap.progress, isGraduationSession: true },
+        },
+        resolve,
+      ),
+    ).toEqual({ kind: 'server', reason: 'graduation flag' })
+  })
+
   it('a review naming a step without canon is invalid, as the server 400s it', () => {
     const blocks = [1, 2, 3, 4, 5, 6, 7, 8].map((problem) => ({
       node: problem === 8 ? 'add-to-20' : 'add-to-10',

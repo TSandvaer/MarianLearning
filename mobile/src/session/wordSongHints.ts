@@ -4,13 +4,13 @@
  * source: `src/App.tsx` (`readProgressHintsForTrack('word-song')` and the
  * Word Song kick-effect) + `src/lib/audio/wordSongPathA.ts` (the payload).
  *
- * The audio is the baked canon, served by `/api/claude`: letter sounds,
- * blends, words and Emma's lines all arrive as the response's utterances.
- * The payload is the web's, with no render options. That keeps the
- * runtime-safe split (`.claude/docs/planner-and-canon.md`, blend pass-5):
- * a request that bypasses canon (the letter-sounds vowel map) is rendered
- * live with the safe blend, and the full-fidelity blend only ever comes
- * from the bake.
+ * The audio is the baked canon: letter sounds, blends, words and Emma's
+ * lines. The payload is the web's, with no render options, and the app
+ * builds the session from it on the device (`./localSession.ts`). The
+ * letter-sounds vowel map no longer reaches the server either (no-Claude
+ * plan phase 4): the app builds the vowel's session from the canon, with
+ * a `seed` that varies its letters, and the server, asked only when a
+ * local build fails, gets neither and answers from canon.
  *
  * Unlike the web, the app never asks the server for a cvc-words graduation
  * plan: it builds the check itself from the canon plan
@@ -65,6 +65,9 @@ export interface WordSongProgressHints {
   intro?: IntroGuideLineId | null
   /** A due graduation check's probe words (core `graduationProbeWords`). */
   probeWords?: readonly string[]
+  /** With the vowel map: the session count at kick time, which varies the
+   *  vowel session's letters (the Hub prefetch and the tap agree). */
+  seed?: number
 }
 
 const NO_HINTS: WordSongProgressHints = {
@@ -112,25 +115,27 @@ export function readWordSongProgressHints(): WordSongProgressHints {
       node === 'letter-sounds'
         ? progress.literacy?.letterSoundsVowelStates
         : undefined,
+    ...(node === 'letter-sounds' ? { seed: sessionCount } : {}),
     planKind,
   }
 }
 
 /**
- * The vowel map bypasses canon (live planner, slow). A graduation check no
- * longer does (the app builds it), and a review sends no map, so neither
- * takes the 5 s fallback.
+ * Whether the request carries the vowel map (and its seed): a forward
+ * letter-sounds session only. Every other request is the hint-free one,
+ * as before. The map no longer sends the session to the planner (the app
+ * builds it, no-Claude plan phase 4), so nothing takes the 5 s fallback.
  */
-export function hasCanonBypassingHints(hints: WordSongProgressHints): boolean {
+export function carriesVowelMap(hints: WordSongProgressHints): boolean {
   if (hints.planKind.kind === 'review') return false
   return hints.letterSoundsVowelStates !== undefined
 }
 
 /**
  * The `session-start` payload (web `prepareWordSongPathA`). `withHints:
- * false` strips the canon-bypassing hints (the visible-wait fallback); the
- * warm-up refs ride on both. A review sends its 8 blocks and the focus node
- * (the server ignores every other hint for it).
+ * false` strips the vowel map and its seed; the warm-up refs ride on both.
+ * A review sends its 8 blocks and the focus node (the server ignores every
+ * other hint for it).
  */
 export function buildWordSongSessionPayload(
   hints: WordSongProgressHints,
@@ -162,6 +167,7 @@ function forwardPayload(
   const graduation =
     withHints && hints.isGraduationSession !== undefined ? false : undefined
   const vowels = withHints ? hints.letterSoundsVowelStates : undefined
+  const seed = vowels !== undefined ? hints.seed : undefined
   const hasProgress =
     hints.focusNode !== undefined ||
     hints.recentSuccessRate !== undefined ||
@@ -194,6 +200,7 @@ function forwardPayload(
     level: 1,
     childName: 'friend',
     ...progressBlock,
+    ...(seed !== undefined ? { seed } : {}),
   }
 }
 
@@ -251,7 +258,8 @@ export function readWordSongSessionExtras(
   }
 }
 
-/** The server's letter-sounds target vowel, validated (web `wordSongPathA`). */
+/** The session start's letter-sounds target vowel, validated (web
+ *  `wordSongPathA`). */
 export type TargetVowel = '/o/' | '/u/' | '/i/' | '/e/'
 
 export function narrowTargetVowel(raw: unknown): TargetVowel | undefined {

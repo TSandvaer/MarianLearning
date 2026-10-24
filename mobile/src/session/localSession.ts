@@ -10,17 +10,21 @@
  * same plan and lines from the bundled canon text
  * (`assets/canon/canon-text.json`, written by `npm run export-audio`), and
  * every line plays its bundled clip (phase 1). No network call, no wait.
+ * A letter-sounds vowel map past greenfield is built here too (phase 4),
+ * with the `currentTargetVowel` the server stamps for the session-end
+ * write.
  *
  * The rest goes to the server as today (`startSession`):
  * - a hint the planner uses (the add-to-10 Leitner box, a slow fact on
- *   add-to-10 or sub-to-10, a letter-sounds vowel map past greenfield),
- *   until phases 3–4 move them; their 5 s fallback is hint-free, so it is
- *   built here;
+ *   add-to-10 or sub-to-10), until phase 3 moves them; their 5 s fallback
+ *   is hint-free, so it is built here;
  * - a step this build has no canon for;
  * - a request the bundled canon cannot serve (a review naming a block the
  *   build lacks; the server may have it, else it answers 400 as before);
  * - a local build that throws (logged), so a bug here costs a request,
  *   not a session.
+ * A server request never carries the vowel map or the seed (`toServer`):
+ * the device builds vowel sessions, so the server answers from canon.
  */
 import {
   canonTextKey,
@@ -39,6 +43,7 @@ import {
   type PreparedSession,
   type SessionStartArgs,
   type SessionStartDeps,
+  type SessionStartPayload,
 } from '../audio/sessionStart'
 
 const CANON_TEXT = canonText as unknown as Readonly<Record<string, CanonText>>
@@ -63,11 +68,33 @@ export interface LocalSessionDeps extends SessionStartDeps {
 const message = (err: unknown) =>
   err instanceof Error ? err.message : String(err)
 
+/**
+ * `args` for the server: without the device-only fields, the vowel map
+ * (the server would run the planner for it) and the vowel session's seed.
+ */
+function toServer(args: SessionStartArgs): SessionStartArgs {
+  const progress = args.payload.progress
+  const hasMap =
+    typeof progress === 'object' &&
+    progress !== null &&
+    'letterSoundsVowelStates' in progress
+  if (!('seed' in args.payload) && !hasMap) return args
+  const payload: SessionStartPayload = { ...args.payload }
+  delete payload.seed
+  if (hasMap) {
+    const rest: Record<string, unknown> = { ...progress }
+    delete rest.letterSoundsVowelStates
+    payload.progress = rest
+  }
+  return { ...args, payload }
+}
+
 export async function startSessionLocalFirst(
   args: SessionStartArgs,
   deps: LocalSessionDeps = {},
 ): Promise<PreparedSession> {
-  const startServer = deps.startServer ?? startSession
+  const startServer = (a: SessionStartArgs, d: SessionStartDeps) =>
+    (deps.startServer ?? startSession)(toServer(a), d)
   const now = deps.now ?? Date.now
   const t0 = now()
   let composed: ComposedSession
@@ -119,6 +146,9 @@ export async function startSessionLocalFirst(
     sessionId: args.sessionId,
     track: args.payload.track,
     plan: composed.session.plan,
+    ...(composed.currentTargetVowel !== undefined
+      ? { currentTargetVowel: composed.currentTargetVowel }
+      : {}),
     audio,
     fetchMs: ms,
   }

@@ -4265,6 +4265,25 @@ export const LETTER_SOUNDS_CURRENT_TARGET_VOWELS: readonly LetterSoundsPoolFact[
       letter: 'e',
       category: 'current-target-vowel',
     },
+    // The anchored U/I spellings the planner emits and the canon bakes
+    // (`api/_planner.ts` ANCHORED VOWELS U/I: "Which letter says uh?" /
+    // "ih?"). Same sound ids as uuu/iii, so the duplicate cap and the
+    // /ɪ/-/ɛ/ ban count them together (the client parser keeps both
+    // spellings too, `packages/core/src/wordSong/letterSoundsPool.ts`).
+    {
+      id: 'sound-u',
+      mnemonic: 'uh',
+      ipa: 'ʌ',
+      letter: 'u',
+      category: 'current-target-vowel',
+    },
+    {
+      id: 'sound-i',
+      mnemonic: 'ih',
+      ipa: 'ɪ',
+      letter: 'i',
+      category: 'current-target-vowel',
+    },
   ]
 
 export interface LetterSoundsRulesConfig {

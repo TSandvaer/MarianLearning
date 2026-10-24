@@ -51,7 +51,7 @@ const GRADUATION: WordSongProgressHints = {
   planKind: { kind: 'forward', warmup: [] },
 }
 
-/** Letter sounds with a vowel map: the one canon-bypassing hint left. */
+/** Letter sounds with a vowel map: built on the device since phase 4. */
 const VOWEL_MAP: WordSongProgressHints = {
   focusNode: 'letter-sounds',
   focusMode: 'forward',
@@ -220,19 +220,16 @@ it('an unreadable plan unloads its audio and falls back', async () => {
   expect(session.getSnapshot()).toMatchObject({ plan: null, audioReady: true })
 })
 
-it('a slow hinted request is replaced by a hint-free one after 5 s on screen', async () => {
+it('a letter-sounds vowel session gets no wait timer: the app builds it (no-Claude phase 4)', () => {
   jest.useFakeTimers()
   try {
     const { calls, session } = harness(VOWEL_MAP)
     session.kick()
     session.startWaitTimer()
-    jest.advanceTimersByTime(SESSION_START_WAIT_TIMEOUT_MS)
-    expect(calls).toHaveLength(2)
-    expect(calls[0]!.args.signal?.aborted).toBe(true)
-    expect(calls[1]!.args.sessionId).toBe(
-      'word-song-word-song-shorta-A-1000-fallback',
-    )
-    expect(calls[1]!.args.payload.progress).not.toHaveProperty(
+    jest.advanceTimersByTime(SESSION_START_WAIT_TIMEOUT_MS * 3)
+    expect(calls).toHaveLength(1)
+    expect(calls[0]!.args.signal?.aborted).toBe(false)
+    expect(calls[0]!.args.payload.progress).toHaveProperty(
       'letterSoundsVowelStates',
     )
   } finally {
