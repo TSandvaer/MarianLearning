@@ -218,6 +218,24 @@ export const CRITTER_PICTURE_WORDS: readonly string[] = [
   ...new Set(Object.values(CRITTER_WORDS_BY_STEP).flatMap((ws) => ws!)),
 ].sort()
 
+/** The three picture words whose lesson praise is not "Yes! That's a <w>.". */
+const CRITTER_PRAISE_OWN: Readonly<Record<string, string>> = {
+  dad: 'Yes! Dad!',
+  hot: 'Yes! Hot.',
+  jam: 'Yes! Jam!',
+}
+
+/**
+ * A picture word's praise (Thomas 2026-10-25, Dave's ruling): the lesson's
+ * own `word.p*.correct` line for it ("Yes! That's a fan."), which Emma says
+ * the first time the word is built in a visit. Every one is a bundled
+ * canon clip, so it costs no render. Undefined for any other run.
+ */
+export function critterPraise(word: string): string | undefined {
+  if (!CRITTER_PICTURE_WORDS.includes(word)) return undefined
+  return CRITTER_PRAISE_OWN[word] ?? `Yes! That's a ${word}.`
+}
+
 /**
  * The real 3-letter words over the 22 critter letters (D5): the CVC words,
  * by vowel, then the other 3-letter words (Dave 2026-10-25), since the

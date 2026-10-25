@@ -101,6 +101,20 @@ describe('manifest lines (web playHubLine.ts contract)', () => {
     expect(onPlay).toHaveBeenCalledTimes(1)
   })
 
+  it('a line with its own clip (a canon clip, src null; Dave 2026-10-25) plays that clip', async () => {
+    const player = createManifestLinePlayer(
+      'play',
+      { praise: { src: null, text: "Yes! That's a fan.", clip: 4242 } },
+      engine(),
+    )
+    const done = player.playLine('praise')
+    expect(fakePlayers).toHaveLength(1)
+    expect(fakePlayers[0].source).toBe(4242)
+    fakePlayers[0].start(1)
+    fakePlayers[0].finish()
+    await expect(done).resolves.toBeUndefined()
+  })
+
   it.each(['missing', 'captionOnly'] as const)(
     'no clip (%s): walks the caption at 165 wpm and resolves, silently',
     async (id) => {

@@ -11,7 +11,9 @@ import {
   CRITTER_SAID_PICTURE_WORDS,
   CRITTER_SAID_WORDS,
   CRITTER_SOUND_SOURCE,
+  CRITTER_PICTURE_WORDS,
   CRITTER_WORDS_BY_STEP,
+  critterPraise,
   critterRun,
 } from '@marian/core/games/playPlace'
 import {
@@ -26,7 +28,7 @@ import * as Reanimated from 'react-native-reanimated'
 import { pictureAsset } from '../../assets'
 import { letterWindow, MARK_LEAD_MS } from '../../audio/blendMarks'
 import * as bundledAudio from '../../audio/bundledAudio'
-import { audioForWebPath } from '../../audio/bundledAudio'
+import { audioForWebPath, canonClipFor } from '../../audio/bundledAudio'
 import { mathLayout } from '../../layout/mathLayout'
 import {
   activate,
@@ -45,14 +47,19 @@ import {
   tap,
 } from '../../../test/playHarness'
 import { STORY_TAP_CUE_CANCEL_OUT_MS } from '../wordSong/storyTapCueMotion'
+import { SPARKLE_BURST_MS } from '../wordSong/WordChip'
 import { blendClipPath, blendSegments } from './critterModel'
 import { DRAG_HINT_MS } from './DragHintHand'
 import {
   BOUNCE_MS,
   CRITTERS_OPEN_DELAY_MS,
   HINT_IDLE_MS,
+  JOY_AFTER_MS,
+  JOY_HOLD_MS,
   PICTURE_HOLD_MS,
   PICTURE_LEAVE_MS,
+  PRAISE_AFTER_MS,
+  PRAISE_TAIL_MS,
   SHELF_DROP_MS,
   SHELF_HOLD_MS,
   SING_AFTER_MS,
@@ -60,7 +67,7 @@ import {
   TUMBLE_MS,
 } from './LetterCritters'
 import { centre, critterScene, playArea } from './playGeometry'
-import { PLAY_LINE_MANIFEST } from './playLines'
+import { crittersPraiseLine, PLAY_LINE_MANIFEST } from './playLines'
 
 /** A run's outcome is over → the shelf has dropped and the log is ready. */
 const CLEAR_MS = SHELF_HOLD_MS + SHELF_DROP_MS + 10
@@ -192,7 +199,7 @@ it('§ 3.1 (Thomas 2026-10-22): with no words seam, a visit draws on all 45 pict
 })
 
 describe('N9: a picture word', () => {
-  it('plays the word’s bundled clip from 0, the picture at its mark; no line; meadow closed until it leaves', async () => {
+  it('plays the word’s bundled clip from 0, the picture at its mark; then the joy beat and, the first time, the lesson’s praise; meadow closed until it leaves', async () => {
     const g = await mount()
     await seat('f', 'a', 'n')
     expect(byId('critter-seat-2').props.accessibilityLabel).toBe(
@@ -217,8 +224,13 @@ describe('N9: a picture word', () => {
     )
     expect(has('critter-picture')).toBe(false)
     expect(g.poses.at(-1)).toBe('idle')
-    // No line was spoken for the word.
-    expect(g.lines).toEqual(['guide.play.critters.open'])
+    // The joy beat and the lesson's praise (Dave 2026-10-25); no other line.
+    expect(g.poses).toContain('cheering')
+    expect(g.sfx.cheer.play).toHaveBeenCalledTimes(1)
+    expect(g.lines).toEqual([
+      'guide.play.critters.open',
+      'guide.play.critters.praise.fan',
+    ])
     // The meadow opens once the shelf is clear (Thomas 2026-10-23).
     await advance(CLEAR_MS)
     await tap(byId('critter-b'))
@@ -284,7 +296,7 @@ describe('N10: songs that are not picture words', () => {
     expect(g.lines.filter((l) => l.includes('funny'))).toHaveLength(4)
   })
 
-  it('a said word (Thomas 2026-10-23, build 20): the sounds one by one, a 300 ms gap, then Emma says it as her own line, her caption and pose, while the three sit still; no boing, sparkle or picture without a pack picture', async () => {
+  it('a said word (Thomas 2026-10-23, build 20): the sounds one by one, a 300 ms gap, then Emma says it as her own line, her caption and pose, while the three sit still; then the joy beat (Dave 2026-10-25); no boing, sparkle sound, praise or picture without a pack picture', async () => {
     const starts = bounceStarts()
     const bounces = starts.count
     const g = await mount()
@@ -315,9 +327,23 @@ describe('N10: songs that are not picture words', () => {
     expect(bounces()).toBe(3)
     await advance(LINE_MS)
     expect(ribbon()).toBeNull()
-    expect(g.poses.at(-1)).toBe('idle')
-    expect(bounces()).toBe(3)
+    // Her line ends: the joy beat. Emma cheers with the cheer, the three
+    // bounce together, the burst leaves the middle seat.
+    expect(g.poses.at(-1)).toBe('cheering')
+    expect(g.sfx.cheer.play).toHaveBeenCalledTimes(1)
+    expect(bounces()).toBe(6)
+    expect(has('critter-sparkle-burst')).toBe(true)
     expect(g.calls).toHaveLength(3)
+    await advance(JOY_HOLD_MS - 10)
+    expect(g.poses.at(-1)).toBe('cheering')
+    await advance(10)
+    expect(g.poses.at(-1)).toBe('idle')
+    expect(has('critter-sparkle-burst')).toBe(false)
+    expect(g.lines).toEqual([
+      'guide.play.critters.open',
+      'guide.play.critters.word.tab',
+    ])
+    expect(g.sfx.cheer.play).toHaveBeenCalledTimes(1)
     expect(g.sfx.boing.play).not.toHaveBeenCalled()
     expect(g.sfx.sparkle.play).not.toHaveBeenCalled()
     expect(has('critter-tumble')).toBe(false)
@@ -556,10 +582,10 @@ describe('Thomas 2026-10-23 (Marian’s play test)', () => {
   })
 
   describe('3. every run of three ends with the shelf cleared', () => {
-    it('a said word: after Emma says it, the three drop home; no other line, no praise', async () => {
+    it('a said word: after Emma says it and the joy beat (Dave 2026-10-25), the three drop home; no other line, no praise', async () => {
       const g = await mount()
       await run('tab')
-      await advance(LINE_MS + SHELF_HOLD_MS - 20)
+      await advance(LINE_MS + JOY_HOLD_MS + SHELF_HOLD_MS - 20)
       expect(seated()).toEqual([0, 1, 2])
       expect(dropping()).toBe(0)
       await advance(30)
@@ -770,19 +796,22 @@ describe('Thomas 2026-10-23 (build 20): "No picture for rat and there is no m"',
       expect(g.poses.at(-1)).toBe('attentive-pointing')
       expect(bounces()).toBe(3)
       expect(has('critter-picture')).toBe(false)
-      // Her line ends: the picture pops, with no sparkle and no praise.
+      // Her line ends: the picture pops with the joy beat (Dave
+      // 2026-10-25), and no sparkle sound and no praise.
       await advance(LINE_MS + 10)
       expect(has(`critter-picture-${word}`)).toBe(true)
-      expect(g.poses.at(-1)).toBe('idle')
+      expect(g.poses.at(-1)).toBe('cheering')
+      expect(g.sfx.cheer.play).toHaveBeenCalledTimes(1)
       expect(g.sfx.sparkle.play).not.toHaveBeenCalled()
       expect(g.poses).not.toContain('celebration')
-      expect(bounces()).toBe(3)
+      expect(bounces()).toBe(6)
       expect(seated()).toEqual([0, 1, 2])
       // It holds and leaves as a picture word's does.
       await advance(PICTURE_HOLD_MS + PICTURE_LEAVE_MS - 30)
       expect(has(`critter-picture-${word}`)).toBe(true)
       await advance(30)
       expect(has('critter-picture')).toBe(false)
+      expect(g.poses.at(-1)).toBe('idle')
       expect(seated()).toEqual([0, 1, 2])
       // Then the shelf clears.
       await advance(SHELF_HOLD_MS - 30)
@@ -929,6 +958,134 @@ describe('Thomas on build 21 (2026-10-25): "mom" tumbled; Dave’s ruling', () =
       'guide.play.critters.funny.1',
     ])
     expect(has('critter-picture')).toBe(false)
+  })
+})
+
+describe('Thomas 2026-10-25 (Dave’s ruling): a real word’s joy beat, and a picture word’s first praise in a visit', () => {
+  const fanEnd = () => wholeMs(clipOf('fan'))
+  /** Builds f-a-n and runs to `ms` after its clip ended. */
+  async function fan(ms: number) {
+    await seat('f', 'a', 'n')
+    await advance(SING_AFTER_MS + fanEnd() + ms)
+  }
+
+  it('f-a-n, first build: the joy beat 300 ms after the clip, the lesson’s praise at 1200 ms with Emma still cheering, the picture leaving at 2400 ms', async () => {
+    const starts = bounceStarts()
+    const bounces = starts.count
+    const g = await mount()
+    starts.from()
+    await fan(JOY_AFTER_MS - 10)
+    expect(g.poses.at(-1)).toBe('celebration')
+    expect(g.sfx.cheer.play).not.toHaveBeenCalled()
+    const before = bounces()
+    await advance(10)
+    // The joy beat: the cheer, the three together, the burst.
+    expect(g.poses.at(-1)).toBe('cheering')
+    expect(g.sfx.cheer.play).toHaveBeenCalledTimes(1)
+    expect(bounces() - before).toBe(3)
+    expect(has('critter-sparkle-burst')).toBe(true)
+    expect(g.sfx.sparkle.play).toHaveBeenCalledTimes(1)
+    await advance(SPARKLE_BURST_MS)
+    expect(has('critter-sparkle-burst')).toBe(false)
+    // The praise, once the cheer is over: her caption, still cheering.
+    await advance(PRAISE_AFTER_MS - JOY_AFTER_MS - SPARKLE_BURST_MS - 10)
+    expect(g.lines).toEqual(['guide.play.critters.open'])
+    await advance(10)
+    expect(g.lines.at(-1)).toBe('guide.play.critters.praise.fan')
+    expect(ribbon()?.props.accessibilityLabel).toBe("Yes! That's a fan.")
+    expect(g.poses.at(-1)).toBe('cheering')
+    // A short praise: the picture keeps its 2400 ms hold, then leaves.
+    await advance(PICTURE_HOLD_MS - PRAISE_AFTER_MS + PICTURE_LEAVE_MS - 10)
+    expect(has('critter-picture-fan')).toBe(true)
+    await advance(10)
+    expect(has('critter-picture')).toBe(false)
+    expect(g.poses.at(-1)).toBe('idle')
+    expect(g.lines).toEqual([
+      'guide.play.critters.open',
+      'guide.play.critters.praise.fan',
+    ])
+  })
+
+  it('a second build of fan in the visit: the joy beat again, no praise; cat’s first build gets its own', async () => {
+    const g = await mount()
+    for (const word of ['fan', 'fan', 'cat']) {
+      await seat(...word.split(''))
+      await advance(SING_AFTER_MS + wholeMs(clipOf(word)))
+      await advance(PICTURE_HOLD_MS + PICTURE_LEAVE_MS + CLEAR_MS)
+      expect(seated()).toEqual([])
+    }
+    expect(g.sfx.cheer.play).toHaveBeenCalledTimes(3)
+    expect(g.lines).toEqual([
+      'guide.play.critters.open',
+      'guide.play.critters.praise.fan',
+      'guide.play.critters.praise.cat',
+    ])
+  })
+
+  it('a long praise holds the picture until 400 ms after it ends', async () => {
+    const g = await mount()
+    const playLine = g.player.playLine as jest.Mock
+    const short = playLine.getMockImplementation()!
+    const PRAISE_MS = 2000
+    playLine.mockImplementation((id: string, opts) => {
+      if (!id.includes('.praise.')) return short(id, opts)
+      g.lines.push(id)
+      return new Promise<void>((resolve) => setTimeout(resolve, PRAISE_MS))
+    })
+    const praiseEnd = PRAISE_AFTER_MS + PRAISE_MS
+    await fan(praiseEnd + PRAISE_TAIL_MS + PICTURE_LEAVE_MS - 10)
+    expect(praiseEnd + PRAISE_TAIL_MS).toBeGreaterThan(PICTURE_HOLD_MS)
+    expect(has('critter-picture-fan')).toBe(true)
+    // A line's end resolves on the harness's next 10 ms step.
+    await advance(20)
+    expect(has('critter-picture')).toBe(false)
+    expect(g.poses.at(-1)).toBe('idle')
+  })
+
+  it('a quiet word and a non-word get no cheer and no burst', async () => {
+    const g = await mount()
+    for (const word of ['hag', 'bgf']) {
+      await seat(...word.split(''))
+      await advance(SING_AFTER_MS)
+      for (const l of word) await advance(ownMs(l) + SOUND_GAP_MS)
+      expect(has('critter-sparkle-burst')).toBe(false)
+      await advance(TUMBLE_MS + CLEAR_MS)
+      expect(has('critter-sparkle-burst')).toBe(false)
+    }
+    expect(g.sfx.boing.play).toHaveBeenCalledTimes(1)
+    expect(g.sfx.cheer.play).not.toHaveBeenCalled()
+  })
+
+  it('the 45 praise lines play the lessons’ bundled canon clips; a said word has none', () => {
+    for (const w of CRITTER_PICTURE_WORDS) {
+      const id = crittersPraiseLine(w)!
+      const clip = canonClipFor(critterPraise(w)!)
+      expect(clip).toBeDefined()
+      expect(PLAY_LINE_MANIFEST[id]).toEqual({
+        src: null,
+        text: critterPraise(w),
+        clip: clip!.module,
+      })
+    }
+    for (const w of [...CRITTER_SAID_WORDS, 'sex', 'tup'])
+      expect(crittersPraiseLine(w)).toBeUndefined()
+  })
+
+  it('Reduce Motion: no burst and no bounce, the three light together; the cheer and the praise at the same times', async () => {
+    jest.spyOn(Reanimated, 'useReducedMotion').mockReturnValue(true)
+    const starts = bounceStarts()
+    const g = await mount()
+    await fan(JOY_AFTER_MS - 10)
+    starts.from()
+    await advance(10)
+    expect(g.sfx.cheer.play).toHaveBeenCalledTimes(1)
+    expect(g.poses.at(-1)).toBe('cheering')
+    expect(has('critter-sparkle-burst')).toBe(false)
+    // One light (a sequence) per critter, no hop and pulse (two each).
+    expect(starts.count() * 2).toBe(3)
+    await advance(PRAISE_AFTER_MS - JOY_AFTER_MS)
+    expect(g.lines.at(-1)).toBe('guide.play.critters.praise.fan')
+    expect(has('critter-sparkle-burst')).toBe(false)
   })
 })
 

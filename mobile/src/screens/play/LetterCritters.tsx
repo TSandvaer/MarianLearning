@@ -10,8 +10,12 @@
  * then, 300 ms after the last sound, Emma says the word as her own line,
  * her caption with it, while they sit still; a said word with a pack
  * picture (`CRITTER_SAID_PICTURE_WORDS`) then pops it as a picture word
- * does (Thomas 2026-10-23, build 20). No praise or sparkle for a said
- * word (Thomas 2026-10-22; Dave's safeguards). A word on
+ * does (Thomas 2026-10-23, build 20). Every real word, picture or said,
+ * then gets the joy beat: Emma cheers with the cheer, the three bounce
+ * together and Word Song's burst leaves the middle seat; a picture word's
+ * first build in a visit also gets the lesson's praise line ("Yes! That's
+ * a fan.", Thomas 2026-10-25, Dave's ruling). A said word gets no praise
+ * line and no sparkle. A word on
  * Dave's never-say or not-said list sings and sits, quietly (D5). Three
  * that make no word sing, boing and tumble, and Emma says one of three
  * non-word lines, in turn, every time (Thomas 2026-10-22); before blending
@@ -38,9 +42,9 @@
  * she met here). It has no rounds and no end of its own: she leaves with
  * Back.
  *
- * Reduce Motion (§ 3.7): no bounce, hop, spring or tumble; the singing
- * letter lights, the picture fades, a non-word dims. Dragging still
- * follows the finger.
+ * Reduce Motion (§ 3.7): no bounce, hop, spring, tumble or burst; the
+ * singing letter lights (and at the joy beat the three light together),
+ * the picture fades, a non-word dims. Dragging still follows the finger.
  */
 import {
   CRITTER_CAP,
@@ -77,11 +81,13 @@ import { audioForWebPath } from '../../audio/bundledAudio'
 import { audioEngine } from '../../audio/engine'
 import { createTapClipPlayer, type TapClipPlayer } from '../../audio/tapClip'
 import type { Rect } from '../../layout/layout'
+import { chipInner } from '../../layout/wordSongLayout'
 import { colors, fonts } from '../../theme'
 import {
   STORY_TAP_CUE_CANCEL_OUT_MS,
   storyTapCueSize,
 } from '../wordSong/storyTapCueMotion'
+import { SPARKLE_BURST_MS, SparkleBurst } from '../wordSong/WordChip'
 import {
   blendClipPath,
   blendSegments,
@@ -109,6 +115,7 @@ import type { GameKit } from './playKit'
 import {
   critterLabel,
   crittersFunnyLine,
+  crittersPraiseLine,
   crittersWordLine,
   PLAY_LABELS,
 } from './playLines'
@@ -122,6 +129,17 @@ export const SOUND_GAP_MS = 300
 /** A picture word: clip end → the picture floats away (500 ms). */
 export const PICTURE_HOLD_MS = 2400
 export const PICTURE_LEAVE_MS = 500
+/**
+ * A real word's joy beat (Dave 2026-10-25): a picture word's comes 300 ms
+ * after its clip, its first praise in a visit 1200 ms after (the cheer has
+ * ended), and the picture leaves no sooner than 400 ms after the praise. A
+ * said word's comes as her word line ends; without a picture Emma cheers
+ * for 1200 ms (`POSE_HOLD_MS.cheering`).
+ */
+export const JOY_AFTER_MS = 300
+export const PRAISE_AFTER_MS = 1200
+export const PRAISE_TAIL_MS = 400
+export const JOY_HOLD_MS = 1200
 /** The three bounce together (0.15 c, 250 ms); a tumble; a dim (§ 3.7). */
 export const BOUNCE_MS = 250
 export const TUMBLE_MS = 500
@@ -215,6 +233,11 @@ export function LetterCritters({
   const [seatBounce, setSeatBounce] = useState([0, 0, 0])
   const [meadowHop, setMeadowHop] = useState<Record<string, number>>({})
   const [tumble, setTumble] = useState(0)
+  /** The joy beat's burst, keyed so each one starts afresh. */
+  const [burst, setBurst] = useState<number | null>(null)
+  const burstRef = useRef(0)
+  /** The picture words praised this visit (not saved; Dave 2026-10-25). */
+  const praisedRef = useRef(new Set<string>())
   const [lean, setLean] = useState(false)
   const [twin, setTwin] = useState<string | null>(null)
   /** The shelf dropping home: who falls from which seat. */
@@ -430,25 +453,72 @@ export function LetterCritters({
       kit.setPose('celebration')
     })
     player.play(clip, 0, null, () => {
-      if (songRef.current === token) pictureLeaves(word, token)
+      if (songRef.current === token) pictureEnds(word, run, token)
     })
+  }
+
+  /**
+   * A picture word's clip has ended (Dave 2026-10-25): the joy beat; on
+   * its first build in the visit, the lesson's praise line, Emma still
+   * cheering; the picture leaves at the later of `PICTURE_HOLD_MS` and the
+   * praise's end + `PRAISE_TAIL_MS`.
+   */
+  const pictureEnds = (word: string, run: number[], token: number) => {
+    let waits = 1
+    const ready = () => {
+      waits -= 1
+      if (waits === 0) pictureLeave(word, token)
+    }
+    kit.advance(() => {
+      if (songRef.current === token) joy(run)
+    }, JOY_AFTER_MS)
+    kit.advance(ready, PICTURE_HOLD_MS)
+    const praise = crittersPraiseLine(word)
+    if (praise === undefined || praisedRef.current.has(word)) return
+    waits += 1
+    kit.advance(() => {
+      if (songRef.current !== token) return
+      praisedRef.current.add(word)
+      void kit.speak(praise).then(() => {
+        if (songRef.current === token) kit.advance(ready, PRAISE_TAIL_MS)
+      })
+    }, PRAISE_AFTER_MS)
   }
 
   /** The picture is up: it holds, floats away, then the shelf clears. */
   const pictureLeaves = (word: string, token: number) =>
-    kit.advance(() => {
-      if (songRef.current !== token) return
-      setPicture({ word, leaving: true })
-      kit.advance(
-        () => {
-          if (songRef.current !== token) return
-          setPicture(null)
-          kit.setPose('idle')
-          settle(token)
-        },
-        reducedMotion ? 300 : PICTURE_LEAVE_MS,
-      )
-    }, PICTURE_HOLD_MS)
+    kit.advance(() => pictureLeave(word, token), PICTURE_HOLD_MS)
+  /** It floats away (Reduce Motion: fades), Emma `idle`, the shelf clears. */
+  const pictureLeave = (word: string, token: number) => {
+    if (songRef.current !== token) return
+    setPicture({ word, leaving: true })
+    kit.advance(
+      () => {
+        if (songRef.current !== token) return
+        setPicture(null)
+        kit.setPose('idle')
+        settle(token)
+      },
+      reducedMotion ? 300 : PICTURE_LEAVE_MS,
+    )
+  }
+
+  /**
+   * A real word's joy beat (Dave 2026-10-25): Emma cheers with the shipped
+   * cheer, the three bounce together (Reduce Motion: their letters light),
+   * and Word Song's burst leaves the middle seat (none on Reduce Motion).
+   */
+  const joy = (run: number[]) => {
+    kit.setPose('cheering')
+    sfx.cheer.play()
+    run.forEach(bounceSeat)
+    if (reducedMotion) return
+    const key = ++burstRef.current
+    setBurst(key)
+    kit.later(() => {
+      if (burstRef.current === key) setBurst(null)
+    }, SPARKLE_BURST_MS)
+  }
 
   const song = (run: number[], letters: string[], outcome: Outcome) => {
     const token = ++songRef.current
@@ -489,19 +559,23 @@ export function LetterCritters({
       // A said word (play-place § 3.3, Thomas 2026-10-23, build 20): Emma
       // says it as her own line, her caption with it, as the lesson's Emma
       // says a blend's word (`attentive-pointing`), while the three sit
-      // still. Then a word with a pack picture pops it. No praise line, no
-      // sparkle (Dave's safeguard 2).
+      // still. As it ends, the joy beat, and a word with a pack picture pops
+      // it (Dave 2026-10-25). No praise line, no sparkle sound.
       setLean(true)
       kit.setPose('attentive-pointing')
       recordCritterWord(word)
       void kit.speak(line).then(() => {
         if (songRef.current !== token) return
-        kit.setPose('idle')
+        joy(run)
         if (CRITTER_SAID_PICTURE_WORDS.includes(word)) {
           setPicture({ word, leaving: false })
           pictureLeaves(word, token)
         } else {
-          settle(token)
+          kit.advance(() => {
+            if (songRef.current !== token) return
+            kit.setPose('idle')
+            settle(token)
+          }, JOY_HOLD_MS)
         }
       })
       return
@@ -739,6 +813,21 @@ export function LetterCritters({
           </View>
         )
       })}
+
+      {burst !== null && (
+        <View
+          key={burst}
+          testID="critter-burst"
+          pointerEvents="none"
+          style={[styles.abs, rectStyle(scene.seats[1]!)]}
+        >
+          <SparkleBurst
+            testID="critter-sparkle-burst"
+            distance={chipInner(scene.seats[1]!.width).burstDistance}
+            glyph={chipInner(scene.seats[1]!.width).sparkle}
+          />
+        </View>
+      )}
 
       {falling?.map(({ letter, seat }) => (
         <Falling

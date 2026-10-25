@@ -1,9 +1,10 @@
 /**
  * The Play place's words (play-place spec `design/native/play-place.md`
  * § 4): every spoken line is a core `GUIDANCE_LINES` row of kind `'play'`
- * or `'play-word'` (`guide.play.*`, Lily, `/assets/audio/path/guide-play-*.mp3`), played
- * through one manifest line player (`play`) with word ticks for the bubble
- * and the ribbon. The player never rejects; without a clip it walks the
+ * or `'play-word'` (`guide.play.*`, Lily, `/assets/audio/path/guide-play-*.mp3`),
+ * or a picture word's praise, the lesson's own canon clip (`critterPraise`,
+ * Dave 2026-10-25), played through one manifest line player (`play`) with
+ * word ticks for the bubble and the ribbon. The player never rejects; without a clip it walks the
  * caption at 165 wpm, so nothing waits on audio. The labels nobody speaks
  * (VoiceOver only, § 4.2) sit here too, so a language version swaps rows,
  * not screens.
@@ -12,7 +13,13 @@ import {
   critterWordLine,
   GUIDANCE_LINES,
 } from '@marian/core/emmasPath/guidanceLines'
-import type { PlayGameId, RaftWeight } from '@marian/core/games/playPlace'
+import {
+  CRITTER_PICTURE_WORDS,
+  critterPraise,
+  type PlayGameId,
+  type RaftWeight,
+} from '@marian/core/games/playPlace'
+import { canonClipFor } from '../../audio/bundledAudio'
 import {
   createManifestLinePlayer,
   type ManifestLine,
@@ -32,13 +39,25 @@ export type PlayLineId =
   | 'guide.play.critters.funny.2'
   | 'guide.play.critters.funny.3'
   | `guide.play.critters.word.${string}`
+  | `guide.play.critters.praise.${string}`
+
+const praiseId = (word: string) =>
+  `guide.play.critters.praise.${word}` as PlayLineId
 
 export const PLAY_LINE_MANIFEST: Readonly<Record<PlayLineId, ManifestLine>> =
-  Object.fromEntries(
-    GUIDANCE_LINES.filter(
+  Object.fromEntries([
+    ...GUIDANCE_LINES.filter(
       (l) => l.kind === 'play' || l.kind === 'play-word',
     ).map((l) => [l.id, { src: l.src, text: l.text }]),
-  ) as Record<PlayLineId, ManifestLine>
+    // The picture words' praise: the lessons' canon clips, by their text.
+    ...CRITTER_PICTURE_WORDS.map((w) => {
+      const text = critterPraise(w)!
+      return [
+        praiseId(w),
+        { src: null, text, clip: canonClipFor(text)?.module },
+      ]
+    }),
+  ]) as Record<PlayLineId, ManifestLine>
 
 export type PlayLinePlayer = ManifestLinePlayer<PlayLineId>
 
@@ -60,6 +79,13 @@ export const crittersFunnyLine = (n: 1 | 2 | 3) =>
  */
 export const crittersWordLine = (word: string) =>
   critterWordLine(word)?.id as PlayLineId | undefined
+
+/**
+ * A picture word's praise ("Yes! That's a fan.", Dave 2026-10-25), or
+ * undefined for any other run.
+ */
+export const crittersPraiseLine = (word: string) =>
+  critterPraise(word) === undefined ? undefined : praiseId(word)
 
 /** § 4.2: the labels nobody speaks. */
 export const PLAY_LABELS = {

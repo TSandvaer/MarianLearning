@@ -18,6 +18,7 @@ import {
   CRITTER_SOUND_SOURCE,
   CRITTER_WORDS_BY_STEP,
   critterFunnyOpen,
+  critterPraise,
   critterRun,
   critterSet,
   openPlayGames,
@@ -269,6 +270,31 @@ function canonBlendWords(step: WordSongNode): string[] {
   return canon.plan.utterances
     .filter((u) => /^word\.p\d+\.blend$/.test(u.id))
     .map((u) => u.text.split('...').pop()!.trim())
+}
+
+/** A canon step file's problems: each `word.pN`'s blend word and correct line. */
+function canonPraise(step: WordSongNode): { word: string; correct: string }[] {
+  const canon = JSON.parse(
+    readFileSync(
+      join(
+        process.cwd(),
+        'public',
+        'canon',
+        'word-song',
+        'level-1',
+        `${step}.json`,
+      ),
+      'utf8',
+    ),
+  ) as { plan: { utterances: { id: string; text: string }[] } }
+  const text = (id: string) =>
+    canon.plan.utterances.find((u) => u.id === id)?.text
+  return canon.plan.utterances
+    .filter((u) => /^word\.p\d+\.blend$/.test(u.id))
+    .map((u) => ({
+      word: u.text.split('...').pop()!.trim(),
+      correct: text(u.id.replace(/blend$/, 'correct'))!,
+    }))
 }
 
 /**
@@ -734,6 +760,25 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     for (const w of [...CRITTER_NEVER_SAY, ...CRITTER_NOT_SAID])
       expect(critterRun(w, off)).toBe('quiet')
     expect(critterRun('tup', { funny: true })).toBe('funny')
+  })
+
+  it('critterPraise (Thomas 2026-10-25, Dave): each picture word’s praise is a lesson’s own correct line for it; none for any other run', () => {
+    const lessons = CVC_STEPS.flatMap(canonPraise)
+    for (const w of ALL_45) {
+      const praise = critterPraise(w)
+      expect(lessons.some((l) => l.word === w && l.correct === praise)).toBe(
+        true,
+      )
+    }
+    expect(
+      ALL_45.filter((w) => critterPraise(w) !== `Yes! That's a ${w}.`),
+    ).toEqual(['dad', 'hot', 'jam'])
+    expect(critterPraise('dad')).toBe('Yes! Dad!')
+    expect(critterPraise('hot')).toBe('Yes! Hot.')
+    expect(critterPraise('jam')).toBe('Yes! Jam!')
+    expect(critterPraise('fan')).toBe("Yes! That's a fan.")
+    for (const w of ['map', 'mom', 'egg', 'sex', 'car', 'tup'])
+      expect(critterPraise(w)).toBeUndefined()
   })
 
   it('C10 (Dave’s safeguard): non-words are funny from blending sounds on, quiet before it and for null', () => {
