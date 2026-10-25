@@ -221,17 +221,51 @@ describe('sessionEndGuidance (Guidance G2)', () => {
     expect(ids(g)).toEqual(['guide.end.not-yet.praise'])
   })
 
-  it('a full row not yet grown, replayed after today’s flower: practice, unchanged', () => {
-    // The row filled today and the step waits (its check is not passed).
-    const d1 = entry('cvc-words', 4, 1)
-    const d2 = entry('cvc-words', 5, 1)
-    const earned = entry('cvc-words', 6, 1)
+  describe('a cvc-words row full and not grown this session (Dave 2026-10-25)', () => {
+    // Check half 1, a check not passed, and the sessions until the retake
+    // end alike: the practice ending, every flower grown, effort praise
+    // only. No flower can come today, so never "Play again…".
     const open = { 'cvc-words': 'practicing' } as const
-    const before = doc([d1, d2, earned], open, open)
-    const after = doc([d1, d2, earned, entry('cvc-words', 6, 1)], open, open)
-    const g = run(before, after, 'cvc-words', 8)
+    const waiting = (todayEarned: boolean) => {
+      const days = [3, 4, todayEarned ? 6 : 5].map((d) =>
+        entry('cvc-words', d, 1),
+      )
+      return run(
+        doc(days, open, open),
+        doc([...days, entry('cvc-words', 6, 1)], open, open),
+        'cvc-words',
+        8,
+      )
+    }
+
+    it('first session of the day: practice, not the not-yet day', () => {
+      const g = waiting(false)
+      expect(g.day).toBe('practice')
+      expect(g.slotsBefore).toEqual(['grown', 'grown', 'grown'])
+      expect(g.slotsAfter).toEqual(g.slotsBefore)
+      expect(g.newSlot).toBeNull()
+      expect(g.bonusSlots).toEqual([])
+      expect(g.countText).toBeNull()
+      expect(ids(g)).toEqual(['guide.end.not-yet.praise'])
+    })
+
+    it('the third flower earned today stays grown, no sleeping slot (separate days on)', () => {
+      const g = waiting(true)
+      expect(g.day).toBe('practice')
+      expect(g.slotsAfter).toEqual(['grown', 'grown', 'grown'])
+      expect(ids(g)).toEqual(['guide.end.not-yet.praise'])
+    })
+  })
+
+  it('a full row on a step without the check, not grown (promotion waits on the parent): unchanged', () => {
+    const days = [4, 5, 6].map((d) => entry('add-to-10', d, 1))
+    const g = run(
+      doc(days),
+      doc([...days, entry('add-to-10', 6, 1)]),
+      'add-to-10',
+      8,
+    )
     expect(g.day).toBe('practice')
-    expect(g.newSlot).toBeNull()
     expect(g.slotsAfter).toEqual(['grown', 'grown', 'sleeping'])
     expect(ids(g)).toEqual(['guide.end.not-yet.praise'])
   })

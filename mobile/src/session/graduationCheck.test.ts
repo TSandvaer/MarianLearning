@@ -558,6 +558,58 @@ describe('Session End after the check (build 21: a pass read as the not-yet day)
     expect(ids(result)).toEqual(['guide.end.right.8', 'guide.end.path-opens'])
   })
 
+  it('reserve check half 1: the practice ending, never "Play again…"', async () => {
+    saveProgress(dueLearner())
+    const first = startWordSong()
+    clockNow = new Date('2026-10-24T09:15:00')
+    const { result } = playSession(
+      await first.settle(),
+      first.session,
+      () => true,
+    )
+    expect(loadProgress()!.history.at(-1)!.novelPoolPart).toBeDefined()
+    expect(loadProgress()!.skillLevels['cvc-words']).toBe('practicing')
+    expect(result.guidance.day).toBe('practice')
+    expect(result.guidance.slotsAfter).toEqual(FULL)
+    expect(result.guidance.newSlot).toBeNull()
+    expect(result.guidance.countText).toBeNull()
+    expect(ids(result)).toEqual(['guide.end.not-yet.praise'])
+  })
+
+  it('a check not passed (half 2 the next day, 4 of 6) and the session after it end the same way', async () => {
+    saveProgress(dueLearner())
+    const miss = new Set(['map', 'nap'])
+    const first = startWordSong()
+    clockNow = new Date('2026-10-24T09:15:00')
+    playSession(await first.settle(), first.session, (w) => !miss.has(w))
+    const second = startWordSong()
+    const snap = await second.settle()
+    expect(
+      snap.plan!.problems.slice(snap.warmupCount).map((p) => p.target.word),
+    ).toContain('cab')
+    clockNow = new Date('2026-10-25T09:15:00')
+    const failed = playSession(snap, second.session, () => true).result
+    expect(loadProgress()!.history.at(-1)!.novelPoolSuccessRate).toBeCloseTo(
+      4 / 6,
+    )
+    expect(loadProgress()!.skillLevels['cvc-words']).toBe('practicing')
+    // The next day's plain session, inside the cooldown.
+    expect(readWordSongProgressHints().isGraduationSession).toBe(false)
+    const plain = startWordSong()
+    clockNow = new Date('2026-10-26T09:15:00')
+    const after = playSession(
+      await plain.settle(),
+      plain.session,
+      () => true,
+    ).result
+    for (const result of [failed, after]) {
+      expect(result.guidance.day).toBe('practice')
+      expect(result.guidance.slotsAfter).toEqual(FULL)
+      expect(result.guidance.newSlot).toBeNull()
+      expect(ids(result)).toEqual(['guide.end.not-yet.praise'])
+    }
+  })
+
   it('reserve check: the second half’s pass shows the unlock day, not practice', async () => {
     saveProgress(dueLearner())
     const first = startWordSong()
