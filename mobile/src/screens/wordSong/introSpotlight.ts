@@ -9,16 +9,16 @@
  * it.
  *
  * - Duck words, "Two letters, one sound!": the word's last two cells (c k /
- *   n g) light together. Bee and car words reuse the line (`content-wave-4.md`
- *   § 3.3, § 4.3, D6): the team lights (e e / e a, a r). Snail words reuse it
- *   too (`content-wave-5.md` § 4.3): a i / a y / o a.
+ *   n g) light together.
  * - Moon words, the same line (`content-wave-5.md` § 5.3): no picturable oo
  *   word ends in oo, so the two cells of the word's first "oo" light
  *   together, at once (`'team-pair'`): on moon, the 2nd and 3rd cells.
- * - Bee, car and snail words light their team the same way, wherever it is
- *   in the word: the session's first word is no longer always bee, car or
- *   tray, whose team ends the word (core `wordOrder.ts`, Dave 2026-10-25).
- *   On those three the cells are the last two, as before.
+ * - Bee and car words (`content-wave-4.md` § 3.3, § 4.3, D6) and snail words
+ *   (`content-wave-5.md` § 4.3) reuse the line and moon words' cue: their
+ *   team lights where it first appears (e e / e a, a r, a i / a y / o a). A
+ *   session no longer always opens on bee, car or tray, whose team ends the
+ *   word (core `wordOrder.ts`, Dave 2026-10-25); on those three the cells
+ *   are the last two, as before.
  * - Crab words, "Read all the letters!": every cell lights, one after
  *   another from the left, `INTRO_STAGGER_MS` apart; with Reduce Motion
  *   they light at once.
