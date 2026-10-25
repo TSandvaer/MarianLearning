@@ -14,13 +14,14 @@ import { CRITTER_SAID_WORDS } from '@marian/core/games/playPlace'
 import { HUB_LINES } from '@marian/core/hub/hubLines'
 import { WEB_AUDIO_MODULES } from './audioRegistry'
 import { BLEND_MARKS } from './blendMarks.generated'
-import { canonClipFor, clipHash } from './bundledAudio'
+import { audioForWebPath, canonClipFor, clipHash } from './bundledAudio'
 import {
   CANON_AUDIO_BYTES,
   CANON_AUDIO_HASHES,
   CANON_AUDIO_MODULES,
 } from './canonAudioRegistry'
 import { GREET_LINE_SOURCES } from './greetAudio'
+import { PLAY_SFX_SOURCES } from '../screens/play/playKit'
 import { SFX_SOURCES } from './sfx'
 
 const mobileRoot = resolve(__dirname, '..', '..')
@@ -57,9 +58,18 @@ describe('bundled audio registry (npm run export-audio)', () => {
         (l) => !GUIDANCE_LINES_AWAITING_RENDER.includes(l.id),
       ).map((l) => l.src),
       ...Object.values(SFX_SOURCES),
+      ...Object.values(PLAY_SFX_SOURCES),
     ]
     const missing = wanted.filter((p) => !registryPaths.includes(p))
     expect(missing).toEqual([])
+  })
+
+  it('bundles both Play-place effects, so splash and boing are heard (PLAY_SFX_SOURCES)', () => {
+    const sources = Object.values(PLAY_SFX_SOURCES)
+    expect(sources).toHaveLength(2)
+    expect(sources.filter((src) => audioForWebPath(src) !== undefined)).toEqual(
+      sources,
+    )
   })
 
   it('has no copy of a path line still awaiting its render (the render commit empties that list)', () => {

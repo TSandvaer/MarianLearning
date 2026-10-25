@@ -9,9 +9,8 @@ import { createSfx, SFX_SOURCES, type Sfx } from '../../audio'
 import type { PlayLineId } from './playLines'
 
 /**
- * The two new effects (§ 5.3, T5). Not bundled yet: until the files land
- * in `public/assets/` (and `npm run export-audio` registers them),
- * `createSfx` warns once and plays nothing.
+ * The two new effects (§ 5.3, T5), bundled from `public/assets/` by
+ * `npm run export-audio` like the shipped five.
  */
 export const PLAY_SFX_SOURCES = {
   splash: '/assets/sfx-splash.mp3',
