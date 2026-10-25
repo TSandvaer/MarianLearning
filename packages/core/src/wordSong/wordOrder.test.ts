@@ -128,6 +128,11 @@ function bandViolations(
       }
     }
   }
+  // Cake words' lead, "It makes the A say its name", plays over P1
+  // (content wave 2 § 4.3; Kevin's review of #700).
+  if (step === 'cake-words' && !/^[a-z]a[a-z]e$/.test(words[0]!)) {
+    out.push(`${words[0]} (not a_e) at P1`)
+  }
   if (!sameSet(0, 8)) out.push('the 8 words changed')
   words.forEach((w, i) => {
     if (i > 0 && words[i - 1] === w) out.push(`${w} twice in a row`)
@@ -215,8 +220,11 @@ describe('wordOrder: 20 consecutive sessions per word step', () => {
       })
       previous = words
     }
-    // The first word varies across the sessions, not just between two.
-    expect(seen.size).toBeGreaterThanOrEqual(3)
+    // The first word varies across the sessions, not just between two;
+    // cake words have two a_e words for P1 (cake, cape), so they alternate.
+    if (step === 'cake-words')
+      expect([...seen].sort()).toEqual(['cake', 'cape'])
+    else expect(seen.size).toBeGreaterThanOrEqual(3)
   })
 })
 

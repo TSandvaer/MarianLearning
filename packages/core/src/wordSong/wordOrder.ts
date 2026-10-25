@@ -19,8 +19,14 @@
  *   sight-words directive (7), `api/_planner.ts`).
  * - Sentences: the canon's gentle P1-P3 and trap P4-P8 stay in their bands
  *   (the planner's simple-sentences directive (8)).
- * - Big words: any slot. Every row carries both chip pairs
- *   (`bigWordsSteps.ts`).
+ * - Cake words: P1 an a_e word (cake, cape), the others P2-P8. The lead
+ *   "It makes the A say its name" lights P1's vowel cell on its "A"
+ *   (`introTickCue`, mobile `introSpotlight.ts`; content wave 2 § 4.3), so
+ *   P1's vowel is an a.
+ * - The other big words: any slot. Every row carries both chip pairs
+ *   (`bigWordsSteps.ts`); each of their leads lights a pattern every word of
+ *   the step has (duck words' ck / ng, tent words' end blend, the bee, car,
+ *   snail and moon teams).
  *
  * Within the bands: P1 is never the last session's P1, the order never
  * repeats, as few words as the bands allow keep their slot (none for
@@ -102,6 +108,7 @@ const SIGHT_WORD_OPENERS: ReadonlySet<string> = new Set([
 const ANY = [1, 2, 3, 4, 5, 6, 7, 8]
 const GENTLE = [1, 2, 3]
 const TRAP = [4, 5, 6, 7, 8]
+const AFTER_P1 = [2, 3, 4, 5, 6, 7, 8]
 const LETTER_MIDDLE = [4, 5]
 const LETTER_TRAP = [6, 7, 8]
 
@@ -131,6 +138,8 @@ export function wordSlots(
     return SIGHT_WORD_OPENERS.has(word) ? ANY : TRAP
   }
   if (step === 'simple-sentences') return served <= 3 ? GENTLE : TRAP
+  // Every cake word is CVCe: cell 2 is the vowel the lead's "A" lights.
+  if (step === 'cake-words') return word[1] === 'a' ? ANY : AFTER_P1
   return ANY
 }
 
