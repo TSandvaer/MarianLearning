@@ -145,6 +145,8 @@ P  phone portrait (375×667)              L  phone landscape (667×375)
 
 **Grouping.** Two games need none. When a third arrives, the tiles become a row per kind (numbers, letters, toys), as Dave § 3 suggests. Not in this build.
 
+**The Bunny race** (Thomas 2026-10-25, "Yes, phase 1"; Dave's ruling, `design/research/bunny-race-2026-10-25.md`) is the third game: a race along a 1-20 path for every learner with progress. Its spec is `bunny-race.md`, a sibling of this file. It sets the three-tile shelf (its § 9). The build PR makes this file's other amendments, listed in that spec's § 16.
+
 ### 1.4 Entering, leaving and picking
 
 - **Routes:** `Route` gains `'play-place'` and `'play-game'` (`packages/core/src/router/route.ts`; K5). `ROUTE_EXITS` (`mobile/src/router/routes.ts:48-61`): `hub` adds `'play-place'`; `'play-place': ['hub', 'play-game', 'picker']`; `'play-game': ['play-place']`. `ROUTE_LABELS` (`routes.ts:67`) gains "Play place" and "Play game". Both maps are `Record<Route, …>`, so the `Route` members and their rows land in one PR (§ 7). The game id lives in App state, as the flower bed's does.
