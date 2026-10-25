@@ -1,0 +1,653 @@
+<!doctype html>
+<!--
+  Target mockup for design/native/play-games-restyle.md (Kyle, 2026-10-25).
+  Draws Raft crossing and Letter critters in the app's clay look, at the
+  app's own geometry (geo.js: mathLayout + playGeometry dumped for each
+  screen, no rect changed). Every colour, gradient and shadow below is a
+  token cited in the spec (design/native/play-games-restyle.md § 2).
+
+  Open: target-mockup.html?form=ipadP&game=raft   (form: ipadP ipadL phoneP phoneL;
+        game: raft critters; bg: garden (default) or cream, the frame we leave).
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Play games restyle</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="geo.js"></script>
+    <style>
+      :root {
+        --ink: #6b3f1f;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #222;
+      }
+      #stage {
+        position: relative;
+        overflow: hidden;
+        font-family: 'Fredoka', sans-serif;
+      }
+      .abs {
+        position: absolute;
+      }
+      .centre {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <script>
+      const P = new URLSearchParams(location.search)
+      const form = P.get('form') || 'ipadP'
+      const game = P.get('game') || 'raft'
+      const bg = P.get('bg') || 'garden'
+      const G = window.GEO[form]
+      const A = G.A
+      const tab = G.tablet
+      const stage = document.getElementById('stage')
+      stage.style.width = G.w + 'px'
+      stage.style.height = G.h + 'px'
+      const ASSETS = '../../../mobile/assets/'
+
+      // The frame's backdrop: the Play place's garden (HubBackdrop.tsx:34, :59;
+      // clay.ts:55-81), or the lesson cream we leave (PlayGameScreen.tsx:316-323).
+      stage.style.backgroundColor = bg === 'garden' ? '#cdebb4' : '#FFF5F0'
+      stage.style.backgroundImage =
+        bg === 'garden'
+          ? G.garden
+          : 'radial-gradient(circle at 50% 30%, rgba(255, 224, 230, 0.55) 0%, rgba(255, 245, 240, 0) 60%), linear-gradient(180deg, #FFF5F0 0%, #FFF8F2 100%)'
+
+      function el(css, parent = stage, html = '') {
+        const d = document.createElement('div')
+        d.className = 'abs'
+        Object.assign(d.style, css)
+        d.innerHTML = html
+        parent.appendChild(d)
+        return d
+      }
+      const px = (n) => n + 'px'
+      const box = (r) => ({
+        left: px(r.x),
+        top: px(r.y),
+        width: px(r.width),
+        height: px(r.height),
+      })
+
+      // Land-band scale: MapBand radius 48 s and its shadow (landParts.tsx:52-58);
+      // s = 1 on tablets, 7/12 on phones (mapChrome HomeButton k).
+      const s = tab ? 1 : 7 / 12
+      const R = 48 * s
+      const bandShadow = (lo, k = s) =>
+        `inset 0 ${5 * k}px 0 rgba(255,255,255,0.4), inset 0 ${-8 * k}px 0 rgba(0,0,0,0.08), 0 ${10 * k}px 0 ${lo}, 0 ${18 * k}px ${24 * k}px rgba(60,40,10,0.15)`
+
+      // A clay oval (mapFx.tsx:35 ClayOval): radial face at 45% 30% over a slab.
+      function clayOval(
+        x,
+        y,
+        w,
+        h,
+        drop,
+        stops,
+        slab,
+        parent = stage,
+        soft = true,
+      ) {
+        if (soft)
+          el(
+            {
+              ...box({ x: x - 4, y: y + drop + 2, width: w + 8, height: h }),
+              borderRadius: '50%',
+              background:
+                'radial-gradient(closest-side, rgba(60,30,10,0.22) 55%, rgba(60,30,10,0) 100%)',
+            },
+            parent,
+          )
+        el(
+          {
+            ...box({ x, y: y + drop, width: w, height: h }),
+            borderRadius: '50%',
+            background: slab,
+          },
+          parent,
+        )
+        el(
+          {
+            ...box({ x, y, width: w, height: h }),
+            borderRadius: '50%',
+            background: `radial-gradient(ellipse 78% 99% at 45% 30%, ${stops[0]} 0%, ${stops[1]} 60%, ${stops[2]} 100%)`,
+          },
+          parent,
+        )
+      }
+
+      // The lesson frame, unchanged: back disc (MathHud.tsx:58-63), Emma, ribbon.
+      function frame(line) {
+        const b = G.back
+        el(
+          {
+            ...box(b),
+            borderRadius: '50%',
+            backgroundColor: '#c98a55',
+            backgroundImage:
+              'radial-gradient(circle at 40% 32%, #e7b07a 0%, #c98a55 55%, #a86c3c 100%)',
+            boxShadow:
+              'inset 0 4px 0 rgba(255, 255, 255, 0.3), inset 0 -5px 0 rgba(0, 0, 0, 0.16), 0 7px 0 #7d4a26, 0 12px 16px rgba(60, 30, 10, 0.28)',
+          },
+          stage,
+          `<div class="abs" style="left:${b.width * 0.44}px;top:${b.height * 0.36}px;width:${b.width * 0.2}px;height:${b.width * 0.2}px;border-left:${b.width * 0.07}px solid #fff;border-bottom:${b.width * 0.07}px solid #fff;transform:rotate(45deg);border-radius:2px"></div>`,
+        )
+        const e = G.emma
+        el(
+          { ...box(e) },
+          stage,
+          `<img src="${ASSETS}emma/idle.webp" style="width:100%;height:100%;object-fit:contain;object-position:50% 100%">`,
+        )
+        if (line) {
+          const r = G.ribbon
+          el(
+            {
+              left: px(r.x),
+              top: px(r.y),
+              width: px(r.width),
+              boxSizing: 'border-box',
+              padding: `${G.ribbonPadding.vertical}px ${G.ribbonPadding.horizontal}px`,
+              borderRadius: '32px',
+              backgroundColor: '#fff7ee',
+              backgroundImage: 'linear-gradient(#fffdf8, #fff1e2)',
+              boxShadow:
+                'inset 0 3px 0 #ffffff, 0 8px 0 #efcfb4, 0 14px 22px rgba(90, 45, 20, 0.16)',
+              fontWeight: 600,
+              fontSize: px(G.captionFontSize),
+              lineHeight: px(G.captionLineHeight),
+              color: '#3D2B3D',
+              textAlign: 'center',
+            },
+            stage,
+            line,
+          )
+        }
+      }
+
+      // ---------------------------------------------------------------- Raft
+      const ANIMALS = {
+        1: 'bee',
+        2: 'frog',
+        3: 'hen',
+        4: 'duck',
+        5: 'cat',
+        6: 'fox',
+        7: 'dog',
+        8: 'goat',
+        9: 'pig',
+      }
+      // The cream clay tile, small (ClayChip.tsx:43-51 at half depth), Number Garden slab #dba675.
+      const TILE_FACE = 'linear-gradient(#ffffff 0%, #fff7ee 60%, #ffeedd 100%)'
+      function animal(parent, w, size, onShore) {
+        const cell = el(
+          { left: 0, top: 0, width: px(size), height: px(size) },
+          parent,
+        )
+        if (onShore)
+          clayOval(
+            0.06 * size,
+            0.62 * size,
+            0.88 * size,
+            0.34 * size,
+            tab ? 6 : 4,
+            ['#fffaf0', '#efdcc0', '#d6b890'],
+            '#b8946a',
+            cell,
+          )
+        const p = size * (0.72 + (0.28 * (w - 1)) / 8)
+        el(
+          {
+            left: px((size - p) / 2),
+            top: px((size - p) / 2),
+            width: px(p),
+            height: px(p),
+            filter: `drop-shadow(0 ${tab ? 4 : 3}px ${tab ? 4 : 3}px rgba(60,30,10,0.28))`,
+          },
+          cell,
+          `<img src="${ASSETS}pictures/${ANIMALS[w]}.webp" style="width:100%;height:100%;object-fit:contain">`,
+        )
+        const d = 0.42 * size
+        el(
+          {
+            right: 0,
+            bottom: 0,
+            width: px(d),
+            height: px(d),
+            borderRadius: '50%',
+            backgroundColor: '#fff7ee',
+            backgroundImage: TILE_FACE,
+            boxShadow: `inset 0 2px 0 #ffffff, 0 ${tab ? 4 : 3}px 0 #dba675, 0 ${tab ? 6 : 5}px ${tab ? 9 : 7}px rgba(90,45,20,0.16)`,
+            fontWeight: 700,
+            fontSize: px(0.3 * size),
+            color: '#6b3f1f',
+          },
+          cell,
+        ).classList.add('centre')
+        cell.lastChild.textContent = w
+        return cell
+      }
+
+      function raft() {
+        const S = G.raft,
+          a = S.a
+        const up = S.axis === 'up'
+        // Water: one blue clay pool over the island band and the water band, running
+        // R under the shore so no gap shows. Face = today's water gradient
+        // (RaftCrossing.tsx:108-109); shadow = the land band's, ledge #4a9cc8 (new).
+        const pool = up
+          ? {
+              x: A.x,
+              y: S.island.y,
+              width: A.width,
+              height: S.shore.y - S.island.y + R,
+            }
+          : {
+              x: S.shore.x + S.shore.width - R,
+              y: A.y,
+              width: A.x + A.width - (S.shore.x + S.shore.width - R),
+              height: A.height,
+            }
+        el({
+          ...box(pool),
+          borderRadius: px(R),
+          backgroundColor: '#8fd0ee',
+          backgroundImage: up
+            ? 'linear-gradient(180deg, #8fd0ee 0%, #5fb3dd 100%)'
+            : 'linear-gradient(90deg, #5fb3dd 0%, #8fd0ee 100%)',
+          boxShadow: bandShadow('#4a9cc8'),
+        })
+        // Ripples: short rounded strokes, never a full-width line.
+        // Fractions of the water rect, clear of the raft's path.
+        const rip = up
+          ? [
+              [0.05, 0.25],
+              [0.78, 0.18],
+              [0.08, 0.7],
+              [0.8, 0.62],
+              [0.14, 0.92],
+            ]
+          : [
+              [0.62, 0.12],
+              [0.78, 0.3],
+              [0.6, 0.72],
+              [0.8, 0.88],
+              [0.7, 0.5],
+            ]
+        rip.forEach(([fx, fy]) => {
+          const W = S.water
+          el({
+            ...box({
+              x: W.x + fx * W.width,
+              y: W.y + fy * W.height,
+              width: (up ? 0.12 : 0.16) * W.width,
+              height: tab ? 6 : 4,
+            }),
+            borderRadius: '6px',
+            background: 'rgba(255,255,255,0.55)',
+          })
+        })
+        // Island: a clay sand oval (ClayOval with Word Song honey stops, mapButtonLook.ts:19, :22).
+        const m = S.mound,
+          drop = tab ? 10 : 7
+        clayOval(
+          m.x,
+          m.y,
+          m.width,
+          m.height - drop,
+          drop,
+          ['#ffeec2', '#f2c27a', '#d9a159'],
+          '#b27b37',
+        )
+        // Two clay bushes (CLAY_LOOK.go, clayLook.ts:7-13).
+        const t = 0.5 * a
+        ;[0.3, 0.7].forEach((f) =>
+          el({
+            left: px(m.x + f * m.width - t / 2),
+            top: px(m.y + 0.12 * m.height),
+            width: px(t),
+            height: px(t * 0.8),
+            borderRadius: '50% 50% 45% 45%',
+            backgroundColor: '#6cc655',
+            backgroundImage: 'linear-gradient(#7fd364, #5cb945)',
+            boxShadow: `inset 0 ${3 * s}px 0 rgba(255,255,255,0.35), 0 ${5 * s}px 0 #3f8a2e, 0 ${8 * s}px ${10 * s}px rgba(40,90,20,0.3)`,
+          }),
+        )
+        // Shore: honey sand band (BAND_TINTS[1], mapTheme.ts:8) with the band's shadow.
+        el({
+          ...box(S.shore),
+          borderRadius: px(R),
+          backgroundColor: '#e8c77a',
+          backgroundImage: 'linear-gradient(#ffeec2, #e8c77a)',
+          boxShadow: bandShadow('#e8c77a'),
+        })
+        // Shore animals (a test shore, as 07's): plinth + picture + cream tag.
+        const shore = [7, 3, 6, 4, 9, 2]
+        S.spots.forEach((r, i) => {
+          const c = animal(stage, shore[i], a, true)
+          c.style.left = px(r.x)
+          c.style.top = px(r.y)
+        })
+        // The raft at the dock: five clay logs (Number Garden wood, mapButtonLook.ts:13).
+        const d = S.dock
+        const deck = el({ ...box(d) })
+        el(
+          {
+            left: 0,
+            top: 0,
+            width: px(d.width),
+            height: px(d.height),
+            borderRadius: px(0.14 * a),
+            background: '#7d4a26',
+            boxShadow: `0 ${tab ? 8 : 6}px 0 #7d4a26, 0 ${tab ? 14 : 10}px ${tab ? 18 : 12}px rgba(60,30,10,0.3)`,
+          },
+          deck,
+        )
+        for (let i = 0; i < 5; i++) {
+          const h = d.height / 5
+          el(
+            {
+              left: px(2),
+              top: px(i * h + 1),
+              width: px(d.width - 4),
+              height: px(h - 2),
+              borderRadius: px(h / 2),
+              backgroundColor: '#c98a55',
+              backgroundImage:
+                'linear-gradient(#e7b07a 0%, #c98a55 55%, #a86c3c 100%)',
+              boxShadow: 'inset 0 2px 0 rgba(255,255,255,0.3)',
+            },
+            deck,
+          )
+        }
+        ;[0.2, 0.8].forEach((f) =>
+          el(
+            {
+              left: px(f * d.width - 0.05 * a),
+              top: px(-2),
+              width: px(0.1 * a),
+              height: px(d.height + 4),
+              borderRadius: px(0.05 * a),
+              backgroundColor: '#f2d3a6',
+              boxShadow: 'inset 0 -3px 0 rgba(125,74,38,0.3)',
+            },
+            deck,
+          ),
+        )
+        // Mast, cream flag (the ribbon's clay), oar.
+        const f = S.flag
+        el(
+          {
+            left: px(2),
+            top: px(f.y - 2),
+            width: px(Math.max(6, 0.07 * a)),
+            height: px(-f.y + 16),
+            borderRadius: px(4),
+            backgroundImage: 'linear-gradient(90deg, #a86c3c, #7d4a26)',
+          },
+          deck,
+        )
+        const flag = el(
+          {
+            left: px(8),
+            top: px(f.y),
+            width: px(f.width),
+            height: px(f.height),
+            borderRadius: px(0.08 * a),
+            backgroundColor: '#fff7ee',
+            backgroundImage: 'linear-gradient(#fffdf8, #fff1e2)',
+            boxShadow:
+              'inset 0 2px 0 #ffffff, 0 3px 0 #efcfb4, 0 6px 8px rgba(90,45,20,0.16)',
+            fontWeight: 700,
+            fontSize: px(0.26 * a),
+            color: '#6b3f1f',
+          },
+          deck,
+        )
+        flag.classList.add('centre')
+        flag.textContent = '6'
+        el(
+          {
+            right: px(-8),
+            top: px(0.12 * d.height),
+            width: px(tab ? 10 : 8),
+            height: px(0.76 * d.height),
+            borderRadius: px(6),
+            backgroundImage: 'linear-gradient(90deg, #c98a55, #7d4a26)',
+            boxShadow: '0 3px 0 #7d4a26',
+          },
+          deck,
+        )
+        // Aboard: cat 5 and bee 1 (flag 6), on seats, no plinth.
+        ;[
+          [0, 5],
+          [1, 1],
+        ].forEach(([seat, w]) => {
+          const r = S.seats[seat]
+          const c = animal(deck, w, r.width, false)
+          c.style.left = px(r.x)
+          c.style.top = px(r.y)
+        })
+        frame('Six!')
+      }
+
+      // ------------------------------------------------------------ Critters
+      const VOWELS = new Set(['a', 'e', 'i', 'o', 'u'])
+      const LETTERS = tab
+        ? 'aeioubcdfghjlmnprstvwx'.split('')
+        : 'aeioubcdfghmnprst'.split('').slice(0, 16)
+      // A clay critter (code-drawn, $0): the Word Song honey clay (mapButtonLook.ts:19-22)
+      // or a pink clay (BAND_TINTS[4] + myPink), bigger eyes with a glint, antennae, feet.
+      function critter(parent, letter, x, y, size) {
+        const v = VOWELS.has(letter)
+        const face = v
+          ? 'radial-gradient(circle at 40% 32%, #ffe0ec 0%, #FFC0CB 55%, #f2a9c4 100%)'
+          : 'radial-gradient(circle at 40% 32%, #ffe0a8 0%, #f2c27a 55%, #d9a159 100%)'
+        const ledge = v ? '#F48FB1' : '#b27b37'
+        const k = size / 118
+        const c = el(
+          { left: px(x), top: px(y), width: px(size), height: px(size) },
+          parent,
+        )
+        ;[0.32, 0.68].forEach((f) => {
+          el(
+            {
+              left: px(f * size - 0.025 * size),
+              top: px(-0.07 * size),
+              width: px(0.05 * size),
+              height: px(0.15 * size),
+              background: ledge,
+              borderRadius: '3px',
+            },
+            c,
+          )
+          el(
+            {
+              left: px(f * size - 0.05 * size),
+              top: px(-0.12 * size),
+              width: px(0.1 * size),
+              height: px(0.1 * size),
+              borderRadius: '50%',
+              backgroundImage: face,
+              boxShadow: `0 ${2 * k + 1}px 0 ${ledge}`,
+            },
+            c,
+          )
+        })
+        ;[0.22, 0.78].forEach((f) =>
+          el(
+            {
+              left: px(f * size - 0.11 * size),
+              top: px(size - 0.12 * size),
+              width: px(0.22 * size),
+              height: px(0.14 * size),
+              borderRadius: '50%',
+              background: ledge,
+            },
+            c,
+          ),
+        )
+        const body = el(
+          {
+            left: 0,
+            top: 0,
+            width: px(size),
+            height: px(size),
+            borderRadius: '50%',
+            backgroundImage: face,
+            boxShadow: `inset 0 ${5 * k}px 0 rgba(255,255,255,0.4), inset 0 ${-6 * k}px 0 rgba(0,0,0,0.12), 0 ${9 * k}px 0 ${ledge}, 0 ${14 * k}px ${18 * k}px rgba(120,60,20,0.25)`,
+          },
+          c,
+        )
+        ;[0.32, 0.68].forEach((f) => {
+          const e = el(
+            {
+              left: px(f * size - 0.11 * size),
+              top: px(0.12 * size),
+              width: px(0.22 * size),
+              height: px(0.22 * size),
+              borderRadius: '50%',
+              background: '#fff',
+              boxShadow: '0 1px 0 rgba(0,0,0,0.08)',
+            },
+            body,
+          )
+          el(
+            {
+              left: px(0.055 * size),
+              top: px(0.06 * size),
+              width: px(0.11 * size),
+              height: px(0.11 * size),
+              borderRadius: '50%',
+              background: '#3d2112',
+            },
+            e,
+          )
+          el(
+            {
+              left: px(0.1 * size),
+              top: px(0.07 * size),
+              width: px(0.04 * size),
+              height: px(0.04 * size),
+              borderRadius: '50%',
+              background: '#fff',
+            },
+            e,
+          )
+          el(
+            {
+              left: px(f * size - 0.07 * size + (f < 0.5 ? -0.1 : 0.1) * size),
+              top: px(0.36 * size),
+              width: px(0.14 * size),
+              height: px(0.07 * size),
+              borderRadius: '50%',
+              background: 'rgba(244,143,177,0.45)',
+            },
+            body,
+          )
+        })
+        const t = el(
+          {
+            left: 0,
+            top: px(0.3 * size),
+            width: px(size),
+            height: px(0.6 * size),
+            fontWeight: 700,
+            fontSize: px(0.5 * size),
+            lineHeight: px(0.6 * size),
+            color: '#6b3f1f',
+            textAlign: 'center',
+          },
+          body,
+        )
+        t.textContent = letter
+      }
+      function socket(x, y, w, h, parent = stage) {
+        // The Hub tray's hole (HubFlowerTray.tsx:132, :235-238), as an oval.
+        el(
+          {
+            left: px(x),
+            top: px(y),
+            width: px(w),
+            height: px(h),
+            borderRadius: '50%',
+            backgroundColor: '#4e2c19',
+            backgroundImage:
+              'radial-gradient(circle at 50% 62%, #6b4128 0%, #4e2c19 60%, #3d2112 100%)',
+            boxShadow: `inset 0 ${tab ? 4 : 3}px ${tab ? 5 : 4}px rgba(0,0,0,0.45), 0 ${tab ? 2 : 1.5}px 0 rgba(255,255,255,0.35)`,
+          },
+          parent,
+        )
+      }
+      function critters() {
+        const S = G.critters,
+          c = S.c,
+          g = S.g
+        // Meadow: a green land band (BAND_TINTS[0], mapTheme.ts:7) behind the cells,
+        // the meadow grown by g/2, clipped to A. Paint only: no cell moves.
+        const m = S.meadow
+        const gx = Math.max(A.x, m.x - g),
+          gr = Math.min(A.x + A.width, m.x + m.width + g)
+        el({
+          left: px(gx),
+          top: px(m.y - g / 2),
+          width: px(gr - gx),
+          height: px(m.height + g),
+          borderRadius: px(Math.min(R, 0.5 * c)),
+          backgroundColor: '#a9d68c',
+          backgroundImage: 'linear-gradient(#d7f2c4, #a9d68c)',
+          boxShadow: bandShadow('#a9d68c', tab ? 0.7 : 0.45),
+        })
+        // The log: clay wood (the back disc's wood as a vertical gradient), no outline.
+        const L = S.log
+        el({
+          ...box(L),
+          borderRadius: px(L.height / 2),
+          backgroundColor: '#c98a55',
+          backgroundImage:
+            'linear-gradient(#e7b07a 0%, #c98a55 55%, #a86c3c 100%)',
+          boxShadow: `inset 0 3px 0 rgba(255,255,255,0.3), 0 ${tab ? 6 : 5}px 0 #7d4a26, 0 ${tab ? 10 : 8}px ${tab ? 14 : 10}px rgba(60,30,10,0.3)`,
+        })
+        // Three seat sockets on the log, one per seat.
+        S.seats.forEach((r) =>
+          socket(
+            r.x + 0.18 * r.width,
+            L.y + L.height * 0.18,
+            0.64 * r.width,
+            L.height * 0.64,
+          ),
+        )
+        // Burrows (sockets) and critters.
+        S.cells.forEach((r, i) => {
+          socket(r.x + 0.08 * c, r.y + 0.8 * c, 0.84 * c, 0.26 * c)
+          critter(stage, LETTERS[i], r.x, r.y, c)
+        })
+        // Two seated: "c" and "a" sang "c... a", the third seat waits.
+        ;[
+          ['c', 0],
+          ['a', 1],
+        ].forEach(([l, i]) => {
+          const r = S.seats[i]
+          critter(stage, l, r.x, r.y, r.width)
+        })
+        frame(null)
+      }
+
+      game === 'raft' ? raft() : critters()
+    </script>
+  </body>
+</html>
