@@ -64,6 +64,39 @@ function Particle({
   )
 }
 
+/**
+ * The burst: six sparkles out `distance` over `SPARKLE_BURST_MS`, filling
+ * its parent and centred on it. A correct chip's, and the letter critters'
+ * joy beat's from the middle seat (Dave 2026-10-25). Callers skip it on
+ * Reduce Motion.
+ */
+export function SparkleBurst({
+  distance,
+  glyph,
+  testID = 'word-song-sparkle-burst',
+}: {
+  distance: number
+  glyph: number
+  testID?: string
+}) {
+  return (
+    <Animated.View
+      testID={testID}
+      exiting={FadeOut.duration(150)}
+      style={styles.burst}
+    >
+      {Array.from({ length: 6 }, (_, i) => (
+        <Particle
+          key={i}
+          angle={(i / 6) * Math.PI * 2}
+          distance={distance}
+          glyph={glyph}
+        />
+      ))}
+    </Animated.View>
+  )
+}
+
 export interface WordChipProps {
   entry: WordEntry
   face: ChipFace
@@ -115,20 +148,7 @@ export function WordChip({
       onPress={() => onTap(entry.word)}
       burst={
         bursting && !reducedMotion ? (
-          <Animated.View
-            testID="word-song-sparkle-burst"
-            exiting={FadeOut.duration(150)}
-            style={styles.burst}
-          >
-            {Array.from({ length: 6 }, (_, i) => (
-              <Particle
-                key={i}
-                angle={(i / 6) * Math.PI * 2}
-                distance={inner.burstDistance}
-                glyph={inner.sparkle}
-              />
-            ))}
-          </Animated.View>
+          <SparkleBurst distance={inner.burstDistance} glyph={inner.sparkle} />
         ) : null
       }
     >

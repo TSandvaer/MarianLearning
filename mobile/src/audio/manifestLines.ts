@@ -11,10 +11,11 @@
  * - `cancelActive()` stops the line in flight (clip or caption walk) and
  *   resolves its promise without further ticks (web ticket 86c9m4afh).
  * - A line with `src: null` (the deferred `locked-later` / `gate-locked`
- *   path lines) plays nothing and walks its caption.
+ *   path lines) plays nothing and walks its caption, unless it carries a
+ *   bundled `clip` of its own (a canon clip, looked up by its text).
  */
 import { HUB_LINES, type HubLineId } from '@marian/core/hub/hubLines'
-import { audioForWebPath } from './bundledAudio'
+import { audioForWebPath, type NativeAudio } from './bundledAudio'
 import { FALLBACK_WPM, countWords } from './captionClock'
 import { audioEngine, type AudioEngine } from './engine'
 import type { LineCallbacks } from './linePlayback'
@@ -23,6 +24,12 @@ export interface ManifestLine {
   /** Web URL path of the bundled MP3, or `null` for caption-only. */
   src: string | null
   text: string
+  /**
+   * A bundled clip with no web path (a canon clip, `canonClipFor(text)`):
+   * played instead of `src`. The letter critters' praise lines (Dave
+   * 2026-10-25) are the lessons' canon clips.
+   */
+  clip?: NativeAudio
 }
 
 export interface ManifestLinePlayer<Id extends string> {
@@ -93,7 +100,8 @@ export function createManifestLinePlayer<Id extends string>(
   function playLine(id: Id, opts: LineCallbacks = {}): Promise<void> {
     cancelActive()
     const line = lines[id]
-    const source = line.src === null ? undefined : audioForWebPath(line.src)
+    const source =
+      line.clip ?? (line.src === null ? undefined : audioForWebPath(line.src))
     if (source === undefined) return walk(line.text, opts, 0)
 
     activeId = id

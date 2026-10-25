@@ -71,17 +71,18 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       // The locked-stop peek prompt (locked-stop-peek-prompt § 3).
       'map-peek-ask-locked': 1,
       'map-peek-ask': 1,
-      // The letter critters' said words (Thomas 2026-10-22).
-      'play-word': 156,
+      // The letter critters' said words (Thomas 2026-10-22; Dave
+      // 2026-10-25: 7 more).
+      'play-word': 163,
     })
-    expect(GUIDANCE_LINES).toHaveLength(483)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(483)
+    expect(GUIDANCE_LINES).toHaveLength(490)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(490)
     // Bee, car, snail and moon words' leads are duck words' text (content
-    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories', and four
-    // critter words' captions are story words' ("Got.", "Hid.", "Ran.",
-    // "Sat."): 483 ids, 474 texts, 483 files.
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(474)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(483)
+    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories', and five
+    // critter words' captions are story words' ("And.", "Got.", "Hid.",
+    // "Ran.", "Sat."): 490 ids, 480 texts, 490 files.
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(480)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(490)
   })
 
   it('AC8: both replay sets, one line per STAGE_SPOKEN_NAMES step, with the exact texts (map-tap-to-play § 6, T1 approved 2026-10-17)', () => {
@@ -406,7 +407,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(483)
+    ).toHaveLength(490)
   })
 
   it('repeats no Emma’s Path line', () => {
@@ -691,14 +692,15 @@ describe('the letter critters’ said words (Thomas 2026-10-22)', () => {
         src: `/assets/audio/path/guide-play-critters-word-${w}.mp3`,
       })),
     )
-    // 156 inputs of four characters each, two of them five.
-    expect(words.reduce((n, l) => n + l.input!.length, 0)).toBe(626)
+    // 163 inputs of four characters each, two of them five (Dave
+    // 2026-10-25's seven: 28 characters).
+    expect(words.reduce((n, l) => n + l.input!.length, 0)).toBe(654)
     expect(
       words.filter((l) => /^(Sat|Wed),$/.test(l.input!)).map((l) => l.id),
     ).toEqual([])
   })
 
-  it('the 156 are rendered in Lily (none awaits its render)', () => {
+  it('the 163 are rendered in Lily (none awaits its render)', () => {
     expect(
       words.filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id)),
     ).toEqual([])
