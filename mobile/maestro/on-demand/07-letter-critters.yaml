@@ -4,7 +4,9 @@
 # 20 (Thomas 2026-10-23): every letter on a tablet where all 22 fit both
 # ways, and a said word with a pack picture ("rat") pops it after Emma
 # says it. The probe reserve (Thomas 2026-10-24): "ham", one of its new
-# pack pictures, pops by the same rule.
+# pack pictures, pops by the same rule. After build 21 (Thomas 2026-10-25:
+# "mom" tumbled; Dave's ruling): "mom" and "egg" are said and pop their
+# picture.
 #
 # A CVC-words learner (`qaStep: add-to-10` + the `cvc-words` seed, as 05's
 # second learner): past blending sounds, so a non-word boings and gets a
@@ -225,6 +227,76 @@ tags:
       id: critter-picture-ham
     timeout: 15000
 - takeScreenshot: critters-ham-picture
+- extendedWaitUntil:
+    notVisible:
+      id: critter-picture
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: critter-seat-0
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 1500
+
+# Build 21 (Dave 2026-10-25): "mom" (m row 2 cell 6 twice, o row 1 cell
+# 3) and "egg" (e row 1 cell 1, g row 2 cell 2 twice). The sounds, Emma
+# says the word, her caption with it, then its picture.
+- swipe:
+    start: 729, 811
+    end: 291, 576
+    duration: 800
+- swipe:
+    start: 417, 707
+    end: 417, 576
+    duration: 800
+- swipe:
+    start: 729, 811
+    end: 543, 576
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    visible:
+      id: play-game-ribbon
+    timeout: 15000
+- takeScreenshot: critters-mom-caption
+- extendedWaitUntil:
+    visible:
+      id: critter-picture-mom
+    timeout: 15000
+- takeScreenshot: critters-mom-picture
+- extendedWaitUntil:
+    notVisible:
+      id: critter-picture
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: critter-seat-0
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 1500
+- swipe:
+    start: 209, 707
+    end: 291, 576
+    duration: 800
+- swipe:
+    start: 313, 811
+    end: 417, 576
+    duration: 800
+- swipe:
+    start: 313, 811
+    end: 543, 576
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    visible:
+      id: play-game-ribbon
+    timeout: 15000
+- takeScreenshot: critters-egg-caption
+- extendedWaitUntil:
+    visible:
+      id: critter-picture-egg
+    timeout: 15000
+- takeScreenshot: critters-egg-picture
 - extendedWaitUntil:
     notVisible:
       id: critter-picture
