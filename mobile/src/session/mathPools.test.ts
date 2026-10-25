@@ -124,7 +124,15 @@ describe('the closed math pools before their render (phase 5a)', () => {
         if (canonClipFor(u.text) === undefined) missing.push(`${path} ${u.id}`)
       }
     }
-    expect(missing).toEqual([])
+    // But the probe reserve's 25 lines awaiting their render: no focus node
+    // is the probe file (`./localSession.test.ts`). The render PR empties it.
+    expect(missing).toEqual(
+      [5, 6, 7, 8, 9].flatMap((i) =>
+        ['read', 'correct', 'hint', 'giveAnswer', 'blend'].map(
+          (slot) => `word-song/level-1/cvc-words-probe word.p${i}.${slot}`,
+        ),
+      ),
+    )
   })
 
   it('every picked add-to-10 / sub-to-10 session plays only bundled clips and the served 8', () => {
