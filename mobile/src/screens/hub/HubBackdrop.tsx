@@ -8,6 +8,10 @@
  * L at the same fractions of the screen (x / 820, y / 1180). Blob radii
  * scale with the layout's `garden.scale` (W: u; P / L: the card scale s,
  * so the garden keeps its size next to the cards).
+ *
+ * The Play games stand in the same garden without Emma's light (the light
+ * is the Hub's Emma frame, not the lesson frame's), under their own test
+ * id and fade (play-games-restyle § 2 T1).
  */
 import { StyleSheet, View } from 'react-native'
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'
@@ -22,31 +26,45 @@ export const HUB_EXIT_MS = 250
 const LIGHT =
   'radial-gradient(circle at 50% 45%, rgba(255, 236, 190, 0.85) 0%, rgba(255, 224, 160, 0.4) 40%, rgba(255, 214, 140, 0) 70%)'
 
-export function HubBackdrop({ layout }: { layout: HubLayout }) {
-  const { light } = layout
+export function HubBackdrop({
+  layout,
+  light = true,
+  testID = 'hub-backdrop',
+  fadeMs,
+}: {
+  layout: HubLayout
+  /** Emma's warm light (the Hub's); off in a Play game. */
+  light?: boolean
+  testID?: string
+  /** One fade both ways; default the Hub's 300 in, 250 out. */
+  fadeMs?: number
+}) {
+  const glow = layout.light
   return (
     <Animated.View
-      testID="hub-backdrop"
-      entering={FadeIn.duration(HUB_ENTER_MS)}
-      exiting={FadeOut.duration(HUB_EXIT_MS)}
+      testID={testID}
+      entering={FadeIn.duration(fadeMs ?? HUB_ENTER_MS)}
+      exiting={FadeOut.duration(fadeMs ?? HUB_EXIT_MS)}
       style={[
         styles.backdrop,
         { experimental_backgroundImage: gardenBackground(layout.garden) },
       ]}
     >
-      <View
-        testID="hub-emma-light"
-        style={[
-          styles.light,
-          {
-            left: light.x,
-            top: light.y,
-            width: light.width,
-            height: light.height,
-            borderRadius: light.width / 2,
-          },
-        ]}
-      />
+      {light && (
+        <View
+          testID="hub-emma-light"
+          style={[
+            styles.light,
+            {
+              left: glow.x,
+              top: glow.y,
+              width: glow.width,
+              height: glow.height,
+              borderRadius: glow.width / 2,
+            },
+          ]}
+        />
+      )}
     </Animated.View>
   )
 }
