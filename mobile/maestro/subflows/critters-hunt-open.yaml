@@ -1,0 +1,47 @@
+# Letter critters' word hunt (critters-word-hunt.md § 10.3, H26), part 1
+# of 3: from the Hub to the `critters-hunt` seed's round in progress (a b
+# g h p t; bag, hat, bat and tap found), and its screenshot. The calling
+# flow (12, 13) then drags t-a-g; Maestro reads a swipe's points when it
+# loads a flow, so they can't be env values here.
+#
+#   SHOT  the screenshots' prefix
+appId: host.exp.Exponent
+---
+- runFlow: open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub-play
+    timeout: 120000
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: hub-play
+      NEXT: play-place
+- extendedWaitUntil:
+    visible:
+      id: play-tile-critters
+    timeout: 15000
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: play-tile-critters
+      NEXT: letter-critters
+# The round in progress: the 3 on the log, four slots filled, two empty.
+- extendedWaitUntil:
+    visible:
+      id: critter-log-numeral
+    timeout: 15000
+- assertVisible:
+    id: hunt-slot-3-picture-tap
+- assertNotVisible:
+    id: hunt-slot-4-tile-0
+- assertNotVisible:
+    id: hunt-new-letters
+# The open line and the drag hint end (the hand loops 6 s).
+- extendedWaitUntil:
+    notVisible:
+      id: play-game-ribbon
+    timeout: 25000
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ${SHOT}-round-in-progress

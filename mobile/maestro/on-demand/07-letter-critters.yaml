@@ -8,9 +8,12 @@
 # "mom" tumbled; Dave's ruling): "mom" and "egg" are said and pop their
 # picture.
 #
-# A CVC-words learner (`qaStep: add-to-10` + the `cvc-words` seed, as 05's
-# second learner): past blending sounds, so a non-word boings and gets a
-# line.
+# The free meadow, so a learner before blending sounds (`qaStep: add-to-10`
+# + the `letter-sounds` seed): from blending sounds the meadow is the word
+# hunt (critters-word-hunt.md § 8; flows 12 and 13), and before it a
+# non-word sings and sits, quietly, with no line (Dave's safeguard). Until
+# the word hunt (2026-10-25) this flow used a CVC-words learner, whose
+# non-word boinged with a line.
 #
 # Drags are swipes between points: Maestro can't VoiceOver-activate. The
 # points are for the iPad Pro 11-inch (M5) simulator in portrait (the
@@ -34,7 +37,7 @@ tags:
     stopApp: true
     arguments:
       qaStep: add-to-10
-      seed: cvc-words
+      seed: letter-sounds
 - runFlow: ../subflows/open-app.yaml
 - extendedWaitUntil:
     visible:
@@ -112,17 +115,9 @@ tags:
     timeout: 5000
 - assertVisible:
     id: critter-seat-0
-# "aei" is no word: the sounds, the boing and tumble, Emma's line.
-- extendedWaitUntil:
-    visible:
-      id: play-game-ribbon
-    timeout: 15000
-- takeScreenshot: critters-nonword-line
-# The line ends: its caption goes; then the shelf drops home.
-- extendedWaitUntil:
-    notVisible:
-      id: play-game-ribbon
-    timeout: 20000
+# "aei" is no word: before blending sounds it sings and sits, quietly;
+# then the shelf drops home.
+- takeScreenshot: critters-nonword-quiet
 - extendedWaitUntil:
     notVisible:
       id: critter-seat-0
