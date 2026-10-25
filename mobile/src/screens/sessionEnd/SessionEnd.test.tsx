@@ -197,6 +197,69 @@ it('3rd good day: "3 of 3!", "A new path opens. Look!"; All done leaves once, 30
   expect(h.onAllDone).toHaveBeenCalledTimes(1)
 })
 
+describe('a step that grew with its row already full: Emma cheers (Thomas 2026-10-25)', () => {
+  // Three good days banked before today's session, the step not yet
+  // grown: today's pass grows it with no flower to fly (the build 21
+  // graduation-check day). A celebration day, so not idle.
+  const fullRow = (node: 'add-to-10' | 'add-two-digit') => {
+    const base = defaultProgress()
+    saveProgress({
+      ...base,
+      skillLevels: { ...base.skillLevels, [node]: 'practicing' },
+      history: [3, 2, 1].map((d) => ({
+        dateISO: daysAgo(d),
+        skillFocus: [node],
+        successRate: 1,
+      })),
+    })
+  }
+
+  it('the unlock day: tray full, no flower, "A new path opens. Look!", cheering', async () => {
+    fullRow('add-to-10')
+    const h = await setup({ ...MATH, totalCorrect: 8 })
+    expect(day()[0]).toBe('unlock')
+    expect(slots()).toEqual(['grown', 'grown', 'grown'])
+    expect(h.poses).toEqual(['cheering'])
+    await advance(15_000)
+    expect(screen.queryByTestId('session-end-new-flower')).toBeNull()
+    expect(h.played).toEqual(['guide.end.right.8', 'guide.end.path-opens'])
+    expect(h.poses).toEqual(['cheering'])
+  })
+
+  it('the world-done day: "You grew your whole garden!", cheering', async () => {
+    fullRow('add-two-digit')
+    const h = await setup({
+      ...MATH,
+      sessionFocus: { node: 'add-two-digit', mode: 'forward' },
+    })
+    expect(day()[0]).toBe('world-done')
+    expect(slots()).toEqual(['grown', 'grown', 'grown'])
+    expect(h.poses).toEqual(['cheering'])
+    await advance(15_000)
+    expect(h.played).toEqual(['guide.end.right.7', 'guide.end.world-done'])
+  })
+
+  it('a practice day stays idle', async () => {
+    // Already grown, replayed: no flower and nothing opens.
+    const base = defaultProgress()
+    saveProgress({
+      ...base,
+      skillLevels: { ...base.skillLevels, 'add-to-10': 'mastered' },
+      history: [3, 2, 1].map((d) => ({
+        dateISO: daysAgo(d),
+        skillFocus: ['add-to-10'],
+        successRate: 1,
+      })),
+    })
+    const h = await setup({
+      ...MATH,
+      sessionFocus: { node: 'add-to-10', mode: 'forward' },
+    })
+    expect(day()[0]).toBe('practice')
+    expect(h.poses).toEqual(['idle'])
+  })
+})
+
 it('not-yet day: warm praise, tray untouched, "Play again…"; Again + Home; never a negative word', async () => {
   const h = await setup({ ...MATH, totalCorrect: 5 })
   expect(day()[0]).toBe('not-yet')
