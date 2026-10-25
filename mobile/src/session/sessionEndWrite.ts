@@ -22,10 +22,14 @@
  * warm-up's Leitner outcomes first and leaves out any scored problem whose
  * fact the warm-up already recorded (one outcome per fact per session).
  *
- * The Word Song graduation split needs the planner's novel-probe word
- * list. The planner's copy lives in the server's `api/` (outside what
- * Metro bundles), so the split reads core's `NOVEL_PROBE_WORDS`, pinned to
- * the planner's by the web suite (`wordRoundParity.test.tsx`).
+ * The Word Song graduation split needs the probe words. The planner's
+ * copy lives in the server's `api/` (outside what Metro bundles), so the
+ * split reads core's `GRADUATION_PROBE_WORDS`: `NOVEL_PROBE_WORDS`, pinned
+ * to the planner's by the web suite (`wordRoundParity.test.tsx`), and the
+ * reserve's words (Dave 2026-10-24), which the app's check serves. With
+ * the reserve check on (`RESERVE_CHECK_READY`) the split is one session of
+ * a two-session check; either way it carries each probe word's first tap
+ * for the seen-record.
  */
 import { currentStepOf } from '@marian/core/hub/hubCardModel'
 import { localDateKey, now as progressNow } from '@marian/core/progress/clock'
@@ -62,7 +66,8 @@ import {
   WORDSONG_SESSION_END_BONUS,
   grantWordSongCompletionBonus,
 } from '@marian/core/shared/wordSongCompletionBonus'
-import { NOVEL_PROBE_WORDS } from '@marian/core/wordSong/novelProbeWords'
+import { GRADUATION_PROBE_WORDS } from '@marian/core/wordSong/novelProbeWords'
+import { RESERVE_CHECK_READY } from './graduationCheck'
 import type { SessionEndPayload } from './sessionEndPayload'
 
 /** The payload with the web's back-compat defaults (null → a zero math session). */
@@ -89,8 +94,10 @@ export function completionBonus(surface: SessionEndSurface): number {
 export interface SessionEndWriteOptions {
   /** Progress clock (honours the debug day offset). */
   clock?: () => Date
-  /** Word Song's novel-probe words (default: core's), for the graduation split. */
+  /** Word Song's probe words (default: core's), for the graduation split. */
   novelProbeWords?: readonly string[]
+  /** The reserve check is on (default: this build's `RESERVE_CHECK_READY`). */
+  reserveCheck?: boolean
 }
 
 export interface SessionEndResult {
@@ -123,7 +130,8 @@ export function writeSessionEnd(
     track,
     focusNode,
     p,
-    opts.novelProbeWords ?? NOVEL_PROBE_WORDS,
+    opts.novelProbeWords ?? GRADUATION_PROBE_WORDS,
+    opts.reserveCheck ?? RESERVE_CHECK_READY,
   )
   const leitnerOutcomes =
     p.surface === 'math' ? forwardLeitnerOutcomes(p) : undefined
@@ -271,9 +279,31 @@ export function forwardLeitnerOutcomes(
 }
 
 /**
+ * How a check scores its probe words: the one switch (Dave 2026-10-24,
+ * run run_3d3d82fb3b65 message msg_a4e2ea6ad291).
+ *
+ * - `'first-tap'` (the ruling): a probe word is right only when her first
+ *   tap was (`firstTapCorrect`, WordSong's scored problems). A session
+ *   without first taps is no check session (no fall-back). At 5 of 6, a
+ *   90% decoder passes 0.89 and a pure guesser 0.018.
+ * - `'any-tap'` (before the ruling): `perProblemCorrect`, right unless Emma
+ *   gave the answer at the 3rd wrong tap, so a child who taps each chip
+ *   once always passes.
+ *
+ * The practised words keep `perProblemCorrect` either way (the canonical
+ * slice and its 90% rule), as do regular sessions and the 90/3 score.
+ */
+export type ProbeScoring = 'first-tap' | 'any-tap'
+export const PROBE_SCORING: ProbeScoring = 'first-tap'
+
+/**
  * Word Song graduation split (web `computeGraduationSplit`, ticket
  * 86c9m3aec): only when the engine flagged this session as graduation AND
- * the plan used novel-pool words; else `null`.
+ * the plan used novel-pool words; else `null`. The probe words score by
+ * `scoring` ({@link PROBE_SCORING}), the practised ones by
+ * `perProblemCorrect`. It carries each probe word's score for the
+ * seen-record and, with `twoSessions` (the reserve check), marks the
+ * session as one of a two-session check (core `progressHistory.ts`).
  */
 export function computeGraduationSplit(
   progress: Progress,
@@ -281,29 +311,43 @@ export function computeGraduationSplit(
   focusNode: SkillNode,
   payload: SessionEndPayload,
   novelProbeWords: readonly string[] | undefined,
+  twoSessions = false,
+  scoring: ProbeScoring = PROBE_SCORING,
 ): GraduationSessionSplit | null {
   if (track !== 'word-song' || novelProbeWords === undefined) return null
   const { targetWords, perProblemCorrect } = payload
   if (!targetWords || !perProblemCorrect) return null
   if (targetWords.length !== perProblemCorrect.length) return null
+  const probeScores =
+    scoring === 'first-tap' ? payload.firstTapCorrect : perProblemCorrect
+  if (!probeScores || probeScores.length !== targetWords.length) return null
   if (!isGraduationSessionPending(progress, focusNode, track)) return null
   const novel = new Set(novelProbeWords)
   let canonicalCount = 0
   let canonicalCorrect = 0
   let novelCount = 0
   let novelCorrect = 0
+  const probes: { word: string; correct: boolean }[] = []
   targetWords.forEach((word, i) => {
-    const correct = perProblemCorrect[i] === true
     if (novel.has(word)) {
+      const correct = probeScores[i] === true
       novelCount += 1
       if (correct) novelCorrect += 1
+      probes.push({ word, correct })
     } else {
       canonicalCount += 1
-      if (correct) canonicalCorrect += 1
+      if (perProblemCorrect[i] === true) canonicalCorrect += 1
     }
   })
   if (novelCount === 0) return null
-  return { canonicalCorrect, canonicalCount, novelCorrect, novelCount }
+  return {
+    canonicalCorrect,
+    canonicalCount,
+    novelCorrect,
+    novelCount,
+    probes,
+    ...(twoSessions ? { twoSessions: true } : {}),
+  }
 }
 
 /**

@@ -13,6 +13,7 @@ export type {
   MasteryThreshold,
   MasteryTrackKey,
   MathFact,
+  NovelPoolPart,
   NumberGardenNode,
   ParentSettings,
   PerTrackMasteryThreshold,
@@ -41,9 +42,14 @@ export { CURRENT_SCHEMA_VERSION } from './types'
 export {
   applyMathOutcomes,
   mathSeenKey,
+  recordProbeResults,
+  recordWordsMet,
   seedSeenItems,
   seenItemsOf,
+  withWordsMet,
+  wordSeenKey,
   type MathOutcome,
+  type ProbeResult,
 } from './seenItems'
 
 export {
@@ -116,6 +122,7 @@ export {
   applyMasteryRule,
   crossVowelMixingActive,
   cvcReviewEligible,
+  graduationCheckFirstHalf,
   isGraduationSessionPending,
   nextNode,
 } from './mastery'

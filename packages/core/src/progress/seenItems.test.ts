@@ -13,8 +13,12 @@ import { isProgressV1 } from './guards'
 import {
   applyMathOutcomes,
   mathSeenKey,
+  recordProbeResults,
+  recordWordsMet,
   seedSeenItems,
   seenItemsOf,
+  withWordsMet,
+  wordSeenKey,
 } from './seenItems'
 import { loadProgress, saveProgress } from './storage'
 import type { LeitnerBox, MathFact, Progress, SeenItems } from './types'
@@ -363,5 +367,160 @@ describe('applyMathOutcomes: a fact promotes at most once a day, and only when d
     const snapshot = JSON.stringify({ b, seen })
     applyMathOutcomes(b, seen, [{ fact: f, correct: true }], at(AFTERNOON))
     expect(JSON.stringify({ b, seen })).toBe(snapshot)
+  })
+})
+
+describe('seenItems: words (the cvc-words probe reserve, Dave 2026-10-24)', () => {
+  const MORNING = '2026-10-24T08:00:00.000Z'
+  const EVENING = '2026-10-24T19:00:00.000Z'
+
+  it('a word key never collides with a math key', () => {
+    expect(wordSeenKey('ham')).toBe('word:ham')
+    for (const f of [fact(3, '+', 4), fact(9, '-', 1), fact(2, '+', 5)]) {
+      expect(mathSeenKey(f).startsWith('math:')).toBe(true)
+      expect(mathSeenKey(f)).not.toBe(wordSeenKey(`${f.a}${f.op}${f.b}`))
+    }
+  })
+
+  it('the guard takes a word record with a check result, and a newer build’s value', () => {
+    expect(
+      isProgressV1(
+        withSeen({
+          'word:ham': { day: '2026-10-24', count: 1, correct: null },
+          'word:cab': {
+            day: '2026-10-24',
+            count: 2,
+            correct: true,
+            check: 'right',
+            checkDay: '2026-10-22',
+          },
+          'word:rag': {
+            day: '2026-10-24',
+            count: 1,
+            correct: false,
+            check: 'missed',
+          },
+          'word:ram': {
+            day: '2026-10-24',
+            count: 1,
+            correct: null,
+            check: 'skipped',
+          },
+        }),
+      ),
+    ).toBe(true)
+    expect(
+      isProgressV1(
+        withSeen({
+          'word:ham': { day: '2026-10-24', count: 1, correct: null, check: 1 },
+        }),
+      ),
+    ).toBe(false)
+    expect(
+      isProgressV1(
+        withSeen({
+          'word:ham': {
+            day: '2026-10-24',
+            count: 1,
+            correct: false,
+            check: 'missed',
+            checkDay: 20261024,
+          },
+        }),
+      ),
+    ).toBe(false)
+  })
+
+  it('a word met (Letter Critters): a new record, then a count; its check result is kept', () => {
+    const once = recordWordsMet({}, ['ham'], at(MORNING))
+    expect(once).toEqual({
+      'word:ham': { day: dayOf(MORNING), count: 1, correct: null },
+    })
+    const checked: SeenItems = {
+      'word:ham': {
+        day: '2026-10-20',
+        count: 1,
+        correct: false,
+        check: 'missed',
+      },
+    }
+    expect(recordWordsMet(checked, ['ham', 'ham'], at(EVENING))).toEqual({
+      'word:ham': {
+        day: dayOf(EVENING),
+        count: 2,
+        correct: false,
+        check: 'missed',
+      },
+    })
+    expect(checked['word:ham']!.count).toBe(1)
+  })
+
+  it('a check writes each probe word’s first tap and its most recent result with the day (Dave 2026-10-24)', () => {
+    const seen = recordProbeResults(
+      { 'word:cab': { day: '2026-10-20', count: 3, correct: null } },
+      [
+        { word: 'cab', correct: true },
+        { word: 'ham', correct: false },
+      ],
+      at(MORNING),
+    )
+    expect(seen).toEqual({
+      'word:cab': {
+        day: dayOf(MORNING),
+        count: 4,
+        correct: true,
+        check: 'right',
+        checkDay: dayOf(MORNING),
+      },
+      'word:ham': {
+        day: dayOf(MORNING),
+        count: 1,
+        correct: false,
+        check: 'missed',
+        checkDay: dayOf(MORNING),
+      },
+    })
+    const later = recordProbeResults(
+      seen,
+      [{ word: 'ham', correct: true }],
+      at(EVENING),
+    )
+    expect(later['word:ham']).toEqual({
+      day: dayOf(EVENING),
+      count: 2,
+      correct: true,
+      check: 'right',
+      checkDay: dayOf(EVENING),
+    })
+    // Letter Critters later keeps the check result and its day.
+    const metAgain = recordWordsMet(later, ['ham'], at('2026-10-26T09:00:00'))
+    expect(metAgain['word:ham']).toMatchObject({
+      check: 'right',
+      checkDay: dayOf(EVENING),
+      count: 3,
+    })
+  })
+
+  it('the first word written to a doc without the field keeps the math seed (migration)', () => {
+    const p: Progress = {
+      ...defaultProgress(),
+      history: [
+        {
+          dateISO: '2026-10-20T09:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 1,
+          mathFacts: [fact(3, '+', 4)],
+        },
+      ],
+    }
+    expect(withWordsMet(p, ['ham'], at(MORNING)).seenItems).toEqual({
+      'math:3+4': {
+        day: dayOf('2026-10-20T09:00:00.000Z'),
+        count: 1,
+        correct: null,
+      },
+      'word:ham': { day: dayOf(MORNING), count: 1, correct: null },
+    })
+    expect(withWordsMet(p, [], at(MORNING))).toBe(p)
   })
 })

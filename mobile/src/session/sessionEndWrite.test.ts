@@ -7,16 +7,20 @@ import {
   defaultProgress,
   loadProgress,
   saveProgress,
+  type Progress,
 } from '@marian/core/progress'
 import { loadStardust } from '@marian/core/shared/stardust'
 import { readSessionHistory } from '@marian/core/sessionEnd/sessionHistory'
+import { GRADUATION_PROBE_WORDS } from '@marian/core/wordSong/novelProbeWords'
 import type { SessionEndPayload } from './sessionEndPayload'
 import {
   buildLeitnerOutcomes,
   computeGraduationSplit,
   forwardLeitnerOutcomes,
   normalizeSessionEndPayload,
+  PROBE_SCORING,
   writeSessionEnd,
+  type ProbeScoring,
 } from './sessionEndWrite'
 
 const MATH: SessionEndPayload = {
@@ -229,6 +233,7 @@ it("Word Song graduation: the split uses core's novel probe words by default", (
     earnedThisSession: 0,
     targetWords: ['cat', 'nap', 'bag', 'rat', 'fan', 'man', 'tap', 'hat'],
     perProblemCorrect: [true, true, true, false, true, true, true, true],
+    firstTapCorrect: [true, true, true, false, true, true, true, true],
     sessionFocus: { node: 'cvc-words', mode: 'forward' },
   }
   writeSessionEnd(ws, { clock })
@@ -236,4 +241,87 @@ it("Word Song graduation: the split uses core's novel probe words by default", (
   expect(loadProgress()?.history.at(-1)?.novelPoolSuccessRate).toBeCloseTo(
     2 / 3,
   )
+})
+
+describe('probe words score on the first tap (Dave 2026-10-24, msg_a4e2ea6ad291)', () => {
+  const base = defaultProgress()
+  const pending: Progress = {
+    ...base,
+    skillLevels: { ...base.skillLevels, 'cvc-words': 'practicing' },
+    goodDays: { 'cvc-words': [daysAgo(3), daysAgo(2), daysAgo(1)] },
+  }
+  // Probes at problems 2, 5 and 7 (nap, rat, tap), as the device's check.
+  const WORDS = ['cat', 'nap', 'bag', 'van', 'rat', 'man', 'tap', 'hat']
+  const PROBE = [false, true, false, false, true, false, true, false]
+  const check = (
+    perProblemCorrect: boolean[],
+    firstTapCorrect?: boolean[],
+  ): SessionEndPayload => ({
+    ...MATH,
+    surface: 'word-song',
+    targetWords: WORDS,
+    perProblemCorrect,
+    ...(firstTapCorrect !== undefined ? { firstTapCorrect } : {}),
+  })
+  const split = (payload: SessionEndPayload, scoring?: ProbeScoring) =>
+    computeGraduationSplit(
+      pending,
+      'word-song',
+      'cvc-words',
+      payload,
+      GRADUATION_PROBE_WORDS,
+      false,
+      scoring,
+    )
+
+  it('the switch is set to first tap', () => {
+    expect(PROBE_SCORING).toBe('first-tap')
+  })
+
+  it('a decoder (every first tap right): 3 of 3, each probe right', () => {
+    const all = WORDS.map(() => true)
+    expect(split(check(all, all))).toMatchObject({
+      novelCorrect: 3,
+      novelCount: 3,
+      probes: [
+        { word: 'nap', correct: true },
+        { word: 'rat', correct: true },
+        { word: 'tap', correct: true },
+      ],
+    })
+  })
+
+  it('a child who taps every chip (solved, first taps wrong on the probes): 0 of 3', () => {
+    const solved = WORDS.map(() => true)
+    const firstTaps = PROBE.map((probe) => !probe)
+    expect(split(check(solved, firstTaps))).toMatchObject({
+      novelCorrect: 0,
+      novelCount: 3,
+    })
+    // Before the ruling the same session scored 3 of 3.
+    expect(split(check(solved, firstTaps), 'any-tap')).toMatchObject({
+      novelCorrect: 3,
+    })
+  })
+
+  it('no first taps: no check session (no fall-back to perProblemCorrect)', () => {
+    const all = WORDS.map(() => true)
+    expect(split(check(all))).toBeNull()
+    expect(split(check(all, [true, true]))).toBeNull()
+  })
+
+  it('the practised words keep perProblemCorrect (the canonical slice and its 90% rule)', () => {
+    const solved = WORDS.map(() => true)
+    const firstTaps = PROBE.map((probe) => probe)
+    expect(split(check(solved, firstTaps))).toMatchObject({
+      canonicalCorrect: 5,
+      canonicalCount: 5,
+      novelCorrect: 3,
+    })
+    const canonMissed = WORDS.map((_, i) => i !== 0)
+    expect(split(check(canonMissed, solved))).toMatchObject({
+      canonicalCorrect: 4,
+      canonicalCount: 5,
+    })
+  })
 })

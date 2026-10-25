@@ -597,21 +597,28 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
       expect(CRITTER_SAID_WORDS).toContain(w)
   })
 
-  it('C10 (Thomas 2026-10-23, build 20): CRITTER_SAID_PICTURE_WORDS is exactly the said words with a bundled pack picture: 9, sorted', () => {
+  it('C10 (Thomas 2026-10-23, build 20): CRITTER_SAID_PICTURE_WORDS is exactly the said words with a bundled pack picture: 13, sorted', () => {
     const bundled = bundledPictures()
     // The registry read works: every picture word's picture is found.
     for (const w of ALL_45) expect(bundled.has(w)).toBe(true)
+    // The probe reserve's pictured said words pop like rat (Thomas
+    // 2026-10-24): cab, ham, pad and ram. rag is no critter word.
     expect(CRITTER_SAID_PICTURE_WORDS).toEqual([
       'bun',
+      'cab',
       'gum',
+      'ham',
       'hut',
       'map',
       'nap',
+      'pad',
       'pop',
+      'ram',
       'rat',
       'tap',
       'top',
     ])
+    expect(CRITTER_SAID_WORDS).not.toContain('rag')
     expect(CRITTER_SAID_PICTURE_WORDS).toEqual(
       CRITTER_SAID_WORDS.filter((w) => bundled.has(w)),
     )

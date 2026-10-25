@@ -21,6 +21,7 @@
       "cup",
       "gum",
       "hot",
+      "pad",
       "sun"
     ]
   },
@@ -49,6 +50,7 @@
       "log",
       "mat",
       "pan",
+      "ram",
       "sun",
       "van"
     ]
@@ -76,6 +78,7 @@
       "drum",
       "fox",
       "gum",
+      "ham",
       "hand",
       "harp",
       "hot",
@@ -87,6 +90,7 @@
       "nut",
       "pond",
       "pot",
+      "rat",
       "ring",
       "sun"
     ]
@@ -108,6 +112,7 @@
       "bat",
       "bug",
       "bus",
+      "cab",
       "cake",
       "cape",
       "card",
@@ -137,7 +142,7 @@
       "a flat cartoon mouse icon",
       "a scary or dirty sewer rat"
     ],
-    "distinctFrom": ["bat", "bus", "cup", "mat"]
+    "distinctFrom": ["bat", "cat", "bus", "cup", "hat", "mat"]
   },
   {
     "word": "map",
@@ -193,6 +198,8 @@
       "a snout or curly tail, like a pig"
     ],
     "distinctFrom": [
+      "rat",
+      "ram",
       "dog",
       "pig",
       "sheep",
@@ -241,6 +248,7 @@
       "a mouse or rat with no wings"
     ],
     "distinctFrom": [
+      "rat",
       "bag",
       "boat",
       "cap",
@@ -252,7 +260,6 @@
       "hut",
       "mat",
       "mom",
-      "rat",
       "sun",
       "tag"
     ]
@@ -294,7 +301,7 @@
       "a bag with a handle",
       "a map"
     ],
-    "distinctFrom": ["bag", "bat", "bug", "cup", "dog", "mom", "pen"]
+    "distinctFrom": ["bag", "bat", "bug", "cup", "dog", "mom", "pen", "rag"]
   },
   {
     "word": "bag",
@@ -332,6 +339,7 @@
       "mom",
       "pan",
       "pen",
+      "rag",
       "rug",
       "sun",
       "tag",
@@ -361,6 +369,7 @@
       "mom",
       "mop",
       "nap",
+      "pad",
       "pen",
       "sun",
       "tap",
@@ -379,6 +388,7 @@
       "letters or a logo"
     ],
     "distinctFrom": [
+      "cab",
       "bus",
       "car",
       "jeep",
@@ -440,6 +450,7 @@
     "distinctFrom": [
       "drum",
       "bun",
+      "cab",
       "chain",
       "dog",
       "fan",
@@ -461,7 +472,17 @@
       "a spoon or bread",
       "a closed tin"
     ],
-    "distinctFrom": ["bag", "bus", "dog", "gum", "log", "mom", "pan"]
+    "distinctFrom": [
+      "bag",
+      "bus",
+      "dog",
+      "gum",
+      "ham",
+      "log",
+      "mom",
+      "pan",
+      "ram"
+    ]
   },
   {
     "word": "mom",
@@ -643,6 +664,7 @@
       "a toy dog"
     ],
     "distinctFrom": [
+      "ram",
       "cat",
       "pig",
       "sheep",
@@ -652,6 +674,7 @@
       "box",
       "bug",
       "bus",
+      "cab",
       "cake",
       "can",
       "cap",
@@ -675,6 +698,7 @@
       "mat",
       "mom",
       "mop",
+      "pad",
       "pan",
       "peach",
       "pen",
@@ -875,6 +899,7 @@
       "fox",
       "frog",
       "goat",
+      "ham",
       "hat",
       "hen",
       "hoop",
@@ -891,6 +916,7 @@
       "pen",
       "pine",
       "pond",
+      "rag",
       "rat",
       "rock",
       "rug",
@@ -1070,6 +1096,7 @@
       "letters or route numbers"
     ],
     "distinctFrom": [
+      "cab",
       "van",
       "car",
       "jeep",
@@ -1085,6 +1112,7 @@
       "dad",
       "dog",
       "fan",
+      "ham",
       "hand",
       "harp",
       "hoop",
@@ -1126,6 +1154,7 @@
       "bug",
       "bun",
       "bus",
+      "cab",
       "can",
       "car",
       "cart",
@@ -1155,9 +1184,11 @@
       "mop",
       "nap",
       "nut",
+      "pad",
       "pan",
       "pen",
       "pot",
+      "ram",
       "rope",
       "rug",
       "sack",
@@ -1310,6 +1341,7 @@
       "mud or a farm"
     ],
     "distinctFrom": [
+      "ram",
       "dog",
       "cat",
       "sheep",
@@ -1498,6 +1530,8 @@
       "net",
       "pan",
       "peach",
+      "rag",
+      "ram",
       "sun",
       "tag",
       "train",
@@ -2202,6 +2236,7 @@
       "jeepney paint or words"
     ],
     "distinctFrom": [
+      "cab",
       "bus",
       "car",
       "van",
@@ -2225,6 +2260,7 @@
       "a cloud shape"
     ],
     "distinctFrom": [
+      "ram",
       "cat",
       "dog",
       "pig",
@@ -2385,6 +2421,7 @@
       "a number plate"
     ],
     "distinctFrom": [
+      "cab",
       "bus",
       "jeep",
       "van",
@@ -2409,6 +2446,7 @@
       "letters or numbers"
     ],
     "distinctFrom": [
+      "cab",
       "bus",
       "car",
       "jeep",
@@ -2428,6 +2466,7 @@
     "subject": "A goat standing in side view: a cream-white coat, two short curved horns, a small pointed beard and a short upright tail.",
     "avoid": ["a sheep's round fleece", "a dog", "a deer's antlers", "a cow"],
     "distinctFrom": [
+      "ram",
       "cat",
       "dog",
       "pig",
@@ -2599,5 +2638,98 @@
     "subject": "One silver spoon lying at a slight angle: an oval bowl and a long thin handle.",
     "avoid": ["a fork", "a ladle", "a pan", "food in it"],
     "distinctFrom": ["bug", "jet", "moon", "mop", "sock", "star", "stool"]
+  },
+  {
+    "word": "ham",
+    "tier": "short-a",
+    "batch": 18,
+    "subject": "One cooked ham in three-quarter view: a rounded rose-pink joint with a golden-brown glazed rind scored in a criss-cross pattern on top, and a short cream bone sticking out at one end.",
+    "avoid": [
+      "a glass jar, like jam",
+      "a pig or any animal",
+      "slices on a plate or a sandwich",
+      "a chicken drumstick",
+      "a bread bun or loaf"
+    ],
+    "distinctFrom": ["bus", "cup", "hat", "jam"]
+  },
+  {
+    "word": "cab",
+    "tier": "short-a",
+    "batch": 18,
+    "subject": "A bright yellow taxi cab in side view: a rounded car body, two side windows, two black tyres, a band of small black-and-white checks along the side and a plain cream sign box on the roof.",
+    "avoid": [
+      "a red car with no roof sign, like the car",
+      "a boxy van with a side door",
+      "a long bus with many windows",
+      "an open-top jeep",
+      "letters, numbers or a logo",
+      "a driver or passengers"
+    ],
+    "distinctFrom": [
+      "bus",
+      "car",
+      "jeep",
+      "train",
+      "van",
+      "can",
+      "cap",
+      "dog",
+      "sun"
+    ]
+  },
+  {
+    "word": "rag",
+    "tier": "short-a",
+    "batch": 18,
+    "subject": "One crumpled cleaning rag: a square of soft sky-blue cloth with frayed edges, loosely bunched in a heap, with a few small white soap bubbles on it.",
+    "avoid": [
+      "a bag with a handle",
+      "a flat striped mat or a fringed rug",
+      "a sack tied with a rope",
+      "a folded towel on a rail",
+      "a shirt or other clothing",
+      "a bucket or a hand"
+    ],
+    "distinctFrom": ["bag", "cup", "pen", "tag"]
+  },
+  {
+    "word": "ram",
+    "tier": "short-a",
+    "batch": 18,
+    "subject": "A ram, a male sheep, standing in side view: a thick cream woolly fleece, a dark-grey face, four thin dark legs and two big curled horns spiralling round beside its ears.",
+    "avoid": [
+      "a sheep with no horns, like the sheep",
+      "a goat's short thin horns and pointed beard",
+      "a deer's branching antlers",
+      "a cow or a bull",
+      "a lamb"
+    ],
+    "distinctFrom": [
+      "cat",
+      "dog",
+      "goat",
+      "pig",
+      "sheep",
+      "jam",
+      "man",
+      "pen",
+      "sun"
+    ]
+  },
+  {
+    "word": "pad",
+    "tier": "short-a",
+    "batch": 18,
+    "subject": "One small notepad in three-quarter view: a stack of plain cream pages with faint pale-blue ruled lines and a silver spiral wire binding along the top edge.",
+    "avoid": [
+      "a book with a cover and a spine",
+      "a paper tag on a string",
+      "a map with land shapes",
+      "writing, letters or numbers on the page",
+      "a tablet or a phone",
+      "a pen or pencil"
+    ],
+    "distinctFrom": ["dad", "dog", "pan", "sun"]
   }
 ]

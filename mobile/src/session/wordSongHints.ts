@@ -37,15 +37,13 @@ import {
   type SessionPlanKind,
 } from '@marian/core/progress/reviewPlan'
 import { readSessionHistory } from '@marian/core/sessionEnd/sessionHistory'
-import {
-  graduationAttempts,
-  graduationProbeWords,
-} from '@marian/core/wordSong/graduationCheck'
+import { graduationCheckWords } from '@marian/core/wordSong/probeReserve'
 import type {
   IntroGuideLineId,
   PrefetchKey,
   SessionStartPayload,
 } from '../audio'
+import { RENDERED_PROBE_WORDS } from './graduationCheck'
 import { planKindFields, planModeOf, sessionIntroFor } from './reviewSession'
 
 /** The progress hints the Word Song request carries. */
@@ -63,7 +61,8 @@ export interface WordSongProgressHints {
   planKind: SessionPlanKind
   /** The focus step's intro lead line (content wave 1 § 6.1), if it plays. */
   intro?: IntroGuideLineId | null
-  /** A due graduation check's probe words (core `graduationProbeWords`). */
+  /** A due graduation check's probe words (core `graduationCheckWords`):
+   *  the reserve's once every reserve word is rendered, else today's. */
   probeWords?: readonly string[]
   /** With the vowel map: the session count at kick time, which varies the
    *  vowel session's letters (the Hub prefetch and the tap agree). */
@@ -80,8 +79,13 @@ const NO_HINTS: WordSongProgressHints = {
   planKind: { kind: 'forward', warmup: [] },
 }
 
-/** Read the hints from the persisted progress, exactly as the web does. */
-export function readWordSongProgressHints(): WordSongProgressHints {
+/**
+ * Read the hints from the persisted progress, exactly as the web does.
+ * `rendered`: the probe words with bundled audio (a test seam).
+ */
+export function readWordSongProgressHints(
+  rendered: ReadonlySet<string> = RENDERED_PROBE_WORDS,
+): WordSongProgressHints {
   const progress = loadProgress()
   if (progress === null) return NO_HINTS
   const sessionCount = readSessionHistory().sessionCount
@@ -99,17 +103,16 @@ export function readWordSongProgressHints(): WordSongProgressHints {
     node,
     'word-song',
   )
+  const probeWords = isGraduationSession
+    ? graduationCheckWords(progress, node, rendered)
+    : undefined
   return {
     intro: sessionIntroFor(progress, node, planKind),
     focusNode: node,
     focusMode: mode,
     recentSuccessRate: pickRecentSuccessRate(progress, 'word-song'),
     isGraduationSession,
-    ...(isGraduationSession
-      ? {
-          probeWords: graduationProbeWords(graduationAttempts(progress, node)),
-        }
-      : {}),
+    ...(probeWords !== undefined ? { probeWords } : {}),
     lifetimeFirstEncounters: progress.lifetimeFirstEncounters ?? [],
     letterSoundsVowelStates:
       node === 'letter-sounds'

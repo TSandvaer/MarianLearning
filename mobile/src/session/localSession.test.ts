@@ -282,7 +282,7 @@ describe('startSessionLocalFirst', () => {
     expect(currentSessionAudio()).toBeNull()
   })
 
-  it('every served line of every bundled canon file has its bundled clip', () => {
+  it('every served line of every bundled canon file has its bundled clip, but the probe reserve’s 25 lines awaiting their render', () => {
     // A pool line may wait for its render (phase 5a): `./mathPools.test.ts`.
     const missing: string[] = []
     for (const [path, entry] of Object.entries(CANON)) {
@@ -290,7 +290,17 @@ describe('startSessionLocalFirst', () => {
         if (canonClipFor(u.text) === undefined) missing.push(`${path} ${u.id}`)
       }
     }
-    expect(missing).toEqual([])
+    // The probe file's five new words (Dave 2026-10-24) are text only until
+    // their render; no focus node is the probe file, and the check serves
+    // no word without audio (graduationCheck.test.ts). The render PR
+    // empties this list (as `scripts/canonIntegrity.test.ts`'s).
+    expect(missing).toEqual(
+      [5, 6, 7, 8, 9].flatMap((i) =>
+        ['read', 'correct', 'hint', 'giveAnswer', 'blend'].map(
+          (slot) => `word-song/level-1/cvc-words-probe word.p${i}.${slot}`,
+        ),
+      ),
+    )
     expect(
       bundledCanonText({ track: 'math', level: 2, focusNode: 'add-to-10' }),
     ).toBeNull()

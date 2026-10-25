@@ -2,16 +2,25 @@
  * The Play place end to end on an in-memory store (play-place spec § 1.4,
  * § 1.6; ACs N4, N5, N6, N16): Hub → Play → a full Raft crossing trip →
  * the Play place, quiet → Letter critters with a word, a non-word and a
- * pair → Back → Home → the Hub. Zero key-value writes: progress, the
- * session history and stardust are byte-identical, nothing reaches the
- * network and no Session End mounts. Back mid-drag, mid-crossing, while a
- * word's picture shows, and a trip to the background keep that.
+ * pair → Back → Home → the Hub. The Raft writes nothing. Letter critters'
+ * one write is each word Emma says, into the progress doc's seen-record
+ * (Dave 2026-10-24: the cvc-words probe reserve skips a word she met
+ * there); everything else in the doc, the session history and stardust are
+ * byte-identical, nothing reaches the network and no Session End mounts.
+ * Back mid-drag, mid-crossing, while a word's picture shows, and a trip to
+ * the background keep that.
  *
  * Lines play their bundled clips on the fake expo-audio players; the test
  * starts and ends each (`finishPlayLine`, as App.game's `finishGameLine`).
  */
 import { CRITTER_PICTURE_WORDS } from '@marian/core/games/playPlace'
-import { loadProgress, saveProgress, STORAGE_KEY } from '@marian/core/progress'
+import {
+  loadProgress,
+  saveProgress,
+  seenItemsOf,
+  STORAGE_KEY,
+  type Progress,
+} from '@marian/core/progress'
 import { SESSION_HISTORY_KEY } from '@marian/core/sessionEnd/sessionHistory'
 import { loadStardust } from '@marian/core/shared/stardust'
 import { WARM_CAP_MS } from '@marian/core/splash/splashTiming'
@@ -152,6 +161,40 @@ function snapshot() {
   }
 }
 
+/**
+ * Since `before`, the only change is Letter critters' seen-record write:
+ * `words` (the words Emma said) under `word:` keys, the math records as they
+ * were (seeded when the doc had none). No other key, no fetch, no history
+ * or stardust change.
+ */
+function expectOnlyWordsMet(
+  before: ReturnType<typeof snapshot>,
+  words: readonly string[],
+) {
+  const now = snapshot()
+  expect({ ...now, progress: null, writes: null }).toEqual({
+    ...before,
+    progress: null,
+    writes: null,
+  })
+  const was = JSON.parse(before.progress!) as Progress
+  const is = JSON.parse(now.progress!) as Progress
+  const { seenItems: seenNow, ...restNow } = is
+  expect({ ...restNow, seenItems: undefined }).toEqual({
+    ...was,
+    seenItems: undefined,
+  })
+  const wordKeys = Object.keys(seenNow ?? {}).filter((k) =>
+    k.startsWith('word:'),
+  )
+  expect(wordKeys.sort()).toEqual(words.map((w) => `word:${w}`).sort())
+  const math = Object.fromEntries(
+    Object.entries(seenNow ?? {}).filter(([k]) => !k.startsWith('word:')),
+  )
+  expect(math).toEqual(seenItemsOf(was))
+  expect(now.writes - before.writes).toBe(words.length)
+}
+
 const touch = (x: number, y: number) => {
   const t = { identifier: '1', pageX: x, pageY: y }
   return { nativeEvent: { ...t, changedTouches: [t], touches: [t] } }
@@ -235,7 +278,7 @@ afterEach(() => {
   jest.useRealTimers()
 })
 
-it('N4, N5: a full raft trip and a critters visit write nothing and call nothing', async () => {
+it('N4, N5: a full raft trip writes nothing; a critters visit writes only the words Emma says; neither calls anything', async () => {
   boot('cvc-words')
   withRaft()
   await toHub()
@@ -264,6 +307,8 @@ it('N4, N5: a full raft trip and a critters visit write nothing and call nothing
   await settle(1500)
   expect(playLine()).toBeNull()
   expect(screen.queryByTestId('play-bubble')).not.toBeOnTheScreen()
+  // The whole raft trip wrote and fetched nothing.
+  expect(snapshot()).toEqual(before)
 
   await open('critters')
   // A word, a non-word and a pair, from the letters this visit shows (16 of
@@ -307,15 +352,16 @@ it('N4, N5: a full raft trip and a critters visit write nothing and call nothing
   await settle(300)
   expect(screen.getByTestId('play-place')).toBeOnTheScreen()
   expect(screen.queryByTestId('session-end')).not.toBeOnTheScreen()
-  // Everything from the Hub's Play tap to here wrote and fetched nothing.
-  expect(snapshot()).toEqual(before)
+  // From the Hub's Play tap to here: only the picture word Emma said, in
+  // the seen-record; no fetch.
+  expectOnlyWordsMet(before, [picture])
   // Home: the Hub (which decides its own visit on mount, as on any return).
   await fireEvent.press(screen.getByTestId('play-home'))
   await settle(500)
   expect(screen.getByTestId('hub')).toBeOnTheScreen()
 })
 
-it('N6: Back mid-drag, mid-crossing and while a picture shows, and a background mid-crossing, write nothing', async () => {
+it('N6: Back mid-drag, mid-crossing and while a picture shows, and a background mid-crossing, write nothing but the word Emma said', async () => {
   boot('cvc-words')
   withRaft()
   await toHub()
@@ -361,7 +407,7 @@ it('N6: Back mid-drag, mid-crossing and while a picture shows, and a background 
   await fireEvent.press(screen.getByTestId('play-game-back'))
   await settle(3000)
   expect(screen.getByTestId('play-place')).toBeOnTheScreen()
-  expect(snapshot()).toEqual(before)
+  expectOnlyWordsMet(before, [picture])
 })
 
 it('N16: a learner on numbers and letter names has the Play disc and the critters (Thomas 2026-10-22)', async () => {

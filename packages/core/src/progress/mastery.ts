@@ -54,6 +54,7 @@ import type {
   GoodDays,
   LetterSoundsVowel,
   MasteryThreshold,
+  NovelPoolPart,
   NumberGardenNode,
   ParentSettings,
   Progress,
@@ -941,6 +942,50 @@ export function isGraduationGated(node: SkillNode): boolean {
 }
 
 /**
+ * The first session of `node`'s two-session reserve check, when the
+ * node's most recent session (every session, not deduped by day) was one:
+ * its part record (`SessionHistoryEntry.novelPoolPart`). `null` otherwise,
+ * so a session in between, or a check on another step, starts a new check.
+ *
+ * The reserve check (Dave 2026-10-24, `wordSong/probeReserve.ts`) puts 6
+ * probe words across two consecutive sessions and passes at 5 of 6. It
+ * fits the gate below unchanged: the first session's entry carries the
+ * part record and no `novelPoolSuccessRate`, so it neither clears the gate
+ * nor starts the cooldown in `isGraduationSessionPending`, and the next
+ * session is a check again; the second session's entry carries the rate
+ * over all 6 (`sessionEnd/progressHistory.ts`), which the gate and the
+ * cooldown read as a one-session check's. An older build or the frozen
+ * web reads the pair the same way: a regular session, then one check. The
+ * guard does not check the field, so a malformed part record reads as none.
+ */
+export function graduationCheckFirstHalf(
+  progress: Pick<Progress, 'history'>,
+  node: SkillNode,
+): NovelPoolPart | null {
+  const focused = progress.history.filter((entry) =>
+    entry.skillFocus.includes(node),
+  )
+  const part: unknown = focused[focused.length - 1]?.novelPoolPart
+  return isNovelPoolPart(part) ? part : null
+}
+
+const isWordList = (v: unknown): v is string[] =>
+  Array.isArray(v) && v.every((w) => typeof w === 'string')
+
+function isNovelPoolPart(v: unknown): v is NovelPoolPart {
+  if (typeof v !== 'object' || v === null) return false
+  const { words, correct, next } = v as Record<string, unknown>
+  return (
+    isWordList(words) &&
+    typeof correct === 'number' &&
+    Number.isInteger(correct) &&
+    correct >= 0 &&
+    correct <= words.length &&
+    (next === undefined || isWordList(next))
+  )
+}
+
+/**
  * For a graduation-gated node already passing `qualifies()`, return
  * true iff the MOST RECENT (cross-day-deduped) session on the node was
  * a good session (`successRate >= threshold.percent`, as the old
@@ -954,7 +999,8 @@ export function isGraduationGated(node: SkillNode): boolean {
  * non-graduation entries (no `novelPoolSuccessRate`); requiring them to
  * clear the novel gate would never be satisfiable. The good days
  * themselves are counted by `qualifies()`, in any order (ticket
- * 123jpnbc3dm).
+ * 123jpnbc3dm). A two-session reserve check's rate sits on its second
+ * session's entry, pooled over both (`graduationCheckFirstHalf`).
  */
 export function graduationGateClears(
   history: readonly SessionHistoryEntry[],

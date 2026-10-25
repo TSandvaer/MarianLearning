@@ -41,7 +41,9 @@ function canonBlends(): Map<string, { bytes: number; sha256: string }> {
           }[]
         }
         for (const u of json.utterances ?? []) {
-          if (/^word\.p\d+\.blend$/.test(u.id) && u.audio) {
+          // A line awaiting its Lily render (the probe reserve's new
+          // words, Dave 2026-10-24) has no clip yet, so no marks.
+          if (/^word\.p\d+\.blend$/.test(u.id) && u.audio?.base64) {
             const mp3 = Buffer.from(u.audio.base64, 'base64')
             out.set(u.text, {
               bytes: mp3.length,

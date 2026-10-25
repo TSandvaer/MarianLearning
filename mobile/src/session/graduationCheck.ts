@@ -9,13 +9,28 @@
  * `withGraduationProbes` swaps its blocks into the canon plan; this module
  * loads its audio beside the session's, so a probe line plays from its own
  * file and every other line from the server's.
+ *
+ * The file holds a block per probe word, today's four and the reserve's
+ * five new words (Dave 2026-10-24); a word is served only once its five
+ * lines have audio here ({@link RENDERED_PROBE_WORDS}). Until all 8 reserve
+ * words do, the device keeps today's check ({@link RESERVE_CHECK_READY}).
  */
+import { renderedProbeWords } from '@marian/core/wordSong/graduationCheck'
+import { reserveCheckReady } from '@marian/core/wordSong/probeReserve'
 import type { Utterance } from '@marian/core/wire/types'
 import probeCanon from '../../assets/canon/cvc-words-probe.json'
 import { loadSessionAudio, type LoadedSessionAudio } from '../audio'
 
 /** The probe lines' server-plan shape, for `withGraduationProbes`. */
 export const GRADUATION_PROBE_PLAN: unknown = probeCanon.plan
+
+/** The probe words this build has audio for (today: nap, rat, map, tap). */
+export const RENDERED_PROBE_WORDS: ReadonlySet<string> =
+  renderedProbeWords(probeCanon)
+
+/** Whether this build serves the reserve check (every reserve word rendered). */
+export const RESERVE_CHECK_READY: boolean =
+  reserveCheckReady(RENDERED_PROBE_WORDS)
 
 /** What Word Song plays a round with (the snapshot's player and files). */
 export type RoundAudio = Pick<

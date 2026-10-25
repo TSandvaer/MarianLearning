@@ -1693,3 +1693,115 @@ describe('recordProgressOnSessionEnd — CVC graduation latch (ticket 86c9qa6n3)
     expect(loadProgress()?.cvcGraduationSessionFired).toBe(false)
   })
 })
+
+describe('recordProgressOnSessionEnd: the two-session reserve check (Dave 2026-10-24)', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    window.localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  const checkSession = (
+    dateISO: string,
+    probes: { word: string; correct: boolean }[],
+  ) =>
+    recordProgressOnSessionEnd({
+      surface: 'word-song',
+      totalCorrect: 5 + probes.filter((p) => p.correct).length,
+      dateISO,
+      focusNode: 'cvc-words',
+      graduationSplit: {
+        canonicalCorrect: 5,
+        canonicalCount: 5,
+        novelCorrect: probes.filter((p) => p.correct).length,
+        novelCount: probes.length,
+        probes,
+        twoSessions: true,
+      },
+    })
+
+  it('the first session keeps its part (words, right count, the attempt’s other 3) and no rate; the second pools all 6 into its rate', () => {
+    const first = checkSession('2026-10-24T09:00:00.000Z', [
+      { word: 'map', correct: true },
+      { word: 'nap', correct: true },
+      { word: 'rat', correct: true },
+    ])
+    expect(first.history.at(-1)).toMatchObject({
+      successRate: 1,
+      novelPoolPart: {
+        words: ['map', 'nap', 'rat'],
+        correct: 3,
+        next: ['ham', 'cab', 'rag'],
+      },
+    })
+    expect(first.history.at(-1)!.novelPoolSuccessRate).toBeUndefined()
+
+    // 2 of 3 alone (0.67) would fail; 5 of 6 over the check (0.83) passes.
+    const second = checkSession('2026-10-24T16:00:00.000Z', [
+      { word: 'ham', correct: true },
+      { word: 'cab', correct: false },
+      { word: 'rag', correct: true },
+    ])
+    const last = second.history.at(-1)!
+    expect(last.novelPoolSuccessRate).toBeCloseTo(5 / 6)
+    expect(last.novelPoolPart).toBeUndefined()
+  })
+
+  it('each probe word’s result lands in the seen-record with its day', () => {
+    const p = checkSession('2026-10-24T09:00:00.000Z', [
+      { word: 'map', correct: true },
+      { word: 'nap', correct: false },
+      { word: 'rat', correct: true },
+    ])
+    const day = localDateKey(new Date('2026-10-24T09:00:00.000Z'))
+    expect(p.seenItems).toEqual({
+      'word:map': {
+        day,
+        count: 1,
+        correct: true,
+        check: 'right',
+        checkDay: day,
+      },
+      'word:nap': {
+        day,
+        count: 1,
+        correct: false,
+        check: 'missed',
+        checkDay: day,
+      },
+      'word:rat': {
+        day,
+        count: 1,
+        correct: true,
+        check: 'right',
+        checkDay: day,
+      },
+    })
+  })
+
+  it('a one-session check (today’s, no twoSessions) keeps today’s entry and still writes the results', () => {
+    const p = recordProgressOnSessionEnd({
+      surface: 'word-song',
+      totalCorrect: 7,
+      dateISO: '2026-10-24T09:00:00.000Z',
+      focusNode: 'cvc-words',
+      graduationSplit: {
+        canonicalCorrect: 5,
+        canonicalCount: 5,
+        novelCorrect: 2,
+        novelCount: 3,
+        probes: [
+          { word: 'nap', correct: true },
+          { word: 'rat', correct: true },
+          { word: 'tap', correct: false },
+        ],
+      },
+    })
+    expect(p.history.at(-1)!.novelPoolSuccessRate).toBeCloseTo(2 / 3)
+    expect(p.history.at(-1)!.novelPoolPart).toBeUndefined()
+    expect(p.seenItems?.['word:tap']?.check).toBe('missed')
+  })
+})

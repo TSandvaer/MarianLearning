@@ -16,6 +16,7 @@ import {
   isForbiddenPair,
 } from './wordPack'
 import { BIG_WORDS_STEPS, bigWordsOf } from './bigWordsSteps'
+import { GRADUATION_PROBE_WORDS } from './novelProbeWords'
 
 // All digraph-tier target words (sh + ch + th). Digraph tiers are NOT
 // classified by the same-vowel CVC heuristic — their distractor rules are
@@ -1273,15 +1274,22 @@ describe('land 6 — duck words and crab words', () => {
     })
   })
 
-  it('drops cab entirely (Dave, D4): no entry, no pair, no forbidden pair', () => {
-    expect(() => getWordEntry('cab')).toThrow(/No entry for word "cab"/)
+  it('drops cab as a distractor (Dave, D4): it came back only as a probe-reserve target (Dave 2026-10-24), never a chip', () => {
+    // D4 dropped cab as crab's trap: never spoken, and an L2 child says
+    // "taxi" (content-wave-1.md:316). The reserve speaks it ("Read the
+    // cab.") and Dave weighed "taxi" there (msg_135871ebd91e).
+    expect(getWordEntry('cab').isTarget).toBe(true)
     expect(DISTRACTOR_ONLY_WORDS.map((e) => e.word)).not.toContain('cab')
     const everyPairWord = Object.values(TARGET_PAIRINGS).flatMap((p) => [
       ...p.gentle,
       ...p.trap,
     ])
     expect(everyPairWord).not.toContain('cab')
-    expect(FORBIDDEN_PAIRS.flat()).not.toContain('cab')
+    expect(
+      FORBIDDEN_PAIRS.filter((p) => p.includes('cab'))
+        .map((p) => p.find((w) => w !== 'cab'))
+        .sort(),
+    ).toEqual(['bus', 'car', 'jeep', 'train', 'van'])
   })
 
   it('no trio contains a forbidden pair, old or new (§ 4.5)', () => {
@@ -1753,6 +1761,19 @@ describe('FORBIDDEN_PAIRS', () => {
       ['roof', 'tent'],
       ['roof', 'barn'],
       ['coat', 'cape'],
+      // The probe reserve (Dave 2026-10-24; probe-word-picture-pack.md:49).
+      ['rat', 'cat'],
+      ['rat', 'bat'],
+      ['cab', 'car'],
+      ['cab', 'van'],
+      ['cab', 'bus'],
+      ['cab', 'jeep'],
+      ['cab', 'train'],
+      ['ram', 'sheep'],
+      ['ram', 'goat'],
+      ['ram', 'dog'],
+      ['ram', 'pig'],
+      ['ram', 'cat'],
     ].map((p) => [...p].sort().join(','))
 
     for (const expected of expectedPairs) {
@@ -1806,7 +1827,7 @@ describe('TARGET_PAIRINGS_CROSSVOWEL', () => {
   // Single source of truth (ticket 86c9qdp2n): `CVC_CROSS_VOWEL_VOWELS`
   // is exported from `mastery.ts` paired with `CVC_CROSS_VOWEL_NODES`.
   // When the cross-vowel matrix widens, both constants update together.
-  const PROBE_WORDS = new Set(['nap', 'rat', 'map', 'tap'])
+  const PROBE_WORDS = new Set(GRADUATION_PROBE_WORDS)
   const POOL_EXTENSION_PENDING_CROSSVOWEL = new Set(['cot', 'top', 'pop'])
   // Digraph-tier words are NOT CVC cross-vowel nodes — they belong to the
   // `digraphs-sh` / `digraphs-ch` SkillNodes, not `cvc-words-short-*`, so
@@ -2071,7 +2092,7 @@ describe('pickDistractors — cross-vowel mode (ticket 86c9qa0kf)', () => {
     // matrix rows yet — that's deferred to the cross-vowel-mode
     // impl ticket 86c9m3aek. They are scoped out here by the same
     // exclusion pattern used for probe words.
-    const PROBE_WORDS = new Set(['nap', 'rat', 'map', 'tap'])
+    const PROBE_WORDS = new Set(GRADUATION_PROBE_WORDS)
     const POOL_EXTENSION_PENDING_CROSSVOWEL = new Set(['cot', 'top', 'pop'])
     // Digraph-tier words are not CVC cross-vowel nodes — see the
     // `DIGRAPH_TIER_WORDS` rationale in the `TARGET_PAIRINGS_CROSSVOWEL`

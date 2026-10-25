@@ -1,8 +1,11 @@
 /**
  * The cvc-words graduation check's probe lines (Thomas 2026-10-23: "App
- * builds the check itself"). There is one block per novel probe word, core's
- * `NOVEL_PROBE_WORDS` (nap, rat, map, tap), in cvc-words' own slot texts,
- * so a probe problem reads exactly like a canon one. The native app bundles
+ * builds the check itself"). There is one block per probe word, core's
+ * `GRADUATION_PROBE_WORDS`: today's four (nap, rat, map, tap, p1-p4) and
+ * the reserve's five new words (ham, cab, rag, ram, pad, p5-p9; Dave
+ * 2026-10-24), in cvc-words' own slot texts, so a probe problem reads
+ * exactly like a canon one. The device serves a word only once its five
+ * lines have audio (core `renderedProbeWords`). The native app bundles
  * this file (`mobile/scripts/export-audio.mjs`) and swaps three of a
  * cvc-words session's problems for its blocks
  * (`@marian/core/wordSong/graduationCheck`).
@@ -24,7 +27,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { NOVEL_PROBE_WORDS } from '@marian/core/wordSong/novelProbeWords'
+import { GRADUATION_PROBE_WORDS } from '@marian/core/wordSong/novelProbeWords'
 import {
   WORD_CANON_DIR,
   awaitingRender,
@@ -71,11 +74,11 @@ function lineFor(
   return out
 }
 
-/** The probe lines: `word.p<i>.<slot>`, word i of `NOVEL_PROBE_WORDS`. */
+/** The probe lines: `word.p<i>.<slot>`, word i of `GRADUATION_PROBE_WORDS`. */
 export function probeLines(
   canon: CanonDoc = readDoc(join(WORD_CANON_DIR, 'cvc-words.json')),
 ): Line[] {
-  return NOVEL_PROBE_WORDS.flatMap((word, i) =>
+  return GRADUATION_PROBE_WORDS.flatMap((word, i) =>
     SLOTS.map((slot) => ({
       id: `word.p${i + 1}.${slot}`,
       text: lineFor(canon, slot, word),

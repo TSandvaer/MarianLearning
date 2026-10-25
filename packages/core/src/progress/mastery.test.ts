@@ -37,6 +37,7 @@ import {
   MAX_GOOD_DAYS_PER_STEP,
   crossVowelMixingActive,
   goodDayCount,
+  graduationCheckFirstHalf,
   isGraduationSessionPending,
   nextNode,
   recordGoodDays,
@@ -2314,5 +2315,106 @@ describe('letter-sounds per-vowel sub-mastery (W9.3)', () => {
     applyMasteryRule(progress)
     // Input document's sub-state is unchanged (pure function).
     expect(progress.literacy!.letterSoundsVowelStates).toEqual(snapshot)
+  })
+})
+
+describe('the two-session reserve check on cvc-words (Dave 2026-10-24: 6 probe words, pass at 5 of 6)', () => {
+  // Three good days banked, then the check. A check session scores its 5
+  // practised words as `successRate` (5/5 = 1).
+  const goodDays = [
+    entry('2026-04-27T10:00:00.000Z', 'cvc-words', 1),
+    entry('2026-04-28T10:00:00.000Z', 'cvc-words', 1),
+    entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1),
+  ]
+  const firstHalf = (
+    dateISO: string,
+    correct: number,
+  ): SessionHistoryEntry => ({
+    dateISO,
+    skillFocus: ['cvc-words'],
+    successRate: 1,
+    novelPoolPart: { words: ['map', 'nap', 'rat'], correct },
+  })
+  const checkProgress = (history: SessionHistoryEntry[]) =>
+    buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history,
+    })
+
+  it('5 of 6 is the 0.8 threshold: 5/6 passes, 4/6 does not', () => {
+    expect(5 / 6).toBeGreaterThanOrEqual(NOVEL_POOL_THRESHOLD)
+    expect(4 / 6).toBeLessThan(NOVEL_POOL_THRESHOLD)
+  })
+
+  it('the first session, all 3 right, does not promote; the next session is the check again', () => {
+    const p = checkProgress([
+      ...goodDays,
+      firstHalf('2026-04-30T10:00:00.000Z', 3),
+    ])
+    expect(applyMasteryRule(p).skillLevels['cvc-words']).toBe('practicing')
+    expect(isGraduationSessionPending(p, 'cvc-words', 'word-song')).toBe(true)
+    expect(graduationCheckFirstHalf(p, 'cvc-words')).toEqual({
+      words: ['map', 'nap', 'rat'],
+      correct: 3,
+    })
+  })
+
+  it('the second session carries the rate over 6: 5/6 promotes', () => {
+    const p = checkProgress([
+      ...goodDays,
+      firstHalf('2026-04-30T10:00:00.000Z', 3),
+      graduationEntry('2026-04-30T16:00:00.000Z', 'cvc-words', 1, 5 / 6),
+    ])
+    expect(graduationCheckFirstHalf(p, 'cvc-words')).toBeNull()
+    const result = applyMasteryRule(p)
+    expect(result.skillLevels['cvc-words']).toBe('mastered')
+    expect(result.skillLevels['cvc-words-short-o']).toBe('intro')
+  })
+
+  it('4/6 holds her on the step, and the cooldown waits 3 sessions as for a one-session check', () => {
+    const failed = [
+      ...goodDays,
+      firstHalf('2026-04-30T10:00:00.000Z', 3),
+      graduationEntry('2026-05-01T10:00:00.000Z', 'cvc-words', 1, 4 / 6),
+    ]
+    const p = checkProgress(failed)
+    expect(applyMasteryRule(p).skillLevels['cvc-words']).toBe('practicing')
+    expect(isGraduationSessionPending(p, 'cvc-words', 'word-song')).toBe(false)
+    const after = checkProgress([
+      ...failed,
+      entry('2026-05-02T10:00:00.000Z', 'cvc-words', 1),
+      entry('2026-05-03T10:00:00.000Z', 'cvc-words', 1),
+      entry('2026-05-04T10:00:00.000Z', 'cvc-words', 1),
+    ])
+    expect(isGraduationSessionPending(after, 'cvc-words', 'word-song')).toBe(
+      true,
+    )
+  })
+
+  it('both sessions on one day (cross-day dedupe keeps the second) still decide', () => {
+    const p = checkProgress([
+      ...goodDays,
+      firstHalf('2026-04-30T09:00:00.000Z', 2),
+      graduationEntry('2026-04-30T09:20:00.000Z', 'cvc-words', 1, 5 / 6),
+    ])
+    expect(applyMasteryRule(p).skillLevels['cvc-words']).toBe('mastered')
+  })
+
+  it('a session in between, or a part on another step, is no first half', () => {
+    expect(
+      graduationCheckFirstHalf(
+        checkProgress([
+          firstHalf('2026-04-30T10:00:00.000Z', 3),
+          entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1),
+        ]),
+        'cvc-words',
+      ),
+    ).toBeNull()
+    expect(
+      graduationCheckFirstHalf(
+        checkProgress([firstHalf('2026-04-30T10:00:00.000Z', 3)]),
+        'cvc-words-short-o',
+      ),
+    ).toBeNull()
   })
 })
