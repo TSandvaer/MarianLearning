@@ -19,8 +19,8 @@ export { FIRST_ROUTE, type Route }
  * - picker → greet | hub          the tap: Greet if that learner never played
  * - hub | greet | map | session-end | parent-settings → picker
  *                                 native only, 2+ learners: the badge, the
- *                                 return rule, Session End's handover and
- *                                 Parent Settings' Done (§§ 1.1, 2.1–2.4)
+ *                                 return rule and Parent Settings' Done
+ *                                 (§§ 1.1, 2.1–2.2, 3.1)
  * - greet → math                  `handleGreetAdvance` (first-launch sequence)
  * - hub → math | literacy         `handleHubPickTree`
  * - hub → map                     `handleHubOpenMap`

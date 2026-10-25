@@ -37,22 +37,22 @@ Two or more children share one iPad or iPhone. Each one taps their own picture a
 - **P6.** Adding, renaming, re-picturing, moving and removing a learner happen in Parent Settings, behind Emma's 3 s press. Picking and switching are the child's: one tap.
 - **P7.** **Emma speaks no names in phase 1–2.** Session requests send `childName: 'friend'` (the planner's own fallback, `api/_planner.ts:1249`). Name audio comes in phase 3, on the picker only (T4). The no-name form is the shipped baseline.
 - **P8.** A new learner starts where the parent says, one land per world (default land 1 in both). The start is built from the empty floor, never from Marian's diagnostic (§ 4.8). A parent can move a learner's start later, down as well as up (§ 3.1, D1).
-- **P9.** With 2+ learners, **Session End hands the device over:** All done opens the picker, not the Hub (§ 2.4, Dave's EXTRA 2).
+- **P9.** With 2+ learners, **Session End's All done goes where it goes with 1 learner:** the learner's own Hub, or the Map when an unlock is waiting (§ 2.4). Thomas 2026-10-25: All done returns to the learner's own Hub; hand-over is the Hub badge. Was: All done opened the picker (Dave's EXTRA 2).
 
 ## 1. Who is playing (the picker)
 
 ### 1.1 When it shows
 
-| Moment                                                                                | 1 learner                            | 2–4 learners                 |
-| ------------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------- |
-| Cold launch, after Splash                                                             | skipped: `nextAfterPick` (§ 6.1, K6) | **picker**                   |
-| Hub badge tap (§ 2.1)                                                                 | no badge                             | **picker**                   |
-| Session End's All done, and Back on the unlock Map it opened (§ 2.4)                  | Hub or Map as today                  | **picker**                   |
-| Back from 10 min or more in the background, on Greet, Hub, Map or Session End (§ 2.2) | nothing                              | **picker**                   |
-| Back from the background on Math, Word Song or a peek                                 | nothing                              | nothing: the session goes on |
-| Done in Parent Settings after the learners or the active learner changed (§ 3.1)      | Greet or Hub                         | **picker**                   |
+| Moment                                                                                | 1 learner                            | 2–4 learners                                                                                                   |
+| ------------------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| Cold launch, after Splash                                                             | skipped: `nextAfterPick` (§ 6.1, K6) | **picker**                                                                                                     |
+| Hub badge tap (§ 2.1)                                                                 | no badge                             | **picker**                                                                                                     |
+| Session End's All done, and Back on the unlock Map it opened (§ 2.4)                  | Hub or Map as today                  | Hub or Map as today (Thomas 2026-10-25: All done returns to the learner's own Hub; hand-over is the Hub badge) |
+| Back from 10 min or more in the background, on Greet, Hub, Map or Session End (§ 2.2) | nothing                              | **picker**                                                                                                     |
+| Back from the background on Math, Word Song or a peek                                 | nothing                              | nothing: the session goes on                                                                                   |
+| Done in Parent Settings after the learners or the active learner changed (§ 3.1)      | Greet or Hub                         | **picker**                                                                                                     |
 
-After a tap: Greet if that learner has never played (§ 6.1), else the Hub. New route `picker`. `ROUTE_EXITS` (`mobile/src/router/routes.ts:40-51`) becomes `splash → picker | greet | hub`, `picker → greet | hub`, `hub → … | picker`, `parent-settings → hub | picker`, `session-end → … | picker` and `map → … | picker` (§ 2.4), and `greet → … | picker` for the return rule.
+After a tap: Greet if that learner has never played (§ 6.1), else the Hub. New route `picker`. `ROUTE_EXITS` (`mobile/src/router/routes.ts:40-51`) becomes `splash → picker | greet | hub`, `picker → greet | hub`, `hub → … | picker`, `parent-settings → hub | picker`, `session-end → … | picker` and `map → … | picker`, and `greet → … | picker`, for the return rule (§ 2.2).
 
 ### 1.2 Layout
 
@@ -126,16 +126,16 @@ When the app comes back from the background (`AppState` `background`, `mobile/sr
 4. Start that learner's launch reconcile, once per learner per launch (the latch in `mobile/src/lifecycle/launchReconcile.ts:19` becomes per learner id). Nothing waits for it, as today.
 5. Mount the screens fresh (the QA jump's remount, `App.tsx:50-56`), at Greet or the Hub.
 
-### 2.4 Session End hands over (2–4 learners)
+### 2.4 Session End returns to the learner's own Hub (2–4 learners)
 
-The common handover is one child finishing and passing the device straight on. The app never goes to the background, so the return rule misses it (Dave's EXTRA 2).
+**Thomas 2026-10-25: All done returns to the learner's own Hub; hand-over is the Hub badge.** With 2–4 learners Session End exits exactly as with 1 learner:
 
-- **All done** opens the picker instead of the Hub.
-- **An unlock waiting:** All done opens the Map as today, because the unlock is this child's. Back on that Map opens the picker instead of the Hub. A Map reached from the Hub keeps Back → Hub.
-- **Again** keeps the same learner: a child who plays on needs no tap.
-- **1 learner:** unchanged.
+- **All done** opens the learner's own Hub.
+- **An unlock waiting:** All done opens the Map as today, because the unlock is this child's. Back on that Map opens the Hub. A Map reached from the Hub keeps Back → Hub.
+- **Again** keeps the same learner.
+- **Handing the device on:** the Hub's badge (§ 2.1). The return rule (§ 2.2) still asks after 10 minutes in the background.
 
-The cost is one tap for a child who wants their own Hub after a session.
+Was (Dave's EXTRA 2, approved 2026-10-19): All done opened the picker, and Back on the unlock Map opened the picker, because a child passing the device straight on never sends the app to the background, so the return rule misses that hand-over. Thomas reversed it on 2026-10-25 from build 21: after a Number Garden session with a flower, All done opened "Who is playing?" instead of Marian's Hub. The cost now: a sibling handed the device straight after Session End must tap the badge, or the session counts for the child who just played (one stray session can't master a step, § 7).
 
 ## 3. Parent Settings: learners
 
@@ -226,7 +226,14 @@ export const MAX_LEARNERS = 4 // the add buttons' cap (T1); the guard has no upp
 export const LEARNER_NAME_MAX = 24 // types.ts:466
 
 export type AvatarId =
-  'fox' | 'lion' | 'frog' | 'turtle' | 'penguin' | 'owl' | 'cat' | 'bear'
+  | 'fox'
+  | 'lion'
+  | 'frog'
+  | 'turtle'
+  | 'penguin'
+  | 'owl'
+  | 'cat'
+  | 'bear'
 
 /** Reserved for the planned Danish version. Only 'en' exists; nothing reads it yet. */
 export type LearnerLanguage = 'en'
@@ -392,7 +399,7 @@ It plays once per learner: `nextAfterPick` goes to Greet when the learner's `ses
 
 - **Hub:** the badge with 2+ learners (§ 2.1). Cards, flowers, guidance and Emma's lines are the playing learner's, read as today.
 - **Map:** the playing learner's lands, stops and unlock beats; the seen-marker is written to and pushed for that learner (`unlockBeat.ts:73-80`).
-- **Session End:** written to the playing learner. No name, no sibling mention. With 2+ learners, All done opens the picker (§ 2.4).
+- **Session End:** written to the playing learner. No name, no sibling mention. All done opens the learner's own Hub, with any number of learners (§ 2.4).
 - **Stardust:** per learner, never summed, never shown beside another's.
 
 ### 6.3 Names
@@ -404,7 +411,7 @@ Phase 1–2: the name is on the picker tile as text only. Emma says no name anyw
 - **Remove a learner:** § 3.5. Removing the last learner isn't possible. Their cloud record stays (no server delete). Re-adding them by code restores their doc but not stardust or session history with the streak, which were never in the cloud (§ Today); the alert says so.
 - **Restore onto a device with other learners:** Add from a code makes a new learner; it never overwrites one (§ 3.3). A per-learner Restore stays read-first (`cloudBackup.ts:157-168`), is bound to its learner (§ 3.4), and refuses another learner's code or a record that carries another code (§ 3.4, § 4.5).
 - **Two learners, one device, mid-session:** a session belongs to the learner who started it. The picker never interrupts Math, Word Song or a peek (§ 2.2). A reconcile still in flight from before a switch lands in its own learner (§ 4.4).
-- **One child hands the device to another after a session:** Session End opens the picker (§ 2.4).
+- **One child hands the device to another after a session:** the Hub's badge (§ 2.1); Session End returns to the playing learner's Hub (§ 2.4, Thomas 2026-10-25).
 - **A sibling taps the wrong tile:** the badge shows whose Hub it is; one tap fixes it. A whole session played as the sibling adds at most one day toward the sibling's step. A step needs 3 good days (`parentSettings.ts:57`) or 2 secure days on the fast track, so one stray session can't master it (D2).
 - **A learner placed too high:** a parent moves them down with Where to start (§ 3.1, § 4.9).
 - **No network:** picking, switching, adding, renaming, moving and removing are local and work. Add from a code shows the error line and writes nothing. Reconcile keeps local on `cloud-error`, as today. Phase 3: no name clip until the next time Parent Settings is open and online.
@@ -417,7 +424,7 @@ Phase 1–2: the name is on the picker tile as text only. Emma says no name anyw
 - **No comparison:** no screen a child sees shows another learner's flowers, stars, levels, streak, stardust or play time. Picker tiles carry a picture and a name, nothing else (§ 1.2). The order is fixed; it never sorts by progress or by who played last (D3).
 - **No leaderboard, no shared pool:** stardust, flowers and unlocks are per learner. No "family total", no sibling unlocks.
 - **No shaming or nudging between siblings:** Emma never mentions another child, who played today or who didn't. No streak copy across learners.
-- **No pressure to switch or stay:** switching costs nothing and loses nothing mid-day. The return rule and Session End's handover only ask "Who is playing?" (§ 2.2, § 2.4).
+- **No pressure to switch or stay:** switching costs nothing and loses nothing mid-day. The return rule and the badge only ask "Who is playing?" (§ 2.1, § 2.2).
 - **Avatars:** animals, not people. No gender, skin or appearance coding. Colours avoid red (never a red X), and the cat is grey, not pink (D7). The child picks their own with the parent (T3, D7).
 - **Adult gate unchanged:** add, rename, move, remove and restore sit behind the 3 s press (`Hub.tsx:65-66`).
 - **Honest parent copy:** the Remove alert says what does not come back (§ 3.5).
@@ -486,7 +493,7 @@ Phase 1–2: the name is on the picker tile as text only. Emma says no name anyw
 30. **Badge:** top-left, hit area 56 × 56; a tap opens the picker. Emma's 3 s press still opens Parent Settings; a 3 s press on the badge does not.
 31. **Return rule:** hidden 10 min on Greet, Hub, Map or Session End with 2+ learners → the picker on return. On Math, Word Song or a peek: no change. At 9 min 59 s: no change.
 32. **Switch:** a pick within 30 s of leaving A's Hub → B's Hub plays its line (K2).
-33. **Session End handover:** 2+ learners → All done opens the picker; with an unlock waiting, the Map, and its Back opens the picker; Again starts the same learner's session.
+33. **Session End, 2+ learners:** All done opens the learner's own Hub; with an unlock waiting, the Map, and its Back opens the Hub; Again starts the same learner's session (Thomas 2026-10-25; was: the picker).
 34. **Parent Settings, selecting:** a row tap moves "Playing now" and every section re-reads; an in-flight Push now or Restore is aborted. A toggle after the row tap changes only B's keys, and Push now sends B's doc to B's sync ID (X2).
 35. **Parent Settings, adding:** Add enforces 1–24 characters and unique pictures and offers the lands. With an unnamed learner 1, both sheets ask for their name first and [Add] writes both names (D5). § 3.3's 6 outcomes show their lines.
 36. **Where to start:** each world's row shows the current land; picking another land shows the alert; Cancel writes nothing; Change calls `setLearnerStart`.
@@ -522,7 +529,7 @@ Thomas approved T1–T8 and Dave's EXTRA 2 by popup on 2026-10-19. T9 is open. P
 - **T6. Parent-facing words:** "Learners", "Playing now", "No name", "+ Add a learner", "Add from a code", "Where to start", "Backup code" (for "Device ID"), and § 3.3–3.5's lines; "they" for every learner. **Approved (Thomas, 2026-10-19): as written, plus Dave's Remove warning that stars and streak are not in the backup and will not come back (§ 3.5).**
 - **T7. A fresh install keeps today's zero-setup first run** (Splash → Greet → Math). Its learner 1 is unnamed, starts at land 1 in both worlds, and is named when a second learner is added (§ 3.2 step 0). Today a fresh install starts at Marian's diagnostic. Marian's devices are upgrades and keep her doc. **Approved (Thomas, 2026-10-19), with a per-learner Where to start row that a parent can also move down (Dave D1; § 3.1, § 4.9).**
 - **T8. Session requests send "friend" for every learner,** so no child's name goes in a session request. The canon is unaffected (its key has no name, `api/_canon.ts:75-79`). **Approved (Thomas, 2026-10-19).** Not covered: the planner's system prompt still says "an 8-year-old child named Marian" and "Marian's context" (`api/_planner.ts:1612-1614`, K9). Changing it is a server change outside this spec. Whether to change it is Thomas's call, separately.
-- **EXTRA 2 (Dave). Session End hands over to the picker** with 2+ learners (§ 2.4). **Approved (Thomas, 2026-10-19).**
+- **EXTRA 2 (Dave). Session End hands over to the picker** with 2+ learners (§ 2.4). **Approved (Thomas, 2026-10-19). Reversed (Thomas, 2026-10-25): All done returns to the learner's own Hub; hand-over is the Hub badge.**
 - **T9. Three parent lines new since T6** (open): the Where-to-start alert, "Start \<name\> at \<land name\>?" / "Steps before this land count as learned. This land and the ones after it start again. Stars and streak stay." / [Cancel] [Change] (§ 3.1); "Name the first learner" (§ 3.2); "That backup holds another learner's progress." (§ 3.3, § 3.4). **Approved as written (Thomas, 2026-10-19).** Only PR B needs them.
 - **T10. The planner prompt becomes learner-neutral in PR A.** `api/_planner.ts:1612-1614` says "an 8-year-old child named Marian" and "Speaks Tagalog primarily". PR A rewrites it as a young child learning English, with no name and no home language, matching T8. It is a server change, so it ships with a release, and PR A checks that session output still matches the canon. **Approved (Thomas, 2026-10-19).**
 

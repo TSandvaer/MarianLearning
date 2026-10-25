@@ -42,10 +42,11 @@
  *
  * Learner profiles (`design/native/learner-profiles.md`): with 2 to 4
  * learners Splash opens "Who is playing?" (`./screens/picker/`), and so do
- * the Hub's badge, Session End's All done (and Back on the unlock Map it
- * opened), Parent Settings' Done after the learners changed, and a return
- * from 10 minutes in the background on Greet, the Hub, the Map or Session
- * End (`./lifecycle/pickerReturn.ts`). A pick switches the learner: the
+ * the Hub's badge, Parent Settings' Done after the learners changed, and a
+ * return from 10 minutes in the background on Greet, the Hub, the Map or
+ * Session End (`./lifecycle/pickerReturn.ts`). Session End's All done goes
+ * to the learner's own Hub (or the unlock Map) as with one learner: the
+ * hand-over is the badge (§ 2.4). A pick switches the learner: the
  * route change already tore the kicked or prefetched session down; then
  * that learner's store is installed (`activateLearner`), the Hub's quiet
  * remount mark is cleared so their Hub speaks, their launch reconcile
@@ -271,12 +272,6 @@ const logStoryCueLine = (line: string) => console.log(line)
 /** Where a session was started (map-tap-to-play § 4): its Back and end return there. */
 type SessionOrigin = 'hub' | 'map'
 
-/**
- * Where the Map's Home goes: the Hub, or with 2+ learners the picker on a
- * Map Session End's All done opened (learner profiles § 2.4).
- */
-type MapBack = 'hub' | 'picker'
-
 /** The Hub card's tree of a map's world. */
 const TREE_OF: Readonly<Record<MasteryTrack, SkillTreeId>> = {
   math: 'number-garden',
@@ -386,7 +381,6 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
   // Where the session on screen was started (map-tap-to-play § 4); set by
   // each way into a session, kept through Session End's "Again".
   const originRef = useRef<SessionOrigin>('hub')
-  const mapBackRef = useRef<MapBack>('hub')
   // The learners, read per render (Parent Settings can change them).
   const learners = installedLearnerList()?.learners ?? []
   const several = learners.length >= 2
@@ -441,11 +435,10 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
     [mathSession, wordSongSession],
   )
   // A way into the map: the handoff first, then the route (only when the
-  // map is an exit of the route we are on). `back` is where its Home goes.
+  // map is an exit of the route we are on).
   const openMap = useCallback(
-    (world: MasteryTrack, back: MapBack = 'hub') => {
+    (world: MasteryTrack) => {
       if (nextRoute(routeRef.current, 'map') !== 'map') return
-      mapBackRef.current = back
       setMapEntry({ world })
       navigate('map')
     },
@@ -453,11 +446,9 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
   )
   // Back to a world's map from a session the Map started, or a peek or a
   // replay (map-tap-to-play § 4, fast-track § 6.4): quiet, Emma has spoken.
-  // Home keeps going where it went, unless Session End hands over (`back`).
   const returnToMap = useCallback(
-    (world: MasteryTrack, back?: MapBack) => {
+    (world: MasteryTrack) => {
       if (nextRoute(routeRef.current, 'map') !== 'map') return
-      if (back !== undefined) mapBackRef.current = back
       setMapEntry({ world, quietReturn: true })
       navigate('map')
     },
@@ -540,22 +531,21 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
   // yet opens the map (which plays it); otherwise the Hub. (The route
   // flip tears the Math session down, as the web's handler does.) A
   // session the Map started returns to its map, quiet; a pending unlock
-  // plays its beat there all the same (map-tap-to-play § 4). With 2+
-  // learners Session End hands the device over (learner profiles § 2.4):
-  // the picker instead of the Hub, and that Map's Home opens the picker.
+  // plays its beat there all the same (map-tap-to-play § 4). The same with
+  // 2+ learners: the learner's own Hub, never the picker (learner profiles
+  // § 2.4, Thomas 2026-10-25; the hand-over is the Hub's badge).
   const onSessionEndAllDone = useCallback(() => {
     const world: MasteryTrack =
       sessionEnd?.surface === 'word-song' ? 'word-song' : 'math'
-    const home: MapBack = several ? 'picker' : 'hub'
     if (originRef.current === 'map') {
-      returnToMap(world, home)
+      returnToMap(world)
       return
     }
     const saved = loadProgress()
     if (saved !== null && pendingUnlock(saved, world) !== null) {
-      openMap(world, home)
-    } else navigate(home)
-  }, [sessionEnd, several, navigate, openMap, returnToMap])
+      openMap(world)
+    } else navigate('hub')
+  }, [sessionEnd, navigate, openMap, returnToMap])
   // Web `handleSessionEndAgain` (not-yet day): another session, same world.
   const onSessionEndAgain = useCallback(
     () => navigate(sessionEnd?.surface === 'word-song' ? 'literacy' : 'math'),
@@ -608,10 +598,10 @@ function Shell({ startRoute, onQaJump, onPickLearner, onRemount }: ShellProps) {
   // Web `handleHubOpenMap`; the map's Home is web `handleMapBack` (the
   // map stamps the Hub's rapid-remount clock, so the Hub stays quiet).
   const onHubMap = useCallback(
-    (world: MasteryTrack) => openMap(world, 'hub'),
+    (world: MasteryTrack) => openMap(world),
     [openMap],
   )
-  const onMapHome = useCallback(() => navigate(mapBackRef.current), [navigate])
+  const onMapHome = useCallback(() => navigate('hub'), [navigate])
   // Fast-track spec § 6.1: a later stop's tap (a peek), and map-tap-to-play
   // § 3: a mastered stop's (a replay, the same route under the same rules).
   // The map waits (taps held) until this settles; `true` = it opened. Home
