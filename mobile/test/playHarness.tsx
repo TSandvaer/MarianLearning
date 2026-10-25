@@ -180,7 +180,11 @@ export async function mountGame(
     )
     await act(async () => {})
   }
-  return { ...lines, sfx, visibility, poses, onExit, relayout }
+  /** Leaving the game (Back, as App unmounts it). */
+  const unmount = async () => {
+    await act(async () => view.unmount())
+  }
+  return { ...lines, sfx, visibility, poses, onExit, relayout, unmount }
 }
 
 /**

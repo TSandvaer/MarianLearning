@@ -311,6 +311,7 @@ export function Slot({
         />
       )}
       <Animated.View
+        testID={`hunt-slot-${index}-card`}
         style={[styles.abs, rectStyle(card), turned]}
         pointerEvents="box-none"
       >
