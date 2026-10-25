@@ -367,6 +367,8 @@ Lines and sounds are unchanged. Dragging still follows the finger: it is the inp
 
 ## 3. Letter critters (Word Song content)
 
+**The word hunt** (Thomas 2026-10-25, Dave's ruling): from blending sounds on, a visit is a round of six critters whose words fill a row of slots, with a reward when all but one are found. Its spec is `critters-word-hunt.md`, a sibling of this file. Before blending sounds, Letter critters stays exactly as this section describes it. The build PR makes this section's amendments, listed in that spec's § 11.
+
 ### 3.1 Content: words, letters and sounds (core)
 
 In `playPlace.ts`:
