@@ -58,6 +58,17 @@ const PROBE = canonDoc('cvc-words-probe')
 const CANON_WORDS = ['hat', 'fan', 'man', 'van', 'cat', 'bag', 'pan', 'tag']
 const PROBES: ReadonlySet<string> = new Set(GRADUATION_PROBE_WORDS)
 
+/**
+ * A plain session plays the 8 canon words in a new order (core
+ * `wordOrder.ts`, Dave 2026-10-25): the canon words, no probe, P1 not the
+ * last session's P1, and not the last session's order.
+ */
+function expectPlain(words: readonly string[], last: readonly string[]) {
+  expect([...words].sort()).toEqual([...CANON_WORDS].sort())
+  expect(words[0]).not.toBe(last[0])
+  expect(words).not.toEqual(last)
+}
+
 let clockNow = new Date('2026-10-26T09:00:00')
 const clock = () => clockNow
 function setNow(local: string): void {
@@ -186,6 +197,11 @@ const missing =
   (...missed: string[]) =>
   (w: string) =>
     !missed.includes(w)
+/** The first `n` practised words played wrong, whichever slots they are in. */
+const missingPractised = (n: number) => {
+  let left = n
+  return (w: string) => PROBES.has(w) || left-- <= 0
+}
 
 let seenWake: FlowerWakeRecord = {}
 /** The Hub as it mounts at `local` time (the wake record carried over). */
@@ -315,7 +331,7 @@ describe('N=2 (0.8/2), separate days off: the simulator pre-check', () => {
     // The 1 plain session after a failed attempt.
     const s3 = await play('2026-10-26T09:40:00', allRight)
     expect(s3.hints.isGraduationSession).toBe(false)
-    expect(s3.words).toEqual(CANON_WORDS)
+    expectPlain(s3.words, s2.words)
     expect(s3.probeAudio).toBe(false)
     expect(s3.day).toBe('practice')
     expect(s3.after).toEqual([G, E])
@@ -327,7 +343,7 @@ describe('N=2 (0.8/2), separate days off: the simulator pre-check', () => {
     expect(s4.words.filter((w) => PROBES.has(w))).toEqual(['ram', 'pad', 'rat'])
     expect(s4.day).toBe('practice')
     expect(s4.lines).toEqual(['guide.end.not-yet.praise'])
-    const s5 = await play('2026-10-26T10:20:00', missing('hat', 'man'))
+    const s5 = await play('2026-10-26T10:20:00', missingPractised(2))
     expect(last().successRate).toBe(6 / 8)
     expect(last().novelPoolSuccessRate).toBe(1)
     expect(cat()).toBe('mastered')
@@ -351,7 +367,7 @@ describe('N=2 (0.8/2), separate days off: the simulator pre-check', () => {
     expect(s2.day).toBe('good-day')
     const s3 = await play('2026-10-26T09:40:00', allRight)
     expect(s3.hints.isGraduationSession).toBe(false)
-    expect(s3.words).toEqual(CANON_WORDS)
+    expectPlain(s3.words, s2.words)
     expect(s3.day).toBe('practice')
     expect(s3.after).toEqual([G, G])
     expect(s3.lines).toEqual(['guide.end.not-yet.praise'])
@@ -399,7 +415,7 @@ describe('N=3 (0.875/3), separate days on', () => {
 
     const d3 = await play('2026-10-28T09:00:00', allRight)
     expect(d3.hints.isGraduationSession).toBe(false)
-    expect(d3.words).toEqual(CANON_WORDS)
+    expectPlain(d3.words, d2.words)
     expect(cat()).toBe('mastered')
     expect(d3.day).toBe('unlock')
     expect(d3.after).toEqual([G, G, G])
@@ -596,7 +612,7 @@ describe('the migration marker: a row already full when the build lands stays fu
     expect(fail.lines).toEqual(['guide.end.not-yet.praise'])
     expect(loadProgress()!.keptFullRows).toEqual(['cvc-words'])
     const plain = await play('2026-10-26T09:30:00', allRight)
-    expect(plain.words).toEqual(CANON_WORDS)
+    expectPlain(plain.words, fail.words)
     expect(plain.after).toEqual([G, G])
     expect(plain.lines).toEqual(['guide.end.not-yet.praise'])
     const part1 = await play('2026-10-26T09:50:00', allRight)
