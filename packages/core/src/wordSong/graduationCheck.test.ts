@@ -126,7 +126,7 @@ describe('withGraduationProbes', () => {
 })
 
 describe('the probe canon', () => {
-  it('holds one five-line block per probe word: today’s four rendered, the reserve’s five new words awaiting their render', () => {
+  it('holds one five-line block per probe word, every one rendered', () => {
     expect(GRADUATION_PROBE_WORDS).toEqual([
       'nap',
       'rat',
@@ -142,15 +142,9 @@ describe('the probe canon', () => {
     const unrendered = PROBE_DOC.utterances
       .filter((u: { audio: { base64: string } }) => u.audio.base64 === '')
       .map((u: { id: string }) => u.id)
-    expect(unrendered).toEqual(
-      [5, 6, 7, 8, 9].flatMap((i) =>
-        ['read', 'correct', 'hint', 'giveAnswer', 'blend'].map(
-          (slot) => `word.p${i}.${slot}`,
-        ),
-      ),
-    )
+    expect(unrendered).toEqual([])
     expect([...renderedProbeWords(PROBE_DOC)].sort()).toEqual(
-      [...NOVEL_PROBE_WORDS].sort(),
+      [...GRADUATION_PROBE_WORDS].sort(),
     )
     for (const w of GRADUATION_PROBE_WORDS) {
       expect(

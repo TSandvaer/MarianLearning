@@ -13,7 +13,7 @@
  *   drops a pool, or a hand edit, fails here).
  * - Scenario C's pools: 176 new blocks; each fact once.
  * - Audio: a pool line whose text canon already voices carries those
- *   bytes; a new text waits for its Lily render (empty `base64`).
+ *   bytes; a new text has its Lily render (the 5a render: none is empty).
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -121,11 +121,11 @@ describe('generateMathPools (phase 5a, scenario C)', () => {
   )
 
   it(
-    'voices a pool line with the clip canon has for its text, else waits for the render',
+    'voices a pool line with the clip canon has for its text, else with its own render',
     () => {
       const audio = canonAudioIndex()
       let reused = 0
-      let waiting = 0
+      let rendered = 0
       for (const step of MATH_POOL_STEPS) {
         const doc = read(step)
         const pool = doc.utterances.filter(
@@ -137,12 +137,13 @@ describe('generateMathPools (phase 5a, scenario C)', () => {
             expect(u.audio.base64).toBe(known)
             reused++
           } else {
-            waiting++
+            expect(u.audio.base64).not.toBe('')
+            rendered++
           }
         }
       }
       expect(reused).toBeGreaterThan(0)
-      expect(waiting).toBeGreaterThan(0)
+      expect(rendered).toBeGreaterThan(0)
     },
     LOAD_BUDGET_MS,
   )
@@ -173,19 +174,23 @@ describe('generateMathPools (phase 5a, scenario C)', () => {
   )
 
   it(
-    'bills exactly the pool lines still waiting for audio',
+    'the render voiced exactly the billed pool lines: none waits for audio',
     () => {
-      // Before the render: every billed request text is a pool line with an
-      // empty clip, and every empty pool line is billed.
-      const { servedInputs } = canonAudioIndex()
-      const waiting = new Set<string>()
+      // After the render: no pool line is empty, and the texts only the
+      // pools voice (no served line has them) are the bill's lines.
+      const { served } = canonAudioIndex()
+      const own = new Set<string>()
+      let empty = 0
       for (const step of MATH_POOL_STEPS) {
-        for (const u of read(step).utterances) {
-          if (u.audio.base64 === '') waiting.add(u.text)
+        const doc = read(step)
+        const servedLines = new Set(servedCanon(doc).utterances)
+        for (const u of doc.utterances) {
+          if (u.audio.base64 === '') empty++
+          if (!servedLines.has(u) && !served.has(u.text)) own.add(u.text)
         }
       }
-      expect([...waiting].some((t) => servedInputs.has(t))).toBe(false)
-      expect(waiting.size).toBe(poolRenderBill().total.lines)
+      expect(empty).toBe(0)
+      expect(own.size).toBe(poolRenderBill().total.lines)
     },
     LOAD_BUDGET_MS,
   )

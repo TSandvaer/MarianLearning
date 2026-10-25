@@ -646,8 +646,10 @@
       // render adds its 18 new texts (1342). The cvc-words graduation
       // check's probe lines (cvc-words-probe, never served as a session;
       // the native app bundles them) add 20 with their Lily render (1362).
-      // A line awaiting its render (empty audio) is not counted.
-      const EXPECTED_CANON_UNIQUE = 1362
+      // The no-Claude plan's 5a render adds 291: the 9 closed math steps'
+      // pools 266 (#680) and the probe reserve's five new words 25 (#681;
+      // 1653). A line awaiting its render (empty audio) is not counted.
+      const EXPECTED_CANON_UNIQUE = 1653
       const CANON_FILES = [
         // math/level-1
         ['math', 'add-to-10'],

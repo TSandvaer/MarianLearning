@@ -35,9 +35,11 @@ const raw: CanonTextResolver = (key) =>
 
 /** The texts the app bundles a clip for: every canon line with audio
  *  (`mobile/scripts/export-audio.mjs`; `audioRegistry.test.ts` holds the
- *  registry to it). A pool line reusing a served text is voiced; a new text
- *  waits for its render. */
+ *  registry to it). Since the 5a render every pool line is voiced.
+ *  `servedTexts`: the texts the served sessions (problems 1–8) voice, which
+ *  is all a build without the pools' render has a clip for. */
 const voicedTexts = new Set<string>()
+const servedTexts = new Set<string>()
 const walk = (dir: string) => {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = join(dir, e.name)
@@ -48,6 +50,9 @@ const walk = (dir: string) => {
       }
       for (const u of doc.utterances) {
         if (u.audio?.base64) voicedTexts.add(u.text)
+      }
+      for (const u of servedCanon(doc).utterances) {
+        if (u.audio?.base64) servedTexts.add(u.text)
       }
     }
   }
@@ -62,6 +67,12 @@ const playable: CanonTextResolver = (key) => {
 const allVoiced: CanonTextResolver = (key) => {
   const entry = raw(key)
   return entry === null ? null : playablePoolText(entry, () => true)
+}
+const servedOnly: CanonTextResolver = (key) => {
+  const entry = raw(key)
+  return entry === null
+    ? null
+    : playablePoolText(entry, (text) => servedTexts.has(text))
 }
 
 const NOW = new Date('2026-10-24T09:00:00.000Z').getTime()
@@ -194,7 +205,7 @@ describe('playablePoolText', () => {
 })
 
 describe('the picker never serves an unrendered pool block', () => {
-  it('today (no pool clip rendered): every pick plays only the served 8', () => {
+  it('a build with no pool clip rendered: every pick plays only the served 8', () => {
     for (const step of ['add-to-10', 'sub-to-10'] as const) {
       const served = new Set(
         servedCanon(BUNDLE[`math/level-1/${step}`]!)
@@ -203,19 +214,19 @@ describe('the picker never serves an unrendered pool block', () => {
       )
       for (let seed = 0; seed < 40; seed++) {
         const s = session(
-          composeSession(math(step, { seed }), playable, {
+          composeSession(math(step, { seed }), servedOnly, {
             mathPick: request(step, seed),
           }),
         )
         const reads = pickedReads(s)
         expect(reads).toHaveLength(8)
         expect(reads.filter((r) => !served.has(r))).toEqual([])
-        expect(s.utterances.filter((u) => !hasClip(u.text))).toEqual([])
+        expect(s.utterances.filter((u) => !servedTexts.has(u.text))).toEqual([])
       }
     }
   }, 30_000)
 
-  it('once a pool block is voiced, the picker can draw it', () => {
+  it('once a pool block is voiced (this bundle, after the 5a render), the picker can draw it', () => {
     // Every fact due in box 1: P4–P8 take the most overdue first, which the
     // served 8 cannot all be.
     const due = {
@@ -226,7 +237,7 @@ describe('the picker never serves an unrendered pool block', () => {
       })),
     }
     const s = session(
-      composeSession(math('add-to-10'), allVoiced, {
+      composeSession(math('add-to-10'), playable, {
         mathPick: request('add-to-10', 0, due),
       }),
     )
