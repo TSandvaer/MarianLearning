@@ -18,6 +18,7 @@ import {
   type SkillNode,
 } from '@marian/core/progress'
 import type { CanonTextResolver } from '@marian/core/session/composeSession'
+import { servedCanon } from '@marian/core/wire/canonPool'
 import { fakePlayerFactory, resetFakePlayers } from '../../test/fakeAudio'
 import { _resetAudioLogForTests, readAudioLog } from '../audio/audioLog'
 import { createAudioEngine } from '../audio/engine'
@@ -177,14 +178,15 @@ describe('a pick that cannot be built', () => {
   it('asks the server with the hint-free request, and says so', async () => {
     seed('add-to-10', [[{ a: 6, b: 4, op: '+' }, 1]])
     const hints = readMathProgressHints()
-    // This build's add-to-10 canon (what the device draws: the served 8,
-    // its pool unrendered) lost a block: the pick throws.
+    // A build whose add-to-10 canon is the served 8 only (no pool) lost a
+    // block: the pick throws.
     const broken: CanonTextResolver = (key) => {
       const entry = bundledCanonText(key)
       if (entry === null || key.focusNode !== 'add-to-10') return entry
+      const served = servedCanon(entry)
       return {
-        plan: entry.plan,
-        utterances: entry.utterances.filter(
+        plan: served.plan,
+        utterances: served.utterances.filter(
           (u) => !u.id.startsWith('math.p3.'),
         ),
       }

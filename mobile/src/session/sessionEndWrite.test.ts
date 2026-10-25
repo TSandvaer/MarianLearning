@@ -219,7 +219,7 @@ it('no graduation split without the novel-probe word list, or on math', () => {
   expect(computeGraduationSplit(p, 'math', 'add-to-10', ws, ['nap'])).toBeNull()
 })
 
-it("Word Song graduation: the split uses core's novel probe words by default", () => {
+it("Word Song graduation, today's check (reserve check off): the split uses core's novel probe words", () => {
   // cvc-words practicing with three good days banked: graduation pending.
   const base = defaultProgress()
   saveProgress({
@@ -236,7 +236,9 @@ it("Word Song graduation: the split uses core's novel probe words by default", (
     firstTapCorrect: [true, true, true, false, true, true, true, true],
     sessionFocus: { node: 'cvc-words', mode: 'forward' },
   }
-  writeSessionEnd(ws, { clock })
+  // This bundle serves the reserve check (graduationCheck.test.ts); today's
+  // check is a build without the reserve's audio.
+  writeSessionEnd(ws, { clock, reserveCheck: false })
   // 3 novel words (nap, rat, tap), 2 right.
   expect(loadProgress()?.history.at(-1)?.novelPoolSuccessRate).toBeCloseTo(
     2 / 3,
