@@ -6,17 +6,14 @@
  * `/voice-qa.html?filter=new`). The page's own code (`computeItems`,
  * `diffAgainstBaseline`, evaluated out of public/voice-qa.html) shows:
  * - every pool file is on the page (`CANON_FILES`);
- * - before the render the pools add no row (a reused clip is an old row,
- *   an empty one is not listed);
- * - after the render "New / changed" lists exactly one row per new
- *   request text, the render bill's line count, and changes no old row.
+ * - the rendered pools (the 5a render) add exactly one "New / changed" row
+ *   per new request text, the render bill's line count, against the page
+ *   without them (a reused clip is an old row), and change no old row.
  */
-import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { servedCanon } from '@marian/core/wire/canonPool'
-import { renderElevenLabsText } from '../api/_tts_elevenlabs.js'
 import { MATH_POOL_STEPS, poolRenderBill } from './generateMathPools'
 import {
   computeItems,
@@ -48,25 +45,6 @@ const tree =
     return Buffer.from(JSON.stringify(edit(JSON.parse(bytes.toString()))))
   }
 
-/** What `revoiceCanonLily.ts --unrendered` does, with a fake take: one clip
- *  per request text, into every empty line. */
-const rendered = (doc: Doc): Doc => ({
-  ...doc,
-  utterances: doc.utterances.map((u) =>
-    u.audio.base64 !== ''
-      ? u
-      : {
-          ...u,
-          audio: {
-            ...u.audio,
-            base64: createHash('sha256')
-              .update(`take|${renderElevenLabsText(u.text)}`)
-              .digest('base64'),
-          },
-        },
-  ),
-})
-
 describe('voice-QA rows for the closed math pools', () => {
   it('lists every canon file, the pool files included', () => {
     const listed = new Set(
@@ -81,7 +59,7 @@ describe('voice-QA rows for the closed math pools', () => {
     expect([...POOL_FILES].filter((p) => !listed.has(p))).toEqual([])
   })
 
-  it('before the render the pools add no row; after it, one new row per new line', () => {
+  it('the rendered pools add one new row per new line, and change no old row', () => {
     const withoutPools = computeItems(
       defs,
       tree((d) => servedCanon(d)),
@@ -90,13 +68,7 @@ describe('voice-QA rows for the closed math pools', () => {
       defs,
       tree((d) => d),
     ).items
-    expect(diffAgainstBaseline(defs, now, withoutPools)).toEqual({
-      added: [],
-      changed: [],
-    })
-
-    const after = computeItems(defs, tree(rendered)).items
-    const diff = diffAgainstBaseline(defs, after, now)
+    const diff = diffAgainstBaseline(defs, now, withoutPools)
     expect(diff.changed).toEqual([])
     expect(diff.added).toHaveLength(poolRenderBill().total.lines)
     expect(diff.added).toHaveLength(266)

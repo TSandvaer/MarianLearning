@@ -24,25 +24,11 @@ const CANON_ROOT = join(
   'canon',
 )
 
-/**
- * The one set of lines committed without audio on purpose: the cvc-words
- * probe reserve's five new words (ham, cab, rag, ram, pad; Dave
- * 2026-10-24), text only until their Lily render. The device serves no
- * probe word without audio (core `renderedProbeWords`, mobile
- * `graduationCheck.test.ts`). The render PR empties this list.
- */
-const AWAITING_RENDER = [5, 6, 7, 8, 9].flatMap((i) =>
-  ['read', 'correct', 'hint', 'giveAnswer', 'blend'].map((slot) => ({
-    file: join('word-song', 'level-1', 'cvc-words-probe.json'),
-    id: `word.p${i}.${slot}`,
-  })),
-)
-
 describe('committed canon (public/canon)', () => {
-  it('(a) every committed canon utterance the server or the app serves has audio, but the probe reserve’s 25 lines awaiting their render', () => {
+  it('(a) every committed canon utterance the server or the app serves has audio', () => {
     // A failure lists { file, id } for each silent line. Fix: run
     // `npx tsx scripts/revoiceCanonLily.ts --unrendered` before committing.
-    expect(emptyAudioSlots(CANON_ROOT)).toEqual(AWAITING_RENDER)
+    expect(emptyAudioSlots(CANON_ROOT)).toEqual([])
   })
 
   it('(b) every active step has a committed canon file', () => {

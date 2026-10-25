@@ -111,8 +111,9 @@ describe('bundled blend clips (play-place spec § 3.4, N15)', () => {
 
   it('bundles every BLEND_MARKS clip as /native/blend/<word>.mp3, with its measured bytes and hash', () => {
     const texts = Object.keys(BLEND_MARKS)
-    // 46, plus the graduation check's nap, rat, map and tap.
-    expect(texts).toHaveLength(50)
+    // 46, plus the graduation check's nap, rat, map and tap, plus the
+    // probe reserve's ham, cab, rag, ram and pad.
+    expect(texts).toHaveLength(55)
     const wrong = texts.filter((text) => {
       const webPath = `${BLEND_PREFIX}${word(text)}.mp3`
       if (!registryPaths.includes(webPath)) return true
