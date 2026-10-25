@@ -1,0 +1,1814 @@
+{
+  "add-to-10 | 80/2 off | 0 earlier | good": {
+    "node": "practicing 1/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ge -,- t=false u=1 c=false n=add-to-20 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=number-garden | lines=grow.number-garden | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "good-day ee>ge new=0 bonus= count=1 of 2 right.8,flower"
+  },
+  "add-to-10 | 80/2 off | 0 earlier | weak": {
+    "node": "practicing 0/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 00 nearly=false",
+    "end": "not-yet ee>ee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "add-to-10 | 80/2 off | 0 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-20 ee -,- t=false u=2 c=false n=sub-to-10 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock ge>gg new=1 bonus= count=2 of 2! right.8,flower,path-opens"
+  },
+  "add-to-10 | 80/2 off | 0 earlier | good, then weak": {
+    "node": "practicing 1/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ge -,- t=false u=1 c=false n=add-to-20 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=number-garden | lines=grow.number-garden | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "practice ge>ge new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 80/2 off | 0 earlier | weak, then good": {
+    "node": "practicing 1/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ge -,- t=false u=1 c=false n=add-to-20 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=number-garden | lines=grow.number-garden | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "good-day ee>ge new=0 bonus= count=1 of 2 right.8,flower"
+  },
+  "add-to-10 | 80/2 off | 1 earlier | good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-20 ee -,- t=false u=2 c=false n=sub-to-10 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock ge>gg new=1 bonus= count=2 of 2! right.8,flower,path-opens"
+  },
+  "add-to-10 | 80/2 off | 1 earlier | weak": {
+    "node": "practicing 1/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ge -,- t=false u=1 c=false n=add-to-20 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=number-garden | lines=grow.number-garden | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "not-yet ge>ge new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "add-to-10 | 80/2 off | 1 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-20 ee -,- t=false u=2 c=false n=sub-to-10 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 80/2 off | 1 earlier | good, then weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-20 ee -,- t=false u=2 c=false n=sub-to-10 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 80/2 off | 1 earlier | weak, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-20 ee -,- t=false u=2 c=false n=sub-to-10 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock ge>gg new=1 bonus= count=2 of 2! right.8,flower,path-opens"
+  },
+  "add-to-10 | 80/2 off | 2 earlier | good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-20 ee -,- t=false u=2 c=false n=sub-to-10 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 80/2 off | 2 earlier | weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-20 ee -,- t=false u=2 c=false n=sub-to-10 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 80/2 off | 2 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-20 ee -,- t=false u=2 c=false n=sub-to-10 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 80/2 off | 2 earlier | good, then weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-20 ee -,- t=false u=2 c=false n=sub-to-10 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 80/2 off | 2 earlier | weak, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-20 ee -,- t=false u=2 c=false n=sub-to-10 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 80/2 off | 3 earlier | good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-20 ee -,- t=false u=2 c=false n=sub-to-10 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 80/2 off | 3 earlier | weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-20 ee -,- t=false u=2 c=false n=sub-to-10 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 80/2 off | 3 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-20 ee -,- t=false u=2 c=false n=sub-to-10 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 80/2 off | 3 earlier | good, then weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-20 ee -,- t=false u=2 c=false n=sub-to-10 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 80/2 off | 3 earlier | weak, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-20 ee -,- t=false u=2 c=false n=sub-to-10 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on | 0 earlier | good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 see -,-,- t=true u=2 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "add-to-10 | 87.5/3 on | 0 earlier | weak": {
+    "node": "practicing 0/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 000 nearly=false",
+    "end": "not-yet eee>eee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "add-to-10 | 87.5/3 on | 0 earlier | good, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 see -,-,- t=true u=2 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on | 0 earlier | good, then weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 see -,-,- t=true u=2 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on | 0 earlier | weak, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 see -,-,- t=true u=2 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "add-to-10 | 87.5/3 on | 1 earlier | good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 gse 2026-10-09,-,- t=true u=1 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "add-to-10 | 87.5/3 on | 1 earlier | weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 gee 2026-10-09,-,- t=false u=2 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=number-garden | lines=grow.number-garden | woke=hub.woke.one,grow.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "not-yet gee>gee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "add-to-10 | 87.5/3 on | 1 earlier | good, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 gse 2026-10-09,-,- t=true u=1 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on | 1 earlier | good, then weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 gse 2026-10-09,-,- t=true u=1 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on | 1 earlier | weak, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 gse 2026-10-09,-,- t=true u=1 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "add-to-10 | 87.5/3 on | 2 earlier | good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-20 eee -,-,- t=false u=3 c=false n=sub-to-10 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3,path-opens"
+  },
+  "add-to-10 | 87.5/3 on | 2 earlier | weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 gge 2026-10-08,2026-10-09,- t=false u=1 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=number-garden | lines=grow.number-garden | woke=hub.woke.one,one-more",
+    "map": "current 110 nearly=false",
+    "end": "not-yet gge>gge new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "add-to-10 | 87.5/3 on | 2 earlier | good, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-20 eee -,-,- t=false u=3 c=false n=sub-to-10 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on | 2 earlier | good, then weak": {
+    "node": "mastered 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-20 eee -,-,- t=false u=3 c=false n=sub-to-10 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on | 2 earlier | weak, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-20 eee -,-,- t=false u=3 c=false n=sub-to-10 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3,path-opens"
+  },
+  "add-to-10 | 87.5/3 on | 3 earlier | good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-20 eee -,-,- t=false u=3 c=false n=sub-to-10 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on | 3 earlier | weak": {
+    "node": "mastered 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-20 eee -,-,- t=false u=3 c=false n=sub-to-10 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on | 3 earlier | good, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-20 eee -,-,- t=false u=3 c=false n=sub-to-10 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on | 3 earlier | good, then weak": {
+    "node": "mastered 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-20 eee -,-,- t=false u=3 c=false n=sub-to-10 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on | 3 earlier | weak, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-20 eee -,-,- t=false u=3 c=false n=sub-to-10 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 0 earlier | good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 see -,-,- t=true u=2 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 0 earlier | weak": {
+    "node": "practicing 0/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 000 nearly=false",
+    "end": "not-yet eee>eee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 0 earlier | good, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 see -,-,- t=true u=2 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 0 earlier | good, then weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 see -,-,- t=true u=2 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 0 earlier | weak, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 see -,-,- t=true u=2 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 1 earlier | good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 gse 2026-10-09,-,- t=true u=1 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 1 earlier | weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 gee 2026-10-09,-,- t=false u=2 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=number-garden | lines=grow.number-garden | woke=hub.woke.one,grow.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "not-yet gee>gee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 1 earlier | good, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 gse 2026-10-09,-,- t=true u=1 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 1 earlier | good, then weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 gse 2026-10-09,-,- t=true u=1 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 1 earlier | weak, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 gse 2026-10-09,-,- t=true u=1 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 2 earlier | good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 111 nearly=false",
+    "end": "good-day gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 2 earlier | weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 gge 2026-10-08,2026-10-09,- t=false u=1 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=number-garden | lines=grow.number-garden | woke=hub.woke.one,one-more",
+    "map": "current 110 nearly=false",
+    "end": "not-yet gge>gge new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 2 earlier | good, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 2 earlier | good, then weak": {
+    "node": "practicing 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 2 earlier | weak, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 111 nearly=false",
+    "end": "good-day gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 3 earlier | good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 111 nearly=false",
+    "end": "not-yet ggg>ggg new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 3 earlier | weak": {
+    "node": "practicing 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ggg 2026-10-07,2026-10-08,2026-10-09 t=false u=0 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=number-garden | lines=grow.number-garden | woke=hub.woke.one,grow.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "not-yet ggg>ggg new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 3 earlier | good, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 3 earlier | good, then weak": {
+    "node": "practicing 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "add-to-10 | 87.5/3 on, auto off | 3 earlier | weak, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=sleeping.word-song | woke=hub.woke.one,sleeping.word-song",
+    "map": "current 111 nearly=false",
+    "end": "not-yet ggg>ggg new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "letter-sounds | 80/2 off | 0 earlier | good": {
+    "node": "practicing 1/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: letter-sounds ge -,- t=false u=1 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "good-day ee>ge new=0 bonus= count=1 of 2 right.8,flower"
+  },
+  "letter-sounds | 80/2 off | 0 earlier | weak": {
+    "node": "practicing 0/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: letter-sounds ee -,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 00 nearly=false",
+    "end": "not-yet ee>ee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "letter-sounds | 80/2 off | 0 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ee -,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock ge>gg new=1 bonus= count=2 of 2! right.8,flower,path-opens"
+  },
+  "letter-sounds | 80/2 off | 0 earlier | good, then weak": {
+    "node": "practicing 1/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: letter-sounds ge -,- t=false u=1 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "practice ge>ge new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 80/2 off | 0 earlier | weak, then good": {
+    "node": "practicing 1/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: letter-sounds ge -,- t=false u=1 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "good-day ee>ge new=0 bonus= count=1 of 2 right.8,flower"
+  },
+  "letter-sounds | 80/2 off | 1 earlier | good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ee -,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock ge>gg new=1 bonus= count=2 of 2! right.8,flower,path-opens"
+  },
+  "letter-sounds | 80/2 off | 1 earlier | weak": {
+    "node": "practicing 1/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: letter-sounds ge -,- t=false u=1 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "not-yet ge>ge new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "letter-sounds | 80/2 off | 1 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ee -,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 80/2 off | 1 earlier | good, then weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ee -,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 80/2 off | 1 earlier | weak, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ee -,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock ge>gg new=1 bonus= count=2 of 2! right.8,flower,path-opens"
+  },
+  "letter-sounds | 80/2 off | 2 earlier | good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ee -,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 80/2 off | 2 earlier | weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ee -,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 80/2 off | 2 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ee -,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 80/2 off | 2 earlier | good, then weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ee -,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 80/2 off | 2 earlier | weak, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ee -,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 80/2 off | 3 earlier | good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ee -,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 80/2 off | 3 earlier | weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ee -,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 80/2 off | 3 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ee -,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 80/2 off | 3 earlier | good, then weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ee -,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 80/2 off | 3 earlier | weak, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ee -,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on | 0 earlier | good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds see -,-,- t=true u=2 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "letter-sounds | 87.5/3 on | 0 earlier | weak": {
+    "node": "practicing 0/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 000 nearly=false",
+    "end": "not-yet eee>eee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "letter-sounds | 87.5/3 on | 0 earlier | good, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds see -,-,- t=true u=2 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on | 0 earlier | good, then weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds see -,-,- t=true u=2 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on | 0 earlier | weak, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds see -,-,- t=true u=2 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "letter-sounds | 87.5/3 on | 1 earlier | good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds gse 2026-10-09,-,- t=true u=1 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "letter-sounds | 87.5/3 on | 1 earlier | weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds gee 2026-10-09,-,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 100 nearly=false",
+    "end": "not-yet gee>gee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "letter-sounds | 87.5/3 on | 1 earlier | good, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds gse 2026-10-09,-,- t=true u=1 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on | 1 earlier | good, then weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds gse 2026-10-09,-,- t=true u=1 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on | 1 earlier | weak, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds gse 2026-10-09,-,- t=true u=1 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "letter-sounds | 87.5/3 on | 2 earlier | good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv eee -,-,- t=false u=3 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3,path-opens"
+  },
+  "letter-sounds | 87.5/3 on | 2 earlier | weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds gge 2026-10-08,2026-10-09,- t=false u=1 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 110 nearly=false",
+    "end": "not-yet gge>gge new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "letter-sounds | 87.5/3 on | 2 earlier | good, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv eee -,-,- t=false u=3 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on | 2 earlier | good, then weak": {
+    "node": "mastered 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv eee -,-,- t=false u=3 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on | 2 earlier | weak, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv eee -,-,- t=false u=3 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3,path-opens"
+  },
+  "letter-sounds | 87.5/3 on | 3 earlier | good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv eee -,-,- t=false u=3 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on | 3 earlier | weak": {
+    "node": "mastered 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv eee -,-,- t=false u=3 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on | 3 earlier | good, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv eee -,-,- t=false u=3 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on | 3 earlier | good, then weak": {
+    "node": "mastered 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv eee -,-,- t=false u=3 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on | 3 earlier | weak, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv eee -,-,- t=false u=3 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 0 earlier | good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds see -,-,- t=true u=2 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 0 earlier | weak": {
+    "node": "practicing 0/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds eee -,-,- t=false u=3 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 000 nearly=false",
+    "end": "not-yet eee>eee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 0 earlier | good, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds see -,-,- t=true u=2 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 0 earlier | good, then weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds see -,-,- t=true u=2 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 0 earlier | weak, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds see -,-,- t=true u=2 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 1 earlier | good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds gse 2026-10-09,-,- t=true u=1 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 1 earlier | weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds gee 2026-10-09,-,- t=false u=2 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 100 nearly=false",
+    "end": "not-yet gee>gee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 1 earlier | good, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds gse 2026-10-09,-,- t=true u=1 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 1 earlier | good, then weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds gse 2026-10-09,-,- t=true u=1 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 1 earlier | weak, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds gse 2026-10-09,-,- t=true u=1 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 2 earlier | good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "good-day gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 2 earlier | weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds gge 2026-10-08,2026-10-09,- t=false u=1 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 110 nearly=false",
+    "end": "not-yet gge>gge new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 2 earlier | good, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 2 earlier | good, then weak": {
+    "node": "practicing 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 2 earlier | weak, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "good-day gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 3 earlier | good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "not-yet ggg>ggg new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 3 earlier | weak": {
+    "node": "practicing 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds ggg 2026-10-07,2026-10-08,2026-10-09 t=false u=0 c=false n=blending-cv | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 111 nearly=false",
+    "end": "not-yet ggg>ggg new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 3 earlier | good, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 3 earlier | good, then weak": {
+    "node": "practicing 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "letter-sounds | 87.5/3 on, auto off | 3 earlier | weak, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: letter-sounds ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=blending-cv | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "not-yet ggg>ggg new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "blending-cv | 80/2 off | 0 earlier | good": {
+    "node": "practicing 1/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ge -,- t=false u=1 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "good-day ee>ge new=0 bonus= count=1 of 2 right.8,flower"
+  },
+  "blending-cv | 80/2 off | 0 earlier | weak": {
+    "node": "practicing 0/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ee -,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 00 nearly=false",
+    "end": "not-yet ee>ee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "blending-cv | 80/2 off | 0 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ee -,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock ge>gg new=1 bonus= count=2 of 2! right.8,flower,path-opens"
+  },
+  "blending-cv | 80/2 off | 0 earlier | good, then weak": {
+    "node": "practicing 1/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ge -,- t=false u=1 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "practice ge>ge new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 80/2 off | 0 earlier | weak, then good": {
+    "node": "practicing 1/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ge -,- t=false u=1 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "good-day ee>ge new=0 bonus= count=1 of 2 right.8,flower"
+  },
+  "blending-cv | 80/2 off | 1 earlier | good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ee -,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock ge>gg new=1 bonus= count=2 of 2! right.8,flower,path-opens"
+  },
+  "blending-cv | 80/2 off | 1 earlier | weak": {
+    "node": "practicing 1/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: blending-cv ge -,- t=false u=1 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "not-yet ge>ge new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "blending-cv | 80/2 off | 1 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ee -,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 80/2 off | 1 earlier | good, then weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ee -,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 80/2 off | 1 earlier | weak, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ee -,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock ge>gg new=1 bonus= count=2 of 2! right.8,flower,path-opens"
+  },
+  "blending-cv | 80/2 off | 2 earlier | good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ee -,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 80/2 off | 2 earlier | weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ee -,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 80/2 off | 2 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ee -,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 80/2 off | 2 earlier | good, then weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ee -,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 80/2 off | 2 earlier | weak, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ee -,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 80/2 off | 3 earlier | good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ee -,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 80/2 off | 3 earlier | weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ee -,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 80/2 off | 3 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ee -,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 80/2 off | 3 earlier | good, then weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ee -,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 80/2 off | 3 earlier | weak, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ee -,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on | 0 earlier | good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv see -,-,- t=true u=2 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "blending-cv | 87.5/3 on | 0 earlier | weak": {
+    "node": "practicing 0/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv eee -,-,- t=false u=3 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 000 nearly=false",
+    "end": "not-yet eee>eee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "blending-cv | 87.5/3 on | 0 earlier | good, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv see -,-,- t=true u=2 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on | 0 earlier | good, then weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv see -,-,- t=true u=2 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on | 0 earlier | weak, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv see -,-,- t=true u=2 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "blending-cv | 87.5/3 on | 1 earlier | good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv gse 2026-10-09,-,- t=true u=1 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "blending-cv | 87.5/3 on | 1 earlier | weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv gee 2026-10-09,-,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 100 nearly=false",
+    "end": "not-yet gee>gee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "blending-cv | 87.5/3 on | 1 earlier | good, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv gse 2026-10-09,-,- t=true u=1 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on | 1 earlier | good, then weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv gse 2026-10-09,-,- t=true u=1 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on | 1 earlier | weak, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv gse 2026-10-09,-,- t=true u=1 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "blending-cv | 87.5/3 on | 2 earlier | good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out eee -,-,- t=false u=3 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3,path-opens"
+  },
+  "blending-cv | 87.5/3 on | 2 earlier | weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv gge 2026-10-08,2026-10-09,- t=false u=1 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 110 nearly=false",
+    "end": "not-yet gge>gge new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "blending-cv | 87.5/3 on | 2 earlier | good, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out eee -,-,- t=false u=3 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on | 2 earlier | good, then weak": {
+    "node": "mastered 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out eee -,-,- t=false u=3 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on | 2 earlier | weak, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out eee -,-,- t=false u=3 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3,path-opens"
+  },
+  "blending-cv | 87.5/3 on | 3 earlier | good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out eee -,-,- t=false u=3 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on | 3 earlier | weak": {
+    "node": "mastered 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out eee -,-,- t=false u=3 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on | 3 earlier | good, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out eee -,-,- t=false u=3 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on | 3 earlier | good, then weak": {
+    "node": "mastered 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out eee -,-,- t=false u=3 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on | 3 earlier | weak, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out eee -,-,- t=false u=3 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on, auto off | 0 earlier | good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv see -,-,- t=true u=2 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "blending-cv | 87.5/3 on, auto off | 0 earlier | weak": {
+    "node": "practicing 0/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv eee -,-,- t=false u=3 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 000 nearly=false",
+    "end": "not-yet eee>eee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "blending-cv | 87.5/3 on, auto off | 0 earlier | good, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv see -,-,- t=true u=2 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on, auto off | 0 earlier | good, then weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv see -,-,- t=true u=2 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on, auto off | 0 earlier | weak, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv see -,-,- t=true u=2 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "blending-cv | 87.5/3 on, auto off | 1 earlier | good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv gse 2026-10-09,-,- t=true u=1 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "blending-cv | 87.5/3 on, auto off | 1 earlier | weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv gee 2026-10-09,-,- t=false u=2 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 100 nearly=false",
+    "end": "not-yet gee>gee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "blending-cv | 87.5/3 on, auto off | 1 earlier | good, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv gse 2026-10-09,-,- t=true u=1 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on, auto off | 1 earlier | good, then weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv gse 2026-10-09,-,- t=true u=1 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on, auto off | 1 earlier | weak, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv gse 2026-10-09,-,- t=true u=1 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "blending-cv | 87.5/3 on, auto off | 2 earlier | good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "good-day gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3"
+  },
+  "blending-cv | 87.5/3 on, auto off | 2 earlier | weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv gge 2026-10-08,2026-10-09,- t=false u=1 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 110 nearly=false",
+    "end": "not-yet gge>gge new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "blending-cv | 87.5/3 on, auto off | 2 earlier | good, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on, auto off | 2 earlier | good, then weak": {
+    "node": "practicing 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on, auto off | 2 earlier | weak, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "good-day gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3"
+  },
+  "blending-cv | 87.5/3 on, auto off | 3 earlier | good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "not-yet ggg>ggg new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "blending-cv | 87.5/3 on, auto off | 3 earlier | weak": {
+    "node": "practicing 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv ggg 2026-10-07,2026-10-08,2026-10-09 t=false u=0 c=false n=sounding-out | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 111 nearly=false",
+    "end": "not-yet ggg>ggg new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "blending-cv | 87.5/3 on, auto off | 3 earlier | good, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on, auto off | 3 earlier | good, then weak": {
+    "node": "practicing 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "blending-cv | 87.5/3 on, auto off | 3 earlier | weak, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: blending-cv ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=sounding-out | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "not-yet ggg>ggg new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "sounding-out | 80/2 off | 0 earlier | good": {
+    "node": "practicing 1/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ge -,- t=false u=1 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "good-day ee>ge new=0 bonus= count=1 of 2 right.8,flower"
+  },
+  "sounding-out | 80/2 off | 0 earlier | weak": {
+    "node": "practicing 0/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ee -,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 00 nearly=false",
+    "end": "not-yet ee>ee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "sounding-out | 80/2 off | 0 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words ee -,- t=false u=2 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock ge>gg new=1 bonus= count=2 of 2! right.8,flower,path-opens"
+  },
+  "sounding-out | 80/2 off | 0 earlier | good, then weak": {
+    "node": "practicing 1/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ge -,- t=false u=1 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "practice ge>ge new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 80/2 off | 0 earlier | weak, then good": {
+    "node": "practicing 1/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ge -,- t=false u=1 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "good-day ee>ge new=0 bonus= count=1 of 2 right.8,flower"
+  },
+  "sounding-out | 80/2 off | 1 earlier | good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words ee -,- t=false u=2 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock ge>gg new=1 bonus= count=2 of 2! right.8,flower,path-opens"
+  },
+  "sounding-out | 80/2 off | 1 earlier | weak": {
+    "node": "practicing 1/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: sounding-out ge -,- t=false u=1 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "not-yet ge>ge new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "sounding-out | 80/2 off | 1 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words ee -,- t=false u=2 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 80/2 off | 1 earlier | good, then weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words ee -,- t=false u=2 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 80/2 off | 1 earlier | weak, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words ee -,- t=false u=2 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock ge>gg new=1 bonus= count=2 of 2! right.8,flower,path-opens"
+  },
+  "sounding-out | 80/2 off | 2 earlier | good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words ee -,- t=false u=2 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 80/2 off | 2 earlier | weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words ee -,- t=false u=2 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 80/2 off | 2 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words ee -,- t=false u=2 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 80/2 off | 2 earlier | good, then weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words ee -,- t=false u=2 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 80/2 off | 2 earlier | weak, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words ee -,- t=false u=2 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 80/2 off | 3 earlier | good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words ee -,- t=false u=2 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 80/2 off | 3 earlier | weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words ee -,- t=false u=2 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 80/2 off | 3 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words ee -,- t=false u=2 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 80/2 off | 3 earlier | good, then weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words ee -,- t=false u=2 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 80/2 off | 3 earlier | weak, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words ee -,- t=false u=2 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on | 0 earlier | good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out see -,-,- t=true u=2 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "sounding-out | 87.5/3 on | 0 earlier | weak": {
+    "node": "practicing 0/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out eee -,-,- t=false u=3 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 000 nearly=false",
+    "end": "not-yet eee>eee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "sounding-out | 87.5/3 on | 0 earlier | good, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out see -,-,- t=true u=2 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on | 0 earlier | good, then weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out see -,-,- t=true u=2 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on | 0 earlier | weak, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out see -,-,- t=true u=2 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "sounding-out | 87.5/3 on | 1 earlier | good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out gse 2026-10-09,-,- t=true u=1 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "sounding-out | 87.5/3 on | 1 earlier | weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out gee 2026-10-09,-,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 100 nearly=false",
+    "end": "not-yet gee>gee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "sounding-out | 87.5/3 on | 1 earlier | good, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out gse 2026-10-09,-,- t=true u=1 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on | 1 earlier | good, then weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out gse 2026-10-09,-,- t=true u=1 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on | 1 earlier | weak, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out gse 2026-10-09,-,- t=true u=1 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "sounding-out | 87.5/3 on | 2 earlier | good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words eee -,-,- t=false u=3 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3,path-opens"
+  },
+  "sounding-out | 87.5/3 on | 2 earlier | weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out gge 2026-10-08,2026-10-09,- t=false u=1 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 110 nearly=false",
+    "end": "not-yet gge>gge new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "sounding-out | 87.5/3 on | 2 earlier | good, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words eee -,-,- t=false u=3 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on | 2 earlier | good, then weak": {
+    "node": "mastered 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words eee -,-,- t=false u=3 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on | 2 earlier | weak, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words eee -,-,- t=false u=3 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3,path-opens"
+  },
+  "sounding-out | 87.5/3 on | 3 earlier | good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words eee -,-,- t=false u=3 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on | 3 earlier | weak": {
+    "node": "mastered 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words eee -,-,- t=false u=3 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on | 3 earlier | good, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words eee -,-,- t=false u=3 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on | 3 earlier | good, then weak": {
+    "node": "mastered 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words eee -,-,- t=false u=3 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on | 3 earlier | weak, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words eee -,-,- t=false u=3 c=false n=cvc-words-short-o | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on, auto off | 0 earlier | good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out see -,-,- t=true u=2 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "sounding-out | 87.5/3 on, auto off | 0 earlier | weak": {
+    "node": "practicing 0/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out eee -,-,- t=false u=3 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 000 nearly=false",
+    "end": "not-yet eee>eee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "sounding-out | 87.5/3 on, auto off | 0 earlier | good, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out see -,-,- t=true u=2 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on, auto off | 0 earlier | good, then weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out see -,-,- t=true u=2 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on, auto off | 0 earlier | weak, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out see -,-,- t=true u=2 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "sounding-out | 87.5/3 on, auto off | 1 earlier | good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out gse 2026-10-09,-,- t=true u=1 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "sounding-out | 87.5/3 on, auto off | 1 earlier | weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out gee 2026-10-09,-,- t=false u=2 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 100 nearly=false",
+    "end": "not-yet gee>gee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "sounding-out | 87.5/3 on, auto off | 1 earlier | good, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out gse 2026-10-09,-,- t=true u=1 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on, auto off | 1 earlier | good, then weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out gse 2026-10-09,-,- t=true u=1 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on, auto off | 1 earlier | weak, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out gse 2026-10-09,-,- t=true u=1 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "sounding-out | 87.5/3 on, auto off | 2 earlier | good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "good-day gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3"
+  },
+  "sounding-out | 87.5/3 on, auto off | 2 earlier | weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out gge 2026-10-08,2026-10-09,- t=false u=1 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 110 nearly=false",
+    "end": "not-yet gge>gge new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "sounding-out | 87.5/3 on, auto off | 2 earlier | good, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on, auto off | 2 earlier | good, then weak": {
+    "node": "practicing 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on, auto off | 2 earlier | weak, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "good-day gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3"
+  },
+  "sounding-out | 87.5/3 on, auto off | 3 earlier | good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "not-yet ggg>ggg new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "sounding-out | 87.5/3 on, auto off | 3 earlier | weak": {
+    "node": "practicing 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out ggg 2026-10-07,2026-10-08,2026-10-09 t=false u=0 c=false n=cvc-words | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 111 nearly=false",
+    "end": "not-yet ggg>ggg new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "sounding-out | 87.5/3 on, auto off | 3 earlier | good, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on, auto off | 3 earlier | good, then weak": {
+    "node": "practicing 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "sounding-out | 87.5/3 on, auto off | 3 earlier | weak, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: sounding-out ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=cvc-words | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "not-yet ggg>ggg new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "cvc-words-short-o | 80/2 off | 0 earlier | good": {
+    "node": "practicing 1/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-o ge -,- t=false u=1 c=false n=cvc-words-short-u | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "good-day ee>ge new=0 bonus= count=1 of 2 right.8,flower"
+  },
+  "cvc-words-short-o | 80/2 off | 0 earlier | weak": {
+    "node": "practicing 0/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-o ee -,- t=false u=2 c=false n=cvc-words-short-u | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 00 nearly=false",
+    "end": "not-yet ee>ee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "cvc-words-short-o | 80/2 off | 0 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-u ee -,- t=false u=2 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock ge>gg new=1 bonus= count=2 of 2! right.8,flower,path-opens"
+  },
+  "cvc-words-short-o | 80/2 off | 0 earlier | good, then weak": {
+    "node": "practicing 1/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-o ge -,- t=false u=1 c=false n=cvc-words-short-u | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "practice ge>ge new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 80/2 off | 0 earlier | weak, then good": {
+    "node": "practicing 1/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-o ge -,- t=false u=1 c=false n=cvc-words-short-u | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "good-day ee>ge new=0 bonus= count=1 of 2 right.8,flower"
+  },
+  "cvc-words-short-o | 80/2 off | 1 earlier | good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-u ee -,- t=false u=2 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock ge>gg new=1 bonus= count=2 of 2! right.8,flower,path-opens"
+  },
+  "cvc-words-short-o | 80/2 off | 1 earlier | weak": {
+    "node": "practicing 1/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-o ge -,- t=false u=1 c=false n=cvc-words-short-u | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 10 nearly=false",
+    "end": "not-yet ge>ge new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "cvc-words-short-o | 80/2 off | 1 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-u ee -,- t=false u=2 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 80/2 off | 1 earlier | good, then weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-u ee -,- t=false u=2 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 80/2 off | 1 earlier | weak, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-u ee -,- t=false u=2 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock ge>gg new=1 bonus= count=2 of 2! right.8,flower,path-opens"
+  },
+  "cvc-words-short-o | 80/2 off | 2 earlier | good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-u ee -,- t=false u=2 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 80/2 off | 2 earlier | weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-u ee -,- t=false u=2 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 80/2 off | 2 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-u ee -,- t=false u=2 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 80/2 off | 2 earlier | good, then weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-u ee -,- t=false u=2 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 80/2 off | 2 earlier | weak, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-u ee -,- t=false u=2 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 80/2 off | 3 earlier | good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-u ee -,- t=false u=2 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 80/2 off | 3 earlier | weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-u ee -,- t=false u=2 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 80/2 off | 3 earlier | good, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-u ee -,- t=false u=2 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 80/2 off | 3 earlier | good, then weak": {
+    "node": "mastered 2/2 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-u ee -,- t=false u=2 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 80/2 off | 3 earlier | weak, then good": {
+    "node": "mastered 2/2 last=1 awaiting=false",
+    "hub": "ng: add-to-10 ee -,- t=false u=2 c=false n=add-to-20 | ws: cvc-words-short-u ee -,- t=false u=2 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice gg>gg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on | 0 earlier | good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o see -,-,- t=true u=2 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "cvc-words-short-o | 87.5/3 on | 0 earlier | weak": {
+    "node": "practicing 0/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o eee -,-,- t=false u=3 c=false n=cvc-words-short-u | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 000 nearly=false",
+    "end": "not-yet eee>eee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "cvc-words-short-o | 87.5/3 on | 0 earlier | good, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o see -,-,- t=true u=2 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on | 0 earlier | good, then weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o see -,-,- t=true u=2 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on | 0 earlier | weak, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o see -,-,- t=true u=2 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "cvc-words-short-o | 87.5/3 on | 1 earlier | good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o gse 2026-10-09,-,- t=true u=1 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "cvc-words-short-o | 87.5/3 on | 1 earlier | weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o gee 2026-10-09,-,- t=false u=2 c=false n=cvc-words-short-u | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 100 nearly=false",
+    "end": "not-yet gee>gee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "cvc-words-short-o | 87.5/3 on | 1 earlier | good, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o gse 2026-10-09,-,- t=true u=1 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on | 1 earlier | good, then weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o gse 2026-10-09,-,- t=true u=1 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on | 1 earlier | weak, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o gse 2026-10-09,-,- t=true u=1 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "cvc-words-short-o | 87.5/3 on | 2 earlier | good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-u eee -,-,- t=false u=3 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3,path-opens"
+  },
+  "cvc-words-short-o | 87.5/3 on | 2 earlier | weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o gge 2026-10-08,2026-10-09,- t=false u=1 c=false n=cvc-words-short-u | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 110 nearly=false",
+    "end": "not-yet gge>gge new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "cvc-words-short-o | 87.5/3 on | 2 earlier | good, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-u eee -,-,- t=false u=3 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on | 2 earlier | good, then weak": {
+    "node": "mastered 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-u eee -,-,- t=false u=3 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on | 2 earlier | weak, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-u eee -,-,- t=false u=3 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "unlock gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3,path-opens"
+  },
+  "cvc-words-short-o | 87.5/3 on | 3 earlier | good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-u eee -,-,- t=false u=3 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on | 3 earlier | weak": {
+    "node": "mastered 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-u eee -,-,- t=false u=3 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on | 3 earlier | good, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-u eee -,-,- t=false u=3 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on | 3 earlier | good, then weak": {
+    "node": "mastered 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-u eee -,-,- t=false u=3 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on | 3 earlier | weak, then good": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-u eee -,-,- t=false u=3 c=false n=cvc-words-short-i | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 0 earlier | good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o see -,-,- t=true u=2 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 0 earlier | weak": {
+    "node": "practicing 0/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o eee -,-,- t=false u=3 c=false n=cvc-words-short-u | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 000 nearly=false",
+    "end": "not-yet eee>eee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 0 earlier | good, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o see -,-,- t=true u=2 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 0 earlier | good, then weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o see -,-,- t=true u=2 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "practice see>see new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 0 earlier | weak, then good": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o see -,-,- t=true u=2 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 1 earlier | good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o gse 2026-10-09,-,- t=true u=1 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 1 earlier | weak": {
+    "node": "practicing 1/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o gee 2026-10-09,-,- t=false u=2 c=false n=cvc-words-short-u | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 100 nearly=false",
+    "end": "not-yet gee>gee new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 1 earlier | good, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o gse 2026-10-09,-,- t=true u=1 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 1 earlier | good, then weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o gse 2026-10-09,-,- t=true u=1 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "practice gse>gse new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 1 earlier | weak, then good": {
+    "node": "practicing 2/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o gse 2026-10-09,-,- t=true u=1 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 110 nearly=false",
+    "end": "good-day gee>gse new=1 bonus= count=2 of 3 right.8,flower,count.2,sleeps"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 2 earlier | good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "good-day gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 2 earlier | weak": {
+    "node": "practicing 2/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o gge 2026-10-08,2026-10-09,- t=false u=1 c=false n=cvc-words-short-u | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,one-more",
+    "map": "current 110 nearly=false",
+    "end": "not-yet gge>gge new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 2 earlier | good, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 2 earlier | good, then weak": {
+    "node": "practicing 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 2 earlier | weak, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o ggs 2026-10-08,2026-10-09,- t=true u=0 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "good-day gge>ggg new=2 bonus= count=3 of 3! right.8,flower,count.3"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 3 earlier | good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "not-yet ggg>ggg new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 3 earlier | weak": {
+    "node": "practicing 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o ggg 2026-10-07,2026-10-08,2026-10-09 t=false u=0 c=false n=cvc-words-short-u | suggest=word-song | lines=grow.word-song | woke=hub.woke.one,grow.word-song",
+    "map": "current 111 nearly=false",
+    "end": "not-yet ggg>ggg new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 3 earlier | good, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 3 earlier | good, then weak": {
+    "node": "practicing 3/3 last=0.625 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "practice ggs>ggs new=null bonus= count=null not-yet.praise"
+  },
+  "cvc-words-short-o | 87.5/3 on, auto off | 3 earlier | weak, then good": {
+    "node": "practicing 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o ggs 2026-10-07,2026-10-08,- t=true u=0 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 111 nearly=false",
+    "end": "not-yet ggg>ggg new=null bonus= count=null not-yet.praise,not-yet.again"
+  },
+  "marian ipad: cat words grown | dog words": {
+    "node": "practicing 1/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o see -,-,- t=true u=2 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "current 100 nearly=false",
+    "end": "good-day eee>see new=0 bonus= count=1 of 3 right.8,flower,count.1,sleeps"
+  },
+  "marian ipad: cat words grown | cat words": {
+    "node": "mastered 3/3 last=1 awaiting=false",
+    "hub": "ng: add-to-10 eee -,-,- t=false u=3 c=false n=add-to-20 | ws: cvc-words-short-o see -,-,- t=true u=2 c=false n=cvc-words-short-u | suggest=number-garden | lines=sleeping.number-garden | woke=hub.woke.one,sleeping.number-garden",
+    "map": "mastered  nearly=false",
+    "end": "practice ggg>ggg new=null bonus= count=null not-yet.praise"
+  }
+}
