@@ -219,6 +219,12 @@ import {
   type SessionHistoryV2,
 } from '../sessionEnd/sessionHistory'
 import { now as progressNow } from '../progress/clock'
+import {
+  freshHuntRecord,
+  huntFind,
+  huntRoundOf,
+  saveHuntRecord,
+} from '../games/critterHunt'
 
 interface SeedRecipe {
   /**
@@ -255,6 +261,12 @@ interface SeedRecipe {
    * device picks.
    */
   readonly leitner?: readonly LeitnerItem<MathFact>[]
+  /**
+   * Optional Letter critters word hunt round in progress: its letters
+   * (vowel first) and the words already found, in find order. Written to
+   * the learner's hunt record (`games/critterHunt.ts`).
+   */
+  readonly hunt?: { letters: readonly string[]; found: readonly string[] }
 }
 
 /**
@@ -721,6 +733,27 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
       { item: { a: 6, b: 4, op: '+' }, box: 1, lastSeen: 0 },
     ],
   },
+
+  // Letter critters word hunt (critters-word-hunt.md § 10.3, H26): a
+  // learner past cvc-words with short o current (Marian, 2026-10-25), and
+  // the round a b g h p t in progress with bag, hat, bat and tap found
+  // (4 of its 6 targets). Building t-a-g completes it (the beat); p-a-t
+  // then fills the last slot with no beat. Its extras: gap, tab, gag.
+  'critters-hunt': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'sounding-out': 'mastered',
+      'cvc-words': 'mastered',
+      'cvc-words-short-o': 'practicing',
+    },
+    skipGreet: true,
+    hunt: {
+      letters: ['a', 'b', 'g', 'h', 'p', 't'],
+      found: ['bag', 'hat', 'bat', 'tap'],
+    },
+  },
 }
 
 /** Every recognized seed name, in table order. */
@@ -754,6 +787,9 @@ export function applyDebugSeed(value: string): boolean {
   }
   if (recipe.leitner) {
     applyLeitnerSeed(recipe.leitner)
+  }
+  if (recipe.hunt) {
+    applyHuntSeed(recipe.hunt)
   }
   if (recipe.skipGreet) {
     bumpSessionCountIfZero()
@@ -808,6 +844,22 @@ function applyLeitnerSeed(items: readonly LeitnerItem<MathFact>[]): void {
       ],
     },
   })
+}
+
+/** Write a hunt round in progress as the learner's hunt record. */
+function applyHuntSeed({
+  letters,
+  found,
+}: {
+  letters: readonly string[]
+  found: readonly string[]
+}): void {
+  const round = huntRoundOf(letters)
+  if (round === null) {
+    console.warn(`[debugSeed] not a hunt round: ${letters.join('')}`)
+    return
+  }
+  saveHuntRecord(found.reduce(huntFind, freshHuntRecord(round)))
 }
 
 /**

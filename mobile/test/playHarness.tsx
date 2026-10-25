@@ -143,6 +143,7 @@ export async function mountGame(
     rng?: () => number
     words?: readonly string[]
     sounds?: TapClipPlayer
+    hunt?: boolean
   } = {},
 ) {
   resetDragForTests()
@@ -163,6 +164,7 @@ export async function mountGame(
     shore: opts.shore,
     words: opts.words,
     sounds: opts.sounds,
+    hunt: opts.hunt,
   }
   const view = await render(
     <PlayGameScreen

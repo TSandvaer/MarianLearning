@@ -40,6 +40,10 @@ export type PlayLineId =
   | 'guide.play.critters.funny.3'
   | `guide.play.critters.word.${string}`
   | `guide.play.critters.praise.${string}`
+  | 'guide.play.critters.done'
+
+/** "You did it!", Word Song's session-end opener (no new audio). */
+export const CRITTERS_DONE_TEXT = 'You did it!'
 
 const praiseId = (word: string) =>
   `guide.play.critters.praise.${word}` as PlayLineId
@@ -57,6 +61,16 @@ export const PLAY_LINE_MANIFEST: Readonly<Record<PlayLineId, ManifestLine>> =
         { src: null, text, clip: canonClipFor(text)?.module },
       ]
     }),
+    // The word hunt's completion beat (critters-word-hunt.md § 5.1): Word
+    // Song's `session.end.opener`, its bundled canon clip.
+    [
+      'guide.play.critters.done',
+      {
+        src: null,
+        text: CRITTERS_DONE_TEXT,
+        clip: canonClipFor(CRITTERS_DONE_TEXT)?.module,
+      },
+    ],
   ]) as Record<PlayLineId, ManifestLine>
 
 export type PlayLinePlayer = ManifestLinePlayer<PlayLineId>
@@ -94,6 +108,12 @@ export const PLAY_LABELS = {
   back: 'Back',
   raft: 'Raft',
   log: 'Log',
+  // The word hunt (critters-word-hunt.md § 6.3).
+  huntLog: 'Log, three letters',
+  emptySlot: 'Empty word',
+  hint: 'Hint',
+  bonus: 'Bonus words',
+  newLetters: 'New letters',
 } as const
 
 /** § 4.2: each tile's label, per game. */
@@ -126,6 +146,13 @@ export const animalLabel = (animal: string, weight: number) =>
 /** The raft: "Raft, <total>". */
 export const raftLabel = (total: number) =>
   `${PLAY_LABELS.raft}, ${NUMBER_WORDS[total]}`
+
+/** A filled slot: the word, capitalised ("Fan"). */
+export const slotLabel = (word: string) => capitalised(word)
+
+/** The bonus chip: "Bonus words, <w>, <w>" ("Bonus words, tan"). */
+export const bonusLabel = (words: readonly string[]) =>
+  [PLAY_LABELS.bonus, ...words].join(', ')
 
 /** A critter: "Letter <x>"; seated, "Letter <x>, on the log". */
 export const critterLabel = (letter: string, seated: boolean) =>

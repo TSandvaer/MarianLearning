@@ -7,8 +7,11 @@
 import type { Viewport } from '../../layout/layout'
 import { mathLayout } from '../../layout/mathLayout'
 import {
+  chipRect,
   critterScene,
   crittersFitBothWays,
+  huntScene,
+  huntSceneFits,
   overlaps,
   playArea,
   raftScene,
@@ -264,5 +267,263 @@ describe('Thomas 2026-10-23 (build 20): every letter on a tablet, 22 critters', 
     // A phone never: it keeps the cap.
     expect(fit(vp(375, 667), 11)).toBe(false)
     expect(fit(vp(667, 375), 11)).toBe(false)
+  })
+})
+
+/**
+ * critters-word-hunt.md § 2.4: the word hunt's step and rects (N 8) on its
+ * 15 viewports, as printed: (x, y, width, height).
+ */
+const HUNT_TABLE: readonly (readonly [
+  string,
+  Viewport,
+  string,
+  Record<'board' | 'logBand' | 'meadow' | 'chip', readonly number[]> & {
+    picture: readonly [number, number, number]
+  },
+])[] = [
+  [
+    '375 × 667',
+    vp(375, 667),
+    'S4',
+    {
+      board: [22.5, 265, 330, 138],
+      logBand: [58.5, 415, 258, 86],
+      meadow: [95.5, 509, 184, 120],
+      chip: [287.5, 565, 60, 64],
+      picture: [87.5, 422, 200],
+    },
+  ],
+  [
+    '667 × 375',
+    vp(667, 375),
+    'S4',
+    {
+      board: [405, 149.6, 246, 210],
+      logBand: [160, 160.6, 228, 76],
+      meadow: [194, 244.6, 160, 104],
+      chip: [582, 294.6, 60, 64],
+      picture: [180, 160.6, 188],
+    },
+  ],
+  [
+    '390 × 844 (t47 b34)',
+    vp(390, 844, { top: 47, bottom: 34 }),
+    'S4',
+    {
+      board: [30, 370.5, 330, 138],
+      logBand: [66, 520.5, 258, 86],
+      meadow: [103, 614.5, 184, 120],
+      chip: [295, 670.5, 60, 64],
+      picture: [95, 527.5, 200],
+    },
+  ],
+  [
+    '844 × 390 (l/r47 b21)',
+    vp(844, 390, { left: 47, right: 47, bottom: 21 }),
+    'S4',
+    {
+      board: [507, 146.1, 246, 210],
+      logBand: [255, 157.1, 228, 76],
+      meadow: [289, 241.1, 160, 104],
+      chip: [684, 291.1, 60, 64],
+      picture: [275, 157.1, 188],
+    },
+  ],
+  [
+    '820 × 1180 (t24 b20)',
+    vp(820, 1180, { top: 24, bottom: 20 }),
+    'S1',
+    {
+      board: [98, 462.4, 624, 288],
+      logBand: [213, 774.4, 394, 126],
+      meadow: [262, 916.4, 296, 192],
+      chip: [574, 992.4, 108, 116],
+      picture: [260, 791.4, 300],
+    },
+  ],
+  [
+    '1180 × 820 (b20)',
+    vp(1180, 820, { bottom: 20 }),
+    'S1',
+    {
+      board: [681.6, 279.5, 464, 440],
+      logBand: [263.6, 332.5, 394, 126],
+      meadow: [312.6, 474.5, 296, 192],
+      chip: [1019.6, 593.5, 108, 116],
+      picture: [310.6, 349.5, 300],
+    },
+  ],
+  [
+    '1180 × 820 (t24 b20)',
+    vp(1180, 820, { top: 24, bottom: 20 }),
+    'S1',
+    {
+      board: [681.6, 291.5, 464, 440],
+      logBand: [263.6, 344.5, 394, 126],
+      meadow: [312.6, 486.5, 296, 192],
+      chip: [1019.6, 605.5, 108, 116],
+      picture: [310.6, 361.5, 300],
+    },
+  ],
+  [
+    '834 × 1194 (t24 b20)',
+    vp(834, 1194, { top: 24, bottom: 20 }),
+    'S1',
+    {
+      board: [105, 471.2, 624, 288],
+      logBand: [220, 783.2, 394, 126],
+      meadow: [269, 925.2, 296, 192],
+      chip: [581, 1001.2, 108, 116],
+      picture: [267, 800.2, 300],
+    },
+  ],
+  [
+    '1194 × 834 (t24 b20)',
+    vp(1194, 834, { top: 24, bottom: 20 }),
+    'S1',
+    {
+      board: [690.4, 298.5, 464, 440],
+      logBand: [272.4, 351.5, 394, 126],
+      meadow: [321.4, 493.5, 296, 192],
+      chip: [1028.4, 612.5, 108, 116],
+      picture: [319.4, 368.5, 300],
+    },
+  ],
+  [
+    '744 × 1133 (t24 b20)',
+    vp(744, 1133, { top: 24, bottom: 20 }),
+    'S2',
+    {
+      board: [108, 456.8, 528, 240],
+      logBand: [175, 720.8, 394, 126],
+      meadow: [224, 862.8, 296, 192],
+      chip: [536, 950.8, 96, 104],
+      picture: [222, 737.8, 300],
+    },
+  ],
+  [
+    '1133 × 744 (t24 b20)',
+    vp(1133, 744, { top: 24, bottom: 20 }),
+    'S2',
+    {
+      board: [684.2, 289.5, 392, 368],
+      logBand: [266.2, 306.5, 394, 126],
+      meadow: [315.2, 448.5, 296, 192],
+      chip: [968.2, 549.5, 96, 104],
+      picture: [313.2, 323.5, 300],
+    },
+  ],
+  [
+    '810 × 1080 (t24 b20)',
+    vp(810, 1080, { top: 24, bottom: 20 }),
+    'S2',
+    {
+      board: [141, 423.4, 528, 240],
+      logBand: [208, 687.4, 394, 126],
+      meadow: [257, 829.4, 296, 192],
+      chip: [569, 917.4, 96, 104],
+      picture: [255, 704.4, 300],
+    },
+  ],
+  [
+    '1080 × 810 (t24 b20)',
+    vp(1080, 810, { top: 24, bottom: 20 }),
+    'S2',
+    {
+      board: [666.3, 322.5, 392, 368],
+      logBand: [248.3, 339.5, 394, 126],
+      meadow: [297.3, 481.5, 296, 192],
+      chip: [950.3, 582.5, 96, 104],
+      picture: [295.3, 356.5, 300],
+    },
+  ],
+  [
+    '768 × 1024 (t24 b20)',
+    vp(768, 1024, { top: 24, bottom: 20 }),
+    'S3',
+    {
+      board: [156, 410.1, 456, 196],
+      logBand: [187, 630.1, 394, 126],
+      meadow: [236, 772.1, 296, 192],
+      chip: [548, 880.1, 78, 84],
+      picture: [234, 647.1, 300],
+    },
+  ],
+  [
+    '1024 × 768 (t24 b20)',
+    vp(1024, 768, { top: 24, bottom: 20 }),
+    'S3',
+    {
+      board: [659.8, 334.5, 338, 302],
+      logBand: [241.8, 318.5, 394, 126],
+      meadow: [290.8, 460.5, 296, 192],
+      chip: [907.8, 549.5, 78, 84],
+      picture: [288.8, 335.5, 300],
+    },
+  ],
+]
+
+describe('H7: the word hunt scene (critters-word-hunt.md § 2.4)', () => {
+  const sceneOf = (v: Viewport, n: number) => {
+    const layout = mathLayout(v)
+    const A = playArea(layout)
+    return { A, s: huntScene(A, layout.tablet, layout.landscape, n) }
+  }
+  const expectRect = (
+    r: { x: number; y: number; width: number; height: number },
+    [x, y, w, h]: readonly number[],
+  ) => {
+    expect(r.x).toBeCloseTo(x!, 1)
+    expect(r.y).toBeCloseTo(y!, 1)
+    expect(r.width).toBeCloseTo(w!, 1)
+    expect(r.height).toBeCloseTo(h!, 1)
+  }
+
+  it.each(HUNT_TABLE)(
+    '%s: § 2.4’s step and rects for N 8',
+    (_, v, step, want) => {
+      const { s } = sceneOf(v, 8)
+      expect(s.step.name).toBe(step)
+      expectRect(s.board, want.board)
+      expectRect(s.logBand, want.logBand)
+      expectRect(s.meadow, want.meadow)
+      expectRect(chipRect(s, 3), want.chip)
+      const [px, py, p] = want.picture
+      expectRect(s.picture, [px, py, p, p])
+    },
+  )
+
+  it.each(HUNT_TABLE)('%s: § 2.2’s fit rule holds for N 5-8', (_, v) => {
+    for (const n of [5, 6, 7, 8]) {
+      const { A, s } = sceneOf(v, n)
+      expect(s.slots).toHaveLength(n)
+      expect(huntSceneFits(s, A)).toBe(true)
+    }
+  })
+
+  it('6 critters, 3 a row in 2 rows; the numeral disc on the log’s left end (32 phone, 40 tablet)', () => {
+    const phone = sceneOf(vp(375, 667), 6).s
+    expect(phone.cells).toHaveLength(6)
+    expect(new Set(phone.cells.map((r) => r.y)).size).toBe(2)
+    expect(phone.cells.slice(0, 3).map((r) => r.y)).toEqual([509, 509, 509])
+    expectRect(phone.numeral, [58.5, phone.log.y - 4, 32, 32])
+    const tablet = sceneOf(vp(820, 1180, { top: 24, bottom: 20 }), 6).s
+    expectRect(tablet.numeral, [213, 868.4, 40, 40])
+  })
+
+  it('portrait rows: ceil(N/2) over floor(N/2); landscape: rows of 3 with the chip’s cell after the last slot', () => {
+    const rowsOf = (s: ReturnType<typeof huntScene>) =>
+      [...new Set(s.slots.map((x) => x.card.y))].map(
+        (y) => s.slots.filter((x) => x.card.y === y).length,
+      )
+    expect(rowsOf(sceneOf(vp(375, 667), 5).s)).toEqual([3, 2])
+    expect(rowsOf(sceneOf(vp(375, 667), 8).s)).toEqual([4, 4])
+    expect(rowsOf(sceneOf(vp(667, 375), 5).s)).toEqual([3, 2])
+    expect(rowsOf(sceneOf(vp(667, 375), 7).s)).toEqual([3, 3, 1])
+    const l = sceneOf(vp(667, 375), 6).s
+    expect(l.chipCell).not.toBeNull()
+    expect(l.chipCell!.y).toBeGreaterThan(l.slots[5]!.card.y)
+    expect(sceneOf(vp(375, 667), 6).s.chipCell).toBeNull()
   })
 })

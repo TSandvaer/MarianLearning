@@ -48,6 +48,8 @@ export interface GameKit {
   landscape: boolean
   /** The screen the frame is laid out from (the critters' fit, § 3.2). */
   viewport: Viewport
+  /** Back's disc (§ 1.7): the word hunt's New letters sits beside it. */
+  back: Rect
   reducedMotion: boolean
   /**
    * Plays a line, cutting the one before it; resolves `true` when it ended

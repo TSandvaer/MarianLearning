@@ -23,6 +23,7 @@ import type { Rect } from '../../layout/layout'
 import type { MapCaptionSlot } from '../../layout/mapScreenLayout'
 import { FILL, fonts } from '../../theme'
 import { TITLE } from '../hub/cardLook'
+import { MAP_BUTTON_LOOK } from '../hub/mapButtonLook'
 import { PRESS_MS } from '../hub/clay'
 import { CLAY_LOOK } from '../sessionEnd/clayLook'
 import { EASE_OUT } from './mapMotion'
@@ -31,6 +32,9 @@ import type { MapCaptionLine } from './useMapVisit'
 export function MapBackdrop() {
   return <View pointerEvents="none" style={styles.backdrop} />
 }
+
+/** Each clay disc's ledge. */
+const LEDGE = { wood: '#7d4a26', cream: '#e3c6a6', honey: '#b27b37' } as const
 
 /** The clay Home button → Hub. The face sinks 6 × k at press-in. */
 export function HomeButton({
@@ -60,8 +64,10 @@ export function HomeButton({
 
 /**
  * A round clay disc button with a piece of path art at 68 × k, Home's
- * shape, ledge and press: wood (Home), or the Hub bubble's cream over its
- * `#e3c6a6` ledge (the Hub's Play disc, play-place § 1.2). No idle motion.
+ * shape, ledge and press: wood (Home), the Hub bubble's cream over its
+ * `#e3c6a6` ledge (the Hub's Play disc, play-place § 1.2), or Word Song
+ * honey over its `#b27b37` ledge (Letter critters' New letters,
+ * critters-word-hunt.md § 5.3). No idle motion.
  */
 export function ClayDisc({
   rect,
@@ -78,7 +84,7 @@ export function ClayDisc({
   testID: string
   label: string
   art: PathArtId
-  look: 'wood' | 'cream'
+  look: 'wood' | 'cream' | 'honey'
 }) {
   const [down, setDown] = useState(false)
   const sink = useSharedValue(0)
@@ -88,8 +94,8 @@ export function ClayDisc({
   const pressed = useAnimatedStyle(() => ({
     transform: [{ translateY: sink.get() }],
   }))
-  const ledge = look === 'wood' ? '#7d4a26' : '#e3c6a6'
-  const shine = look === 'wood' ? 0.3 : 1
+  const ledge = LEDGE[look]
+  const shine = look === 'wood' ? 0.3 : look === 'honey' ? 0.4 : 1
   return (
     <Pressable
       testID={testID}
@@ -105,7 +111,7 @@ export function ClayDisc({
     >
       <Animated.View
         style={[
-          look === 'wood' ? styles.home : styles.cream,
+          styles[look === 'wood' ? 'home' : look],
           {
             borderRadius: rect.width / 2,
             boxShadow: `inset 0 ${5 * k}px 0 rgba(255,255,255,${shine}), 0 ${8 * k}px 0 ${ledge}, 0 ${12 * k}px ${16 * k}px rgba(60,30,10,0.3)`,
@@ -372,6 +378,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff8ee',
+  },
+  // Word Song honey, the Letter critters tile's face (play-place § 1.3).
+  honey: {
+    ...FILL,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: MAP_BUTTON_LOOK['word-song'].flat,
+    experimental_backgroundImage: MAP_BUTTON_LOOK['word-song'].face,
   },
   titleBox: { alignItems: 'center', justifyContent: 'center' },
   title: { fontFamily: fonts.bold, textAlign: 'center' },

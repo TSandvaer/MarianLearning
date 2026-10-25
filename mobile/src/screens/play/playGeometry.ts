@@ -264,10 +264,11 @@ export function critterScene(
   tablet: boolean,
   landscape: boolean,
   count: number,
+  { perRow: fixedPerRow }: { perRow?: number } = {},
 ): CritterScene {
   const c = tablet ? 88 : landscape ? 48 : 56
   const g = tablet ? 16 : 8
-  const perRow = Math.max(1, Math.floor((A.width + g) / (c + g)))
+  const perRow = fixedPerRow ?? Math.max(1, Math.floor((A.width + g) / (c + g)))
   const rows = Math.max(1, Math.ceil(count / perRow))
   const meadowH = rows * c + (rows - 1) * g
   const cols = Math.min(perRow, Math.max(1, count))
@@ -366,4 +367,270 @@ export function crittersFitBothWays(v: Viewport, count: number): boolean {
         bottom(r) <= bottom(A) + 0.01,
     )
   })
+}
+
+// --------------------------------------------------------------------------
+// Letter critters' word hunt (critters-word-hunt.md § 2)
+// --------------------------------------------------------------------------
+
+/** § 2.2: a slot's box, box gap, padding and picture box; the chip's tile. */
+export interface SlotStep {
+  name: 'S1' | 'S2' | 'S3' | 'S4'
+  b: number
+  gb: number
+  pad: number
+  T: number
+  bx: number
+}
+
+/** § 2.2's ladder: tablets take the first that fits; phones take S4. */
+export const SLOT_STEPS: readonly SlotStep[] = [
+  { name: 'S1', b: 40, gb: 4, pad: 8, T: 72, bx: 28 },
+  { name: 'S2', b: 32, gb: 4, pad: 8, T: 56, bx: 24 },
+  { name: 'S3', b: 28, gb: 3, pad: 6, T: 44, bx: 20 },
+  { name: 'S4', b: 22, gb: 2, pad: 4, T: 32, bx: 16 },
+]
+
+/** The hunt's 6 critters: 3 a row, 2 rows (Decision 2). */
+export const HUNT_PER_ROW = 3
+export const HUNT_CRITTERS = 6
+
+/** A slot: its card, picture box and 3 tile boxes. */
+export interface SlotParts {
+  card: Rect
+  picture: Rect
+  boxes: readonly Rect[]
+}
+
+export interface HuntScene extends CritterScene {
+  step: SlotStep
+  /** The log band and the meadow together. */
+  block: Rect
+  /** The N slots (and, in landscape, the chip's cell). */
+  board: Rect
+  slots: readonly SlotParts[]
+  /** Landscape: the board's cell after the last slot; portrait: none. */
+  chipCell: Rect | null
+  /** The numeral disc on the log's left end (§ 3.2). */
+  numeral: Rect
+}
+
+/** § 2.2: a slot's side for `step`. */
+export const slotSize = ({ b, gb, pad, T }: SlotStep) => ({
+  width: 3 * b + 2 * gb + 2 * pad,
+  height: pad + T + pad + b + pad,
+})
+
+function slotParts(x: number, y: number, step: SlotStep): SlotParts {
+  const { b, gb, pad, T } = step
+  const { width, height } = slotSize(step)
+  return {
+    card: { x, y, width, height },
+    picture: { x: x + (width - T) / 2, y: y + pad, width: T, height: T },
+    boxes: [0, 1, 2].map((k) => ({
+      x: x + pad + k * (b + gb),
+      y: y + pad + T + pad,
+      width: b,
+      height: b,
+    })),
+  }
+}
+
+/**
+ * § 4.5: the bonus chip with `k` extras (1-3), stacked in a column, the
+ * newest at the bottom: beside the meadow, bottom-aligned (portrait), or
+ * centred in its cell (landscape).
+ */
+export function chipRect(scene: HuntScene, k: number): Rect {
+  const { bx, gb, pad } = scene.step
+  const width = 3 * bx + 2 * gb + 2 * pad
+  const height = k * bx + (k - 1) * pad + 2 * pad
+  const cell = scene.chipCell
+  if (cell !== null) {
+    return {
+      x: cell.x + (cell.width - width) / 2,
+      y: cell.y + (cell.height - height) / 2,
+      width,
+      height,
+    }
+  }
+  const { meadow, g } = scene
+  return {
+    x: right(meadow) + g,
+    y: bottom(meadow) - height,
+    width,
+    height,
+  }
+}
+
+/** The tile boxes of the chip's extra `i` of `k`. */
+export function chipTiles(scene: HuntScene, k: number, i: number): Rect[] {
+  const { bx, gb, pad } = scene.step
+  const chip = chipRect(scene, k)
+  return [0, 1, 2].map((j) => ({
+    x: chip.x + pad + j * (bx + gb),
+    y: chip.y + pad + i * (bx + pad),
+    width: bx,
+    height: bx,
+  }))
+}
+
+/** § 2.3: the scene for `n` targets with `step`. */
+function huntSceneAt(
+  A: Rect,
+  tablet: boolean,
+  landscape: boolean,
+  n: number,
+  step: SlotStep,
+): HuntScene {
+  const c = tablet ? 88 : landscape ? 48 : 56
+  const g = tablet ? 16 : 8
+  const seat = SEATED_SCALE * c
+  const blockW = 3 * seat + 2 * g + 32
+  const blockH = seat + 16 + g + 2 * c + g
+  const sg = tablet ? 16 : 6
+  const { width: W, height: H } = slotSize(step)
+  const rowW = (k: number) => k * W + (k - 1) * sg
+
+  let rows: number[]
+  let blockAt: { x: number; y: number }
+  let boardRect: Rect
+  if (!landscape) {
+    rows = [Math.ceil(n / 2), Math.floor(n / 2)]
+    const boardW = rowW(rows[0]!)
+    const boardH = 2 * H + sg
+    const gap = tablet ? 24 : 12
+    const top = A.y + (A.height - (boardH + gap + blockH)) / 2
+    boardRect = {
+      x: A.x + (A.width - boardW) / 2,
+      y: top,
+      width: boardW,
+      height: boardH,
+    }
+    blockAt = { x: A.x + (A.width - blockW) / 2, y: top + boardH + gap }
+  } else {
+    const cells = n + 1
+    rows = []
+    for (let left = cells; left > 0; left -= 3) rows.push(Math.min(3, left))
+    const boardW = rowW(3)
+    const boardH = rows.length * H + (rows.length - 1) * sg
+    const gap = Math.min(24, A.width - blockW - boardW)
+    const x0 = A.x + (A.width - (blockW + gap + boardW)) / 2
+    blockAt = { x: x0, y: A.y + (A.height - blockH) / 2 }
+    boardRect = {
+      x: x0 + blockW + gap,
+      y: A.y + (A.height - boardH) / 2,
+      width: boardW,
+      height: boardH,
+    }
+  }
+  const mid = boardRect.x + boardRect.width / 2
+  const cellRects: Rect[] = []
+  rows.forEach((k, r) => {
+    const x0 = mid - rowW(k) / 2
+    for (let i = 0; i < k; i++) {
+      cellRects.push({
+        x: x0 + i * (W + sg),
+        y: boardRect.y + r * (H + sg),
+        width: W,
+        height: H,
+      })
+    }
+  })
+  const block = { ...blockAt, width: blockW, height: blockH }
+  const base = critterScene(block, tablet, landscape, HUNT_CRITTERS, {
+    perRow: HUNT_PER_ROW,
+  })
+  const p = Math.min(blockH, blockW, tablet ? 300 : 200)
+  const D = tablet ? 40 : 32
+  return {
+    ...base,
+    p,
+    picture: {
+      x: block.x + (blockW - p) / 2,
+      y: block.y + (blockH - p) / 2,
+      width: p,
+      height: p,
+    },
+    step,
+    block,
+    board: boardRect,
+    slots: cellRects.slice(0, n).map((r) => slotParts(r.x, r.y, step)),
+    chipCell: landscape ? cellRects[n]! : null,
+    numeral: {
+      x: base.log.x,
+      y: base.log.y + base.log.height / 2 - D / 2,
+      width: D,
+      height: D,
+    },
+  }
+}
+
+/** A burrow hangs 0.04 c below its cell (`LetterCritters.tsx` burrow). */
+const BURROW_HANG = 0.04
+
+/**
+ * § 2.2's fit rule for `scene`: every part inside `A` (burrows included);
+ * each slot clear of the other slots, the log band, the numeral, every
+ * seat's drop zone, every meadow cell and the bonus chip (3 extras); the
+ * chip clear of the meadow and the drop zones; the picture card off the
+ * board.
+ */
+export function huntSceneFits(scene: HuntScene, A: Rect): boolean {
+  const e = 0.01
+  const inA = (r: Rect) =>
+    r.x >= A.x - e &&
+    r.y >= A.y - e &&
+    right(r) <= right(A) + e &&
+    bottom(r) <= bottom(A) + e
+  const chip = chipRect(scene, 3)
+  const cards = scene.slots.map((s) => s.card)
+  const drops = scene.seats.map((r) => grow(r, 0.2 * scene.c))
+  const burrows = scene.cells.map((r) => ({
+    ...r,
+    height: r.height + BURROW_HANG * scene.c,
+  }))
+  const parts = [
+    ...cards,
+    scene.logBand,
+    scene.numeral,
+    ...burrows,
+    chip,
+    scene.picture,
+  ]
+  if (!parts.every(inA)) return false
+  const others = [scene.logBand, scene.numeral, ...drops, ...scene.cells, chip]
+  for (let i = 0; i < cards.length; i++) {
+    if (others.some((o) => overlaps(cards[i]!, o))) return false
+    if (cards.some((o, j) => j !== i && overlaps(cards[i]!, o))) return false
+  }
+  if ([...scene.cells, ...drops].some((o) => overlaps(chip, o))) return false
+  return !overlaps(scene.picture, scene.board)
+}
+
+/**
+ * The word hunt's scene (§ 2): a phone takes S4; a tablet the first of
+ * S1, S2, S3 that fits for every N from 5 to 8 in this orientation (else
+ * S3, logged). The step depends on `A` alone, so slots keep their size
+ * from round to round.
+ */
+export function huntScene(
+  A: Rect,
+  tablet: boolean,
+  landscape: boolean,
+  n: number,
+): HuntScene {
+  const s4 = SLOT_STEPS[3]!
+  if (!tablet) return huntSceneAt(A, false, landscape, n, s4)
+  const step = SLOT_STEPS.slice(0, 3).find((st) =>
+    [5, 6, 7, 8].every((k) =>
+      huntSceneFits(huntSceneAt(A, true, landscape, k, st), A),
+    ),
+  )
+  if (step === undefined) {
+    console.warn(
+      `[layout] the word hunt does not fit ${A.width} x ${A.height} at S3`,
+    )
+  }
+  return huntSceneAt(A, true, landscape, n, step ?? SLOT_STEPS[2]!)
 }

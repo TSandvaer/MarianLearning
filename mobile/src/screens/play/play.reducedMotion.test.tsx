@@ -82,6 +82,7 @@ it('raft: a splash dims instead of wobbling, with the same sound and line; a cro
 it('critters: a non-word dims instead of tumbling; the boing and the line play', async () => {
   const s = fakeSounds(() => 2000)
   const g = await mountGame('critters', {
+    hunt: false,
     words: BLENDING_WORDS,
     sounds: s.sounds,
   })
@@ -97,7 +98,11 @@ it('critters: a non-word dims instead of tumbling; the boing and the line play',
 
 it('critters (Thomas 2026-10-23): the shelf clears with a fade back, no drop; the drag hint still shows', async () => {
   const s = fakeSounds(() => 2000)
-  await mountGame('critters', { words: BLENDING_WORDS, sounds: s.sounds })
+  await mountGame('critters', {
+    hunt: false,
+    words: BLENDING_WORDS,
+    sounds: s.sounds,
+  })
   await advance(CRITTERS_OPEN_DELAY_MS)
   // The hand is hidden from VoiceOver; under Reduce Motion it only fades.
   const hidden = { includeHiddenElements: true } as const
@@ -132,6 +137,7 @@ it('critters (Thomas 2026-10-23): the shelf clears with a fade back, no drop; th
 it('critters (Thomas 2026-10-23, build 20): a said word’s picture fades in after Emma says it and out over 300 ms, then the shelf fades back', async () => {
   const s = fakeSounds(() => 2000)
   const g = await mountGame('critters', {
+    hunt: false,
     words: ['rug', 'cat'],
     sounds: s.sounds,
   })
