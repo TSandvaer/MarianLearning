@@ -5,7 +5,8 @@
  * after Splash, and a pick switches the store and mounts their Greet or
  * Hub; the badge switches back, and the next learner's Hub speaks even
  * within 30 s (K2); the return rule after 10 minutes hidden; Session End
- * hands over; Parent Settings' Done opens the picker after a change.
+ * returns to the learner's own Hub; Parent Settings' Done opens the picker
+ * after a change.
  */
 import {
   LEARNERS_STORAGE_KEY,
@@ -412,22 +413,26 @@ describe('AC 31: the return rule', () => {
   })
 })
 
-describe('AC 33: Session End hands over', () => {
-  it('2+ learners: All done opens the picker', async () => {
+describe('AC 33: Session End returns to the learner’s own Hub (Thomas 2026-10-25)', () => {
+  it('2+ learners: All done opens that learner’s Hub, never the picker', async () => {
     boot([MARIAN, SAM])
     hasPlayed(MARIAN.id)
     hasPlayed(SAM.id)
     await renderPastSplash()
-    await pick(MARIAN.id)
+    await pick(SAM.id)
     await settle(2000)
     await playMathSession()
     await fireEvent.press(screen.getByTestId('session-end-cta'))
     await advance(LEAVE_DELAY_MS)
-    expect(screen.getByTestId('picker')).toBeOnTheScreen()
-    expect(screen.queryByTestId('hub')).toBeNull()
+    expect(screen.getByTestId('hub')).toBeOnTheScreen()
+    expect(screen.queryByTestId('picker')).toBeNull()
+    expect(activeLearner()?.id).toBe(SAM.id)
+    expect(
+      screen.getByTestId('hub-learner-badge').props.accessibilityLabel,
+    ).toBe('Sam')
   })
 
-  it('with an unlock waiting: All done opens the Map, and its Home opens the picker', async () => {
+  it('with an unlock waiting: All done opens the Map, and its Home opens the Hub', async () => {
     const day = (d: number) =>
       localDateKey(new Date(Date.now() - d * 86_400_000))
     boot([MARIAN, SAM])
@@ -447,7 +452,9 @@ describe('AC 33: Session End hands over', () => {
     expect(screen.getByTestId('map-math-beat-unlock')).toBeOnTheScreen()
     await settle(4000)
     await fireEvent.press(screen.getByTestId('map-home'))
-    expect(screen.getByTestId('picker')).toBeOnTheScreen()
+    expect(screen.getByTestId('hub')).toBeOnTheScreen()
+    expect(screen.queryByTestId('picker')).toBeNull()
+    expect(activeLearner()?.id).toBe(MARIAN.id)
   })
 
   it('a Map reached from the Hub keeps Home → Hub', async () => {

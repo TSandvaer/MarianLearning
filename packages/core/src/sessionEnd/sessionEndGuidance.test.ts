@@ -170,6 +170,137 @@ describe('sessionEndGuidance (Guidance G2)', () => {
     expect(last.seconds).toBe(2.4)
   })
 
+  it('a pass with the row already full (the graduation check): the unlock day, tray full, no flower, "A new path opens. Look!"', () => {
+    // Build 21: the row was 3 of 3 before the check, so no flower could
+    // land, and the passed check read as the not-yet day.
+    const days = [3, 4, 5].map((d) => entry('cvc-words', d, 1))
+    const today = entry('cvc-words', 6, 1)
+    const open = { 'cvc-words': 'practicing' } as const
+    const before = doc(days, open, open)
+    const after = doc(
+      [...days, today],
+      { 'cvc-words': 'mastered', 'cvc-words-short-o': 'intro' },
+      open,
+    )
+    const g = run(before, after, 'cvc-words', 8)
+    expect(g.day).toBe('unlock')
+    expect(g.world).toBe('word-song')
+    expect(g.slotsBefore).toEqual(['grown', 'grown', 'grown'])
+    expect(g.slotsAfter).toEqual(['grown', 'grown', 'grown'])
+    expect(g.newSlot).toBeNull()
+    expect(g.bonusSlots).toEqual([])
+    expect(g.countText).toBeNull()
+    expect(ids(g)).toEqual(['guide.end.right.8', 'guide.end.path-opens'])
+    expect(g.lines.map((l) => l.beat)).toEqual(['praise', 'next'])
+  })
+
+  it('a full-row pass on a world’s last step: "You grew your whole garden!", no flower', () => {
+    const days = [3, 4, 5].map((d) => entry('add-two-digit', d, 1))
+    const today = entry('add-two-digit', 6, 1)
+    const open = { 'add-two-digit': 'practicing' } as const
+    const before = doc(days, open, open)
+    const after = doc([...days, today], { 'add-two-digit': 'mastered' }, open)
+    const g = run(before, after, 'add-two-digit', 7)
+    expect(g.day).toBe('world-done')
+    expect(g.newSlot).toBeNull()
+    expect(g.slotsAfter).toEqual(['grown', 'grown', 'grown'])
+    expect(ids(g)).toEqual(['guide.end.right.7', 'guide.end.world-done'])
+  })
+
+  it('an already-grown step replayed while its unlock is still uncelebrated stays practice', () => {
+    // The beat is the map's pending unlock, not this session's: the step
+    // grew on an earlier day, so nothing opens today.
+    const days = [3, 4, 5].map((d) => entry('add-to-10', d, 1))
+    const grown = { 'add-to-10': 'mastered', 'add-to-20': 'intro' } as const
+    const before = doc(days, grown)
+    const after = doc([...days, entry('add-to-10', 6, 1)], grown)
+    expect(sessionEndBeat(before, after, 'add-to-10').kind).toBe('unlock')
+    const g = run(before, after, 'add-to-10', 8)
+    expect(g.day).toBe('practice')
+    expect(g.slotsAfter).toEqual(['grown', 'grown', 'grown'])
+    expect(ids(g)).toEqual(['guide.end.not-yet.praise'])
+  })
+
+  describe('the next step played while the unlock that opened it is still uncelebrated', () => {
+    // The beat is the map's pending unlock (add-to-10 → add-to-20), not
+    // this session's: add-to-20 did not grow, so nothing opens today.
+    const open = { 'add-to-10': 'mastered', 'add-to-20': 'intro' } as const
+
+    it('not-yet day (5/8): the not-yet day, not the unlock day', () => {
+      const d1 = entry('add-to-20', 4, 1)
+      const before = doc([d1], open)
+      const after = doc([d1, entry('add-to-20', 6, 5 / 8)], open)
+      expect(sessionEndBeat(before, after, 'add-to-20').kind).toBe('unlock')
+      const g = run(before, after, 'add-to-20', 5)
+      expect(g.day).toBe('not-yet')
+      expect(g.slotsAfter).toEqual(['grown', 'empty', 'empty'])
+      expect(ids(g)).toEqual([
+        'guide.end.not-yet.praise',
+        'guide.end.not-yet.again',
+      ])
+    })
+
+    it('same-day replay after today’s flower: practice, the flower still sleeps', () => {
+      const flower = entry('add-to-20', 6, 1)
+      const before = doc([flower], open)
+      const after = doc([flower, entry('add-to-20', 6, 1)], open)
+      expect(sessionEndBeat(before, after, 'add-to-20').kind).toBe('unlock')
+      const g = run(before, after, 'add-to-20', 8)
+      expect(g.day).toBe('practice')
+      expect(g.slotsAfter).toEqual(['sleeping', 'empty', 'empty'])
+      expect(ids(g)).toEqual(['guide.end.not-yet.praise'])
+    })
+  })
+
+  describe('a cvc-words row full and not grown this session (Dave 2026-10-25)', () => {
+    // Check half 1, a check not passed, and the sessions until the retake
+    // end alike: the practice ending, every flower grown, effort praise
+    // only. No flower can come today, so never "Play again…".
+    const open = { 'cvc-words': 'practicing' } as const
+    const waiting = (todayEarned: boolean) => {
+      const days = [3, 4, todayEarned ? 6 : 5].map((d) =>
+        entry('cvc-words', d, 1),
+      )
+      return run(
+        doc(days, open, open),
+        doc([...days, entry('cvc-words', 6, 1)], open, open),
+        'cvc-words',
+        8,
+      )
+    }
+
+    it('first session of the day: practice, not the not-yet day', () => {
+      const g = waiting(false)
+      expect(g.day).toBe('practice')
+      expect(g.slotsBefore).toEqual(['grown', 'grown', 'grown'])
+      expect(g.slotsAfter).toEqual(g.slotsBefore)
+      expect(g.newSlot).toBeNull()
+      expect(g.bonusSlots).toEqual([])
+      expect(g.countText).toBeNull()
+      expect(ids(g)).toEqual(['guide.end.not-yet.praise'])
+    })
+
+    it('the third flower earned today stays grown, no sleeping slot (separate days on)', () => {
+      const g = waiting(true)
+      expect(g.day).toBe('practice')
+      expect(g.slotsAfter).toEqual(['grown', 'grown', 'grown'])
+      expect(ids(g)).toEqual(['guide.end.not-yet.praise'])
+    })
+  })
+
+  it('a full row on a step without the check, not grown (promotion waits on the parent): unchanged', () => {
+    const days = [4, 5, 6].map((d) => entry('add-to-10', d, 1))
+    const g = run(
+      doc(days),
+      doc([...days, entry('add-to-10', 6, 1)]),
+      'add-to-10',
+      8,
+    )
+    expect(g.day).toBe('practice')
+    expect(g.slotsAfter).toEqual(['grown', 'grown', 'sleeping'])
+    expect(ids(g)).toEqual(['guide.end.not-yet.praise'])
+  })
+
   it('a step already grown (review) is practice with a full tray', () => {
     const g = run(
       doc([], { 'add-to-10': 'mastered' }),

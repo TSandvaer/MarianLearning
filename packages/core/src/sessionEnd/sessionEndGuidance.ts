@@ -22,7 +22,12 @@ import {
   type Progress,
   type SkillNode,
 } from '../progress'
-import { goodDayKeysFromHistory, nextNode, trackOf } from '../progress/mastery'
+import {
+  goodDayKeysFromHistory,
+  isGraduationGated,
+  nextNode,
+  trackOf,
+} from '../progress/mastery'
 import { nodeProgress } from '../progress/nodeProgress'
 import type { SessionEndBeat } from '../progress/pathBeats'
 
@@ -31,8 +36,8 @@ import type { SessionEndBeat } from '../progress/pathBeats'
  * `unlock`: the flower that opens the next step (the map plays the unlock).
  * `world-done`: the flower that finishes the world's last step.
  * `not-yet`: under the good-day score and no flower today yet.
- * `practice`: today's flower was already earned (same-day replay), or
- *   the step is already grown.
+ * `practice`: today's flower was already earned (same-day replay), the
+ *   step is already grown, or its full row waits on the graduation check.
  */
 export type EndDay =
   | 'good-day'
@@ -271,15 +276,53 @@ export function sessionEndGuidance(
     }
   }
 
-  // No new flower: already grown, or today's flower already earned.
+  // No new flower: the row was already full, already grown, or today's
+  // flower already earned.
   const mastered = input.before.skillLevels[input.node] === 'mastered'
+
+  // The step grew with its row already full: the graduation check passed
+  // (build 21 bug: this read as the not-yet day). No flower flies; the
+  // tray stays full and Emma says what opened. Keyed on this step's own
+  // growth, not the beat: the beat is any uncelebrated unlock in the world.
+  if (!mastered && input.after.skillLevels[input.node] === 'mastered') {
+    const day: EndDay =
+      input.beat.kind !== 'unlock' && nextNode(world, input.node) === null
+        ? 'world-done'
+        : 'unlock'
+    const slots = tray(row.required, row.now, null)
+    return {
+      ...base,
+      day,
+      slotsBefore: slots,
+      slotsAfter: slots,
+      newSlot: null,
+      bonusSlots: [],
+      countText: null,
+      lines: [
+        praiseFor(input.totalCorrect),
+        line(
+          day === 'unlock' ? 'guide.end.path-opens' : 'guide.end.world-done',
+          'next',
+        )!,
+      ],
+    }
+  }
+
+  // A graduation-gated step whose full row did not grow: check half 1, a
+  // check not passed, and the sessions until the retake. No flower can
+  // come today, so the practice ending with every flower grown (Dave's
+  // ruling 2026-10-25): never "Play again to get today's flower."
+  const waitsOnCheck =
+    !mastered && isGraduationGated(input.node) && row.now >= row.required
   const earnedToday = !mastered && earnedTodayBefore(input, world, row)
   const praise = line('guide.end.not-yet.praise', 'praise')!
-  if (mastered || earnedToday) {
+  if (mastered || earnedToday || waitsOnCheck) {
     const slots = tray(
       row.required,
       row.now,
-      earnedToday && crossDay && row.now > 0 ? row.now - 1 : null,
+      earnedToday && !waitsOnCheck && crossDay && row.now > 0
+        ? row.now - 1
+        : null,
     )
     return {
       ...base,

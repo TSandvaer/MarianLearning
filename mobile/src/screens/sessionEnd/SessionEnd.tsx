@@ -34,7 +34,8 @@
  * count badge waits for the last one.
  *
  * Emma is App's hoisted `EmmaStage`; this screen reports her pose
- * (`cheering` on a flower day, else `idle`) through `onPoseChange`.
+ * (`cheering` on a flower day and on the unlock / world-done day of a full
+ * row, else `idle`) through `onPoseChange`.
  */
 import type { EmmaPose } from '@marian/core/character/emmaPose'
 import type {
@@ -174,15 +175,21 @@ export function SessionEnd({
     setResult(resultRef.current)
   }, [p, clock])
 
-  const flowerDay = result?.guidance.newSlot != null
+  // A flower flies, or a step grew with its row already full (the unlock /
+  // world-done day after a passed check): a celebration either way.
+  const celebration =
+    result !== null &&
+    (result.guidance.newSlot !== null ||
+      result.guidance.day === 'unlock' ||
+      result.guidance.day === 'world-done')
   const onPoseChangeRef = useRef(onPoseChange)
   useLayoutEffect(() => {
     onPoseChangeRef.current = onPoseChange
   })
   useEffect(() => {
     if (result === null) return
-    onPoseChangeRef.current?.(flowerDay ? 'cheering' : 'idle')
-  }, [result, flowerDay])
+    onPoseChangeRef.current?.(celebration ? 'cheering' : 'idle')
+  }, [result, celebration])
 
   // ── One line: the clip's end, never before its length, at most its
   //    length + slack (web `speak`).
