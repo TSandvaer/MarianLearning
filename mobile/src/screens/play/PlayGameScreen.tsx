@@ -4,6 +4,8 @@
  * beads, no stardust pill, no streak), App's Emma at `layout.emma` (her
  * poses come up through `onPoseChange`), the caption ribbon walking each
  * line, and the game filling `A`, the problem and chip regions together.
+ * It stands in the Play place's garden, not the lesson's cream sheet
+ * (play-games-restyle § 2 T1): the Hub's backdrop without Emma's light.
  *
  * It runs what both games share: one line player (`playLines.ts`), the
  * effects, and beats that Back clears and that wait while the app is
@@ -31,13 +33,15 @@ import Animated, {
 } from 'react-native-reanimated'
 import type { TapClipPlayer } from '../../audio/tapClip'
 import { CaptionRibbon } from '../../components/CaptionRibbon'
+import { hubLayout } from '../../layout/hubLayout'
 import type { Viewport } from '../../layout/layout'
 import type { MathLayout } from '../../layout/mathLayout'
 import {
   appVisibility,
   type AppVisibility,
 } from '../../lifecycle/appVisibility'
-import { colors, FILL } from '../../theme'
+import { FILL } from '../../theme'
+import { HubBackdrop } from '../hub/HubBackdrop'
 import { BackButton } from '../math/MathHud'
 import { LetterCritters } from './LetterCritters'
 import { backRect, playArea } from './playGeometry'
@@ -253,11 +257,11 @@ export function PlayGameScreen({
   const { ribbon } = layout
   return (
     <>
-      <Animated.View
+      <HubBackdrop
+        layout={hubLayout(viewport)}
+        light={false}
         testID="play-game-background"
-        entering={FadeIn.duration(PLAY_GAME_FADE_MS)}
-        exiting={FadeOut.duration(PLAY_GAME_FADE_MS)}
-        style={styles.background}
+        fadeMs={PLAY_GAME_FADE_MS}
       />
       <Animated.View
         testID="play-game"
@@ -317,15 +321,6 @@ export function PlayGameScreen({
 }
 
 const styles = StyleSheet.create({
-  // Math's: a soft pink glow at 50 % / 30 % over a cream gradient.
-  background: {
-    ...FILL,
-    zIndex: 0,
-    pointerEvents: 'none',
-    backgroundColor: colors.myCream,
-    experimental_backgroundImage:
-      'radial-gradient(circle at 50% 30%, rgba(255, 224, 230, 0.55) 0%, rgba(255, 245, 240, 0) 60%), linear-gradient(180deg, #FFF5F0 0%, #FFF8F2 100%)',
-  },
   foreground: { ...FILL, zIndex: 2, pointerEvents: 'box-none' },
   abs: { position: 'absolute', zIndex: 3 },
   // Math's `.clay-ribbon`: a cream clay speech slab, no outline.

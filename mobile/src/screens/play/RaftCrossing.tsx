@@ -15,6 +15,11 @@
  * scene from `raftScene`. A new layout redraws from the same model, and a
  * motion in flight jumps to its end. Reduce Motion (§ 2.5): fades only,
  * the same lines and sounds; a drag still follows the finger.
+ *
+ * The paint is the app's clay (play-games-restyle § 2 T2-T6): the Map's
+ * land bands for the water and the shore, a clay oval island, clay wood
+ * for the raft, cream clay tiles for the numbers, plinths and contact
+ * shadows for the animals. Paint only: every rect is `raftScene`'s.
  */
 import { RAFT_ANIMALS, type RaftWeight } from '@marian/core/games/playPlace'
 import {
@@ -39,8 +44,10 @@ import Animated, {
 } from 'react-native-reanimated'
 import { Image } from 'expo-image'
 import { pictureAsset } from '../../assets'
+import { imageShadow } from '../../components/imageShadow'
 import type { Rect } from '../../layout/layout'
 import { fonts } from '../../theme'
+import { ClayOval } from '../map/mapFx'
 import { DragPiece } from './DragPiece'
 import { SPRING } from './dragLock'
 import {
@@ -99,15 +106,65 @@ const REDUCED_RETURN_MS = 400
 export const CLOSE_GAP_MS = 800
 const FADE_MS = 150
 
-const WOOD = '#c98a55'
-const WOOD_RIM = '#7d4a26'
-const TAG_FACE = '#FFF5F0'
-const TAG_TEXT = '#6b3f1f'
-const SAND = '#f2c27a'
-const SHORE_SAND = '#f6dca8'
+// The clay (play-games-restyle § 2). k is the frame's clay scale (1 on
+// tablets, 7/12 on phones, the Home disc's); R the Map band's radius.
+const clayK = (tablet: boolean) => (tablet ? 1 : 7 / 12)
+const bandRadius = (tablet: boolean) => 48 * clayK(tablet)
+/** The Map band's shadow on its ledge colour (`landParts.tsx`). */
+const bandShadow = (lo: string, k: number) =>
+  `inset 0 ${5 * k}px 0 rgba(255, 255, 255, 0.4), inset 0 ${-8 * k}px 0 rgba(0, 0, 0, 0.08), 0 ${10 * k}px 0 ${lo}, 0 ${18 * k}px ${24 * k}px rgba(60, 40, 10, 0.15)`
+/** T2: today's water as a pool; its ledge is the only new colour. */
 const WATER = '#8fd0ee'
 const WATER_DEEP = '#5fb3dd'
-const TUFT = '#7bbf5a'
+const WATER_LEDGE = '#4a9cc8'
+/** T2: the Map's sand band (`BAND_TINTS[1]`). */
+const SHORE_HI = '#ffeec2'
+const SHORE_LO = '#e8c77a'
+/** Ripples: fractions of the water rect, clear of the raft's path. */
+const RIPPLES_UP: readonly [number, number][] = [
+  [0.05, 0.25],
+  [0.78, 0.18],
+  [0.08, 0.7],
+  [0.8, 0.62],
+  [0.14, 0.92],
+]
+const RIPPLES_RIGHT: readonly [number, number][] = [
+  [0.62, 0.12],
+  [0.78, 0.3],
+  [0.6, 0.72],
+  [0.8, 0.88],
+  [0.7, 0.5],
+]
+/** T3: the island, a Word Song honey clay oval; bushes in green clay. */
+const MOUND_STOPS = ['#ffeec2', '#f2c27a', '#d9a159'] as const
+const MOUND_SLAB = '#b27b37'
+/** T6: the Map's open-stop plinth. */
+const PLINTH_STOPS = ['#fffaf0', '#efdcc0', '#d6b890'] as const
+const PLINTH_SLAB = '#b8946a'
+/** A clay oval's soft shadow under its slab. */
+const ovalSoft = (drop: number) => ({
+  dy: drop + 2,
+  blur: 8,
+  color: 'rgba(60, 30, 10, 0.22)',
+})
+/** T4: the Home disc's wood, run top to bottom. */
+const WOOD = '#c98a55'
+const WOOD_RIM = '#7d4a26'
+/** T5: the cream clay tile (`ClayChip`) on Number Garden's slab. */
+const TILE = '#fff7ee'
+const TILE_FACE = 'linear-gradient(#ffffff 0%, #fff7ee 60%, #ffeedd 100%)'
+const TAG_SHADOW = {
+  tablet:
+    'inset 0 2px 0 #ffffff, 0 4px 0 #dba675, 0 6px 9px rgba(90, 45, 20, 0.16)',
+  phone:
+    'inset 0 2px 0 #ffffff, 0 3px 0 #dba675, 0 5px 7px rgba(90, 45, 20, 0.16)',
+}
+const TAG_TEXT = '#6b3f1f'
+/** T6: the Hub and map stickers' drop shadow, on every animal picture. */
+const PICTURE_SHADOW = {
+  tablet: imageShadow(4, 8, 'rgba(60, 30, 10, 0.28)'),
+  phone: imageShadow(3, 6, 'rgba(60, 30, 10, 0.28)'),
+}
 
 export interface RaftCrossingProps {
   kit: GameKit
@@ -152,7 +209,7 @@ interface Splash {
 }
 
 export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
-  const { reducedMotion, sfx } = kit
+  const { reducedMotion, sfx, tablet } = kit
   const scene = raftScene(kit.area, kit.tablet, kit.landscape)
   const sceneRef = useRef(scene)
   useLayoutEffect(() => {
@@ -415,7 +472,7 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
 
   return (
     <View testID="raft-crossing" pointerEvents="box-none" style={styles.fill}>
-      <Backdrop scene={scene} />
+      <Backdrop scene={scene} area={kit.area} tablet={tablet} />
 
       {/* The island and every animal on it, this visit. */}
       <View pointerEvents="none" style={styles.fill}>
@@ -440,7 +497,12 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
                   weight === Math.max(...thisCrossing.map((x) => x.weight))
                 }
               >
-                <AnimalArt weight={weight} size={r.width} tag={false} />
+                <AnimalArt
+                  weight={weight}
+                  size={r.width}
+                  tag={false}
+                  tablet={tablet}
+                />
               </IslandMotion>
             </Fly>
           )
@@ -456,6 +518,7 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
         gliding={gliding}
         reducedMotion={reducedMotion}
         frameKey={kit.cancelKey}
+        tablet={tablet}
       >
         {model.seats.map((id, seat) => {
           if (id === null) return null
@@ -489,6 +552,7 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
                   weight={animal.weight}
                   size={scene.seats[seat]!.width}
                   tag
+                  tablet={tablet}
                 />
               </DragPiece>
             </Fly>
@@ -505,6 +569,7 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
               return { ...spot, x: spot.x - deckRect.x, y: spot.y - deckRect.y }
             })()}
             reducedMotion={reducedMotion}
+            tablet={tablet}
           />
         )}
       </Deck>
@@ -533,8 +598,14 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
               onTap={() => onBoard(id)}
               onDrop={(p) => (contains(boardZone, p) ? onBoard(id) : false)}
             >
+              <Plinth size={r.width} tablet={tablet} id={`raft-plinth-${id}`} />
               <Hop count={hops[id] ?? 0} a={a} reducedMotion={reducedMotion}>
-                <AnimalArt weight={animal.weight} size={r.width} tag />
+                <AnimalArt
+                  weight={animal.weight}
+                  size={r.width}
+                  tag
+                  tablet={tablet}
+                />
               </Hop>
             </DragPiece>
           </Fly>
@@ -549,7 +620,12 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
           style={[styles.abs, rectStyle(scene.spots[leaving.spot]!)]}
         >
           <WalkOut to={walkFrom(scene)} reducedMotion={reducedMotion}>
-            <AnimalArt weight={leaving.weight} size={a} tag />
+            <Plinth
+              size={a}
+              tablet={tablet}
+              id={`raft-plinth-leaving-${leaving.id}`}
+            />
+            <AnimalArt weight={leaving.weight} size={a} tag tablet={tablet} />
           </WalkOut>
         </Animated.View>
       )}
@@ -684,30 +760,38 @@ function WalkOut({
 /**
  * An animal and its weight tag (§ 2.2): the pack picture at
  * size × (0.72 + 0.28 × (w − 1) / 8), so the bee is small and the pig
- * fills the cell; a cream disc of 0.42 × size at its lower right with the
- * numeral (D2).
+ * fills the cell, with a contact shadow (T6); a cream clay disc of
+ * 0.42 × size at its lower right with the numeral (D2, T5).
  */
 function AnimalArt({
   weight,
   size,
   tag,
+  tablet,
 }: {
   weight: RaftWeight
   size: number
   tag: boolean
+  tablet: boolean
 }) {
   const px = size * (0.72 + (0.28 * (weight - 1)) / 8)
   const disc = 0.42 * size
   return (
     <View pointerEvents="none" style={styles.centred}>
-      <Image
-        source={pictureAsset(RAFT_ANIMALS[weight])}
-        contentFit="contain"
-        accessible={false}
-        style={{ width: px, height: px }}
-      />
+      <View
+        testID="raft-picture"
+        style={tablet ? PICTURE_SHADOW.tablet : PICTURE_SHADOW.phone}
+      >
+        <Image
+          source={pictureAsset(RAFT_ANIMALS[weight])}
+          contentFit="contain"
+          accessible={false}
+          style={{ width: px, height: px }}
+        />
+      </View>
       {tag && (
         <View
+          testID="raft-tag"
           style={[
             styles.tag,
             {
@@ -716,6 +800,7 @@ function AnimalArt({
               borderRadius: disc / 2,
               right: 0,
               bottom: 0,
+              boxShadow: tablet ? TAG_SHADOW.tablet : TAG_SHADOW.phone,
             },
           ]}
         >
@@ -731,57 +816,165 @@ function AnimalArt({
   )
 }
 
-/** The sand, the water and the island (drawn, § 2.2). */
-function Backdrop({ scene }: { scene: RaftScene }) {
-  const { mound } = scene
-  const tuft = 0.22 * scene.a
+/**
+ * A shore animal's cream clay plinth (T6), inside its cell; it moves with
+ * the animal, so an empty spot shows sand.
+ */
+function Plinth({
+  size,
+  tablet,
+  id,
+}: {
+  size: number
+  tablet: boolean
+  id: string
+}) {
+  const drop = tablet ? 6 : 4
   return (
-    <View pointerEvents="none" style={styles.fill}>
-      <View
-        testID="raft-water"
-        style={[styles.abs, styles.water, rectStyle(scene.water)]}
-      >
-        <View style={styles.wave} />
-      </View>
-      <View
-        testID="raft-shore"
-        style={[styles.abs, styles.shore, rectStyle(scene.shore)]}
+    <View
+      testID="raft-plinth"
+      pointerEvents="none"
+      style={[styles.abs, { left: 0.06 * size, top: 0.62 * size }]}
+    >
+      <ClayOval
+        id={id}
+        w={0.88 * size}
+        h={0.34 * size}
+        drop={drop}
+        stops={PLINTH_STOPS}
+        slab={PLINTH_SLAB}
+        soft={ovalSoft(drop)}
       />
-      <View
-        testID="raft-island"
-        style={[styles.abs, rectStyle(scene.island)]}
-      />
-      <View
-        style={[
-          styles.abs,
-          styles.mound,
-          rectStyle(mound),
-          { borderRadius: Math.min(mound.width, mound.height) / 2 },
-        ]}
-      />
-      {[0.3, 0.7].map((f) => (
-        <View
-          key={f}
-          style={[
-            styles.abs,
-            styles.tuft,
-            {
-              left: mound.x + f * mound.width - tuft / 2,
-              top: mound.y + 0.15 * mound.height,
-              width: tuft,
-              height: tuft,
-              borderRadius: tuft / 2,
-            },
-          ]}
-        />
-      ))}
     </View>
   )
 }
 
 /**
- * The raft (§ 2.2): five logs of Number Garden wood with 6 seats, a mast
- * whose cream flag shows the total (blank at 0) and an oar. It sinks with
+ * The water, the shore and the island (drawn, § 2.2) as the Map's land
+ * (T2, T3): one pool slab under the island and the water, running R under
+ * the shore; short ripples; a clay oval island with two green clay
+ * bushes; the sand band on top. `raft-water` keeps its rect for tests.
+ */
+function Backdrop({
+  scene,
+  area,
+  tablet,
+}: {
+  scene: RaftScene
+  area: Rect
+  tablet: boolean
+}) {
+  const { mound, shore, water, island } = scene
+  const k = clayK(tablet)
+  const R = bandRadius(tablet)
+  const up = scene.axis === 'up'
+  const poolX = shore.x + shore.width - R
+  const pool: Rect = up
+    ? {
+        x: area.x,
+        y: island.y,
+        width: area.width,
+        height: shore.y - island.y + R,
+      }
+    : {
+        x: poolX,
+        y: area.y,
+        width: area.x + area.width - poolX,
+        height: area.height,
+      }
+  const ripple = tablet ? 6 : 4
+  const drop = tablet ? 10 : 7
+  const bush = 0.5 * scene.a
+  return (
+    <View pointerEvents="none" style={styles.fill}>
+      <View
+        testID="raft-pool"
+        style={[
+          styles.abs,
+          styles.pool,
+          rectStyle(pool),
+          {
+            borderRadius: R,
+            experimental_backgroundImage: up
+              ? `linear-gradient(180deg, ${WATER} 0%, ${WATER_DEEP} 100%)`
+              : `linear-gradient(90deg, ${WATER_DEEP} 0%, ${WATER} 100%)`,
+            boxShadow: bandShadow(WATER_LEDGE, k),
+          },
+        ]}
+      />
+      <View testID="raft-water" style={[styles.abs, rectStyle(water)]}>
+        {(up ? RIPPLES_UP : RIPPLES_RIGHT).map(([fx, fy]) => (
+          <View
+            key={`${fx},${fy}`}
+            testID="raft-ripple"
+            style={[
+              styles.ripple,
+              {
+                left: fx * water.width,
+                top: fy * water.height,
+                width: (up ? 0.12 : 0.16) * water.width,
+                height: ripple,
+                borderRadius: ripple / 2,
+              },
+            ]}
+          />
+        ))}
+      </View>
+      <View testID="raft-island" style={[styles.abs, rectStyle(island)]} />
+      <View
+        testID="raft-mound"
+        style={[styles.abs, { left: mound.x, top: mound.y }]}
+      >
+        <ClayOval
+          id="raft-mound"
+          w={mound.width}
+          h={mound.height - drop}
+          drop={drop}
+          stops={MOUND_STOPS}
+          slab={MOUND_SLAB}
+          soft={ovalSoft(drop)}
+        />
+      </View>
+      {[0.3, 0.7].map((f) => (
+        <View
+          key={f}
+          testID="raft-bush"
+          style={[
+            styles.abs,
+            styles.bush,
+            {
+              left: mound.x + f * mound.width - bush / 2,
+              top: mound.y + 0.12 * mound.height,
+              width: bush,
+              height: 0.8 * bush,
+              // 50 % / 50 % / 45 % / 45 % of the height: iOS draws no
+              // elliptical corners, and a '50%' radius here is a lens.
+              borderTopLeftRadius: 0.4 * bush,
+              borderTopRightRadius: 0.4 * bush,
+              borderBottomRightRadius: 0.36 * bush,
+              borderBottomLeftRadius: 0.36 * bush,
+              boxShadow: `inset 0 ${3 * k}px 0 rgba(255, 255, 255, 0.35), 0 ${5 * k}px 0 #3f8a2e, 0 ${8 * k}px ${10 * k}px rgba(40, 90, 20, 0.3)`,
+            },
+          ]}
+        />
+      ))}
+      <View
+        testID="raft-shore"
+        style={[
+          styles.abs,
+          styles.shore,
+          rectStyle(shore),
+          { borderRadius: R, boxShadow: bandShadow(SHORE_LO, k) },
+        ]}
+      />
+    </View>
+  )
+}
+
+/**
+ * The raft (§ 2.2): five logs of Number Garden wood with 6 seats (T4: clay
+ * logs on a dark wood base, two rope bands, no seat marks), a mast whose
+ * cream clay flag shows the total (blank at 0) and an oar. It sinks with
  * its load, goes under on a splash and wobbles (+6° / −6°, three times,
  * 900 ms; Reduce Motion: dims), and glides between the dock and the
  * island, bobbing and rowing. A new layout jumps it to where it is going.
@@ -794,6 +987,7 @@ function Deck({
   gliding,
   reducedMotion,
   frameKey,
+  tablet,
   children,
 }: {
   scene: RaftScene
@@ -803,6 +997,7 @@ function Deck({
   gliding: boolean
   reducedMotion: boolean
   frameKey: string
+  tablet: boolean
   children: ReactNode
 }) {
   const { dock } = scene
@@ -912,6 +1107,10 @@ function Deck({
   }))
   const a = scene.a
   const flag = scene.flag
+  /** The base's depth: 1 on tablets, 0.75 on phones. */
+  const kd = tablet ? 1 : 0.75
+  const log = dock.height / 5
+  const mastW = Math.max(6, 0.07 * a)
   return (
     <Animated.View
       testID="raft"
@@ -923,31 +1122,70 @@ function Deck({
       {splashing && !reducedMotion && <View testID="raft-wobble" />}
       {splashing && reducedMotion && <View testID="raft-dim" />}
       {gliding && !reducedMotion && <View testID="raft-rowing" />}
-      <View
-        pointerEvents="none"
-        style={[styles.fill, styles.deck, { borderRadius: 0.12 * a }]}
-      >
+      <View pointerEvents="none" style={styles.fill}>
+        <View
+          testID="raft-deck"
+          style={[
+            styles.fill,
+            styles.deck,
+            {
+              borderRadius: 0.14 * a,
+              boxShadow: `0 ${8 * kd}px 0 ${WOOD_RIM}, 0 ${14 * kd}px ${18 * kd}px rgba(60, 30, 10, 0.3)`,
+            },
+          ]}
+        />
+        {/* Five logs, 2 pt apart: the base shows between them. */}
         {[0, 1, 2, 3, 4].map((i) => (
           <View
             key={i}
+            testID="raft-log"
             style={[
               styles.log,
-              { top: (i * dock.height) / 5, height: dock.height / 5 - 2 },
+              {
+                top: i * log + 1,
+                height: log - 2,
+                borderRadius: (log - 2) / 2,
+              },
+            ]}
+          />
+        ))}
+        {[0.2, 0.8].map((f) => (
+          <View
+            key={f}
+            testID="raft-rope"
+            style={[
+              styles.rope,
+              {
+                left: f * dock.width - 0.05 * a,
+                width: 0.1 * a,
+                height: dock.height + 4,
+                borderRadius: 0.05 * a,
+              },
             ]}
           />
         ))}
       </View>
-      {/* The mast and its flag, at the back-left corner. */}
+      {/* The mast and its flag, at the back-left corner: the mast's right
+          edge stays 1 pt under the flag, as at its old 4 pt width. */}
       <View
         pointerEvents="none"
-        style={[styles.mast, { left: 4, top: flag.y, height: -flag.y + 12 }]}
+        style={[
+          styles.mast,
+          { left: 8 - mastW, width: mastW, top: flag.y, height: -flag.y + 12 },
+        ]}
       />
       <View
         testID="raft-flag-box"
         pointerEvents="none"
         style={[
           styles.flag,
-          { left: 7, top: flag.y, width: flag.width, height: flag.height },
+          {
+            left: 7,
+            top: flag.y,
+            width: flag.width,
+            height: flag.height,
+            borderRadius: 0.08 * a,
+          },
         ]}
       >
         <Text
@@ -963,7 +1201,12 @@ function Deck({
         pointerEvents="none"
         style={[
           styles.oar,
-          { right: -6, top: 0.15 * dock.height, height: 0.7 * dock.height },
+          {
+            right: -6,
+            top: 0.15 * dock.height,
+            width: tablet ? 10 : 8,
+            height: 0.7 * dock.height,
+          },
           oarStyle,
         ]}
       />
@@ -983,12 +1226,14 @@ function SplashingAnimal({
   seat,
   home,
   reducedMotion,
+  tablet,
   testID,
 }: {
   weight: RaftWeight
   seat: Rect
   home: Rect
   reducedMotion: boolean
+  tablet: boolean
   testID: string
 }) {
   const x = useSharedValue(0)
@@ -1047,7 +1292,7 @@ function SplashingAnimal({
       pointerEvents="none"
       style={[styles.abs, rectStyle(seat), style]}
     >
-      <AnimalArt weight={weight} size={seat.width} tag />
+      <AnimalArt weight={weight} size={seat.width} tag tablet={tablet} />
     </Animated.View>
   )
 }
@@ -1180,54 +1425,60 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: TAG_FACE,
-    boxShadow: '0 2px 0 rgba(107, 63, 31, 0.25)',
+    backgroundColor: TILE,
+    experimental_backgroundImage: TILE_FACE,
   },
   tagText: { fontFamily: fonts.bold, color: TAG_TEXT },
-  water: {
-    backgroundColor: WATER,
-    experimental_backgroundImage: `linear-gradient(180deg, ${WATER} 0%, ${WATER_DEEP} 100%)`,
-    overflow: 'hidden',
-  },
-  wave: {
+  pool: { backgroundColor: WATER },
+  ripple: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    top: '45%',
-    height: 3,
-    borderRadius: 2,
     backgroundColor: 'rgba(255, 255, 255, 0.55)',
   },
-  shore: { backgroundColor: SHORE_SAND },
-  mound: { backgroundColor: SAND },
-  tuft: { backgroundColor: TUFT },
-  deck: {
-    backgroundColor: WOOD,
-    borderWidth: 2,
-    borderColor: WOOD_RIM,
-    overflow: 'hidden',
+  bush: {
+    backgroundColor: '#6cc655',
+    experimental_backgroundImage: 'linear-gradient(#7fd364, #5cb945)',
   },
+  shore: {
+    backgroundColor: SHORE_LO,
+    experimental_backgroundImage: `linear-gradient(${SHORE_HI}, ${SHORE_LO})`,
+  },
+  deck: { backgroundColor: WOOD_RIM },
   log: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    left: 2,
+    right: 2,
     backgroundColor: WOOD,
-    borderBottomWidth: 2,
-    borderBottomColor: WOOD_RIM,
+    experimental_backgroundImage:
+      'linear-gradient(#e7b07a 0%, #c98a55 55%, #a86c3c 100%)',
+    boxShadow: 'inset 0 2px 0 rgba(255, 255, 255, 0.3)',
   },
-  mast: { position: 'absolute', width: 4, backgroundColor: WOOD_RIM },
+  rope: {
+    position: 'absolute',
+    top: -2,
+    backgroundColor: '#f2d3a6',
+    boxShadow: 'inset 0 -3px 0 rgba(125, 74, 38, 0.3)',
+  },
+  mast: {
+    position: 'absolute',
+    borderRadius: 4,
+    backgroundColor: WOOD_RIM,
+    experimental_backgroundImage: `linear-gradient(90deg, #a86c3c, ${WOOD_RIM})`,
+  },
   flag: {
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff8ee',
-    borderRadius: 4,
+    backgroundColor: TILE,
+    experimental_backgroundImage: 'linear-gradient(#fffdf8, #fff1e2)',
+    boxShadow:
+      'inset 0 2px 0 #ffffff, 0 3px 0 #efcfb4, 0 6px 8px rgba(90, 45, 20, 0.16)',
   },
   flagText: { fontFamily: fonts.bold, color: TAG_TEXT },
   oar: {
     position: 'absolute',
-    width: 8,
-    borderRadius: 4,
+    borderRadius: 6,
     backgroundColor: WOOD_RIM,
+    experimental_backgroundImage: `linear-gradient(90deg, ${WOOD}, ${WOOD_RIM})`,
+    boxShadow: `0 3px 0 ${WOOD_RIM}`,
   },
 })
