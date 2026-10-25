@@ -219,25 +219,28 @@ export const CRITTER_PICTURE_WORDS: readonly string[] = [
 ].sort()
 
 /**
- * The real CVC words over the 22 critter letters (D5). A run on it that is
- * not a picture word is never a mistake: Emma says it after the sounds
- * (`CRITTER_SAID_WORDS`, Thomas 2026-10-22), unless it is on
- * `CRITTER_NEVER_SAY` or `CRITTER_NOT_SAID`. Pinned exactly as § 3.1
- * prints it (C10), by vowel.
+ * The real 3-letter words over the 22 critter letters (D5): the CVC words,
+ * by vowel, then the other 3-letter words (Dave 2026-10-25), since the
+ * screen judges any run of three. A run on it that is not a picture word
+ * is never a mistake: Emma says it after the sounds (`CRITTER_SAID_WORDS`,
+ * Thomas 2026-10-22), unless it is on `CRITTER_NEVER_SAY` or
+ * `CRITTER_NOT_SAID`. Pinned exactly as § 3.1 prints it (C10).
  */
 export const CRITTER_REAL_WORDS: ReadonlySet<string> = new Set(
   [
-    'bad bag ban bat cab can cap cat dab dad dam fad fag fan fat fax gag gap gas had hag ham has hat jab',
-    'jam lab lad lag lap lax mad man map mat nab nag nap pad pal pan pat ram ran rap rat sad sag sap sat',
-    'sax tab tag tan tap tax van vat wag was wax',
-    'bed beg bet den fed gem get hem hen hex jet led leg let men met net peg pen pet red set sex ten vet',
-    'vex web wed wet',
-    'bib bid big bin bit dig dim din dip fib fig fin fit fix gig gin git hid him hip his hit jig lid lip',
-    'lit mix nib nip pig pin pit rib rid rig rim rip sin sip sit six tin tip tit wig win wit',
-    'bob bog box cob cod cog cop cot dog dot fog fox god got hob hog hop hot job jog jot lob log lot mob',
-    'mop nod not pod pop pot rob rod rot sob son top tot won',
-    'bud bug bum bun bus but cub cum cup cut dud dug fun gum gun gut hub hug hum hut jug jut lug mud mug',
-    'mum nun nut pub pug pun pup pus put rub rug rum run rut sub sum sun tub tug',
+    'bad bag ban bar bat cab can cap car cat dab dad dam fad fag fan far fat fax gag gap gas had hag ham',
+    'has hat jab jam jar jaw lab lad lag lap lax mad man map mat nab nag nan nap pad pal pan pat paw rag',
+    'ram ran rap rat raw sad sag sap sat saw sax tab tag tan tap tax van vat wag was wax',
+    'bed beg bet den fed few gem get hem hen her hex jet led leg let men met net new peg pen pet red set',
+    'sex ten vet vex web wed wet',
+    'bib bid big bin bit did dig dim din dip fib fig fin fit fix gig gin git hid him hip his hit jig lid',
+    'lip lit mix nib nip pig pin pit rib rid rig rim rip sin sip sir sis sit six tin tip tit wig win wit',
+    'bob bog bow box cob cod cog cop cot cow dog dot fog for fox god got hob hog hop hot how job jog jot',
+    'lob log lot low mob mom mop nod not now pod pop pot rob rod rot row sob son ton top tot won wow',
+    'bud bug bum bun bus but cub cum cup cut dud dug fun fur gum gun gut hub hug huh hum hut jug jut lug',
+    'mud mug mum nun nut pub pug pun pup pus put rub rug rum run rut sub sum sun tub tug',
+    // The other 3-letter words (Dave 2026-10-25).
+    'all and are ass bee eat egg one out pee poo see she the too two wee',
   ]
     .join(' ')
     .split(' '),
@@ -245,7 +248,9 @@ export const CRITTER_REAL_WORDS: ReadonlySet<string> = new Set(
 
 /**
  * Real words Emma never says (Dave 2026-10-22): rude words, an insult, an
- * exclamation and a weapon. They sing their sounds and sit, as before.
+ * exclamation and a weapon; and, from the other 3-letter words, the toilet
+ * words _poo_, _pee_ and _wee_ and the rude _ass_ (Dave 2026-10-25). They
+ * sing their sounds and sit, as before.
  */
 export const CRITTER_NEVER_SAY: ReadonlySet<string> = new Set([
   'bum',
@@ -258,13 +263,21 @@ export const CRITTER_NEVER_SAY: ReadonlySet<string> = new Set([
   'hag',
   'god',
   'gun',
+  'poo',
+  'pee',
+  'wee',
+  'ass',
 ])
 
 /**
  * Real words Emma does not say because the critters' sounds do not spell
  * them (gem, gin: g sings /g/; has, his, was: s is /z/; son, won: o is
- * /ʌ/; put: u is /ʊ/) and _rum_, an adult drink (Dave 2026-10-22). They
- * sing their sounds and sit.
+ * /ʌ/; put: u is /ʊ/) and _rum_, an adult drink (Dave 2026-10-22). Since
+ * Dave 2026-10-25 also the CVC words whose letters don't sing the word's
+ * vowel (car, for, bar, far, jar, her, sir, fur; cow, how, now, wow, bow,
+ * row, low; saw, paw, jaw, raw; new, few; ton; huh) and eleven of the
+ * other 3-letter words (the, see, she, bee, are, all, two, one, too, out,
+ * eat). They sing their sounds and sit.
  */
 export const CRITTER_NOT_SAID: ReadonlySet<string> = new Set([
   'gem',
@@ -276,13 +289,49 @@ export const CRITTER_NOT_SAID: ReadonlySet<string> = new Set([
   'won',
   'put',
   'rum',
+  // Dave 2026-10-25: the CVC words whose letters don't sing the vowel.
+  'car',
+  'for',
+  'bar',
+  'far',
+  'jar',
+  'her',
+  'sir',
+  'fur',
+  'cow',
+  'how',
+  'now',
+  'wow',
+  'bow',
+  'row',
+  'low',
+  'saw',
+  'paw',
+  'jaw',
+  'raw',
+  'new',
+  'few',
+  'ton',
+  'huh',
+  // Dave 2026-10-25: the other 3-letter words that sing and sit.
+  'the',
+  'see',
+  'she',
+  'bee',
+  'are',
+  'all',
+  'two',
+  'one',
+  'too',
+  'out',
+  'eat',
 ])
 
 /**
  * The words Emma says after the critters sing them, sorted: every real word
  * that is not a picture word, not on `CRITTER_NEVER_SAY` and not on
  * `CRITTER_NOT_SAID`. Each has a whole-word Lily clip
- * (`critterWordLine(word)` in `emmasPath/guidanceLines.ts`); the 13 on
+ * (`critterWordLine(word)` in `emmasPath/guidanceLines.ts`); the 16 on
  * `CRITTER_SAID_PICTURE_WORDS` also have a pack picture.
  */
 export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
@@ -299,19 +348,23 @@ export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
  * its picture pops, holds and leaves as a picture word's does (Thomas
  * 2026-10-23, build 20: "No picture for 'rat'"). The probe reserve's
  * pictured said words (cab, ham, pad, ram) pop by the same rule (Thomas
- * 2026-10-24). Pinned here, since core never reads the app's registry;
- * `playPlace.test.ts` checks them against it.
+ * 2026-10-24), and so do _mom_ (Word Song teaches it), _rag_ and _egg_
+ * (Dave 2026-10-25). Pinned here, since core never reads the app's
+ * registry; `playPlace.test.ts` checks them against it.
  */
 export const CRITTER_SAID_PICTURE_WORDS: readonly string[] = [
   'bun',
   'cab',
+  'egg',
   'gum',
   'ham',
   'hut',
   'map',
+  'mom',
   'nap',
   'pad',
   'pop',
+  'rag',
   'ram',
   'rat',
   'tap',

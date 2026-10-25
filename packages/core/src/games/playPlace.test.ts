@@ -502,41 +502,63 @@ describe('the critters (§ 3.1)', () => {
 
 /** § 3.1's printed list, as printed (C10: pinned exactly). */
 const PRINTED_REAL_WORDS = `
-bad bag ban bat cab can cap cat dab dad dam fad fag fan fat fax gag gap gas had hag ham has hat jab
-jam lab lad lag lap lax mad man map mat nab nag nap pad pal pan pat ram ran rap rat sad sag sap sat
-sax tab tag tan tap tax van vat wag was wax
-bed beg bet den fed gem get hem hen hex jet led leg let men met net peg pen pet red set sex ten vet
-vex web wed wet
-bib bid big bin bit dig dim din dip fib fig fin fit fix gig gin git hid him hip his hit jig lid lip
-lit mix nib nip pig pin pit rib rid rig rim rip sin sip sit six tin tip tit wig win wit
-bob bog box cob cod cog cop cot dog dot fog fox god got hob hog hop hot job jog jot lob log lot mob
-mop nod not pod pop pot rob rod rot sob son top tot won
-bud bug bum bun bus but cub cum cup cut dud dug fun gum gun gut hub hug hum hut jug jut lug mud mug
-mum nun nut pub pug pun pup pus put rub rug rum run rut sub sum sun tub tug
+bad bag ban bar bat cab can cap car cat dab dad dam fad fag fan far fat fax gag gap gas had hag ham
+has hat jab jam jar jaw lab lad lag lap lax mad man map mat nab nag nan nap pad pal pan pat paw rag
+ram ran rap rat raw sad sag sap sat saw sax tab tag tan tap tax van vat wag was wax
+bed beg bet den fed few gem get hem hen her hex jet led leg let men met net new peg pen pet red set
+sex ten vet vex web wed wet
+bib bid big bin bit did dig dim din dip fib fig fin fit fix gig gin git hid him hip his hit jig lid
+lip lit mix nib nip pig pin pit rib rid rig rim rip sin sip sir sis sit six tin tip tit wig win wit
+bob bog bow box cob cod cog cop cot cow dog dot fog for fox god got hob hog hop hot how job jog jot
+lob log lot low mob mom mop nod not now pod pop pot rob rod rot row sob son ton top tot won wow
+bud bug bum bun bus but cub cum cup cut dud dug fun fur gum gun gut hub hug huh hum hut jug jut lug
+mud mug mum nun nut pub pug pun pup pus put rub rug rum run rut sub sum sun tub tug
+all and are ass bee eat egg one out pee poo see she the too two wee
 `
   .trim()
   .split(/\s+/)
 
+/** A consonant, a vowel and a consonant: § 3.1's CVC words. */
+const isCvc = (w: string) =>
+  !VOWELS.has(w[0]!) && VOWELS.has(w[1]!) && !VOWELS.has(w[2]!)
+
 describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
-  it('C10: is exactly § 3.1’s 220 words', () => {
+  it('C10: is exactly § 3.1’s 265 words (Dave 2026-10-25)', () => {
     expect([...CRITTER_REAL_WORDS].sort()).toEqual(
       [...PRINTED_REAL_WORDS].sort(),
     )
-    expect(CRITTER_REAL_WORDS.size).toBe(220)
+    expect(CRITTER_REAL_WORDS.size).toBe(265)
     const perVowel: Record<string, number> = {}
-    for (const w of CRITTER_REAL_WORDS)
+    for (const w of [...CRITTER_REAL_WORDS].filter(isCvc))
       perVowel[w[1]!] = (perVowel[w[1]!] ?? 0) + 1
-    expect(perVowel).toEqual({ a: 61, e: 29, i: 47, o: 39, u: 44 })
+    expect(perVowel).toEqual({ a: 71, e: 32, i: 50, o: 49, u: 46 })
   })
 
-  it('C10: each is a consonant, a short vowel and a consonant from the 22 critter letters', () => {
+  it('C10 (Dave 2026-10-25): each is 3 letters from the 22 critter letters; 248 CVC words and 17 others', () => {
     for (const w of CRITTER_REAL_WORDS) {
       expect(w).toMatch(/^[a-z]{3}$/)
       for (const l of w) expect(CRITTER_LETTERS).toContain(l)
-      expect(VOWELS.has(w[0]!)).toBe(false)
-      expect(VOWELS.has(w[1]!)).toBe(true)
-      expect(VOWELS.has(w[2]!)).toBe(false)
     }
+    expect([...CRITTER_REAL_WORDS].filter(isCvc)).toHaveLength(248)
+    expect([...CRITTER_REAL_WORDS].filter((w) => !isCvc(w)).sort()).toEqual([
+      'all',
+      'and',
+      'are',
+      'ass',
+      'bee',
+      'eat',
+      'egg',
+      'one',
+      'out',
+      'pee',
+      'poo',
+      'see',
+      'she',
+      'the',
+      'too',
+      'two',
+      'wee',
+    ])
   })
 
   it('C10: holds all 45 picture words and gem', () => {
@@ -544,8 +566,9 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     expect(CRITTER_REAL_WORDS.has('gem')).toBe(true)
   })
 
-  it('C10: CRITTER_NEVER_SAY and CRITTER_NOT_SAID are Dave’s lists, real words, no picture word (Dave 2026-10-22)', () => {
+  it('C10: CRITTER_NEVER_SAY and CRITTER_NOT_SAID are Dave’s lists, real words, no picture word (Dave 2026-10-22, 2026-10-25)', () => {
     expect([...CRITTER_NEVER_SAY].sort()).toEqual([
+      'ass',
       'bum',
       'cum',
       'dam',
@@ -554,20 +577,64 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
       'god',
       'gun',
       'hag',
+      'pee',
+      'poo',
       'sex',
       'tit',
+      'wee',
     ])
-    expect([...CRITTER_NOT_SAID].sort()).toEqual([
-      'gem',
-      'gin',
-      'has',
-      'his',
-      'put',
-      'rum',
-      'son',
-      'was',
-      'won',
-    ])
+    expect([...CRITTER_NOT_SAID].sort()).toEqual(
+      [
+        // Dave 2026-10-22.
+        'gem',
+        'gin',
+        'has',
+        'his',
+        'put',
+        'rum',
+        'son',
+        'was',
+        'won',
+        // Dave 2026-10-25: CVC words whose letters don't sing the vowel.
+        'car',
+        'for',
+        'bar',
+        'far',
+        'jar',
+        'her',
+        'sir',
+        'fur',
+        'cow',
+        'how',
+        'now',
+        'wow',
+        'bow',
+        'row',
+        'low',
+        'saw',
+        'paw',
+        'jaw',
+        'raw',
+        'new',
+        'few',
+        'ton',
+        'huh',
+        // Dave 2026-10-25: other 3-letter words.
+        'the',
+        'see',
+        'she',
+        'bee',
+        'are',
+        'all',
+        'two',
+        'one',
+        'too',
+        'out',
+        'eat',
+      ].sort(),
+    )
+    expect(CRITTER_NEVER_SAY.size).toBe(14)
+    expect(CRITTER_NOT_SAID.size).toBe(43)
     for (const w of [...CRITTER_NEVER_SAY, ...CRITTER_NOT_SAID]) {
       expect(CRITTER_REAL_WORDS.has(w)).toBe(true)
       expect(ALL_45).not.toContain(w)
@@ -577,10 +644,10 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     ).toEqual([])
   })
 
-  it('C10: CRITTER_SAID_WORDS is every other real word that is not a picture word: 156, sorted', () => {
-    expect(CRITTER_SAID_WORDS).toHaveLength(156)
+  it('C10: CRITTER_SAID_WORDS is every other real word that is not a picture word: 163, sorted', () => {
+    expect(CRITTER_SAID_WORDS).toHaveLength(163)
     expect(CRITTER_SAID_WORDS).toEqual([...CRITTER_SAID_WORDS].sort())
-    expect(new Set(CRITTER_SAID_WORDS).size).toBe(156)
+    expect(new Set(CRITTER_SAID_WORDS).size).toBe(163)
     expect([...CRITTER_SAID_WORDS].sort()).toEqual(
       [...CRITTER_REAL_WORDS]
         .filter(
@@ -591,34 +658,44 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
         )
         .sort(),
     )
-    // 220 = 45 pictures + 10 never said + 9 not said + 156 said.
-    expect(45 + CRITTER_NEVER_SAY.size + CRITTER_NOT_SAID.size + 156).toBe(220)
+    // 265 = 45 pictures + 14 never said + 43 not said + 163 said.
+    expect(45 + CRITTER_NEVER_SAY.size + CRITTER_NOT_SAID.size + 163).toBe(265)
     for (const w of ['map', 'cab', 'ham', 'sat', 'hop', 'six', 'win'])
       expect(CRITTER_SAID_WORDS).toContain(w)
+    // Dave 2026-10-25: the seven new said words; mum stays said.
+    expect(
+      ['mom', 'rag', 'did', 'nan', 'sis', 'egg', 'and', 'mum'].filter(
+        (w) => !CRITTER_SAID_WORDS.includes(w),
+      ),
+    ).toEqual([])
   })
 
-  it('C10 (Thomas 2026-10-23, build 20): CRITTER_SAID_PICTURE_WORDS is exactly the said words with a bundled pack picture: 13, sorted', () => {
+  it('C10 (Thomas 2026-10-23, build 20): CRITTER_SAID_PICTURE_WORDS is exactly the said words with a bundled pack picture: 16, sorted', () => {
     const bundled = bundledPictures()
     // The registry read works: every picture word's picture is found.
     for (const w of ALL_45) expect(bundled.has(w)).toBe(true)
     // The probe reserve's pictured said words pop like rat (Thomas
-    // 2026-10-24): cab, ham, pad and ram. rag is no critter word.
+    // 2026-10-24): cab, ham, pad and ram; and mom, rag and egg (Dave
+    // 2026-10-25).
     expect(CRITTER_SAID_PICTURE_WORDS).toEqual([
       'bun',
       'cab',
+      'egg',
       'gum',
       'ham',
       'hut',
       'map',
+      'mom',
       'nap',
       'pad',
       'pop',
+      'rag',
       'ram',
       'rat',
       'tap',
       'top',
     ])
-    expect(CRITTER_SAID_WORDS).not.toContain('rag')
+    expect(CRITTER_SAID_WORDS).toContain('rag')
     expect(CRITTER_SAID_PICTURE_WORDS).toEqual(
       CRITTER_SAID_WORDS.filter((w) => bundled.has(w)),
     )
@@ -634,6 +711,17 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     for (const w of [...CRITTER_NEVER_SAY, ...CRITTER_NOT_SAID])
       expect(critterRun(w)).toBe('quiet')
     for (const w of ['tup', 'baf', 'gub', 'vop'])
+      expect(critterRun(w)).toBe('funny')
+  })
+
+  it('C10 (Dave 2026-10-25, Thomas build 21: "mom" tumbled): mom and egg are said, car and poo sing and sit, a non-word is still funny', () => {
+    for (const w of ['mom', 'rag', 'did', 'nan', 'sis', 'egg', 'and', 'mum'])
+      expect(critterRun(w)).toBe('word')
+    for (const w of ['car', 'cow', 'saw', 'new', 'ton', 'huh', 'the', 'see'])
+      expect(critterRun(w)).toBe('quiet')
+    for (const w of ['poo', 'pee', 'wee', 'ass'])
+      expect(critterRun(w)).toBe('quiet')
+    for (const w of ['mup', 'egb', 'baf', 'aaa'])
       expect(critterRun(w)).toBe('funny')
   })
 
