@@ -282,12 +282,9 @@ export function sessionEndGuidance(
 
   // The step grew with its row already full: the graduation check passed
   // (build 21 bug: this read as the not-yet day). No flower flies; the
-  // tray stays full and Emma says what opened.
-  if (
-    !mastered &&
-    (input.beat.kind === 'unlock' ||
-      input.after.skillLevels[input.node] === 'mastered')
-  ) {
+  // tray stays full and Emma says what opened. Keyed on this step's own
+  // growth, not the beat: the beat is any uncelebrated unlock in the world.
+  if (!mastered && input.after.skillLevels[input.node] === 'mastered') {
     const day: EndDay =
       input.beat.kind !== 'unlock' && nextNode(world, input.node) === null
         ? 'world-done'

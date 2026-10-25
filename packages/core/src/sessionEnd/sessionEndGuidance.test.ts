@@ -221,6 +221,37 @@ describe('sessionEndGuidance (Guidance G2)', () => {
     expect(ids(g)).toEqual(['guide.end.not-yet.praise'])
   })
 
+  describe('the next step played while the unlock that opened it is still uncelebrated', () => {
+    // The beat is the map's pending unlock (add-to-10 → add-to-20), not
+    // this session's: add-to-20 did not grow, so nothing opens today.
+    const open = { 'add-to-10': 'mastered', 'add-to-20': 'intro' } as const
+
+    it('not-yet day (5/8): the not-yet day, not the unlock day', () => {
+      const d1 = entry('add-to-20', 4, 1)
+      const before = doc([d1], open)
+      const after = doc([d1, entry('add-to-20', 6, 5 / 8)], open)
+      expect(sessionEndBeat(before, after, 'add-to-20').kind).toBe('unlock')
+      const g = run(before, after, 'add-to-20', 5)
+      expect(g.day).toBe('not-yet')
+      expect(g.slotsAfter).toEqual(['grown', 'empty', 'empty'])
+      expect(ids(g)).toEqual([
+        'guide.end.not-yet.praise',
+        'guide.end.not-yet.again',
+      ])
+    })
+
+    it('same-day replay after today’s flower: practice, the flower still sleeps', () => {
+      const flower = entry('add-to-20', 6, 1)
+      const before = doc([flower], open)
+      const after = doc([flower, entry('add-to-20', 6, 1)], open)
+      expect(sessionEndBeat(before, after, 'add-to-20').kind).toBe('unlock')
+      const g = run(before, after, 'add-to-20', 8)
+      expect(g.day).toBe('practice')
+      expect(g.slotsAfter).toEqual(['sleeping', 'empty', 'empty'])
+      expect(ids(g)).toEqual(['guide.end.not-yet.praise'])
+    })
+  })
+
   describe('a cvc-words row full and not grown this session (Dave 2026-10-25)', () => {
     // Check half 1, a check not passed, and the sessions until the retake
     // end alike: the practice ending, every flower grown, effort praise
