@@ -854,6 +854,84 @@ describe('Thomas 2026-10-23 (build 20): "No picture for rat and there is no m"',
   })
 })
 
+describe('Thomas on build 21 (2026-10-25): "mom" tumbled; Dave’s ruling', () => {
+  /** mom, egg, car, poo and mup from 11 letters. */
+  const WORDS_21 = ['mop', 'leg', 'cat', 'rug']
+  async function mount21() {
+    const s = fakeSounds(wholeMs)
+    const g = await mountGame('critters', { words: WORDS_21, sounds: s.sounds })
+    await advance(CRITTERS_OPEN_DELAY_MS + LINE_MS)
+    return { ...g, ...s }
+  }
+  async function sing(word: string) {
+    await seat(...word.split(''))
+    await advance(SING_AFTER_MS)
+    for (const l of word) await advance(ownMs(l) + SOUND_GAP_MS)
+  }
+
+  it.each([
+    ['m-o-m', 'mom', 'Mom.'],
+    ['e-g-g', 'egg', 'Egg.'],
+  ])(
+    '%s: sounds, then Emma says the word, then its picture pops; no boing or tumble',
+    async (_, word, caption) => {
+      const g = await mount21()
+      expect(critterRun(word)).toBe('word')
+      await sing(word)
+      expect(g.calls).toEqual([...word].map(own))
+      expect(g.lines).toEqual([
+        'guide.play.critters.open',
+        `guide.play.critters.word.${word}`,
+      ])
+      expect(ribbon()?.props.accessibilityLabel).toBe(caption)
+      expect(g.poses.at(-1)).toBe('attentive-pointing')
+      expect(has('critter-picture')).toBe(false)
+      await advance(LINE_MS + 10)
+      expect(has(`critter-picture-${word}`)).toBe(true)
+      expect(
+        JSON.stringify(byId(`critter-picture-${word}`).props.source),
+      ).toContain(`pictures/${word}.webp`)
+      expect(g.sfx.boing.play).not.toHaveBeenCalled()
+      expect(g.sfx.sparkle.play).not.toHaveBeenCalled()
+      expect(has('critter-tumble')).toBe(false)
+      expect(g.calls).toHaveLength(3)
+    },
+  )
+
+  it.each([
+    ['c-a-r', 'car'],
+    ['p-o-o', 'poo'],
+  ])(
+    '%s: the sounds, then the three sit; no word, boing, tumble, line or picture',
+    async (_, word) => {
+      const asked = jest.spyOn(bundledAudio, 'audioForWebPath')
+      const g = await mount21()
+      expect(critterRun(word)).toBe('quiet')
+      await sing(word)
+      await advance(WORD_CLIP_MS + BOUNCE_MS)
+      expect(g.calls).toEqual([...word].map(own))
+      expect(wordClipsAsked(asked)).toEqual([])
+      expect(g.sfx.boing.play).not.toHaveBeenCalled()
+      expect(has('critter-tumble')).toBe(false)
+      expect(has('critter-picture')).toBe(false)
+      expect(g.lines).toEqual(['guide.play.critters.open'])
+    },
+  )
+
+  it('m-u-p, a non-word, still boings and tumbles with a line', async () => {
+    const g = await mount21()
+    expect(critterRun('mup')).toBe('funny')
+    await sing('mup')
+    expect(g.sfx.boing.play).toHaveBeenCalledTimes(1)
+    expect(has('critter-tumble')).toBe(true)
+    expect(g.lines).toEqual([
+      'guide.play.critters.open',
+      'guide.play.critters.funny.1',
+    ])
+    expect(has('critter-picture')).toBe(false)
+  })
+})
+
 describe('the seen-record (Dave 2026-10-24: the probe reserve skips a word she met here)', () => {
   const seen = () => loadProgress()!.seenItems ?? {}
 
