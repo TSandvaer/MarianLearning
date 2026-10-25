@@ -38,6 +38,11 @@ import {
 } from '@marian/core/progress/reviewPlan'
 import { readSessionHistory } from '@marian/core/sessionEnd/sessionHistory'
 import { graduationCheckWords } from '@marian/core/wordSong/probeReserve'
+import {
+  lastWordOrder,
+  WORD_ORDER_STEPS,
+  type WordOrderHint,
+} from '@marian/core/wordSong/wordOrder'
 import type {
   IntroGuideLineId,
   PrefetchKey,
@@ -67,6 +72,9 @@ export interface WordSongProgressHints {
   /** With the vowel map: the session count at kick time, which varies the
    *  vowel session's letters (the Hub prefetch and the tap agree). */
   seed?: number
+  /** A forward session of a step the device orders (core `wordOrder.ts`):
+   *  the seed and the step's last session, which set this session's order. */
+  wordOrder?: WordOrderHint
 }
 
 const NO_HINTS: WordSongProgressHints = {
@@ -119,6 +127,14 @@ export function readWordSongProgressHints(
         ? progress.literacy?.letterSoundsVowelStates
         : undefined,
     ...(node === 'letter-sounds' ? { seed: sessionCount } : {}),
+    ...(planKind.kind === 'forward' && WORD_ORDER_STEPS.has(node)
+      ? {
+          wordOrder: {
+            seed: sessionCount,
+            last: lastWordOrder(progress, node),
+          },
+        }
+      : {}),
     planKind,
   }
 }

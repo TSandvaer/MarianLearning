@@ -9,13 +9,16 @@
  * it.
  *
  * - Duck words, "Two letters, one sound!": the word's last two cells (c k /
- *   n g) light together. Bee and car words reuse the line and the cue
- *   (`content-wave-4.md` § 3.3, § 4.3, D6): on bee and car, the team (e e /
- *   a r). Snail words reuse them too (`content-wave-5.md` § 4.3): on tray,
- *   a y.
+ *   n g) light together. Bee and car words reuse the line (`content-wave-4.md`
+ *   § 3.3, § 4.3, D6): the team lights (e e / e a, a r). Snail words reuse it
+ *   too (`content-wave-5.md` § 4.3): a i / a y / o a.
  * - Moon words, the same line (`content-wave-5.md` § 5.3): no picturable oo
  *   word ends in oo, so the two cells of the word's first "oo" light
  *   together, at once (`'team-pair'`): on moon, the 2nd and 3rd cells.
+ * - Bee, car and snail words light their team the same way, wherever it is
+ *   in the word: the session's first word is no longer always bee, car or
+ *   tray, whose team ends the word (core `wordOrder.ts`, Dave 2026-10-25).
+ *   On those three the cells are the last two, as before.
  * - Crab words, "Read all the letters!": every cell lights, one after
  *   another from the left, `INTRO_STAGGER_MS` apart; with Reduce Motion
  *   they light at once.
@@ -42,9 +45,9 @@ type Pattern = 'ending-pair' | 'team-pair' | 'left-to-right'
 
 const PATTERNS: Readonly<Partial<Record<IntroGuideLineId, Pattern>>> = {
   'guide.session.intro.duck-words': 'ending-pair',
-  'guide.session.intro.bee-words': 'ending-pair',
-  'guide.session.intro.car-words': 'ending-pair',
-  'guide.session.intro.snail-words': 'ending-pair',
+  'guide.session.intro.bee-words': 'team-pair',
+  'guide.session.intro.car-words': 'team-pair',
+  'guide.session.intro.snail-words': 'team-pair',
   'guide.session.intro.moon-words': 'team-pair',
   'guide.session.intro.crab-words': 'left-to-right',
   'guide.session.intro.tent-words': 'left-to-right',
@@ -56,8 +59,14 @@ const END_PULSE_LINES: ReadonlySet<IntroGuideLineId> = new Set([
   'guide.session.intro.tent-words',
 ])
 
-/** The team moon words' lead lights where it first appears (§ 5.3). */
-const MOON_WORDS_TEAM = 'oo'
+/** The teams a `'team-pair'` lead lights where one first appears (§ 5.3;
+ *  bee words' ee / ea, car words' ar, snail words' ai / ay / oa). */
+const TEAMS: Readonly<Partial<Record<IntroGuideLineId, readonly string[]>>> = {
+  'guide.session.intro.bee-words': ['ee', 'ea'],
+  'guide.session.intro.car-words': ['ar'],
+  'guide.session.intro.snail-words': ['ai', 'ay', 'oa'],
+  'guide.session.intro.moon-words': ['oo'],
+}
 
 /** The intro whose ticks drive the quiet-E cue. */
 const QUIET_E_LINE: IntroGuideLineId = 'guide.session.intro.cake-words'
@@ -96,9 +105,12 @@ export function introSpotlight(
   if (pattern === 'ending-pair')
     return Array.from({ length: n }, (_, i) => (i >= n - 2 ? 0 : null))
   if (pattern === 'team-pair') {
-    const at = word.indexOf(MOON_WORDS_TEAM)
+    const found = (TEAMS[line] ?? [])
+      .map((team) => word.indexOf(team))
+      .filter((i) => i >= 0)
+    const at = found.length > 0 ? Math.min(...found) : -1
     return Array.from({ length: n }, (_, i) =>
-      at >= 0 && i >= at && i < at + MOON_WORDS_TEAM.length ? 0 : null,
+      at >= 0 && i >= at && i < at + 2 ? 0 : null,
     )
   }
   return Array.from({ length: n }, (_, i) =>

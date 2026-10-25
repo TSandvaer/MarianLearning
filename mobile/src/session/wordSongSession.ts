@@ -37,6 +37,7 @@
  */
 import { WARMUP_PROBLEMS } from '@marian/core/progress/reviewPlan'
 import { withGraduationProbes } from '@marian/core/wordSong/graduationCheck'
+import { orderWordSession } from '@marian/core/wordSong/wordOrder'
 import {
   wordSongSessionPlanFromServer,
   wordSongWarmupFromServer,
@@ -284,15 +285,22 @@ export function createWordSongSessionController(
             payload: buildWordSongSessionPayload(hints, carriesVowelMap(hints)),
             signal,
           }))
-        // A due check on a forward session: the canon plan with probe
-        // words swapped in (`null`: the plan is played as it is).
+        // A forward session of a step the device orders: its 8 in this
+        // session's order (core `orderWordSession`), before a check swaps
+        // its problems 2, 5 and 7.
+        const ordered =
+          hints.wordOrder !== undefined && hints.focusNode !== undefined
+            ? orderWordSession(prepared.plan, hints.focusNode, hints.wordOrder)
+            : prepared.plan
+        // A due check on a forward session: the plan with probe words
+        // swapped in (`null`: the plan is played as it is).
         const check =
           hints.planKind.kind === 'forward' && hints.probeWords !== undefined
-            ? withGraduationProbes(prepared.plan, probePlan, hints.probeWords)
+            ? withGraduationProbes(ordered, probePlan, hints.probeWords)
             : null
         try {
           return {
-            ...wordSongRoundFromServer(check ?? prepared.plan, hints),
+            ...wordSongRoundFromServer(check ?? ordered, hints),
             audio:
               check === null
                 ? prepared.audio
@@ -327,8 +335,14 @@ export function createWordSongSessionController(
           unload = () => prepared.audio.unload()
           sessionFocus = focus
           vowel = prepared.vowel ?? null
+          // An ordered session names its P1, so a device log shows the
+          // order changing from one session to the next.
+          const first =
+            hints.wordOrder !== undefined
+              ? prepared.plan.problems[prepared.warmupCount]?.target.word
+              : undefined
           note(
-            `ready (${prepared.plan.id}${usedFallback ? ', hint-free fallback' : ''}${prepared.warmupCount > 0 ? `, ${prepared.warmupCount} warm-up` : ''}${prepared.check ? ', graduation check' : ''})`,
+            `ready (${prepared.plan.id}${usedFallback ? ', hint-free fallback' : ''}${prepared.warmupCount > 0 ? `, ${prepared.warmupCount} warm-up` : ''}${prepared.check ? ', graduation check' : ''}${first !== undefined ? `, P1 ${first}` : ''})`,
           )
           publish({
             ...extras,
