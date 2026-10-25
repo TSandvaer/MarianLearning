@@ -27,7 +27,7 @@ import {
   STORAGE_KEY,
   type SkillNode,
 } from '@marian/core/progress'
-import { fireEvent, screen, within } from '@testing-library/react-native'
+import { act, fireEvent, screen, within } from '@testing-library/react-native'
 import { useRef } from 'react'
 import { StyleSheet } from 'react-native'
 import * as Reanimated from 'react-native-reanimated'
@@ -633,6 +633,62 @@ describe('H20: leaving and coming back', () => {
     expect(meadow()).not.toEqual(ROUND)
     expect(loadHuntRecord()!.found).toEqual([])
     expect(has('hunt-new-letters')).toBe(false)
+  })
+})
+
+describe('the background mid-outcome (§ 6.4)', () => {
+  /**
+   * Seats `word` and sends the app to the background 300 ms into its run;
+   * 5 s later she is back. The cut run clears once she is back
+   * (`play-place.md` § 3.3), and its find is never lost (Dave (3)).
+   */
+  async function cutByBackground(
+    g: Awaited<ReturnType<typeof mount>>,
+    word: string,
+  ) {
+    await seat(...word)
+    await advance(SING_AFTER_MS + 300)
+    await act(async () => g.visibility.set(true))
+    await advance(5000)
+    await act(async () => g.visibility.set(false))
+  }
+
+  it.each(['bag', 'pat'])(
+    'a new target (%s) lands in its slot once she is back; the next takes the next slot',
+    async (word) => {
+      const g = await mount()
+      await cutByBackground(g, word)
+      await advance(10000)
+      expect(loadHuntRecord()!.found).toEqual([word])
+      expect(tilesOf(0)).toBe(word)
+      expect(seated()).toEqual([])
+      expect(locked()).toBe(false)
+      await build('hat')
+      expect([tilesOf(0), tilesOf(1)]).toEqual([word, 'hat'])
+    },
+  )
+
+  it('an extra (tab) joins the bonus chip once she is back; no slot changes', async () => {
+    const g = await mount()
+    await cutByBackground(g, 'tab')
+    await advance(10000)
+    expect(byId('hunt-bonus').props.accessibilityLabel).toBe('Bonus words, tab')
+    expect(screen.queryAllByTestId(/^hunt-slot-\d-tile-\d$/)).toHaveLength(0)
+  })
+
+  it('the completing find: its slot fills, then the beat laps every found slot', async () => {
+    learnerAt('cvc-words-short-o', {
+      letters: ROUND,
+      found: ['bag', 'hat', 'bat', 'tap'],
+    })
+    const g = await mount()
+    await cutByBackground(g, 'tag')
+    const calls = g.calls.length
+    await advance(SHELF_DROP_MS)
+    expect(tilesOf(4)).toBe('tag')
+    await advance(20000)
+    expect(g.calls.slice(calls)).toContainEqual(wordSound('tag'))
+    expect(has('hunt-new-letters')).toBe(true)
   })
 })
 

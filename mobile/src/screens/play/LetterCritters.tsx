@@ -484,6 +484,33 @@ export function LetterCritters({
 
   // --- A run of three and the shelf (Thomas 2026-10-23) -----------------
 
+  // The hunt's glow, declared here: the background's landing (an effect)
+  // reaches it.
+
+  /** § 4.6: the first empty slot glows, silently; none after completion. */
+  const showGlow = () => {
+    glowDueRef.current = false
+    const r = recordRef.current
+    if (r === null || r.complete || glowRef.current || beatRef.current) return
+    if (huntHintTarget(r, r.found) === undefined) return
+    glowRef.current = true
+    setGlow({ ghost: null })
+  }
+  const endGlow = () => {
+    glowRef.current = false
+    setGlow(null)
+  }
+  /** `HUNT_HINT_IDLE_MS` from now with no drag start: the glow. */
+  const armHuntIdle = () => {
+    const token = ++huntIdleRef.current
+    if (recordRef.current === null || !ranRef.current) return
+    kit.advance(() => {
+      if (huntIdleRef.current !== token || draggingRef.current) return
+      if (lockedRef.current) glowDueRef.current = true
+      else showGlow()
+    }, HUNT_HINT_IDLE_MS)
+  }
+
   /** From the run's first sound the board waits until the shelf is clear. */
   const startRun = () => {
     lock(true)
@@ -527,6 +554,22 @@ export function LetterCritters({
       reducedMotion ? SHELF_FADE_MS : SHELF_DROP_MS,
     )
   }
+  /**
+   * § 6.4: a run cut by the background never fills or joins the chip; once
+   * she is back its find lands with no motion (the slot fades in, as Reduce
+   * Motion's fill), before the shelf clears (Dave (3): never a lost find).
+   */
+  const landPending = () => {
+    const r = recordRef.current
+    const landing = pendingRef.current
+    if (r === null || landing.length === 0) return
+    setPending([])
+    const target = landing.find((w) => r.targets.includes(w))
+    if (target === undefined) return
+    setFresh(target)
+    endGlow()
+    armHuntIdle()
+  }
 
   // The hint and its open line; unmount: the sound in flight stops, the
   // player is freed.
@@ -554,6 +597,7 @@ export function LetterCritters({
       if (lockedRef.current && !beatRef.current) {
         kit.advance(() => {
           kit.setPose('idle')
+          landPending()
           dropShelf()
         }, 0)
       }
@@ -914,30 +958,6 @@ export function LetterCritters({
     if (found.kind === 'extra') {
       setPending(pendingRef.current.filter((w) => w !== word))
     } else if (found.kind === 'extra-repeat') bump(setLit, word)
-  }
-
-  /** § 4.6: the first empty slot glows, silently; none after completion. */
-  const showGlow = () => {
-    glowDueRef.current = false
-    const r = recordRef.current
-    if (r === null || r.complete || glowRef.current || beatRef.current) return
-    if (huntHintTarget(r, r.found) === undefined) return
-    glowRef.current = true
-    setGlow({ ghost: null })
-  }
-  const endGlow = () => {
-    glowRef.current = false
-    setGlow(null)
-  }
-  /** `HUNT_HINT_IDLE_MS` from now with no drag start: the glow. */
-  const armHuntIdle = () => {
-    const token = ++huntIdleRef.current
-    if (recordRef.current === null || !ranRef.current) return
-    kit.advance(() => {
-      if (huntIdleRef.current !== token || draggingRef.current) return
-      if (lockedRef.current) glowDueRef.current = true
-      else showGlow()
-    }, HUNT_HINT_IDLE_MS)
   }
 
   /**
