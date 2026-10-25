@@ -249,9 +249,17 @@ it('a due check rides the fast canon request: no planner hint, no 5 s fallback',
   expect(snap.audioReady).toBe(true)
 })
 
+/**
+ * Today's check (3 of nap, rat, map, tap by attempt): what a build without
+ * the reserve's audio serves. This bundle serves the reserve check
+ * (`the probe reserve on the device` below); these tests pin the fallback.
+ */
+const todaysCheck = () => readWordSongProgressHints(new Set(NOVEL_PROBE_WORDS))
+
 it('the due session holds three probe words in canon problem shape', async () => {
   saveProgress(dueLearner())
-  const { settle, main, probe, loadProbeAudio, session } = startWordSong()
+  const { settle, main, probe, loadProbeAudio, session } =
+    startWordSong(todaysCheck)
   const snap = await settle()
   const scored = snap.plan!.problems.slice(snap.warmupCount)
   expect(scored.map((p) => p.target.word)).toEqual([
@@ -295,10 +303,10 @@ it('the due session holds three probe words in canon problem shape', async () =>
 
 it('all correct: the novel-pool score is 1, cvc-words is mastered and short-o is next', async () => {
   saveProgress(dueLearner())
-  const { settle, session } = startWordSong()
+  const { settle, session } = startWordSong(todaysCheck)
   const snap = await settle()
   clockNow = new Date('2026-10-24T09:15:00')
-  endSession(snap, session, () => true)
+  endSession(snap, session, () => true, false)
   const after = loadProgress()!
   expect(after.history.at(-1)!.novelPoolSuccessRate).toBe(1)
   expect(after.skillLevels['cvc-words']).toBe('mastered')
@@ -308,11 +316,12 @@ it('all correct: the novel-pool score is 1, cvc-words is mastered and short-o is
 
 it('a missed check (novel < 0.8) does not master, and the re-check waits three sessions', async () => {
   saveProgress(dueLearner())
-  const first = startWordSong()
+  const first = startWordSong(todaysCheck)
   const words = endSession(
     await first.settle(),
     first.session,
     (w) => w !== 'rat',
+    false,
   )
   expect(words.filter((w) => NOVEL_PROBE_WORDS.includes(w))).toHaveLength(3)
   let after = loadProgress()!
@@ -321,9 +330,9 @@ it('a missed check (novel < 0.8) does not master, and the re-check waits three s
 
   // Three plain sessions push the miss out of the window.
   for (let i = 0; i < 3; i++) {
-    expect(readWordSongProgressHints().isGraduationSession).toBe(false)
-    const s = startWordSong()
-    const plain = endSession(await s.settle(), s.session, () => true)
+    expect(todaysCheck().isGraduationSession).toBe(false)
+    const s = startWordSong(todaysCheck)
+    const plain = endSession(await s.settle(), s.session, () => true, false)
     expect(plain).toEqual(CANON_WORDS)
     expect(s.loadProbeAudio).not.toHaveBeenCalled()
   }
@@ -331,8 +340,8 @@ it('a missed check (novel < 0.8) does not master, and the re-check waits three s
   expect(after.skillLevels['cvc-words']).toBe('practicing')
 
   // Then the check is due again, leading with a different probe word.
-  expect(readWordSongProgressHints().isGraduationSession).toBe(true)
-  const again = startWordSong()
+  expect(todaysCheck().isGraduationSession).toBe(true)
+  const again = startWordSong(todaysCheck)
   const snap = await again.settle()
   expect(
     snap.plan!.problems.slice(snap.warmupCount).map((p) => p.target.word),
@@ -389,7 +398,7 @@ it('with no check due, the session is the one today ships: same requests, plain 
   session.tearDown()
 })
 
-it('bundles the web probe lines byte for byte; today’s four words rendered, the reserve’s five new words awaiting their render (npm run export-audio)', () => {
+it('bundles the web probe lines byte for byte, every one rendered (npm run export-audio)', () => {
   const rel = 'canon/word-song/level-1/cvc-words-probe.json'
   expect(
     readFileSync(resolve(__dirname, '../../assets/canon/cvc-words-probe.json')),
@@ -398,10 +407,7 @@ it('bundles the web probe lines byte for byte; today’s four words rendered, th
   const unrendered = PROBE.utterances
     .filter((u: { audio: { base64: string } }) => u.audio.base64 === '')
     .map((u: { text: string }) => u.text)
-  expect(unrendered).toHaveLength(25)
-  for (const w of ['ham', 'cab', 'rag', 'ram', 'pad']) {
-    expect(unrendered).toContain(`Read the ${w}.`)
-  }
+  expect(unrendered).toEqual([])
 })
 
 describe('the probe reserve on the device (Dave 2026-10-24)', () => {
@@ -409,18 +415,15 @@ describe('the probe reserve on the device (Dave 2026-10-24)', () => {
     ...NOVEL_PROBE_WORDS,
     ...PROBE_RESERVE_WORDS,
   ])
-  const reserveHints = () => readWordSongProgressHints(ALL_RENDERED)
   const scoredWords = (
     snap: ReturnType<
       ReturnType<typeof startWordSong>['session']['getSnapshot']
     >,
   ) => snap.plan!.problems.slice(snap.warmupCount).map((p) => p.target.word)
 
-  it('this bundle keeps today’s check: no unrendered word is ever served', async () => {
-    expect([...RENDERED_PROBE_WORDS].sort()).toEqual(
-      [...NOVEL_PROBE_WORDS].sort(),
-    )
-    expect(RESERVE_CHECK_READY).toBe(false)
+  it('this bundle serves the reserve check: every probe word rendered, none served without audio', async () => {
+    expect([...RENDERED_PROBE_WORDS].sort()).toEqual([...ALL_RENDERED].sort())
+    expect(RESERVE_CHECK_READY).toBe(true)
     const met = { day: DAY, count: 1, correct: null }
     const missed = { ...met, correct: false, check: 'missed' }
     const seenRecords: (SeenItems | undefined)[] = [
@@ -447,17 +450,17 @@ describe('the probe reserve on the device (Dave 2026-10-24)', () => {
         for (const w of words) expect(RENDERED_PROBE_WORDS.has(w)).toBe(true)
       }
     }
+    // The bundle's own hints are the reserve check's: the tests below run
+    // on them, with no rendered-words seam.
     saveProgress(dueLearner())
-    const { settle } = startWordSong()
-    const served = scoredWords(await settle())
-    for (const w of ['ham', 'cab', 'rag', 'ram', 'pad']) {
-      expect(served).not.toContain(w)
-    }
+    expect(readWordSongProgressHints()).toEqual(
+      readWordSongProgressHints(ALL_RENDERED),
+    )
   }, 15_000)
 
   it('with every word rendered: two check sessions of 3 probe words, and 5 of 6 masters cvc-words', async () => {
     saveProgress(dueLearner())
-    const first = startWordSong(reserveHints)
+    const first = startWordSong()
     const one = scoredWords(await first.settle())
     expect(one).toEqual([
       'hat',
@@ -470,7 +473,7 @@ describe('the probe reserve on the device (Dave 2026-10-24)', () => {
       'tag',
     ])
     clockNow = new Date('2026-10-24T09:15:00')
-    endSession(await first.settle(), first.session, () => true, true)
+    endSession(await first.settle(), first.session, () => true)
     let after = loadProgress()!
     expect(after.history.at(-1)!.novelPoolPart).toEqual({
       words: ['map', 'nap', 'rat'],
@@ -482,8 +485,8 @@ describe('the probe reserve on the device (Dave 2026-10-24)', () => {
     expect(after.seenItems?.['word:map']?.check).toBe('right')
 
     // The second session is the check again, with the next 3 words.
-    expect(reserveHints().isGraduationSession).toBe(true)
-    const second = startWordSong(reserveHints)
+    expect(readWordSongProgressHints().isGraduationSession).toBe(true)
+    const second = startWordSong()
     const two = scoredWords(await second.settle())
     expect(two).toEqual([
       'hat',
@@ -496,7 +499,7 @@ describe('the probe reserve on the device (Dave 2026-10-24)', () => {
       'tag',
     ])
     clockNow = new Date('2026-10-24T09:40:00')
-    endSession(await second.settle(), second.session, (w) => w !== 'cab', true)
+    endSession(await second.settle(), second.session, (w) => w !== 'cab')
     after = loadProgress()!
     expect(after.history.at(-1)!.novelPoolSuccessRate).toBeCloseTo(5 / 6)
     expect(after.skillLevels['cvc-words']).toBe('mastered')
@@ -507,19 +510,23 @@ describe('the probe reserve on the device (Dave 2026-10-24)', () => {
     saveProgress(dueLearner())
     const miss = new Set(['map', 'nap'])
     for (const minute of [15, 40]) {
-      const s = startWordSong(reserveHints)
+      const s = startWordSong()
       clockNow = new Date(`2026-10-24T09:${minute}:00`)
-      endSession(await s.settle(), s.session, (w) => !miss.has(w), true)
+      endSession(await s.settle(), s.session, (w) => !miss.has(w))
     }
     const after = loadProgress()!
     expect(after.history.at(-1)!.novelPoolSuccessRate).toBeCloseTo(4 / 6)
     expect(after.skillLevels['cvc-words']).toBe('practicing')
     for (let i = 0; i < 3; i++) {
-      expect(reserveHints().isGraduationSession).toBe(false)
-      const s = startWordSong(reserveHints)
+      expect(readWordSongProgressHints().isGraduationSession).toBe(false)
+      const s = startWordSong()
       clockNow = new Date(`2026-10-24T1${i}:00:00`)
-      endSession(await s.settle(), s.session, () => true, true)
+      endSession(await s.settle(), s.session, () => true)
     }
-    expect(reserveHints().probeWords).toEqual(['ram', 'pad', 'rat'])
+    expect(readWordSongProgressHints().probeWords).toEqual([
+      'ram',
+      'pad',
+      'rat',
+    ])
   }, 15_000)
 })

@@ -7,7 +7,8 @@
  * (mat, bat, can, cap, dad, jam): 46, measured by `npm run export-assets`
  * after their Lily render; fewer than 6 new entries would mean a retake.
  * The cvc-words graduation check's probe lines (`cvc-words-probe.json`)
- * add 4 (nap, rat, map, tap): 50.
+ * add 4 (nap, rat, map, tap): 50, and its reserve's five new words 5
+ * (ham, cab, rag, ram, pad): 55.
  */
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
@@ -41,10 +42,8 @@ function canonBlends(): Map<string, { bytes: number; sha256: string }> {
           }[]
         }
         for (const u of json.utterances ?? []) {
-          // A line awaiting its Lily render (the probe reserve's new
-          // words, Dave 2026-10-24) has no clip yet, so no marks.
-          if (/^word\.p\d+\.blend$/.test(u.id) && u.audio?.base64) {
-            const mp3 = Buffer.from(u.audio.base64, 'base64')
+          if (/^word\.p\d+\.blend$/.test(u.id)) {
+            const mp3 = Buffer.from(u.audio?.base64 ?? '', 'base64')
             out.set(u.text, {
               bytes: mp3.length,
               sha256: createHash('sha256')
@@ -64,8 +63,8 @@ function canonBlends(): Map<string, { bytes: number; sha256: string }> {
 describe('the generated marks', () => {
   const canon = canonBlends()
 
-  it('cover the 50 canon blend clips: same length, same content', () => {
-    expect(canon.size).toBe(50)
+  it('cover the 55 canon blend clips: same length, same content', () => {
+    expect(canon.size).toBe(55)
     expect(Object.keys(BLEND_MARKS).sort()).toEqual([...canon.keys()].sort())
     for (const [text, clip] of canon) {
       const { bytes, sha256 } = BLEND_MARKS[text]!

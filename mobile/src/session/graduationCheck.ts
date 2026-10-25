@@ -24,7 +24,7 @@ import { loadSessionAudio, type LoadedSessionAudio } from '../audio'
 /** The probe lines' server-plan shape, for `withGraduationProbes`. */
 export const GRADUATION_PROBE_PLAN: unknown = probeCanon.plan
 
-/** The probe words this build has audio for (today: nap, rat, map, tap). */
+/** The probe words this build has audio for (all nine since the 5a render). */
 export const RENDERED_PROBE_WORDS: ReadonlySet<string> =
   renderedProbeWords(probeCanon)
 

@@ -1,10 +1,10 @@
 /**
  * The closed math pools on the device (no-Claude plan phase 5a,
- * `design/native/no-claude-sizing.md` § 2 "How a pool grows"), before
+ * `design/native/no-claude-sizing.md` § 2 "How a pool grows"), after
  * their Lily render: the bundle carries every pool block (problems 9..N of
  * the 9 closed steps), and the device draws a block only when every one of
- * its lines has a bundled clip (`bundledCanonText`). So no learner sees a
- * change until the render and `npm run export-audio` land.
+ * its lines has a bundled clip (`bundledCanonText`). Every block has its
+ * clips, so the device serves every one.
  */
 import { localDateKey } from '@marian/core/progress/clock'
 import {
@@ -90,21 +90,20 @@ function pick(step: 'add-to-10' | 'sub-to-10', seed: number): LocalSession {
   return out.session
 }
 
-describe('the closed math pools before their render (phase 5a)', () => {
+describe('the closed math pools after their render (phase 5a)', () => {
   it('the bundle carries every pool block of the 9 closed steps', () => {
     for (const [step, n] of Object.entries(POOL_STEPS)) {
       expect(problemsOf(CANON[`math/level-1/${step}`]!)).toHaveLength(n)
     }
   })
 
-  it('the device sees no add-to-10 or sub-to-10 pool block: none is voiced yet', () => {
-    expect(problemsOf(device('add-to-10'))).toEqual(EIGHT)
-    expect(problemsOf(device('sub-to-10'))).toEqual(EIGHT)
-  })
-
-  it('a pool block whose every line is voiced already is kept (mult-3-4: 4 reuse other steps’ clips)', () => {
-    expect(problemsOf(device('mult-3-4'))).toEqual([...EIGHT, 10, 12, 13, 14])
-    expect(device('mult-3-4')).not.toBe(CANON['math/level-1/mult-3-4'])
+  it('the device sees every pool block of the 9 closed steps: all are voiced', () => {
+    for (const [step, n] of Object.entries(POOL_STEPS)) {
+      const all = Array.from({ length: n }, (_, i) => i + 1)
+      expect([step, problemsOf(device(step))]).toEqual([step, all])
+      // Nothing to leave out: the bundled entry itself.
+      expect(device(step)).toBe(CANON[`math/level-1/${step}`])
+    }
   })
 
   it('every line the device can serve has its bundled clip', () => {
@@ -124,24 +123,23 @@ describe('the closed math pools before their render (phase 5a)', () => {
         if (canonClipFor(u.text) === undefined) missing.push(`${path} ${u.id}`)
       }
     }
-    // But the probe reserve's 25 lines awaiting their render: no focus node
-    // is the probe file (`./localSession.test.ts`). The render PR empties it.
-    expect(missing).toEqual(
-      [5, 6, 7, 8, 9].flatMap((i) =>
-        ['read', 'correct', 'hint', 'giveAnswer', 'blend'].map(
-          (slot) => `word-song/level-1/cvc-words-probe word.p${i}.${slot}`,
-        ),
-      ),
-    )
+    expect(missing).toEqual([])
   })
 
-  it('every picked add-to-10 / sub-to-10 session plays only bundled clips and the served 8', () => {
+  it('every picked add-to-10 / sub-to-10 session plays only bundled clips, and draws pool blocks', () => {
     for (const step of ['add-to-10', 'sub-to-10'] as const) {
       const served = new Set(
         device(step)
           .utterances.filter((u) => u.id.endsWith('.read'))
           .map((u) => u.text),
       )
+      // The reads of problems 9+ (the pool), by text.
+      const pool = new Set(
+        device(step)
+          .utterances.filter((u) => /^math\.p(9|\d{2,})\.read$/.test(u.id))
+          .map((u) => u.text),
+      )
+      const drawn = new Set<string>()
       for (let seed = 0; seed < 60; seed++) {
         const s = pick(step, seed)
         const reads = s.utterances
@@ -149,10 +147,12 @@ describe('the closed math pools before their render (phase 5a)', () => {
           .map((u) => u.text)
         expect(reads).toHaveLength(8)
         expect(reads.filter((r) => !served.has(r))).toEqual([])
+        for (const r of reads) if (pool.has(r)) drawn.add(r)
         expect(
           s.utterances.filter((u) => canonClipFor(u.text) === undefined),
         ).toEqual([])
       }
+      expect(drawn.size).toBeGreaterThan(0)
     }
   }, 30_000)
 
