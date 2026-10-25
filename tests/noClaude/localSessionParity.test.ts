@@ -60,6 +60,12 @@ import {
   type ComposedSession,
 } from '../../packages/core/src/session/composeSession.js'
 import { MIX_SOURCE_STEPS } from '../../packages/core/src/wire/types.js'
+import { wordSongSessionPlanFromServer } from '../../packages/core/src/wordSong/planFromServer.js'
+import {
+  orderWordSession,
+  WORD_ORDER_STEPS,
+} from '../../packages/core/src/wordSong/wordOrder.js'
+import { lintLetterNamesComposition } from '../../scripts/compositionLint.js'
 import bundle from '../../mobile/assets/canon/canon-text.json'
 
 type Track = 'math' | 'word-song'
@@ -288,6 +294,77 @@ describe('the canon session of every step', () => {
   it('a canon file outside the trees (the graduation probe file)', async () => {
     await expectSame(base('word-song', { focusNode: 'cvc-words-probe' }))
   })
+})
+
+/**
+ * The device plays a word step's 8 in a new order each session (core
+ * `wordOrder.ts`, Dave 2026-10-25), after the session above is built. So
+ * the session it plays is the server's, block for block, read by word
+ * rather than by slot: each problem carries the lines of the server's
+ * problem with that word, and every other line is the server's.
+ */
+describe("the device's word order: the server's blocks, read by word", () => {
+  type Line = { id: string; text: string }
+  const PROBLEM = /^word\.p(\d+)\.(.+)$/
+  /** Each problem's lines by slot name, keyed by its target word. */
+  const blocksByWord = (lines: readonly Line[], node: string) => {
+    const words = wordSongSessionPlanFromServer(
+      { id: 'x', label: 'x', utterances: lines },
+      { littleStories: true, blendReads: true, step: node as never },
+    ).problems.map((p) => p.target.word)
+    const out = new Map<string, Record<string, string>[]>()
+    const byProblem = new Map<number, Record<string, string>>()
+    for (const u of lines) {
+      const m = PROBLEM.exec(u.id)
+      if (m === null) continue
+      const slots = byProblem.get(Number(m[1])) ?? {}
+      slots[m[2]!] = u.text
+      byProblem.set(Number(m[1]), slots)
+    }
+    words.forEach((w, i) => {
+      out.set(w, [...(out.get(w) ?? []), byProblem.get(i + 1)!])
+    })
+    return { words, out }
+  }
+
+  for (const node of WORD_ORDER_STEPS) {
+    it(`word-song ${node}: 20 sessions`, async () => {
+      const payload = base('word-song', { focusNode: node })
+      const composed = await expectSame(payload)
+      const server = await serve(payload)
+      const serverLines = (server.body.plan as { utterances: Line[] })
+        .utterances
+      const reference = blocksByWord(serverLines, node)
+      let last: readonly string[] | 'canon' = 'canon'
+      for (let s = 1; s <= 20; s++) {
+        const plan = orderWordSession(composed.session.plan, node, {
+          seed: s * 3,
+          last,
+        }) as { id: string; label: string; utterances: Line[] }
+        expect(plan.id).toBe((server.body.plan as { id: string }).id)
+        const played = blocksByWord(plan.utterances, node)
+        expect([...played.words].sort()).toEqual([...reference.words].sort())
+        expect(played.words).not.toEqual(
+          last === 'canon' ? reference.words : last,
+        )
+        for (const [word, blocks] of played.out) {
+          // A word served twice (ship, chin, thin) has identical blocks.
+          expect(blocks, `${node} ${word}`).toEqual(reference.out.get(word))
+        }
+        const rest = (lines: readonly Line[]) =>
+          lines.filter((u) => !PROBLEM.test(u.id))
+        expect(rest(plan.utterances)).toEqual(rest(serverLines))
+        if (node === 'letter-names') {
+          expect(
+            lintLetterNamesComposition({
+              utterances: plan.utterances as never,
+            }),
+          ).toEqual([])
+        }
+        last = played.words
+      }
+    })
+  }
 })
 
 describe('the first-encounter opener', () => {

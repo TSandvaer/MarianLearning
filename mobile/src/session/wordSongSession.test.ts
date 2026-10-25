@@ -6,6 +6,9 @@
  * `startSession` is faked: no network, no audio. The graduation check the
  * app builds itself is `./graduationCheck.test.ts`.
  */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { wordSongSessionPlanFromServer } from '@marian/core/wordSong/planFromServer'
 import {
   STATIC_WORD_SONG_PLANS,
   wordSongSessionPlanToUtteranceSources,
@@ -196,6 +199,47 @@ it('kicks once, publishes the frozen extras at once, then the server plan', asyn
   expect(session.currentTargetVowel).toBe('/o/')
   await snap.playUtterance?.('Tap the cat.')
   expect(p.audio.playUtterance).toHaveBeenCalledWith('Tap the cat.', undefined)
+})
+
+it("an ordered step's forward session plays its 8 in this session's order (core wordOrder.ts)", async () => {
+  const canon = JSON.parse(
+    readFileSync(
+      resolve(
+        __dirname,
+        '../../../public/canon/word-song/level-1/cvc-words.json',
+      ),
+      'utf8',
+    ),
+  ).plan
+  const wordsOf = (plan: unknown) =>
+    wordSongSessionPlanFromServer(plan, { step: 'cvc-words' }).problems.map(
+      (p) => p.target.word,
+    )
+  const ordered: WordSongProgressHints = {
+    ...GRADUATION,
+    isGraduationSession: false,
+    wordOrder: { seed: 4, last: 'canon' },
+  }
+  const a = harness(ordered)
+  a.session.kick()
+  a.calls[0]!.resolve(a.prepared(canon).value)
+  await flush()
+  const plan = a.session.getSnapshot().plan!
+  const words = plan.problems.map((p) => p.target.word)
+  expect([...words].sort()).toEqual([...wordsOf(canon)].sort())
+  // Her last session played the canon order, which opens on hat.
+  expect(words[0]).not.toBe('hat')
+  // Each problem is numbered by its slot, so its chips follow the slot.
+  expect(plan.problems.map((p) => p.index)).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
+
+  // Without the hint (a review, letter sounds, a story) it plays as served.
+  const b = harness({ ...GRADUATION, isGraduationSession: false })
+  b.session.kick()
+  b.calls[0]!.resolve(b.prepared(canon).value)
+  await flush()
+  expect(
+    b.session.getSnapshot().plan!.problems.map((p) => p.target.word),
+  ).toEqual(wordsOf(canon))
 })
 
 it('a failed start still releases problem 1 (static plan, silent)', async () => {

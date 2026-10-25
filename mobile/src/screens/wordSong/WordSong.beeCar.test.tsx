@@ -132,10 +132,29 @@ async function answerRight(h: Harness, plan: WordSongSessionPlan, i: number) {
 beforeEach(() => jest.useFakeTimers())
 afterEach(() => jest.useRealTimers())
 
-describe('introSpotlight: duck words’ ending-pair cue (§ 3.3, § 4.3)', () => {
+describe('introSpotlight: the team lights (§ 3.3, § 4.3)', () => {
   it('bee: e e; car: a r; with Reduce Motion too', () => {
     expect(introSpotlight(BEE_INTRO, 'bee', false)).toEqual([null, 0, 0])
     expect(introSpotlight(CAR_INTRO, 'car', true)).toEqual([null, 0, 0])
+  })
+
+  it('a session may open on any word (core wordOrder.ts): the team where it is', () => {
+    expect(introSpotlight(BEE_INTRO, 'leaf', false)).toEqual([null, 0, 0, null])
+    expect(introSpotlight(BEE_INTRO, 'sheep', false)).toEqual([
+      null,
+      null,
+      0,
+      0,
+      null,
+    ])
+    expect(introSpotlight(CAR_INTRO, 'barn', false)).toEqual([null, 0, 0, null])
+    expect(introSpotlight(CAR_INTRO, 'scarf', true)).toEqual([
+      null,
+      null,
+      0,
+      0,
+      null,
+    ])
   })
 })
 
