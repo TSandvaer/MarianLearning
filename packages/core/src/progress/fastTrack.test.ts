@@ -247,14 +247,16 @@ describe('AC4 not fast-tracked', () => {
 })
 
 describe('AC5 cvc-words keeps its novel-word gate (P6)', () => {
-  it('2 secure days → practicing, graduation pending, a full row awaiting the check; the graduation then masters', () => {
+  it('2 secure days with no check → practicing, graduation pending, the last flower held for the check; the graduation then masters', () => {
     saveProgress(progressAtStep('cvc-words'))
     play('cvc-words', MON, ALL)
     const p = play('cvc-words', TUE, ALL)
     expect(p.skillLevels['cvc-words']).toBe('practicing')
     expect(isGraduationSessionPending(p, 'cvc-words', 'word-song')).toBe(true)
+    // Check fold-in (Dave 2026-10-25 (4)): never a full row before a pass.
     const np = nodeProgress(p, 'cvc-words')
-    expect(np.goodDays).toBe(3)
+    expect(np.goodDays).toBe(2)
+    expect(np.flowerHeld).toBe(true)
     expect(np.requiredDays).toBe(3)
     expect(np.awaitingNovelWordCheck).toBe(true)
 

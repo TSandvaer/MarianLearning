@@ -451,14 +451,13 @@ export function applyMasteryRule(progress: Progress): Progress {
         continue
       }
       // Graduation gate (ticket 86c9m3aec). For graduation-gated nodes
-      // the standard rule is necessary but not sufficient — the most
-      // recent qualifying entry must additionally carry a passing
-      // novelPoolSuccessRate. If the gate isn't satisfied, the node
-      // stays at 'practicing'; the next session-start picks it up as
-      // graduation-pending and the planner emits the novel-word probe.
+      // the standard rule is necessary but not sufficient — the check
+      // must have passed (check fold-in, Dave 2026-10-25 (2)). Until it
+      // has, the node stays at 'practicing' and every forward session
+      // carries the check's probe words.
       if (
         isGraduationGated(node) &&
-        !graduationGateClears(progress.history, node, trackThreshold, settings)
+        !graduationGateClears(progress.history, node)
       ) {
         continue
       }
@@ -858,59 +857,6 @@ export function unionGoodDays(
 const EMPTY_GOOD_DAYS: GoodDays = Object.freeze({})
 
 /**
- * Reduce a list of history entries to one-per-calendar-day. The day key
- * is computed in LOCAL time, matching the streak counter's convention
- * (`sessionHistory.ts` uses an inline `differenceInCalendarDays` keyed
- * on local `getFullYear/getMonth/getDate`). Two semantics for the same
- * `dateISO` would otherwise be observable to Marian — the streak band
- * counts a Manila-evening + Manila-morning pair as two days while the
- * mastery rule used to collapse them to one (UTC offset = 8h).
- *
- * "One per day" is the LATEST entry on that day (the entry with the
- * highest position in the list — `Progress.history` is appended-only,
- * most-recent-last per `saveProgress` semantics). This mirrors how a
- * parent would think about it: "today's high score" is the one that
- * sticks.
- *
- * P0.3 history (audit follow-up to PR #120)
- * -----------------------------------------
- * Earlier shape used `entry.dateISO.slice(0, 10)` — the UTC `YYYY-MM-DD`
- * prefix produced by `Date#toISOString()`. Under Manila (UTC+8) the
- * 22:00–06:00 window collapses across the UTC midnight: a session at
- * 2026-04-30 21:00 Manila and 2026-05-01 06:00 Manila both stamp UTC
- * day `2026-04-30`, so the cross-day filter discarded one of the two
- * and `add-to-20`'s 3-session requirement could never accumulate. The
- * mastery rule's own header self-flagged the UTC choice as a "known
- * simplification" — empirically it bit. Audit:
- * `design/audits/2026-05-02-polish/jessica-qa-edge-cases.md` § P0.3.
- *
- * Edge cases:
- *   - Malformed dateISO (`Date#parse` returns NaN): fall back to using
- *     the raw `dateISO` string as the day key. A single weirdly-shaped
- *     entry doesn't poison promotion logic for the whole node.
- *   - Cross-timezone playback: the day key is computed in whatever
- *     local timezone the JS runtime is in when `applyMasteryRule()`
- *     runs. For Marian's use (single iPad in Manila), this is
- *     wall-clock-correct. A future multi-device / cross-tz scenario
- *     would need an explicit per-profile timezone — out of scope here.
- */
-function dedupeByCalendarDay(
-  entries: readonly SessionHistoryEntry[],
-): SessionHistoryEntry[] {
-  // Index of the LAST entry per local-day key. We walk the source list
-  // (most-recent-last by saveProgress contract) and remember the
-  // highest index per key; the surviving entries are exactly those
-  // indices in original order, which preserves the chronological-ish
-  // ordering `slice(-N)` upstream depends on.
-  const lastIndexByKey = new Map<string, number>()
-  entries.forEach((entry, idx) => {
-    lastIndexByKey.set(localDayKey(entry.dateISO), idx)
-  })
-  const keepIndices = new Set(lastIndexByKey.values())
-  return entries.filter((_entry, idx) => keepIndices.has(idx))
-}
-
-/**
  * Convert an ISO 8601 timestamp into a `YYYY-MM-DD` local-tz day key.
  * Same convention `sessionHistory.ts`'s streak counter uses (local
  * `getFullYear/getMonth/getDate`), kept inline here to avoid pulling
@@ -986,73 +932,32 @@ function isNovelPoolPart(v: unknown): v is NovelPoolPart {
 }
 
 /**
- * For a graduation-gated node already passing `qualifies()`, return
- * true iff the MOST RECENT (cross-day-deduped) session on the node was
- * a good session (`successRate >= threshold.percent`, as the old
- * all-good window guaranteed) that also carries a
- * `novelPoolSuccessRate >= NOVEL_POOL_THRESHOLD`.
+ * The graduation check has passed: the latest decided attempt on `node`
+ * (the latest history entry with a `novelPoolSuccessRate`, every session,
+ * not deduped by day) scored at least `NOVEL_POOL_THRESHOLD`.
  *
- * Why "most recent" only
- * ----------------------
- * The novel-pool gate is a single-session generalization probe, and the
- * graduation session is the most recent one. Earlier sessions are
- * non-graduation entries (no `novelPoolSuccessRate`); requiring them to
- * clear the novel gate would never be satisfiable. The good days
- * themselves are counted by `qualifies()`, in any order (ticket
- * 123jpnbc3dm). A two-session reserve check's rate sits on its second
- * session's entry, pooled over both (`graduationCheckFirstHalf`).
+ * Check fold-in (Dave 2026-10-25 (2)): the pass never expires and need not
+ * be on the last session or a good one, so the step masters at its good
+ * days AND a passed check, in any order. A two-session reserve check's
+ * rate sits on its second session's entry, pooled over both
+ * (`graduationCheckFirstHalf`); an older one-session check's rate counts
+ * as a decided attempt.
  */
 export function graduationGateClears(
   history: readonly SessionHistoryEntry[],
   node: SkillNode,
-  threshold: MasteryThreshold,
-  settings: ParentSettings,
 ): boolean {
-  const focused = history.filter((entry) => entry.skillFocus.includes(node))
-  if (focused.length === 0) return false
-  const filtered = settings.crossDayEnforcement
-    ? dedupeByCalendarDay(focused)
-    : focused
-  const tail = filtered[filtered.length - 1]!
+  const decided = history.filter(
+    (entry) =>
+      entry.skillFocus.includes(node) &&
+      typeof entry.novelPoolSuccessRate === 'number',
+  )
+  const latest = decided[decided.length - 1]
   return (
-    tail.successRate >= threshold.percent &&
-    typeof tail.novelPoolSuccessRate === 'number' &&
-    tail.novelPoolSuccessRate >= NOVEL_POOL_THRESHOLD
+    latest !== undefined && latest.novelPoolSuccessRate! >= NOVEL_POOL_THRESHOLD
   )
 }
 
-/**
- * Return true iff the next session for `node` on `track` should be
- * flagged as a graduation session — meaning the planner should mix
- * 2–3 novel-pool probe words into the 8-problem set so the engine
- * can verify Marian's decoding generalises beyond the canonical
- * pool (ticket 86c9m3aec).
- *
- * Rules (all must hold):
- *   1. `node` is in `WORD_SONG_GRADUATION_GATED_NODES`.
- *   2. `node` is currently at `'practicing'` (a `'mastered'` node has
- *      already promoted; an `'intro'` / `'locked'` node hasn't reached
- *      a graduation gate yet).
- *   3. The node has `threshold.sessions` good days banked, in any
- *      order (ticket 123jpnbc3dm — see `goodDayCount`).
- *   4. NONE of the last `threshold.sessions` sessions (cross-day-
- *      deduped per `parentSettings.crossDayEnforcement`) already carries
- *      a `novelPoolSuccessRate` — i.e. graduation hasn't happened yet,
- *      or the previous attempt's novel-tagged entry has aged out of
- *      the tail window.
- *
- * Rule (4) is the "engine waits before re-probing" guarantee from the
- * AC. After a failed graduation (novel < 80%), the failed
- * entry sits at the tail of the window with a
- * `novelPoolSuccessRate` set — predicate returns false, so the next
- * session is a regular cvc-words session. Only after 3 fresh
- * non-graduation sessions push the failed entry out of the tail
- * window does the predicate flip true again.
- *
- * Pure read of `progress`; does not mutate. Safe to call at session-
- * start (after `loadProgress()`) or at session-end before
- * `recordProgressOnSessionEnd` runs.
- */
 // ── Cross-vowel mix gate (ticket 86c9qa0kf) ─────────────────────────────
 
 /**
@@ -1189,41 +1094,43 @@ export function cvcReviewEligible(progress: Progress): boolean {
   return true
 }
 
+/**
+ * Return true iff the next forward session for `node` should carry the
+ * graduation check's probe words (ticket 86c9m3aec), so the engine can
+ * verify the learner's decoding generalises beyond the practised words.
+ *
+ * Check fold-in (Dave 2026-10-25 (1), (3)): the check is due from the
+ * learner's first forward session on the step until an attempt passes,
+ * with no good-day precondition, so it rides the plant sessions instead of
+ * coming after a full row. All must hold:
+ *   1. `node` is in `WORD_SONG_GRADUATION_GATED_NODES`.
+ *   2. `node` is being worked on: `'intro'` (her first session on it) or
+ *      `'practicing'`. A `'mastered'` node has promoted; a `'locked'` one
+ *      is not reached yet.
+ *   3. No attempt has passed (`graduationGateClears`); with auto-promote
+ *      off a passed step waits in the parent's queue with no more probes.
+ *   4. Not the 1 plain session after a failed attempt: a failed decided
+ *      entry is not the node's latest entry. Forward entries are counted
+ *      raw, not deduped by day; reviews write no history, so they neither
+ *      count nor break an attempt.
+ *
+ * Pure read of `progress`; does not mutate. Safe to call at session-
+ * start (after `loadProgress()`) or at session-end before
+ * `recordProgressOnSessionEnd` runs.
+ */
 export function isGraduationSessionPending(
   progress: Progress,
   node: SkillNode,
   track: MasteryTrack,
 ): boolean {
-  if (!isGraduationGated(node)) return false
-  if (progress.skillLevels[node] !== 'practicing') return false
-
-  const settings = getSettings(progress)
-  const threshold = settings.masteryThreshold[track]
-
+  if (!isGraduationGated(node) || trackOf(node) !== track) return false
+  const level = progress.skillLevels[node]
+  if (level !== 'intro' && level !== 'practicing') return false
+  if (graduationGateClears(progress.history, node)) return false
   const focused = progress.history.filter((entry) =>
     entry.skillFocus.includes(node),
   )
-  // The good days must be banked (any order — ticket 123jpnbc3dm), or
-  // the step fast-tracked (2 secure days, fast-track spec P6) ...
-  if (
-    !hasEnoughGoodDays(
-      focused,
-      threshold,
-      settings,
-      progress.goodDays?.[node],
-      fastTrackSecureDays(progress, node),
-    )
-  ) {
-    return false
-  }
-
-  const filtered = settings.crossDayEnforcement
-    ? dedupeByCalendarDay(focused)
-    : focused
-  // ... and none of the last `threshold.sessions` sessions may already
-  // be tagged with a novelPoolSuccessRate: a previous graduation
-  // (passing or failing) blocks an immediate re-attempt until that many
-  // fresh sessions have pushed it out.
-  const window = filtered.slice(-threshold.sessions)
-  return window.every((entry) => entry.novelPoolSuccessRate === undefined)
+  // A failed attempt as her latest session: this one is the plain practice
+  // session between the attempt and the retake.
+  return focused[focused.length - 1]?.novelPoolSuccessRate === undefined
 }

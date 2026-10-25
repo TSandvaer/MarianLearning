@@ -199,10 +199,11 @@ export interface RecordProgressInput {
    * BEFORE recording the new entry.
    *
    * When supplied AND both counts are positive:
-   *  - The recorded entry's `successRate` becomes
-   *    `canonicalCorrect / canonicalCount` (canonical-pool only) so
-   *    the existing 90/3 rule continues to gate on canonical accuracy
-   *    per PR #127.
+   *  - The recorded entry's `successRate` becomes the practised words
+   *    on the 8-problem scale, `(8 - (canonicalCount - canonicalCorrect))
+   *    / 8` (check fold-in, Dave 2026-10-25 (2)), so the good-day rule
+   *    gates on the practised words only, with the same misses allowed
+   *    as on a plain session.
    *  - The recorded entry gains a `novelPoolSuccessRate` field equal
    *    to `novelCorrect / novelCount`, which the mastery engine reads
    *    as the second gate at `NOVEL_POOL_THRESHOLD`.
@@ -626,11 +627,17 @@ function buildEntry(
     }
   }
 
+  // The flower reads the practised words only, on the 8-problem scale
+  // (check fold-in, Dave 2026-10-25 (2)): a probe session needs the same
+  // practised misses as a plain one, and a probe never counts for or
+  // against it. Every `successRate >= percent` site reads it unchanged.
   const split = graduationSplit
+  const practisedMisses = split.canonicalCount - split.canonicalCorrect
   return {
     dateISO: input.dateISO,
     skillFocus: [input.focusNode],
-    successRate: split.canonicalCorrect / split.canonicalCount,
+    successRate:
+      (PROBLEMS_PER_SESSION - practisedMisses) / PROBLEMS_PER_SESSION,
     ...novelPoolFields(split, existing, input.focusNode),
     ...(latencyClone !== undefined ? { latencyMs: latencyClone } : {}),
     ...(mathFactsClone !== undefined ? { mathFacts: mathFactsClone } : {}),

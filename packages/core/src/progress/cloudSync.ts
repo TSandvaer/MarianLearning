@@ -53,6 +53,7 @@ import { mergeUnlocksCelebrated } from './pathBeats'
 import {
   saveProgress,
   withDefaultedSkillLevels,
+  withKeptFullRows,
   withKnownPendingPromotion,
   withRetiredLegacyThresholds,
 } from './storage'
@@ -728,17 +729,18 @@ export function installCloudBlob(
       : unionGoodDays(withUnlocks.secureDays, localSecureDays)
   // `mergeUnlocksCelebrated` is the add-only union of two step lists.
   const paceHold = mergeUnlocksCelebrated(withUnlocks.paceHold, localPaceHold)
-  if (
-    secureDays === withUnlocks.secureDays &&
-    paceHold === withUnlocks.paceHold
-  ) {
-    return withUnlocks
-  }
-  return {
-    ...withUnlocks,
-    ...(secureDays !== undefined ? { secureDays } : {}),
-    ...(paceHold !== undefined ? { paceHold } : {}),
-  }
+  const withFastTrack: Progress =
+    secureDays === withUnlocks.secureDays && paceHold === withUnlocks.paceHold
+      ? withUnlocks
+      : {
+          ...withUnlocks,
+          ...(secureDays !== undefined ? { secureDays } : {}),
+          ...(paceHold !== undefined ? { paceHold } : {}),
+        }
+  // Mirror of `storage.ts:withKeptFullRows` (check fold-in migration
+  // marker): a cloud blob from a build before the fold-in gets the marker
+  // from the merged doc, exactly as a local load would.
+  return withKeptFullRows(withFastTrack)
 }
 
 /**

@@ -15,6 +15,7 @@ import { LETTER_SOUNDS_VOWELS, defaultLockedSkillLevels } from './defaults'
 import { isKnownSkillNode, isProgressV1, readSchemaVersion } from './guards'
 import { inferLifetimeFirstEncountersFromProgress } from './lifetimeFirstEncounters'
 import { LITERACY_TREE, MATH_TREE, recordGoodDays } from './mastery'
+import { keptFullRowsOf } from './nodeProgress'
 import { migrate } from './migrate'
 import { getSettings, retireLegacyMasteryThreshold } from './parentSettings'
 import type {
@@ -78,11 +79,13 @@ export function loadProgress(): Progress | null {
     // blob is fine but whose presence is preferred by downstream
     // consumers (the planner-side gate doesn't have to short-circuit
     // a missing list when the field is always set after load).
-    return withSeededGoodDays(
-      withDefaultedCvcGraduationSessionFired(
-        withDefaultedLifetimeFirstEncounters(
-          withDefaultedSettings(
-            withRetiredLegacyThresholds(withKnownPendingPromotion(defaulted)),
+    return withKeptFullRows(
+      withSeededGoodDays(
+        withDefaultedCvcGraduationSessionFired(
+          withDefaultedLifetimeFirstEncounters(
+            withDefaultedSettings(
+              withRetiredLegacyThresholds(withKnownPendingPromotion(defaulted)),
+            ),
           ),
         ),
       ),
@@ -92,11 +95,13 @@ export function loadProgress(): Progress | null {
   // Different version (older or newer) — route through migrate.
   const migrated = migrate(parsed)
   if (migrated === null) return null
-  return withSeededGoodDays(
-    withDefaultedCvcGraduationSessionFired(
-      withDefaultedLifetimeFirstEncounters(
-        withDefaultedSettings(
-          withRetiredLegacyThresholds(withKnownPendingPromotion(migrated)),
+  return withKeptFullRows(
+    withSeededGoodDays(
+      withDefaultedCvcGraduationSessionFired(
+        withDefaultedLifetimeFirstEncounters(
+          withDefaultedSettings(
+            withRetiredLegacyThresholds(withKnownPendingPromotion(migrated)),
+          ),
         ),
       ),
     ),
@@ -542,6 +547,20 @@ export function withRetiredLegacyThresholds(p: Progress): Progress {
 function withSeededGoodDays(p: Progress): Progress {
   if (p.goodDays !== undefined) return p
   return { ...p, goodDays: { ...recordGoodDays(p) } }
+}
+
+/**
+ * The check fold-in's migration marker (Dave 2026-10-25 (4b),
+ * `Progress.keptFullRows`): on the first load by this build, the gated
+ * rows already shown full with the check not passed, so they stay full.
+ * Runs last: it reads the settings and good days the defaulters above
+ * fill. A doc that carries the field (any value, including `[]`) passes
+ * through untouched, so the marker is stored once with the next save and
+ * never re-derived. Mirrored by `cloudSync.ts:installCloudBlob`.
+ */
+export function withKeptFullRows(p: Progress): Progress {
+  if (p.keptFullRows !== undefined) return p
+  return { ...p, keptFullRows: keptFullRowsOf(p) }
 }
 
 /**

@@ -305,7 +305,9 @@ export interface WordSongProps {
   /**
    * QA only (debug + `EXPO_PUBLIC_QA_AUTOTAP_MS`): answer this long after
    * the chips open. Problem 1 gets three wrong answers (re-prompt, blend or
-   * hint, the answer), problem 2 one, the rest the right one.
+   * hint, the answer), problem 3 one, the rest the right one. Not problem
+   * 2: it is a cat-words check probe (problems 2/5/7), and a wrong first
+   * tap there would fail every check attempt.
    */
   qaAutoAnswerAfterMs?: number
   /** Test seam: the silent caption walk used without a player. */
@@ -1763,9 +1765,10 @@ export function WordSong({
     if (qaAutoAnswerAfterMs === undefined) return
     if (!readAloudPlayed || problemState.resolved || answerClip) return
     const target = plan.problems[problemIndex]!.target.word
-    // The scored problems' first two, as before; warm-ups answered right.
+    // Scored problems 1 and 3 (problem 2 is a check probe); warm-ups
+    // answered right.
     const scored = problemIndex - warmups
-    const wanted = scored === 0 ? 3 : scored === 1 ? 1 : 0
+    const wanted = scored === 0 ? 3 : scored === 2 ? 1 : 0
     const wrong = round.chips.find((e) => e.word !== target)?.word
     const word =
       problemState.wrongCount < wanted && wrong !== undefined ? wrong : target

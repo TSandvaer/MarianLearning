@@ -80,7 +80,7 @@ interface SessionHistoryEntry {
 }
 ```
 
-For non-graduation sessions, `successRate = correct / 8` over the full 8-problem pool. For graduation sessions (cvc-words generalization probe per ticket 86c9m3aec), `successRate = canonicalCorrect / canonicalCount` over only the canonical-pool slice (5–6 of 8 problems), and `novelPoolSuccessRate = novelCorrect / novelCount` over the 2–3 novel-probe slice. The two pools are evaluated as independent gates by the mastery rule.
+For non-graduation sessions, `successRate = correct / 8` over the full 8-problem pool. For graduation sessions (cvc-words generalization probe per ticket 86c9m3aec), `successRate = (8 - practised misses) / 8` over the practised slice on the 8 scale (check fold-in 2026-10-25; older entries hold `canonicalCorrect / canonicalCount`), and `novelPoolSuccessRate = novelCorrect / novelCount` over the probe slice. The two pools are evaluated as independent gates by the mastery rule.
 
 `latencyMs` is the per-problem first-tap latency in milliseconds. Detailed capture mechanics + caveats live below at § "Latency capture (M4 — diagnostic, no consumer yet)".
 
@@ -464,18 +464,17 @@ If `pendingPromotion` is set AND `autoPromote === true` on entry, the rule appli
 
 ### Graduation gate (cvc-words generalization probe)
 
-[`mastery.ts:73`](MarianLearning/packages/core/src/progress/mastery.ts#L73). Graduation-gated nodes are listed in `WORD_SONG_GRADUATION_GATED_NODES` — only `cvc-words` today. For these nodes, the standard 90/3 rule is **necessary but not sufficient**: the most recent qualifying entry must additionally carry `novelPoolSuccessRate >= NOVEL_POOL_THRESHOLD` (`0.8`, [`mastery.ts:92`](MarianLearning/packages/core/src/progress/mastery.ts#L92)).
+Graduation-gated nodes are listed in `WORD_SONG_GRADUATION_GATED_NODES` (`mastery.ts`) — only `cvc-words` today. For these nodes the good-day rule is **necessary but not sufficient**: the check must also have passed — the latest decided entry (the latest with a `novelPoolSuccessRate`, raw, not deduped by day) at `>= NOVEL_POOL_THRESHOLD` (`0.8`; the two-session reserve check is 6 probes at 5 of 6). The pass never expires and need not be on the last or a good session (`graduationGateClears`).
 
-Per Dave's developmental review (`design/research/cvc-words-developmental-review.md` § P1.2), a 90/3 mastery threshold over a fixed 8-word canonical pool can reflect item familiarity rather than decoding ability. The novel-pool gate verifies that Marian generalises her decoding to 2–3 novel short-a words she has not seen in the canonical pool.
+Per Dave's developmental review (`design/research/cvc-words-developmental-review.md` § P1.2), a threshold over a fixed canonical pool can reflect item familiarity rather than decoding ability; the probe words verify generalisation.
 
-`isGraduationSessionPending(progress, node, track)` ([`mastery.ts:528`](MarianLearning/packages/core/src/progress/mastery.ts#L528)) is the predicate the planner reads at session-start to decide whether to mix novel-probe words into the 8-problem set (web only; on native the app reads it itself and swaps in the bundled probe words, no planner involved, see `planner-and-canon.md` § Graduation-session bypass). All four conditions must hold:
+**Check fold-in (Dave 2026-10-25; Thomas, build 22: a full row still needed 2 more sessions).** The check rides the plant sessions:
 
-1. `node` is in `WORD_SONG_GRADUATION_GATED_NODES`.
-2. `node` is currently at `'practicing'`.
-3. The last `threshold.sessions` qualifying entries (cross-day-deduped) all hit `successRate >= threshold.percent`.
-4. NONE of those tail entries already carries a `novelPoolSuccessRate` — i.e., graduation hasn't happened yet, or the previous attempt's novel-tagged entry has aged out.
-
-Rule (4) is the "engine waits for canonical 90/3 to reset" guarantee from the AC. After a failed graduation (novel < 80%), the failed entry sits at the tail of the qualifying window with `novelPoolSuccessRate` set — the predicate returns false, so the next session is a regular cvc-words session. Only after `threshold.sessions` fresh non-graduation sessions push the failed entry out of the tail does the predicate flip true again.
+- `isGraduationSessionPending(progress, node, track)` is true from the learner's FIRST forward session on the step (`'intro'` or `'practicing'`, no good-day precondition) until an attempt passes, except the 1 plain session after a failed attempt (a failed decided entry as the node's latest entry). Reviews write no history, so they neither count nor break an attempt. Web: the planner reads it at session start; native: the app swaps in the bundled probe words (`planner-and-canon.md` § Graduation-session bypass).
+- A probe session's `successRate` is the practised words on the 8 scale, `(8 - practised misses) / 8` (`progressHistory.ts`), so the flower needs the same misses as a plain session and probes never count for or against it.
+- `nodeProgress().goodDays` is the SHOWN count: `mastered ? N : passed ? min(good, N) : min(good, N - 1)`. The held last flower is `flowerHeld`; `awaitingNovelWordCheck` (map nearly-there, Hub "One more flower") = shown N-1 and not passed. A full row on a practicing gated step means only autoPromote off with a pass, or a row kept by the migration marker.
+- Migration marker `Progress.keptFullRows` (`storage.ts:withKeptFullRows`, mirrored in `cloudSync.ts:installCloudBlob`): stored once on the first load by a fold-in build — gated rows already full with the check not passed stay full. Never re-derive it: a derived rule would shrink the row after a failed check. Fresh docs carry `[]`.
+- Session End: a gated row one flower short (not passed) or full, with no new flower, is the practice day (`not-yet.praise` only). Hub: `HubCardModel.earnedToday` (good day banked: review trigger, `canEarnToday`) is split from `flowerSleeping` (a SHOWN flower sleeps: slots, sleeping lines); a held good day never sleeps.
 
 **`WORD_SONG_GRADUATION_GATED_NODES` is intentionally `{ 'cvc-words' }` only — new sibling vowel tiers must NOT be added.** The graduation gate exists because `cvc-words` (short-a) is the _first_ CVC tier, and the novel-pool probe verifies that Marian has acquired a generalised decoding skill rather than item familiarity with the 14 canonical words. Subsequent vowel tiers (`cvc-words-short-o`, `cvc-words-short-u`, `cvc-words-short-i`, `cvc-words-short-e`) build on a generalised decoder that the `cvc-words` gate already established — they are vocabulary-extension nodes, not decoding-acquisition gates. Adding them to `WORD_SONG_GRADUATION_GATED_NODES` would impose a novel-pool graduation on tier transitions that have no novel-probe pool, no developmental justification, and no planner support. The set stays at `{ 'cvc-words' }` unless Dave's developmental review explicitly prescribes a new gate. Canon-wire PRs for new sibling tiers must NOT add the new node to this set. Verified 2026-05-13 during PR #206 (Jessica's failing-first short-e E2E spec) — adding short-e to the gated set would flip the spec from RED to GREEN for the wrong reason, silently reversing the safety net.
 
@@ -806,7 +805,7 @@ interface GraduationSessionSplit {
 
 Caller decides whether to supply this by reading `isGraduationSessionPending(loadProgress(), focusNode, track)` BEFORE recording the new entry. When supplied AND both counts are positive:
 
-- Recorded entry's `successRate = canonicalCorrect / canonicalCount`
+- Recorded entry's `successRate = (8 - (canonicalCount - canonicalCorrect)) / 8` (check fold-in: the practised words on the 8 scale)
 - Recorded entry gains `novelPoolSuccessRate = novelCorrect / novelCount`
 
 When omitted or one count is 0: legacy `totalCorrect / 8` shape, no `novelPoolSuccessRate`. The defensive zero-handling protects against an upstream bug computing a 0-count slice — better to under-promote than feed garbage into the mastery rule.

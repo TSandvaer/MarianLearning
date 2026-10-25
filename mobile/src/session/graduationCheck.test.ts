@@ -321,7 +321,7 @@ it('all correct: the novel-pool score is 1, cvc-words is mastered and short-o is
   expect(pickFocusNode(after, 'word-song').node).toBe('cvc-words-short-o')
 })
 
-it('a missed check (novel < 0.8) does not master, and the re-check waits three sessions', async () => {
+it('a missed check (novel < 0.8) does not master, and the re-check waits one plain session (check fold-in (3))', async () => {
   saveProgress(dueLearner())
   const first = startWordSong(todaysCheck)
   const words = endSession(
@@ -335,14 +335,12 @@ it('a missed check (novel < 0.8) does not master, and the re-check waits three s
   expect(after.history.at(-1)!.novelPoolSuccessRate).toBeCloseTo(2 / 3)
   expect(after.skillLevels['cvc-words']).toBe('practicing')
 
-  // Three plain sessions push the miss out of the window.
-  for (let i = 0; i < 3; i++) {
-    expect(todaysCheck().isGraduationSession).toBe(false)
-    const s = startWordSong(todaysCheck)
-    const plain = endSession(await s.settle(), s.session, () => true, false)
-    expect(plain).toEqual(CANON_WORDS)
-    expect(s.loadProbeAudio).not.toHaveBeenCalled()
-  }
+  // One plain session after a failed attempt.
+  expect(todaysCheck().isGraduationSession).toBe(false)
+  const s = startWordSong(todaysCheck)
+  const plain = endSession(await s.settle(), s.session, () => true, false)
+  expect(plain).toEqual(CANON_WORDS)
+  expect(s.loadProbeAudio).not.toHaveBeenCalled()
   after = loadProgress()!
   expect(after.skillLevels['cvc-words']).toBe('practicing')
 
@@ -356,7 +354,15 @@ it('a missed check (novel < 0.8) does not master, and the re-check waits three s
 })
 
 it('with no check due, the session is the one today ships: same requests, plain canon round', async () => {
-  saveProgress(dueLearner(2))
+  // The plain session after a failed attempt (check fold-in (3)).
+  const learner = dueLearner(2)
+  saveProgress({
+    ...learner,
+    history: [
+      ...learner.history,
+      { ...cvcEntry(10), novelPoolSuccessRate: 0.5 },
+    ],
+  })
   const hints = readWordSongProgressHints()
   expect(hints.isGraduationSession).toBe(false)
   const lifetimeFirstEncounters = [
@@ -513,7 +519,7 @@ describe('the probe reserve on the device (Dave 2026-10-24)', () => {
     expect(after.seenItems?.['word:cab']?.check).toBe('missed')
   })
 
-  it('4 of 6 holds her; after the cooldown the retake is 2 fresh words, then words she read right', async () => {
+  it('4 of 6 holds her; after the 1 plain session the retake is 2 fresh words, then words she read right', async () => {
     saveProgress(dueLearner())
     const miss = new Set(['map', 'nap'])
     for (const minute of [15, 40]) {
@@ -524,12 +530,11 @@ describe('the probe reserve on the device (Dave 2026-10-24)', () => {
     const after = loadProgress()!
     expect(after.history.at(-1)!.novelPoolSuccessRate).toBeCloseTo(4 / 6)
     expect(after.skillLevels['cvc-words']).toBe('practicing')
-    for (let i = 0; i < 3; i++) {
-      expect(readWordSongProgressHints().isGraduationSession).toBe(false)
-      const s = startWordSong()
-      clockNow = new Date(`2026-10-24T1${i}:00:00`)
-      endSession(await s.settle(), s.session, () => true)
-    }
+    // The 1 plain session after a failed attempt (check fold-in (3)).
+    expect(readWordSongProgressHints().isGraduationSession).toBe(false)
+    const s = startWordSong()
+    clockNow = new Date('2026-10-24T10:00:00')
+    endSession(await s.settle(), s.session, () => true)
     expect(readWordSongProgressHints().probeWords).toEqual([
       'ram',
       'pad',
@@ -542,8 +547,10 @@ describe('Session End after the check (build 21: a pass read as the not-yet day)
   const ids = (r: ReturnType<typeof playSession>['result']) =>
     r.guidance.lines.map((l) => l.id)
   const FULL = ['grown', 'grown', 'grown']
+  // Three good days banked, the 3rd held for the check (check fold-in (4)).
+  const HELD = ['grown', 'grown', 'empty']
 
-  it('one-session check: a pass shows the unlock day over the full tray', async () => {
+  it('one-session check: a pass lands the held flower on the unlock day', async () => {
     saveProgress(dueLearner())
     const { settle, session } = startWordSong(todaysCheck)
     const snap = await settle()
@@ -552,10 +559,15 @@ describe('Session End after the check (build 21: a pass read as the not-yet day)
     expect(loadProgress()!.skillLevels['cvc-words']).toBe('mastered')
     expect(result.beat.kind).toBe('unlock')
     expect(result.guidance.day).toBe('unlock')
-    expect(result.guidance.slotsBefore).toEqual(FULL)
+    expect(result.guidance.slotsBefore).toEqual(HELD)
     expect(result.guidance.slotsAfter).toEqual(FULL)
-    expect(result.guidance.newSlot).toBeNull()
-    expect(ids(result)).toEqual(['guide.end.right.8', 'guide.end.path-opens'])
+    expect(result.guidance.newSlot).toBe(2)
+    expect(ids(result)).toEqual([
+      'guide.end.right.8',
+      'guide.end.flower',
+      'guide.end.count.3',
+      'guide.end.path-opens',
+    ])
   })
 
   it('reserve check half 1: the practice ending, never "Play again…"', async () => {
@@ -570,7 +582,7 @@ describe('Session End after the check (build 21: a pass read as the not-yet day)
     expect(loadProgress()!.history.at(-1)!.novelPoolPart).toBeDefined()
     expect(loadProgress()!.skillLevels['cvc-words']).toBe('practicing')
     expect(result.guidance.day).toBe('practice')
-    expect(result.guidance.slotsAfter).toEqual(FULL)
+    expect(result.guidance.slotsAfter).toEqual(HELD)
     expect(result.guidance.newSlot).toBeNull()
     expect(result.guidance.countText).toBeNull()
     expect(ids(result)).toEqual(['guide.end.not-yet.praise'])
@@ -604,13 +616,13 @@ describe('Session End after the check (build 21: a pass read as the not-yet day)
     ).result
     for (const result of [failed, after]) {
       expect(result.guidance.day).toBe('practice')
-      expect(result.guidance.slotsAfter).toEqual(FULL)
+      expect(result.guidance.slotsAfter).toEqual(HELD)
       expect(result.guidance.newSlot).toBeNull()
       expect(ids(result)).toEqual(['guide.end.not-yet.praise'])
     }
   })
 
-  it('reserve check: the second half’s pass shows the unlock day, not practice', async () => {
+  it('reserve check: the second half’s pass lands the held flower on the unlock day, not practice', async () => {
     saveProgress(dueLearner())
     const first = startWordSong()
     clockNow = new Date('2026-10-24T09:15:00')
@@ -626,7 +638,12 @@ describe('Session End after the check (build 21: a pass read as the not-yet day)
     expect(loadProgress()!.skillLevels['cvc-words']).toBe('mastered')
     expect(result.guidance.day).toBe('unlock')
     expect(result.guidance.slotsAfter).toEqual(FULL)
-    expect(result.guidance.newSlot).toBeNull()
-    expect(ids(result)).toEqual(['guide.end.right.7', 'guide.end.path-opens'])
+    expect(result.guidance.newSlot).toBe(2)
+    expect(ids(result)).toEqual([
+      'guide.end.right.7',
+      'guide.end.flower',
+      'guide.end.count.3',
+      'guide.end.path-opens',
+    ])
   })
 })

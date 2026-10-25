@@ -121,3 +121,92 @@ describe('planHubVisit', () => {
     expect(v.wake.wakeWorlds).toEqual(['math'])
   })
 })
+
+describe('planHubVisit — cat words with its check folded in (Dave 2026-10-25 (5))', () => {
+  /** Number Garden on number-recog, Word Song on cat words (0.875 / 3, separate days on). */
+  function catWords(
+    cvc: SessionHistoryEntry[],
+    ng: SessionHistoryEntry[] = [],
+    over: Partial<Progress> = {},
+  ): Progress {
+    const p = withHistory([...ng, ...cvc])
+    return {
+      ...p,
+      skillLevels: {
+        ...p.skillLevels,
+        'letter-names': 'mastered',
+        'letter-sounds': 'mastered',
+        'blending-cv': 'mastered',
+        'sounding-out': 'mastered',
+        'cvc-words': 'practicing',
+      },
+      ...over,
+    }
+  }
+  const planFor = (progress: Progress, seenWake = {}) =>
+    planHubVisit({
+      progress,
+      history: emptySessionHistory(),
+      now: NOW,
+      seenWake,
+      suppressed: false,
+    })
+
+  it('2 of 3 shown, check not passed: "One more flower…" in place of the grow line', () => {
+    const v = planFor(
+      catWords([entry(8, 'cvc-words'), entry(9, 'cvc-words')]),
+      {
+        'word-song': MAY(9),
+      },
+    )
+    expect(v.suggestion).toBe('word-song')
+    expect(v.wordSong.slots).toEqual(['grown', 'grown', 'empty'])
+    expect(v.lines).toEqual(['guide.one-more'])
+  })
+
+  it('after a wake-up: the wake line, then "One more flower…"', () => {
+    const v = planFor(catWords([entry(8, 'cvc-words'), entry(9, 'cvc-words')]))
+    expect(v.lines).toEqual(['guide.hub.woke.one', 'guide.one-more'])
+  })
+
+  it('a held good day today and Number Garden asleep: no line (nothing sleeps in Word Song)', () => {
+    const v = planFor(
+      catWords(
+        [entry(7, 'cvc-words'), entry(8, 'cvc-words'), entry(10, 'cvc-words')],
+        [entry(10, 'number-recog')],
+      ),
+      { math: MAY(10), 'word-song': MAY(8) },
+    )
+    expect(v.wordSong.slots).toEqual(['grown', 'grown', 'empty'])
+    expect(v.numberGarden.slots).toEqual(['sleeping', 'empty', 'empty'])
+    expect(v.suggestion).toBeNull()
+    expect(v.lines).toEqual([])
+  })
+
+  it('a held good day today and Number Garden can grow: "Let’s grow a flower in Number Garden!"', () => {
+    const v = planFor(
+      catWords([
+        entry(7, 'cvc-words'),
+        entry(8, 'cvc-words'),
+        entry(10, 'cvc-words'),
+      ]),
+      { 'word-song': MAY(8) },
+    )
+    expect(v.suggestion).toBe('number-garden')
+    expect(v.lines).toEqual(['guide.grow.number-garden'])
+  })
+
+  it('a row the migration kept full: no Word Song line', () => {
+    const v = planFor(
+      catWords(
+        [entry(7, 'cvc-words'), entry(8, 'cvc-words'), entry(9, 'cvc-words')],
+        [],
+        { keptFullRows: ['cvc-words'] },
+      ),
+      { 'word-song': MAY(9) },
+    )
+    expect(v.wordSong.slots).toEqual(['grown', 'grown', 'grown'])
+    expect(v.suggestion).toBe('word-song')
+    expect(v.lines).toEqual([])
+  })
+})

@@ -97,6 +97,9 @@ describe('morning wake-up — which clip the Hub requests', () => {
     slots: ['grown', 'empty', 'empty'],
     slotDays: ['2026-05-02', null, null],
     earnedToday: false,
+    flowerSleeping: false,
+    oneMore: false,
+    keptFullRow: false,
     flowersToUnlock: 2,
     complete: false,
   })

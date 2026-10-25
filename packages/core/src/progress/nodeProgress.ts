@@ -11,6 +11,12 @@
  * as `applyMasteryRule` counts them, floored by the fast track's secure
  * days (native spec `design/native/fast-track-native.md` § 3.4: a
  * fast-tracked step not yet mastered reports `goodDays === requiredDays`).
+ *
+ * Check fold-in (Dave 2026-10-25 (4)): a graduation-gated step SHOWS
+ * `mastered ? N : passed ? min(good, N) : min(good, N - 1)`, so its row
+ * holds the last flower until the check passes and a full row always means
+ * the step opens. A row the migration marker kept full
+ * (`Progress.keptFullRows`) shows as before.
  */
 
 import { LETTER_SOUNDS_VOWELS } from './defaults'
@@ -22,6 +28,7 @@ import {
   nextNode,
   perVowelTrackingActive,
   trackOf,
+  WORD_SONG_GRADUATION_GATED_NODES,
 } from './mastery'
 import { getSettings } from './parentSettings'
 import type {
@@ -42,19 +49,27 @@ export interface VowelProgress {
 export interface NodeProgress {
   level: SkillLevel
   /**
-   * Good days banked toward mastery under the current rule, 0..requiredDays.
-   * A mastered step reports `requiredDays`. For `letter-sounds` while
-   * per-vowel tracking is active this is the sum over the four vowels.
+   * Good days SHOWN toward mastery under the current rule, 0..requiredDays:
+   * the banked ones, less a flower held for the graduation check
+   * (`flowerHeld`). A mastered step reports `requiredDays`. For
+   * `letter-sounds` while per-vowel tracking is active this is the sum
+   * over the four vowels.
    */
   goodDays: number
+  /**
+   * Graduation-gated steps: a banked good day the row does not show,
+   * because the check has not passed (its last flower is held).
+   */
+  flowerHeld: boolean
   requiredDays: number
   /** successRate of the most recent session on this step, or null. */
   lastSuccessRate: number | null
   /** The step this one unlocks when mastered, or null for a tree's last step. */
   unlocksNext: SkillNode | null
   /**
-   * Graduation-gated steps (cvc-words): the good days are all banked but
-   * the novel-word check (novelPoolSuccessRate >= 0.8) has not cleared yet.
+   * Graduation-gated steps (cvc-words): the row shows all but its last
+   * flower and the check has not passed, so one more flower opens the
+   * path (the map's nearly-there stop, the Hub's "One more flower").
    */
   awaitingNovelWordCheck: boolean
   /** Per-vowel sub-steps; present only for `letter-sounds` while per-vowel tracking is active. */
@@ -113,6 +128,7 @@ export function nodeProgress(
       level,
       goodDays: vowels.reduce((sum, v) => sum + v.goodDays, 0),
       requiredDays: threshold.sessions * vowels.length,
+      flowerHeld: false,
       lastSuccessRate,
       unlocksNext,
       awaitingNovelWordCheck: false,
@@ -120,32 +136,62 @@ export function nodeProgress(
     }
   }
 
-  const bankedDays = goodDayCount(
-    focused,
-    threshold,
-    settings,
-    progress.goodDays?.[node],
-    fastTrackSecureDays(progress, node),
-  )
+  const bankedDays = bankedGoodDays(progress, node)
+  // The check's hold (fold-in (4)): a gated step being worked on whose
+  // check has not passed shows at most N - 1 flowers.
+  const holdsLast =
+    (level === 'intro' || level === 'practicing') &&
+    isGraduationGated(node) &&
+    !graduationGateClears(progress.history, node) &&
+    !(progress.keptFullRows ?? []).includes(node)
+  const shownMax = holdsLast ? threshold.sessions - 1 : threshold.sessions
   const goodDays =
     level === 'mastered'
       ? threshold.sessions
       : level === 'locked'
         ? 0
-        : Math.min(threshold.sessions, bankedDays)
-
-  const awaitingNovelWordCheck =
-    level === 'practicing' &&
-    isGraduationGated(node) &&
-    bankedDays >= threshold.sessions &&
-    !graduationGateClears(progress.history, node, threshold, settings)
+        : Math.min(shownMax, bankedDays)
 
   return {
     level,
     goodDays,
+    flowerHeld: holdsLast && bankedDays > shownMax,
     requiredDays: threshold.sessions,
     lastSuccessRate,
     unlocksNext,
-    awaitingNovelWordCheck,
+    awaitingNovelWordCheck: holdsLast && goodDays === shownMax,
   }
+}
+
+/** `node`'s good days as the mastery rule counts them (uncapped). */
+function bankedGoodDays(progress: Progress, node: SkillNode): number {
+  const track = trackOf(node)!
+  const settings = getSettings(progress)
+  return goodDayCount(
+    progress.history.filter((entry) => entry.skillFocus.includes(node)),
+    settings.masteryThreshold[track],
+    settings,
+    progress.goodDays?.[node],
+    fastTrackSecureDays(progress, node),
+  )
+}
+
+/**
+ * The migration marker's value for a doc this build has not loaded yet
+ * (`Progress.keptFullRows`, Dave 2026-10-25 (4b)): the graduation-gated
+ * steps being worked on whose row the build before the fold-in showed full
+ * (good days >= N) with the check not passed. Their row stays full: never
+ * take a flower from a child.
+ */
+export function keptFullRowsOf(progress: Progress): SkillNode[] {
+  return WORD_SONG_GRADUATION_GATED_NODES.filter((node) => {
+    const level = progress.skillLevels[node]
+    if (level !== 'intro' && level !== 'practicing') return false
+    const required =
+      getSettings(progress).masteryThreshold[trackOf(node)!].sessions
+    return (
+      bankedGoodDays(progress, node) >= required &&
+      !graduationGateClears(progress.history, node)
+    )
+  })
 }

@@ -103,17 +103,18 @@ describe('AC7 the fast-track Tuesday', () => {
     ])
   })
 
-  it('cvc-words before its check: good-day, full row, nothing sleeps', () => {
+  it('cvc-words with its check not passed: the last flower is held, no bonus, the row never fills (check fold-in (4))', () => {
     saveProgress(progressAtStep('cvc-words'))
     end('cvc-words', 12, ALL)
     const g = end('cvc-words', 13, ALL)
     expect(g.day).toBe('good-day')
-    expect(g.bonusSlots).toEqual([2])
-    expect(g.slotsAfter).toEqual(['grown', 'grown', 'grown'])
+    expect(g.bonusSlots).toEqual([])
+    expect(g.slotsAfter).toEqual(['grown', 'sleeping', 'empty'])
     expect(ids(g)).toEqual([
       'guide.end.right.8',
-      'guide.end.fast-track',
-      'guide.end.count.3',
+      'guide.end.flower',
+      'guide.end.count.2',
+      'guide.end.sleeps',
     ])
   })
 

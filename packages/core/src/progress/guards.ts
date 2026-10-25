@@ -549,6 +549,13 @@ export function isProgressV1(v: unknown): v is Progress {
     if (!Array.isArray(v.paceHold)) return false
     if (!v.paceHold.every((n) => typeof n === 'string')) return false
   }
+  // keptFullRows is optional (check fold-in migration marker, Dave
+  // 2026-10-25 (4b); additive, no schemaVersion bump): an array of strings.
+  // A name that is not a gated step is inert, as for paceHold.
+  if ('keptFullRows' in v && v.keptFullRows !== undefined) {
+    if (!Array.isArray(v.keptFullRows)) return false
+    if (!v.keptFullRows.every((n) => typeof n === 'string')) return false
+  }
   // unlocksCelebrated is optional (Emma's Path 9/10 — ticket 123jpnbc3dt;
   // additive, no schemaVersion bump). When present it must be an array of
   // strings. A name that is not a current step is inert (`pathBeats.ts`

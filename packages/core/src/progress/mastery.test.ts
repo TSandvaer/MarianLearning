@@ -1145,11 +1145,11 @@ describe('applyMasteryRule — cumulative good days (ticket 123jpnbc3dm)', () =>
 // review.md` § P1.2), the standard 90/3 rule on the canonical 8-word
 // pool can reflect item familiarity rather than decoding skill.
 // `cvc-words` joins `WORD_SONG_GRADUATION_GATED_NODES`: promotion
-// requires (a) the canonical 90/3 to clear AND (b) the most recent
-// qualifying entry to carry a `novelPoolSuccessRate >= 0.80`. The
-// detection helper `isGraduationSessionPending` flags the next
-// session for novel-word probe insertion when the canonical window
-// is full but the gate hasn't fired yet.
+// requires (a) its good days AND (b) a passed check, the latest decided
+// entry carrying `novelPoolSuccessRate >= 0.80`. Since the check fold-in
+// (Dave 2026-10-25) `isGraduationSessionPending` flags every forward
+// session from her first one on the step until an attempt passes, except
+// the 1 plain session after a failed attempt.
 
 describe('WORD_SONG_GRADUATION_GATED_NODES + NOVEL_POOL_THRESHOLD constants', () => {
   it('cvc-words is the only graduation-gated node in v1', () => {
@@ -1186,20 +1186,28 @@ describe('isGraduationSessionPending — cvc-words detector (ticket 86c9m3aec)',
     )
   })
 
-  it('returns false when the node is at intro (default seed level)', () => {
-    // cvc-words starts at 'intro' in defaultProgress(); a graduation
-    // gate cannot fire until the node has reached 'practicing'.
+  it('returns true at intro: her first session on the step carries the check (fold-in (1))', () => {
+    // cvc-words is 'intro' until her first session on it ends; the check
+    // rides that session already.
     const progress = buildProgress({
       skillLevels: levels({ 'cvc-words': 'intro' }),
-      history: [
-        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0),
-        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 1.0),
-        entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0),
-      ],
+      history: [],
     })
     expect(isGraduationSessionPending(progress, 'cvc-words', 'word-song')).toBe(
-      false,
+      true,
     )
+  })
+
+  it('returns false on a locked or mastered step', () => {
+    for (const level of ['locked', 'mastered'] as const) {
+      const progress = buildProgress({
+        skillLevels: levels({ 'cvc-words': level }),
+        history: [],
+      })
+      expect(
+        isGraduationSessionPending(progress, 'cvc-words', 'word-song'),
+      ).toBe(false)
+    }
   })
 
   it('returns false for a non-graduation-gated node (blending-cv)', () => {
@@ -1220,9 +1228,7 @@ describe('isGraduationSessionPending — cvc-words detector (ticket 86c9m3aec)',
     ).toBe(false)
   })
 
-  it('returns false with only 2 cross-day qualifying entries', () => {
-    // Need exactly threshold.sessions cross-day entries for the
-    // canonical window to be full. Two days short → no graduation.
+  it('returns true with fewer good days than the row needs: no good-day precondition (fold-in (1))', () => {
     const progress = buildProgress({
       skillLevels: levels({ 'cvc-words': 'practicing' }),
       history: [
@@ -1231,11 +1237,11 @@ describe('isGraduationSessionPending — cvc-words detector (ticket 86c9m3aec)',
       ],
     })
     expect(isGraduationSessionPending(progress, 'cvc-words', 'word-song')).toBe(
-      false,
+      true,
     )
   })
 
-  it('returns false when one of the last 3 entries dipped below threshold', () => {
+  it('returns true after a weak session too', () => {
     const progress = buildProgress({
       skillLevels: levels({ 'cvc-words': 'practicing' }),
       history: [
@@ -1245,16 +1251,14 @@ describe('isGraduationSessionPending — cvc-words detector (ticket 86c9m3aec)',
       ],
     })
     expect(isGraduationSessionPending(progress, 'cvc-words', 'word-song')).toBe(
-      false,
+      true,
     )
   })
 
-  it('returns false when the most recent qualifying entry already carries novelPoolSuccessRate (post-graduation cooldown)', () => {
-    // After a previous graduation attempt (passing or failing) the
-    // tail entry has novelPoolSuccessRate set. Per the AC, the engine
-    // "waits for the canonical 90/3 condition to reset" — meaning we
-    // need fresh non-graduation sessions to push the tagged entry out
-    // of the tail window before another graduation fires.
+  it('returns false for the 1 plain session after a failed attempt (fold-in (3))', () => {
+    // A failed attempt as her latest session: the next forward session
+    // is plain practice, so the retake does not measure what Emma just
+    // told her.
     const progress = buildProgress({
       skillLevels: levels({ 'cvc-words': 'practicing' }),
       history: [
@@ -1269,17 +1273,12 @@ describe('isGraduationSessionPending — cvc-words detector (ticket 86c9m3aec)',
     )
   })
 
-  it('returns true again after the cooldown — 3 fresh non-graduation sessions push the tagged entry out of the tail window', () => {
-    // Same scenario as the cooldown test, plus 3 new non-graduation
-    // sessions. The graduation-tagged entry is now older than the
-    // tail-3 window; the engine reflags graduation.
+  it('returns true again after that 1 plain session, the same day too: the retake (fold-in (3))', () => {
     const progress = buildProgress({
       skillLevels: levels({ 'cvc-words': 'practicing' }),
       history: [
         graduationEntry('2026-04-28T10:00:00.000Z', 'cvc-words', 1.0, 0.5),
-        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0),
-        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 1.0),
-        entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-04-28T11:00:00.000Z', 'cvc-words', 1.0),
       ],
     })
     expect(isGraduationSessionPending(progress, 'cvc-words', 'word-song')).toBe(
@@ -1343,7 +1342,7 @@ describe('applyMasteryRule — graduation gate on cvc-words (ticket 86c9m3aec)',
     expect(result.skillLevels['cvc-words-short-o']).toBe('intro')
   })
 
-  it('a graduation session that scored below 7/8 canonically does not clear the gate', () => {
+  it('a passed check on a weak session still masters with the good days banked: the held flower lands (fold-in (2))', () => {
     const progress: Progress = {
       ...buildProgress({
         skillLevels: levels({ 'cvc-words': 'practicing' }),
@@ -1353,9 +1352,20 @@ describe('applyMasteryRule — graduation gate on cvc-words (ticket 86c9m3aec)',
       }),
       goodDays: { 'cvc-words': ['2026-04-01', '2026-04-02', '2026-04-03'] },
     }
-    expect(applyMasteryRule(progress).skillLevels['cvc-words']).toBe(
-      'practicing',
-    )
+    expect(applyMasteryRule(progress).skillLevels['cvc-words']).toBe('mastered')
+  })
+
+  it('a pass never expires: plain sessions after it bank the good days and master', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history: [
+        graduationEntry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0, 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 0.5),
+        entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-02T10:00:00.000Z', 'cvc-words', 1.0),
+      ],
+    })
+    expect(applyMasteryRule(progress).skillLevels['cvc-words']).toBe('mastered')
   })
 
   it('does NOT promote cvc-words after 3 canonical sessions at 100% (graduation pending)', () => {
