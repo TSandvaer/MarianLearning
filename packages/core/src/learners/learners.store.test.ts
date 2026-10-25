@@ -15,6 +15,7 @@ import {
   setCloudSyncAuthSecretSource,
   setCloudSyncSuccessListener,
 } from '../progress/cloudSync'
+import { HUNT_STORAGE_KEY } from '../games/critterHunt'
 import { DEVICE_ID_STORAGE_KEY, readStoredDeviceId } from '../progress/deviceId'
 import { landsOf } from '../progress/lands'
 import { LAST_SYNC_STORAGE_KEY } from '../progress/lastSync'
@@ -100,7 +101,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('the 7 per-learner keys (§ 4.2)', () => {
+describe('the 8 per-learner keys (§ 4.2, critters-word-hunt.md § 1)', () => {
   it('are the modules’ own keys', () => {
     expect([...LEARNER_KEYS]).toEqual([
       STORAGE_KEY,
@@ -110,6 +111,7 @@ describe('the 7 per-learner keys (§ 4.2)', () => {
       FLOWER_WAKE_STORAGE_KEY,
       DEVICE_ID_STORAGE_KEY,
       LAST_SYNC_STORAGE_KEY,
+      HUNT_STORAGE_KEY,
     ])
   })
 })

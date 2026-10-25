@@ -22,7 +22,8 @@
       "gum",
       "hot",
       "pad",
-      "sun"
+      "sun",
+      "hug"
     ]
   },
   {
@@ -52,7 +53,8 @@
       "pan",
       "ram",
       "sun",
-      "van"
+      "van",
+      "sad"
     ]
   },
   {
@@ -525,7 +527,9 @@
       "tag",
       "top",
       "tub",
-      "van"
+      "van",
+      "sad",
+      "hug"
     ]
   },
   {
@@ -802,7 +806,8 @@
       "mom",
       "mop",
       "pop",
-      "rock"
+      "rock",
+      "mud"
     ]
   },
   {
@@ -930,7 +935,8 @@
       "tooth",
       "tray",
       "van",
-      "web"
+      "web",
+      "mug"
     ]
   },
   {
@@ -961,7 +967,8 @@
       "nut",
       "rug",
       "sun",
-      "tub"
+      "tub",
+      "mug"
     ]
   },
   {
@@ -1197,7 +1204,8 @@
       "sock",
       "star",
       "tub",
-      "van"
+      "van",
+      "sad"
     ]
   },
   {
@@ -1725,7 +1733,8 @@
       "rope",
       "rug",
       "sack",
-      "sock"
+      "sock",
+      "mud"
     ]
   },
   {
@@ -1942,7 +1951,7 @@
       "a puddle on a road",
       "a fountain or a bucket"
     ],
-    "distinctFrom": ["cup", "hand", "hat", "hen", "pot"]
+    "distinctFrom": ["cup", "hand", "hat", "hen", "pot", "mud"]
   },
   {
     "word": "desk",
@@ -2731,5 +2740,63 @@
       "a pen or pencil"
     ],
     "distinctFrom": ["dad", "dog", "pan", "sun"]
+  },
+  {
+    "word": "mug",
+    "tier": "short-u",
+    "batch": 19,
+    "subject": "One big, tall cream-white mug in three-quarter view, chunky and heavy with thick walls and a large loop handle on the right, painted with big sky-blue polka dots, full to the top with brown hot cocoa and one soft curl of steam rising from it.",
+    "avoid": [
+      "a small empty rose-pink cup, like the cup",
+      "a spout, like a jug",
+      "a saucer or a dainty teacup",
+      "a glass or a bottle",
+      "a drink can",
+      "letters, a face or a logo on the side"
+    ],
+    "distinctFrom": ["cup", "jug"]
+  },
+  {
+    "word": "sad",
+    "tier": "short-a",
+    "batch": 19,
+    "subject": "A small child's head and shoulders seen from the front, with a clearly sad face: eyebrows tilted up in the middle, eyes looking down, a small downturned mouth and one light-blue teardrop on the cheek; short dark-brown hair and a sky-blue T-shirt.",
+    "avoid": [
+      "a smile or a laugh",
+      "an angry face with a deep frown and red cheeks",
+      "a crying baby with a wide-open mouth",
+      "a round yellow emoji face or a sun with a face",
+      "a grown-up man or woman",
+      "a whole body, a scene, a heart or text"
+    ],
+    "distinctFrom": ["man", "mom", "sun"]
+  },
+  {
+    "word": "mud",
+    "tier": "short-u",
+    "batch": 19,
+    "subject": "One wide, flat puddle of thick, glossy dark-brown mud seen a little from above, with a few round brown splashes flying up from the middle and a couple of small mud blobs around its edge.",
+    "avoid": [
+      "a heap, a coil or a swirl of brown",
+      "chocolate, a cake or a pudding",
+      "clear or blue water, like a pond",
+      "a grey rock or a wooden log",
+      "a pig, a boot or any animal or person"
+    ],
+    "distinctFrom": ["log", "pond", "rock"]
+  },
+  {
+    "word": "hug",
+    "tier": "short-u",
+    "batch": 19,
+    "subject": "Two small children hugging, seen from the front: their arms wrapped round each other, cheeks together, eyes closed and smiling; one has short dark-brown hair and a soft-yellow T-shirt, the other has a black ponytail and a sky-blue T-shirt.",
+    "avoid": [
+      "a grown-up and a child holding hands, like mom or dad",
+      "a kiss",
+      "a baby being carried",
+      "wrestling or a fight",
+      "a heart, text or a background scene"
+    ],
+    "distinctFrom": ["dad", "mom"]
   }
 ]

@@ -14,6 +14,8 @@ import {
   CRITTER_PICTURE_WORDS,
   CRITTER_REAL_WORDS,
   CRITTER_SAID_PICTURE_WORDS,
+  critterHasPicture,
+  critterPictureKey,
   CRITTER_SAID_WORDS,
   CRITTER_SOUND_SOURCE,
   CRITTER_WORDS_BY_STEP,
@@ -540,51 +542,62 @@ lob log lot low mob mom mop nod not now pod pop pot rob rod rot row sob son ton 
 bud bug bum bun bus but cub cum cup cut dud dug fun fur gum gun gut hub hug huh hum hut jug jut lug
 mud mug mum nun nut pub pug pun pup pus put rub rug rum run rut sub sum sun tub tug
 all and are ass bee eat egg one out pee poo see she the too two wee
+owl own old arm art ash who flu act add ant elf end ill its odd off
 `
   .trim()
   .split(/\s+/)
+
+/** Dave's word hunt ruling (2026-10-25, § 6): his 17 text-only words, owl among them. */
+const NEW_17 =
+  'owl own old arm art ash who flu act add ant elf end ill its odd off'.split(
+    ' ',
+  )
 
 /** A consonant, a vowel and a consonant: § 3.1's CVC words. */
 const isCvc = (w: string) =>
   !VOWELS.has(w[0]!) && VOWELS.has(w[1]!) && !VOWELS.has(w[2]!)
 
 describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
-  it('C10: is exactly § 3.1’s 265 words (Dave 2026-10-25)', () => {
+  it('C10: is exactly § 3.1’s 282 words (Dave 2026-10-25; the word hunt ruling’s 17)', () => {
     expect([...CRITTER_REAL_WORDS].sort()).toEqual(
       [...PRINTED_REAL_WORDS].sort(),
     )
-    expect(CRITTER_REAL_WORDS.size).toBe(265)
+    expect(CRITTER_REAL_WORDS.size).toBe(282)
     const perVowel: Record<string, number> = {}
     for (const w of [...CRITTER_REAL_WORDS].filter(isCvc))
       perVowel[w[1]!] = (perVowel[w[1]!] ?? 0) + 1
     expect(perVowel).toEqual({ a: 71, e: 32, i: 50, o: 49, u: 46 })
   })
 
-  it('C10 (Dave 2026-10-25): each is 3 letters from the 22 critter letters; 248 CVC words and 17 others', () => {
+  it('C10 (Dave 2026-10-25): each is 3 letters from the 22 critter letters; 248 CVC words and 34 others', () => {
     for (const w of CRITTER_REAL_WORDS) {
       expect(w).toMatch(/^[a-z]{3}$/)
       for (const l of w) expect(CRITTER_LETTERS).toContain(l)
     }
     expect([...CRITTER_REAL_WORDS].filter(isCvc)).toHaveLength(248)
-    expect([...CRITTER_REAL_WORDS].filter((w) => !isCvc(w)).sort()).toEqual([
-      'all',
-      'and',
-      'are',
-      'ass',
-      'bee',
-      'eat',
-      'egg',
-      'one',
-      'out',
-      'pee',
-      'poo',
-      'see',
-      'she',
-      'the',
-      'too',
-      'two',
-      'wee',
-    ])
+    expect([...CRITTER_REAL_WORDS].filter((w) => !isCvc(w)).sort()).toEqual(
+      [
+        'all',
+        'and',
+        'are',
+        'ass',
+        'bee',
+        'eat',
+        'egg',
+        'one',
+        'out',
+        'pee',
+        'poo',
+        'see',
+        'she',
+        'the',
+        'too',
+        'two',
+        'wee',
+        // Dave's word hunt ruling (2026-10-25, § 6).
+        ...NEW_17,
+      ].sort(),
+    )
   })
 
   it('C10: holds all 45 picture words and gem', () => {
@@ -657,10 +670,12 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
         'too',
         'out',
         'eat',
+        // Dave's word hunt ruling (2026-10-25, § 6): owl and 16 more.
+        ...NEW_17,
       ].sort(),
     )
     expect(CRITTER_NEVER_SAY.size).toBe(14)
-    expect(CRITTER_NOT_SAID.size).toBe(43)
+    expect(CRITTER_NOT_SAID.size).toBe(60)
     for (const w of [...CRITTER_NEVER_SAY, ...CRITTER_NOT_SAID]) {
       expect(CRITTER_REAL_WORDS.has(w)).toBe(true)
       expect(ALL_45).not.toContain(w)
@@ -684,8 +699,8 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
         )
         .sort(),
     )
-    // 265 = 45 pictures + 14 never said + 43 not said + 163 said.
-    expect(45 + CRITTER_NEVER_SAY.size + CRITTER_NOT_SAID.size + 163).toBe(265)
+    // 282 = 45 pictures + 14 never said + 60 not said + 163 said.
+    expect(45 + CRITTER_NEVER_SAY.size + CRITTER_NOT_SAID.size + 163).toBe(282)
     for (const w of ['map', 'cab', 'ham', 'sat', 'hop', 'six', 'win'])
       expect(CRITTER_SAID_WORDS).toContain(w)
     // Dave 2026-10-25: the seven new said words; mum stays said.
@@ -696,13 +711,13 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     ).toEqual([])
   })
 
-  it('C10 (Thomas 2026-10-23, build 20): CRITTER_SAID_PICTURE_WORDS is exactly the said words with a bundled pack picture: 16, sorted', () => {
+  it('C10 (Thomas 2026-10-23, build 20): CRITTER_SAID_PICTURE_WORDS is exactly the said words with a bundled pack picture: 17, sorted', () => {
     const bundled = bundledPictures()
     // The registry read works: every picture word's picture is found.
     for (const w of ALL_45) expect(bundled.has(w)).toBe(true)
     // The probe reserve's pictured said words pop like rat (Thomas
     // 2026-10-24): cab, ham, pad and ram; and mom, rag and egg (Dave
-    // 2026-10-25).
+    // 2026-10-25); and mum, with mom's picture (the word hunt ruling, § 6).
     expect(CRITTER_SAID_PICTURE_WORDS).toEqual([
       'bun',
       'cab',
@@ -712,6 +727,7 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
       'hut',
       'map',
       'mom',
+      'mum',
       'nap',
       'pad',
       'pop',
@@ -723,8 +739,15 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     ])
     expect(CRITTER_SAID_WORDS).toContain('rag')
     expect(CRITTER_SAID_PICTURE_WORDS).toEqual(
-      CRITTER_SAID_WORDS.filter((w) => bundled.has(w)),
+      CRITTER_SAID_WORDS.filter((w) => bundled.has(critterPictureKey(w))),
     )
+    expect(critterPictureKey('mum')).toBe('mom')
+    expect(critterPictureKey('mom')).toBe('mom')
+    for (const w of CRITTER_SAID_PICTURE_WORDS) {
+      expect(critterHasPicture(w)).toBe(true)
+    }
+    for (const w of ALL_45) expect(critterHasPicture(w)).toBe(true)
+    expect(critterHasPicture('fun')).toBe(false)
     for (const w of CRITTER_SAID_PICTURE_WORDS)
       expect(critterRun(w)).toBe('word')
   })

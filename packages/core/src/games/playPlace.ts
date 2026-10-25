@@ -6,7 +6,8 @@
  * A game is open when its `opensAt` step is current or mastered in that
  * step's world, the flower bed's rule (`miniGames.ts` `openGames`). Nothing
  * here is persisted: no `Progress` field, no storage key, no migration, and
- * no Leitner or history read. The games count toward nothing.
+ * no Leitner or history read. The games count toward nothing. The
+ * critters' word hunt keeps its round, toy state only, in `critterHunt.ts`.
  *
  * Runtime code never imports canon JSON (K4): the critters' words are
  * pinned here, and `playPlace.test.ts` checks them against the canon.
@@ -31,7 +32,10 @@ const worldOf = (node: SkillNode): MasteryTrack =>
   (MATH_TREE as readonly SkillNode[]).includes(node) ? 'math' : 'word-song'
 
 /** `node` is mastered, or its world's current step. */
-function currentOrMastered(progress: Progress, node: SkillNode): boolean {
+export function currentOrMastered(
+  progress: Progress,
+  node: SkillNode,
+): boolean {
   return (
     progress.skillLevels[node] === 'mastered' ||
     currentStepOf(progress, worldOf(node)) === node
@@ -259,6 +263,9 @@ export const CRITTER_REAL_WORDS: ReadonlySet<string> = new Set(
     'mud mug mum nun nut pub pug pun pup pus put rub rug rum run rut sub sum sun tub tug',
     // The other 3-letter words (Dave 2026-10-25).
     'all and are ass bee eat egg one out pee poo see she the too two wee',
+    // Dave's word hunt ruling (2026-10-25, § 6): owl, and the words a
+    // child knows that his dictionary sweep found tumbling. Text only.
+    'owl own old arm art ash who flu act add ant elf end ill its odd off',
   ]
     .join(' ')
     .split(' '),
@@ -295,7 +302,8 @@ export const CRITTER_NEVER_SAY: ReadonlySet<string> = new Set([
  * vowel (car, for, bar, far, jar, her, sir, fur; cow, how, now, wow, bow,
  * row, low; saw, paw, jaw, raw; new, few; ton; huh) and eleven of the
  * other 3-letter words (the, see, she, bee, are, all, two, one, too, out,
- * eat). They sing their sounds and sit.
+ * eat). They sing their sounds and sit. Since Dave's word hunt ruling
+ * (2026-10-25, § 6) also his 17 text-only words, _owl_ among them.
  */
 export const CRITTER_NOT_SAID: ReadonlySet<string> = new Set([
   'gem',
@@ -343,13 +351,35 @@ export const CRITTER_NOT_SAID: ReadonlySet<string> = new Set([
   'too',
   'out',
   'eat',
+  // Dave's word hunt ruling (2026-10-25, § 6): owl (o-w sings /ɒ/ /w/,
+  // as cow), seven words the sounds don't spell (own, old, arm, art, ash,
+  // who, flu) and nine they do (act, add, ant, elf, end, ill, its, odd,
+  // off), quiet until the four-letter phase gives them clips. No hunt
+  // round deals letters that spell one (`critterHunt.ts`).
+  'owl',
+  'own',
+  'old',
+  'arm',
+  'art',
+  'ash',
+  'who',
+  'flu',
+  'act',
+  'add',
+  'ant',
+  'elf',
+  'end',
+  'ill',
+  'its',
+  'odd',
+  'off',
 ])
 
 /**
  * The words Emma says after the critters sing them, sorted: every real word
  * that is not a picture word, not on `CRITTER_NEVER_SAY` and not on
  * `CRITTER_NOT_SAID`. Each has a whole-word Lily clip
- * (`critterWordLine(word)` in `emmasPath/guidanceLines.ts`); the 16 on
+ * (`critterWordLine(word)` in `emmasPath/guidanceLines.ts`); the 17 on
  * `CRITTER_SAID_PICTURE_WORDS` also have a pack picture.
  */
 export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
@@ -367,8 +397,9 @@ export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
  * 2026-10-23, build 20: "No picture for 'rat'"). The probe reserve's
  * pictured said words (cab, ham, pad, ram) pop by the same rule (Thomas
  * 2026-10-24), and so do _mom_ (Word Song teaches it), _rag_ and _egg_
- * (Dave 2026-10-25). Pinned here, since core never reads the app's
- * registry; `playPlace.test.ts` checks them against it.
+ * (Dave 2026-10-25), and _mum_, with mom's picture (Dave's word hunt
+ * ruling, 2026-10-25, § 6). Pinned here, since core never reads the
+ * app's registry; `playPlace.test.ts` checks them against it.
  */
 export const CRITTER_SAID_PICTURE_WORDS: readonly string[] = [
   'bun',
@@ -379,6 +410,7 @@ export const CRITTER_SAID_PICTURE_WORDS: readonly string[] = [
   'hut',
   'map',
   'mom',
+  'mum',
   'nap',
   'pad',
   'pop',
@@ -388,6 +420,18 @@ export const CRITTER_SAID_PICTURE_WORDS: readonly string[] = [
   'tap',
   'top',
 ]
+
+/** A word whose pack picture is another word's (Dave 2026-10-25, § 6). */
+const CRITTER_PICTURE_ALIAS: Readonly<Record<string, string>> = { mum: 'mom' }
+
+/** The pack picture key a critter word shows (`mum` shows `mom`). */
+export const critterPictureKey = (word: string): string =>
+  CRITTER_PICTURE_ALIAS[word] ?? word
+
+/** A picture word, or a said word with a bundled pack picture. */
+export const critterHasPicture = (word: string): boolean =>
+  CRITTER_PICTURE_WORDS.includes(word) ||
+  CRITTER_SAID_PICTURE_WORDS.includes(word)
 
 /**
  * What a 3-letter run does: `'picture'` pops its clip and picture, `'word'`

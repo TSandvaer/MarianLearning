@@ -3,9 +3,9 @@
  * §§ 4.2, 4.4, 4.5).
  *
  * The learner in the legacy slot (learner 1, today's child) keeps today's
- * 7 keys; every other learner has the same keys with a `:<id>` suffix. The
- * scoped store rewrites those 7 keys and passes every other key (the list
- * itself included) through, so the 7 modules that own them work unchanged.
+ * 8 keys; every other learner has the same keys with a `:<id>` suffix. The
+ * scoped store rewrites those 8 keys and passes every other key (the list
+ * itself included) through, so the 8 modules that own them work unchanged.
  *
  * It is also where a learner's doc is stamped with its carrier: every
  * write of a learner's progress key carries that learner's sync ID,
@@ -21,7 +21,10 @@ import { getOrCreateDeviceId } from '../progress/deviceId'
 import { listedLearner } from './state'
 import type { LearnerEntry } from './types'
 
-/** Today's 7 per-child keys (§ 4.2), owned by their modules. */
+/**
+ * Today's 8 per-child keys (§ 4.2), owned by their modules: the 7 of § 4.2
+ * and Letter critters' word hunt round (critters-word-hunt.md § 1).
+ */
 export const LEARNER_KEYS = [
   'marian-tutor:progress:v1', // progress/storage.ts STORAGE_KEY
   'marian-tutor.session-history.v1', // sessionEnd/sessionHistory.ts
@@ -30,6 +33,7 @@ export const LEARNER_KEYS = [
   'hub-flower-wake.v1', // hub/hubGuidance.ts
   'marian-tutor:device-id', // progress/deviceId.ts: the sync ID
   'marian-tutor:last-sync', // progress/lastSync.ts
+  'marian-tutor.critter-hunt.v1', // games/critterHunt.ts HUNT_STORAGE_KEY
 ] as const
 
 const PROGRESS_KEY = LEARNER_KEYS[0]
@@ -49,7 +53,7 @@ export function rawOf(store: KeyValueStore): KeyValueStore {
   return RAW_OF.get(store) ?? store
 }
 
-/** `entry`'s 7 keys over `raw`; every other key passes through. */
+/** `entry`'s 8 keys over `raw`; every other key passes through. */
 export function learnerScopedStore(
   raw: KeyValueStore,
   entry: LearnerEntry,
