@@ -175,8 +175,11 @@ function startWordSong(readHints?: WordSongSessionDeps['readHints']) {
   return { session, calls, main, probe, loadProbeAudio, settle }
 }
 
-/** Play the settled round: `correct(word)` gives each scored first tap. */
-function endSession(
+/**
+ * Play the settled round: `correct(word)` gives each scored first tap.
+ * Returns the scored words and what Session End shows.
+ */
+function playSession(
   snap: ReturnType<ReturnType<typeof startWordSong>['session']['getSnapshot']>,
   session: ReturnType<typeof startWordSong>['session'],
   correct: (word: string) => boolean,
@@ -185,7 +188,7 @@ function endSession(
   const scored = snap.plan!.problems.slice(snap.warmupCount)
   const targetWords = scored.map((p) => p.target.word)
   const perProblemCorrect = targetWords.map(correct)
-  writeSessionEnd(
+  const result = writeSessionEnd(
     {
       totalCorrect: perProblemCorrect.filter(Boolean).length,
       totalStardust: 0,
@@ -200,8 +203,12 @@ function endSession(
     { clock, ...(reserveCheck !== undefined ? { reserveCheck } : {}) },
   )
   session.tearDown()
-  return targetWords
+  return { targetWords, result }
 }
+
+/** {@link playSession}, keeping only the scored words. */
+const endSession = (...args: Parameters<typeof playSession>) =>
+  playSession(...args).targetWords
 
 beforeEach(() => {
   const map = new Map<string, string>()
@@ -529,4 +536,45 @@ describe('the probe reserve on the device (Dave 2026-10-24)', () => {
       'rat',
     ])
   }, 15_000)
+})
+
+describe('Session End after the check (build 21: a pass read as the not-yet day)', () => {
+  const ids = (r: ReturnType<typeof playSession>['result']) =>
+    r.guidance.lines.map((l) => l.id)
+  const FULL = ['grown', 'grown', 'grown']
+
+  it('one-session check: a pass shows the unlock day over the full tray', async () => {
+    saveProgress(dueLearner())
+    const { settle, session } = startWordSong(todaysCheck)
+    const snap = await settle()
+    clockNow = new Date('2026-10-24T09:15:00')
+    const { result } = playSession(snap, session, () => true, false)
+    expect(loadProgress()!.skillLevels['cvc-words']).toBe('mastered')
+    expect(result.beat.kind).toBe('unlock')
+    expect(result.guidance.day).toBe('unlock')
+    expect(result.guidance.slotsBefore).toEqual(FULL)
+    expect(result.guidance.slotsAfter).toEqual(FULL)
+    expect(result.guidance.newSlot).toBeNull()
+    expect(ids(result)).toEqual(['guide.end.right.8', 'guide.end.path-opens'])
+  })
+
+  it('reserve check: the second half’s pass shows the unlock day, not practice', async () => {
+    saveProgress(dueLearner())
+    const first = startWordSong()
+    clockNow = new Date('2026-10-24T09:15:00')
+    playSession(await first.settle(), first.session, () => true)
+    expect(loadProgress()!.skillLevels['cvc-words']).toBe('practicing')
+    const second = startWordSong()
+    clockNow = new Date('2026-10-24T09:40:00')
+    const { result } = playSession(
+      await second.settle(),
+      second.session,
+      (w) => w !== 'cab',
+    )
+    expect(loadProgress()!.skillLevels['cvc-words']).toBe('mastered')
+    expect(result.guidance.day).toBe('unlock')
+    expect(result.guidance.slotsAfter).toEqual(FULL)
+    expect(result.guidance.newSlot).toBeNull()
+    expect(ids(result)).toEqual(['guide.end.right.7', 'guide.end.path-opens'])
+  })
 })

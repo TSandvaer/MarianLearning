@@ -271,8 +271,41 @@ export function sessionEndGuidance(
     }
   }
 
-  // No new flower: already grown, or today's flower already earned.
+  // No new flower: the row was already full, already grown, or today's
+  // flower already earned.
   const mastered = input.before.skillLevels[input.node] === 'mastered'
+
+  // The step grew with its row already full: the graduation check passed
+  // (build 21 bug: this read as the not-yet day). No flower flies; the
+  // tray stays full and Emma says what opened.
+  if (
+    !mastered &&
+    (input.beat.kind === 'unlock' ||
+      input.after.skillLevels[input.node] === 'mastered')
+  ) {
+    const day: EndDay =
+      input.beat.kind !== 'unlock' && nextNode(world, input.node) === null
+        ? 'world-done'
+        : 'unlock'
+    const slots = tray(row.required, row.now, null)
+    return {
+      ...base,
+      day,
+      slotsBefore: slots,
+      slotsAfter: slots,
+      newSlot: null,
+      bonusSlots: [],
+      countText: null,
+      lines: [
+        praiseFor(input.totalCorrect),
+        line(
+          day === 'unlock' ? 'guide.end.path-opens' : 'guide.end.world-done',
+          'next',
+        )!,
+      ],
+    }
+  }
+
   const earnedToday = !mastered && earnedTodayBefore(input, world, row)
   const praise = line('guide.end.not-yet.praise', 'praise')!
   if (mastered || earnedToday) {
