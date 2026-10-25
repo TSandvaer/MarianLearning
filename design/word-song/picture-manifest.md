@@ -6,20 +6,20 @@ Every Word Song picture is redrawn in one style. Thomas moved the pack from Midj
 
 ## What the file holds
 
-A JSON array of 127 objects, in generation order:
+A JSON array of 131 objects, in generation order:
 
 | Field          | Meaning                                                                                                                                                                                                                                                                                     |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `word`         | The picture key and file stem (`hen` → `mobile/assets/pictures/hen.webp`).                                                                                                                                                                                                                  |
 | `tier`         | `short-a`, `short-o`, `short-u`, `short-i`, `short-e` (by the word's vowel in `wordPack.ts`), or the wave step: `duck-words`, `crab-words` (wave 1), `tent-words`, `cake-words` (wave 2), `bee-words`, `car-words` (wave 4), `snail-words`, `moon-words` (wave 5). `ship` is `digraphs-sh`. |
-| `batch`        | 1–14 and 18 (table below).                                                                                                                                                                                                                                                                  |
+| `batch`        | 1–14, 18 and 19 (table below).                                                                                                                                                                                                                                                              |
 | `subject`      | One sentence: the object, its pose or view, and its colours. No style words.                                                                                                                                                                                                                |
 | `avoid`        | What this picture must not look like: its look-alikes, plus the drifts the old prompt sheets recorded for this word.                                                                                                                                                                        |
 | `distinctFrom` | Every pack word it shares a picture trio with or forms a `FORBIDDEN_PAIRS` entry with. Forbidden partners come first, then trio mates A–Z. The relation is symmetric: if `a` lists `b`, then `b` lists `a`.                                                                                 |
 
 ## Sources
 
-- **`word` (122).** The 57 keys come from `ls mobile/assets/pictures` (2026-10-16). The 16 wave-1 words come from `BIG_WORDS_STEPS` in `packages/core/src/wordSong/bigWordsSteps.ts` on PR #575 (`devon/ws-wave-1`), which matches [`content-wave-1.md`](../native/content-wave-1.md) § 3.2, § 4.2 and § 8. The 16 wave-2 words (tent and cake words) and their entries are [`content-wave-2.md`](../native/content-wave-2.md) § 7, verbatim, with § 7's symmetry edits to their partners. The 17 wave-4 words (the bee and car words, and _ship_) and their entries are [`content-wave-4.md`](../native/content-wave-4.md) § 9.1, verbatim, with § 9.1's symmetry edits to their partners. The 16 wave-5 words (the snail and moon words) and their entries are [`content-wave-5.md`](../native/content-wave-5.md) § 10.1, verbatim, with § 10.1's symmetry edits to their partners. The 5 probe-reserve words (ham, cab, rag, ram, pad: Dave's ruling of 2026-10-24, `design/research/no-claude-variety-2026-10-23.md` § 2.4) are batch 18, written for the reserve PR, with their symmetry edits and rat's new forbidden partners (cat, bat).
+- **`word` (122).** The 57 keys come from `ls mobile/assets/pictures` (2026-10-16). The 16 wave-1 words come from `BIG_WORDS_STEPS` in `packages/core/src/wordSong/bigWordsSteps.ts` on PR #575 (`devon/ws-wave-1`), which matches [`content-wave-1.md`](../native/content-wave-1.md) § 3.2, § 4.2 and § 8. The 16 wave-2 words (tent and cake words) and their entries are [`content-wave-2.md`](../native/content-wave-2.md) § 7, verbatim, with § 7's symmetry edits to their partners. The 17 wave-4 words (the bee and car words, and _ship_) and their entries are [`content-wave-4.md`](../native/content-wave-4.md) § 9.1, verbatim, with § 9.1's symmetry edits to their partners. The 16 wave-5 words (the snail and moon words) and their entries are [`content-wave-5.md`](../native/content-wave-5.md) § 10.1, verbatim, with § 10.1's symmetry edits to their partners. The 5 probe-reserve words (ham, cab, rag, ram, pad: Dave's ruling of 2026-10-24, `design/research/no-claude-variety-2026-10-23.md` § 2.4) are batch 18, written for the reserve PR, with their symmetry edits and rat's new forbidden partners (cat, bat). The 4 word hunt words (mug, sad, mud, hug: Dave's ruling of 2026-10-25, `design/research/critters-word-hunt-2026-10-25.md` § 6) are batch 19, written for the hunt's build PR, with their look-alikes as `distinctFrom` and the symmetric edits to those partners (cup, jug, man, mom, sun, log, pond, rock, dad).
 - **`subject` and `avoid`.** Each word's recognition cue and negatives come from its prompt sheet:
   - short-a, plus the old distractors bus, sun, dog, fox, cup, pen, log and pot: [`picture-pack-prompts.md`](./picture-pack-prompts.md) § 1–§ 2
   - nap, rat, map, tap: [`probe-word-picture-pack.md`](./probe-word-picture-pack.md) § 1 and § 3
@@ -42,7 +42,7 @@ A JSON array of 127 objects, in generation order:
 
 ## Batches
 
-Fifteen batches, by tier, with the wave steps last. Within a batch, the riskiest words come first. "Risky" means one of three things: a thin shape that can vanish at 96 pt or in background removal, a forbidden or look-alike pair, or a subject that failed or drifted in the Midjourney rounds.
+Sixteen batches, by tier, with the wave steps last. Within a batch, the riskiest words come first. "Risky" means one of three things: a thin shape that can vanish at 96 pt or in background removal, a forbidden or look-alike pair, or a subject that failed or drifted in the Midjourney rounds.
 
 | Batch | Tier                   | Count | Order                                         |
 | ----- | ---------------------- | ----- | --------------------------------------------- |
@@ -61,8 +61,9 @@ Fifteen batches, by tier, with the wave steps last. Within a batch, the riskiest
 | 13    | snail-words            | 8     | train goat loaf chain tray snail coat boat    |
 | 14    | moon-words             | 8     | roof hoop stool tooth moon broom boot spoon   |
 | 18    | short-a                | 5     | ham cab rag ram pad                           |
+| 19    | short-u, short-a       | 4     | mug sad mud hug                               |
 
-Short-a is split so that each look-alike group lands in the same batch and can be reviewed side by side: man/dad, cap/hat, map/mat, and rat/cat/bat in batch 1. Batches 7 and 8 keep `content-wave-1.md` § 8's risk order, batches 9 and 10 keep `content-wave-2.md` § 7's (riskiest first), batches 11 and 12 keep `content-wave-4.md` § 9.1's, and batches 13 and 14 keep `content-wave-5.md` § 10.1's (riskiest first). Batch 18 is the probe reserve's five new words (15–17 are the avatar, flower-bed and Play place art manifests). Thomas picked ham v1, cab v1, rag v1, ram v2 and pad v1 (2026-10-24).
+Short-a is split so that each look-alike group lands in the same batch and can be reviewed side by side: man/dad, cap/hat, map/mat, and rat/cat/bat in batch 1. Batches 7 and 8 keep `content-wave-1.md` § 8's risk order, batches 9 and 10 keep `content-wave-2.md` § 7's (riskiest first), batches 11 and 12 keep `content-wave-4.md` § 9.1's, and batches 13 and 14 keep `content-wave-5.md` § 10.1's (riskiest first). Batch 18 is the probe reserve's five new words (15–17 are the avatar, flower-bed and Play place art manifests). Thomas picked ham v1, cab v1, rag v1, ram v2 and pad v1 (2026-10-24). Batch 19 is the Letter critters word hunt's four new pictures (Dave's ruling of 2026-10-25, `design/research/critters-word-hunt-2026-10-25.md` § 6): mug must not read as cup, sad as sun or a grown-up, mud as a heap, hug as mom or dad. Thomas picked mug v1, sad v1, mud v1 and hug v1 (2026-10-25).
 
 The anchors hen, sack and wing are in the manifest so that the count is 73. If an anchor image is already the final picture, the script can skip that word.
 
@@ -89,10 +90,10 @@ These rules come from `picture-pack-style-anchor.md` § 3.7: one subject, no sce
 ## How it was checked
 
 1. The build step throws unless:
-   - the word set equals the 57 `ls` keys plus the 32 `BIG_WORDS_STEPS` words exactly, plus the 17 words of `content-wave-4.md` § 9.1 and the 16 of `content-wave-5.md` § 10.1 (73 before content wave 2, 89 after it, 106 after content wave 4, 122 after content wave 5), plus the 5 probe-reserve words (127);
+   - the word set equals the 57 `ls` keys plus the 32 `BIG_WORDS_STEPS` words exactly, plus the 17 words of `content-wave-4.md` § 9.1 and the 16 of `content-wave-5.md` § 10.1 (73 before content wave 2, 89 after it, 106 after content wave 4, 122 after content wave 5), plus the 5 probe-reserve words (127), plus the word hunt's 4 (131);
    - every 57-word `tier` matches `getWordEntry(word).vowel`.
-2. After commit, `python3 -c "json.load(...)"` parsed the file and returned 127 entries and 127 unique words, with the batch and tier counts above.
-3. Every `distinctFrom` entry is a pack word, never the word itself, and every link is symmetric (re-checked over all 89 for content wave 2, over all 106 for content wave 4, over all 122 for content wave 5, and over all 127 for the probe reserve, with every `FORBIDDEN_PAIRS` pair of two pictured words linked).
+2. After commit, `python3 -c "json.load(...)"` parsed the file and returned 131 entries and 131 unique words, with the batch and tier counts above.
+3. Every `distinctFrom` entry is a pack word, never the word itself, and every link is symmetric (re-checked over all 89 for content wave 2, over all 106 for content wave 4, over all 122 for content wave 5, over all 127 for the probe reserve, and over all 131 for the word hunt, with every `FORBIDDEN_PAIRS` pair of two pictured words linked).
 
 ## Open questions
 

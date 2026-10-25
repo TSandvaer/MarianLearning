@@ -70,7 +70,12 @@ Pinning Emma's pose at screen beats (Math/WordSong `emma-pose-beats.test.tsx`) s
 
 - **`fireEvent(el, 'responderGrant' | 'responderMove' | 'responderRelease')` does not reach a responder-based piece** (7 red raft tests from the harness alone, a throwaway debug test, ~6 extra runs). Call the props directly, each in its own `act`: `el.props.onResponderGrant({ nativeEvent: { pageX, pageY } })`. See `mobile/test/playHarness.tsx` `send()`.
 - **Never `screen.unmount()` mid-file.** Every later test's `screen` then sees an empty tree ("Unable to find …" while the component renders fine alone; cost 2 debug rounds in `PlayPlace.test` / `play.learners.test`). Split the test, or unmount the `render()` result instead.
+- **Always `await fireEvent.press(...)` (RNTL's `fireEvent` is async).** An un-awaited call leaves its `act()` open, and it leaks into the next tests ("You called act(async () => ...) without await" / "overlapping act() calls"). Every later test then renders an empty tree ("Unable to find an element with testID"), though each passes alone. This is the same symptom as `screen.unmount()` above, from a different cause, so grep for an un-awaited `fireEvent` first. To unmount mid-test, use the `unmount` that `mountGame` returns (`mobile/test/playHarness.tsx`). **Incident:** 10 tests in `LetterCritters.hunt.test.tsx` (the word hunt). **Cost:** about 6 debug rounds.
 - **A line's end is a promise, so jump the fake clock in steps.** One big `advanceTimersByTime` runs every due timer before any `.then`, which shifts each beat chained on a line's end (in PR #656, 400 ms late). The play harness's `advance()` steps 10 ms per `act`.
+
+### 1.7 Maestro flow traps (Maestro 2.11.0)
+
+- **A swipe's start and end points cannot be env values.** Maestro parses them when it loads the flow, before env substitution, so `start: ${T_X}, ${T_Y}` fails with "Parsing Failed at <subflow>.yaml:<line>" before any step runs. Write swipes literally in each device flow. Shared subflows can still take string env: `takeScreenshot: ${SHOT}-...` and `id:` values work (`mobile/maestro/subflows/critters-hunt-{open,beat,end}.yaml`). **Incident:** the first simulator run of the word hunt's flow 12. **Cost:** one wasted bundle build and launch, plus a subflow restructure.
 
 ---
 

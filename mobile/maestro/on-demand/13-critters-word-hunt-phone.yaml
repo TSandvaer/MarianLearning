@@ -1,0 +1,63 @@
+# Letter critters' word hunt on a phone in portrait: the same round as
+# 12-critters-word-hunt.yaml (the shared steps are
+# `../subflows/critters-hunt-{open,beat,end}.yaml`), for phone
+# screenshots. Run it on an iPhone 17 simulator (402 x 874, insets t62
+# b34), not the README's iPad: the points are from `huntScene` there with
+# 6 targets: slots at S4, the meadow's rows at y 667 and 731, cells at x
+# 137, 201 and 265; the seats at y 580, x 123, 201 and 279.
+#
+#   a b g  /  h p t
+#
+# Screenshots go to Maestro's output (run.sh `--debug-output`, under
+# MAESTRO_OUT/13-critters-word-hunt-phone/).
+appId: host.exp.Exponent
+name: Critters word hunt (phone portrait)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: critters-hunt
+- runFlow:
+    file: ../subflows/critters-hunt-open.yaml
+    env:
+      SHOT: hunt-phone-portrait
+# t-a-g, the completing find. The vowel has no twin: its burrow is ringed.
+- swipe:
+    start: 265, 731
+    end: 123, 580
+    duration: 800
+- swipe:
+    start: 137, 667
+    end: 201, 580
+    duration: 800
+- assertVisible:
+    id: critter-burrow-empty-a
+- swipe:
+    start: 265, 667
+    end: 279, 580
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-hunt-beat.yaml
+    env:
+      SHOT: hunt-phone-portrait
+# p-a-t, the last slot, after the beat.
+- swipe:
+    start: 201, 731
+    end: 123, 580
+    duration: 800
+- swipe:
+    start: 137, 667
+    end: 201, 580
+    duration: 800
+- swipe:
+    start: 265, 731
+    end: 279, 580
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-hunt-end.yaml
+    env:
+      SHOT: hunt-phone-portrait

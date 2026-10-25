@@ -1,0 +1,44 @@
+# Letter critters' word hunt, part 3 of 3: after p-a-t, the last slot
+# fills with no second beat; New letters deals a fresh board; Back.
+#
+#   SHOT  the screenshots' prefix
+appId: host.exp.Exponent
+---
+- extendedWaitUntil:
+    visible:
+      id: hunt-slot-5-tile-0
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: critter-seat-0
+    timeout: 20000
+- assertNotVisible:
+    id: hunt-slot-0-lap
+- assertVisible:
+    id: hunt-new-letters
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ${SHOT}-board-full
+
+# New letters: a fresh board, every slot empty.
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: hunt-new-letters
+      NEXT: critter-log-numeral
+- extendedWaitUntil:
+    notVisible:
+      id: hunt-new-letters
+    timeout: 10000
+- assertNotVisible:
+    id: hunt-slot-0-tile-0
+- assertVisible:
+    id: critter-log-numeral
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ${SHOT}-new-letters
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: play-game-back
+      NEXT: play-place

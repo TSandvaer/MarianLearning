@@ -56,6 +56,8 @@ export interface DragPieceProps {
   onAccessibilityAction?: (name: string) => void
   /** No touches at all (taps and drags). */
   disabled?: boolean
+  /** Out of VoiceOver too (the word hunt's vowel while it is out). */
+  hidden?: boolean
   /** Taps only; a drag springs home (e.g. nothing boards while away). */
   dragDisabled?: boolean
   reducedMotion: boolean
@@ -80,6 +82,7 @@ export function DragPiece({
   accessibilityActions = [],
   onAccessibilityAction,
   disabled = false,
+  hidden = false,
   dragDisabled = false,
   reducedMotion,
   onTap,
@@ -218,7 +221,9 @@ export function DragPiece({
   return (
     <Animated.View
       testID={testID}
-      accessible
+      accessible={!hidden}
+      accessibilityElementsHidden={hidden}
+      importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}

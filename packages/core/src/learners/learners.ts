@@ -6,7 +6,7 @@
  * Today's child becomes learner 1 in the legacy slot with nothing moved:
  * the migration (`ensureLearnerList`) writes one new key, the list, and
  * decides "fresh install" from the raw progress key, never from a parse
- * (X1). Every other learner's 7 keys carry a `:<id>` suffix (`./keys.ts`).
+ * (X1). Every other learner's 8 keys carry a `:<id>` suffix (`./keys.ts`).
  *
  * Whoever is playing has their scoped store installed as core's store, so
  * the modules that own the keys need no change. Work that outlives a
@@ -480,7 +480,7 @@ function legacyStartAfterMove(
 }
 
 /**
- * Remove a learner (§ 3.5): their list entry and their 7 keys. Their cloud
+ * Remove a learner (§ 3.5): their list entry and their 8 keys. Their cloud
  * record is kept. The last learner can't be removed (false). If they were
  * playing, the first remaining learner plays next.
  */

@@ -143,6 +143,7 @@ export async function mountGame(
     rng?: () => number
     words?: readonly string[]
     sounds?: TapClipPlayer
+    hunt?: boolean
   } = {},
 ) {
   resetDragForTests()
@@ -163,6 +164,7 @@ export async function mountGame(
     shore: opts.shore,
     words: opts.words,
     sounds: opts.sounds,
+    hunt: opts.hunt,
   }
   const view = await render(
     <PlayGameScreen
@@ -178,7 +180,11 @@ export async function mountGame(
     )
     await act(async () => {})
   }
-  return { ...lines, sfx, visibility, poses, onExit, relayout }
+  /** Leaving the game (Back, as App unmounts it). */
+  const unmount = async () => {
+    await act(async () => view.unmount())
+  }
+  return { ...lines, sfx, visibility, poses, onExit, relayout, unmount }
 }
 
 /**

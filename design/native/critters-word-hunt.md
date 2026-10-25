@@ -34,9 +34,9 @@ She tapped the Letter critters tile in the Play place (`play-place.md` § 1.3). 
 
 ---
 
-## 1. Content and core (Kevin's PR; Dave's rules, made testable)
+## 1. Content and core (Dave's rules, made testable)
 
-The rules are Dave (1)-(4) and (7). **The names below are proposals.** Kevin's core PR pins them, and the UI builds on the merged names (Pattern A).
+The rules are Dave (1)-(4) and (7). **The names below were proposals;** the build PR (one PR, core and UI) pinned them in `packages/core/src/games/critterHunt.ts`, with the additions listed in § 14.
 
 | Name (proposed)                               | Shape                                                              | Meaning                                                                                                                                                                                                                 |
 | --------------------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -257,7 +257,7 @@ The rule is Back's rect, moved right by Back's size + 16 (phone) or + 24 (tablet
 
 ### 6.1 Wireframes (positions from § 2.4; the art is not to scale, the annotations are)
 
-The two sample rounds are real rounds by Dave (1), computed on 2026-10-25 by a scratch script over `playPlace.ts` at `origin/devon/critters-mom-words` cb4d108b with Dave's familiar list. **a c f m n t:** targets can, cat, fan, fat, man, mat (5 with a picture; _fat_ has none); extras nan, tan. **a b c m p t:** targets bat, cab, cap, cat, map, mat, pat, tap (7 with a picture; _pat_ has none); extra tab. Neither spells a quiet word, and every consonant is in a target.
+The two sample rounds are real rounds by Dave (1), computed on 2026-10-25 by a scratch script over `playPlace.ts` at `origin/devon/critters-mom-words` cb4d108b with Dave's familiar list. **Build note:** that was before Dave (6)'s quiet words landed; with them both rounds spell a quiet word (_ant_, _act_), so neither is dealt. The wireframes still show the layout correctly; the build's seeded round is a b g h p t (§ 14). **a c f m n t:** targets can, cat, fan, fat, man, mat (5 with a picture; _fat_ has none); extras nan, tan. **a b c m p t:** targets bat, cab, cap, cat, map, mat, pat, tap (7 with a picture; _pat_ has none); extra tab. Neither spells a quiet word, and every consonant is in a target.
 
 ```
 PHONE PORTRAIT 375×667, mid-hunt
@@ -534,3 +534,22 @@ Line numbers are this branch's (`origin/main` 5c253593 plus the pointer paragrap
 | Grind and completionism      | 5-8 words, all but one; the hint; no hint after completion (Decision 8); Dave's watch: distress at the last slot → remove the empty slots, keep the beat            |
 | Failure feedback             | Unchanged: a non-word tumbles kindly, a real word never does; no lost finds, lives, timer or clock                                                                  |
 | Untaught content judged      | Only her taught vowels deal; the hunt opens with blending sounds (§ 8)                                                                                              |
+
+---
+
+## 14. Build notes (the build PR, 2026-10-25)
+
+What the build decided where this spec or Dave's ruling left room, and what it found. Kyle's § 12 defaults all stand (Q1-Q11).
+
+- **Names** (`packages/core/src/games/critterHunt.ts`): `HUNT_FAMILIAR`, `huntVowels`, `huntProbeGuard(progress)` (cvc-words is the current step), `huntRoundOf(letters, { probeGuard })` (one letter set against Dave (1): `null` when rejected), `huntRounds(vowel, { probeGuard })` (every round a vowel deals), `huntDeal`, `HUNT_FALLBACK` (one pinned round per vowel, each passing the probe guard), `huntComplete`, `huntHintTarget`, `huntFind(record, word)`, `HuntRecord`, `loadHuntRecord` / `saveHuntRecord`. In `playPlace.ts`: `critterHasPicture(word)` and `critterPictureKey(word)` (_mum_ shows `mom`).
+- **The deal** picks one of her vowels, then one of that vowel's rounds, uniformly by `rng`, never `last`'s letters. Enumerating the 6,188 consonant sets once per vowel is draw-and-accept with the draws done once: at Dave's acceptance rates (e 21 of 6,188) a 50-draw loop as `raftShore` would almost always fall back. The counts reproduce Dave's exactly: a 45, e 21, i 30, o 27, u 61 (57 before the four pictures landed), and 11 short-a rounds under the probe guard (`critterHunt.test.ts`).
+- **Dave (6)'s quiet words shape the deal.** Any short-a round with _d_ spells _add_, so _sad_ is never dealt in phase 1; its picture shows in the free meadow (as a said word with a picture) until phase 2 gives _add_ a clip. This is Dave's rule, not a defect. § 6.1's sample rounds spell _ant_ and _act_, so they are not dealt either.
+- **The record's key** is `marian-tutor.critter-hunt.v1`, the learner's 8th own key (`learners/keys.ts` `LEARNER_KEYS`), so the scoped store keeps one per learner and removing a learner removes it. Its value is `{ "3": HuntRecord }`, by length (Dave (7)), so phase 2 adds `"4"`.
+- **A find is written when its run is judged,** not when the slot fills: Back during the outcome keeps it ("never a lost find", Dave (3)). The board shows it when the outcome is over (§ 4.1).
+- **H21 and the seen-record:** a hunt visit also writes the words Emma says to the progress doc's seen-record (§ 1, unchanged; play-place N5). Progress is byte-identical but for that.
+- **Praise and repeats (H12):** the reward ruling's once-per-visit praise is unchanged, so a target found in an earlier visit gets its praise on its first build in this one. Within a visit a repeat never gets praise.
+- **The hint's run count** includes the run that retires the drag hint. A glow the run count earns shows when that run's shelf clears; one the idle timer earns while the board waits shows when it is free.
+- **The bonus chip in landscape** centres in its cell for the extras it holds (§ 2.3's zone is the 3-extra size).
+- **A slot's picture** is drawn at 0.86 of its picture box, as the picture card draws it, so the shrinking card lands on it exactly.
+- **Pictures:** mug, sad, mud and hug are batch 19 of `design/word-song/picture-manifest.json` (Thomas's picks, 2026-10-25: v1 each), bundled and on `CRITTER_SAID_PICTURE_WORDS`.
+- **Test seams:** `LetterCritters` takes `hunt?: boolean` (the free meadow's tests run with it off); the `critters-hunt` debug seed sets up H26's round (a b g h p t, bag, hat, bat and tap found) for the Maestro flows `12-critters-word-hunt.yaml` (iPad landscape) and `13-critters-word-hunt-phone.yaml` (iPhone 17 portrait).

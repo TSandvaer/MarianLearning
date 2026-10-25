@@ -39,19 +39,47 @@
  * segment. The game makes no network call. Its one write is each word
  * Emma says, a picture word's or a said word's, to the learner's
  * seen-record (`./critterSeen.ts`; the cvc-words probe reserve skips a word
- * she met here). It has no rounds and no end of its own: she leaves with
- * Back.
+ * she met here). Before blending sounds it has no rounds and no end of its
+ * own: she leaves with Back.
+ *
+ * From blending sounds (the same gate), the meadow is a word hunt
+ * (`design/native/critters-word-hunt.md`, Dave's ruling of 2026-10-25):
+ * six critters, her vowel (no twin, its burrow ringed while it is out)
+ * and five consonants; a "3" on the log's end; and a board of empty slots,
+ * one per word to find. A new word plays its outcome as above, then its
+ * picture shrinks into the next empty slot and its letters fly up as
+ * tiles; an extra joins the bonus chip; a repeat wiggles its slot. After
+ * five runs without a new word, or 45 s without a drag, the first empty
+ * slot glows: a tap plays the word to spell. At all but one word the
+ * completion beat plays (each found word in turn, "You did it!", the
+ * cheer and the burst), then New letters deals another round. The round
+ * is kept per learner (`critterHunt.ts`): toy state, never progress.
  *
  * Reduce Motion (§ 3.7): no bounce, hop, spring, tumble or burst; the
  * singing letter lights (and at the joy beat the three light together),
  * the picture fades, a non-word dims. Dragging still follows the finger.
  */
+import { critterWordLine } from '@marian/core/emmasPath/guidanceLines'
+import {
+  freshHuntRecord,
+  HUNT_LENGTH,
+  huntDeal,
+  huntFind,
+  huntHintTarget,
+  huntProbeGuard,
+  huntVowels,
+  loadHuntRecord,
+  saveHuntRecord,
+  type HuntRecord,
+} from '@marian/core/games/critterHunt'
 import {
   CRITTER_CAP,
   CRITTER_PICTURE_WORDS,
   CRITTER_SAID_PICTURE_WORDS,
   CRITTER_SOUND_SOURCE,
   critterFunnyOpen,
+  critterHasPicture,
+  critterPictureKey,
   critterRun,
   critterSet,
 } from '@marian/core/games/playPlace'
@@ -68,6 +96,7 @@ import { Pressable, StyleSheet, View } from 'react-native'
 import Animated, {
   Easing,
   FadeIn,
+  FadeOut,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -76,7 +105,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import { pictureAsset } from '../../assets'
-import { letterWindow, MARK_LEAD_MS } from '../../audio/blendMarks'
+import { letterWindow, MARK_LEAD_MS, wordWindow } from '../../audio/blendMarks'
 import { audioForWebPath } from '../../audio/bundledAudio'
 import { audioEngine } from '../../audio/engine'
 import { createTapClipPlayer, type TapClipPlayer } from '../../audio/tapClip'
@@ -103,21 +132,38 @@ import { DragHintHand, DRAG_HINT_MS } from './DragHintHand'
 import { OVER_PIECE_Z } from './dragLock'
 import { DragPiece } from './DragPiece'
 import {
+  BonusChip,
+  FILL_LAND_MS,
+  FILL_SETTLE_MS,
+  FlyingTile,
+  TILE_STAGGER_MS,
+  NewLetters,
+  NumeralDisc,
+  Slot,
+  VowelRing,
+} from './HuntBoard'
+import {
   centre,
+  chipRect,
+  chipTiles,
   contains,
   critterScene,
   crittersFitBothWays,
   grow,
+  huntScene,
   type CritterScene,
+  type HuntScene,
   type Point,
 } from './playGeometry'
 import type { GameKit } from './playKit'
 import {
+  bonusLabel,
   critterLabel,
   crittersFunnyLine,
   crittersPraiseLine,
   crittersWordLine,
   PLAY_LABELS,
+  slotLabel,
 } from './playLines'
 
 /** The open line: 300 ms after the 200 ms fade-in (§ 3.3). */
@@ -153,6 +199,24 @@ export const SHELF_FADE_MS = 300
 export const HINT_IDLE_MS = 8000
 /** Emma says the open line with the hint at most this often a visit. */
 export const HINT_LINES = 2
+/**
+ * The word hunt's hint (critters-word-hunt.md § 4.6, Dave (2)): after this
+ * many runs of three with no new word, or this long with no drag start.
+ */
+export const HUNT_HINT_RUNS = 5
+export const HUNT_HINT_IDLE_MS = 45000
+/**
+ * The completion beat (§ 5.1): the lap starts 300 ms after the shelf
+ * clears; each word's end + 250 lights the next; the last word's end +
+ * 300 "You did it!"; its end the cheer and burst; + 900 New letters.
+ */
+export const BEAT_LAP_AFTER_MS = 300
+export const BEAT_LAP_GAP_MS = 250
+export const BEAT_DONE_AFTER_MS = 300
+export const BEAT_TAIL_MS = 900
+/** New letters: the old board fades out, then the fresh deal fades in. */
+export const DEAL_OUT_MS = 200
+export const DEAL_IN_MS = 300
 
 const HONEY = '#f2c27a'
 const HONEY_LEDGE = '#b27b37'
@@ -163,11 +227,13 @@ const VOWELS = new Set(['a', 'e', 'i', 'o', 'u'])
 export interface LetterCrittersProps {
   kit: GameKit
   /**
-   * Test seams: the tap-sound player, and the picture words the visit's
-   * letters are drawn from (default all 45, `CRITTER_PICTURE_WORDS`).
+   * Test seams: the tap-sound player; the picture words the free meadow's
+   * letters are drawn from (default all 45, `CRITTER_PICTURE_WORDS`); and
+   * the word hunt on or off (default: from blending sounds, as `funny`).
    */
   sounds?: TapClipPlayer
   words?: readonly string[]
+  hunt?: boolean
 }
 
 /** A letter's own sound: its source clip and tap window (§ 3.4). */
@@ -182,39 +248,148 @@ function letterSound(letter: string) {
 
 type Outcome = 'pair' | 'real' | 'word' | 'funny'
 
-/** Whether a non-word boings for the playing learner; unreadable: quiet. */
-function readFunny(): boolean {
+/** A run of three in the hunt: a new or found target, a new or found extra. */
+type HuntFind = 'new' | 'repeat' | 'extra' | 'extra-repeat'
+
+interface Gate {
+  /** A non-word boings (blending sounds is current or mastered). */
+  funny: boolean
+  /** The word hunt's vowels and probe guard, or null: the free meadow. */
+  hunt: { vowels: string[]; probeGuard: boolean } | null
+}
+
+/**
+ * The playing learner's gate, read once at mount (Dave's safeguard; the
+ * hunt's gate is the same, critters-word-hunt.md § 8). Unreadable: quiet,
+ * the free meadow. `hunt` forces the hunt on or off (a test seam).
+ */
+function readGate(hunt?: boolean): Gate {
+  let gate: Gate = { funny: false, hunt: null }
   try {
-    return critterFunnyOpen(loadProgress())
+    const progress = loadProgress()
+    const funny = critterFunnyOpen(progress)
+    gate = {
+      funny,
+      hunt: funny
+        ? {
+            vowels: huntVowels(progress),
+            probeGuard: huntProbeGuard(progress),
+          }
+        : null,
+    }
   } catch {
-    return false
+    // Quiet, the free meadow.
   }
+  if (hunt === false) return { ...gate, hunt: null }
+  if (hunt === true && gate.hunt === null) {
+    return { ...gate, hunt: { vowels: ['a'], probeGuard: false } }
+  }
+  return gate
 }
 
 export function LetterCritters({
   kit,
   sounds,
   words = CRITTER_PICTURE_WORDS,
+  hunt: huntProp,
 }: LetterCrittersProps) {
   const { reducedMotion, sfx } = kit
-  // Every letter where all of them fit both ways (a tablet), else the cap.
-  const [visit] = useState(() =>
-    critterSet(words, kit.rng, {
-      cap: crittersFitBothWays(kit.viewport, new Set(words.join('')).size)
-        ? Infinity
-        : CRITTER_CAP,
-    }),
+  const [gate] = useState(() => readGate(huntProp))
+  const { funny } = gate
+  // The hunt's round (§ 6.4): the one in progress, else a fresh deal,
+  // never the same letters as her last round. Written at mount.
+  const [opening] = useState(() => {
+    if (gate.hunt === null) return null
+    const stored = loadHuntRecord()
+    if (stored !== null && !stored.complete) {
+      return { record: stored, dealt: false }
+    }
+    const round = huntDeal(gate.hunt.vowels, kit.rng, {
+      last: stored?.letters,
+      probeGuard: gate.hunt.probeGuard,
+    })
+    return { record: freshHuntRecord(round), dealt: true }
+  })
+  // The free meadow: every letter where all of them fit both ways (a
+  // tablet), else the cap.
+  const [free] = useState(() =>
+    opening !== null
+      ? null
+      : critterSet(words, kit.rng, {
+          cap: crittersFitBothWays(kit.viewport, new Set(words.join('')).size)
+            ? Infinity
+            : CRITTER_CAP,
+        }),
   )
-  const [funny] = useState(readFunny)
   const [player] = useState<TapClipPlayer>(
     () => sounds ?? createTapClipPlayer(audioEngine),
   )
-  const scene = critterScene(
-    kit.area,
-    kit.tablet,
-    kit.landscape,
-    visit.letters.length,
+
+  // --- The word hunt's state (critters-word-hunt.md) ----------------------
+
+  const [record, setRecordState] = useState<HuntRecord | null>(
+    opening?.record ?? null,
   )
+  const recordRef = useRef(record)
+  /** A new round or a find: kept, and written (Dave (7)). */
+  const setRecord = (next: HuntRecord) => {
+    recordRef.current = next
+    setRecordState(next)
+    saveHuntRecord(next, HUNT_LENGTH)
+  }
+  /** Found, but not on the board yet: the outcome is still playing. */
+  const [pending, setPendingState] = useState<readonly string[]>([])
+  const pendingRef = useRef<readonly string[]>([])
+  const setPending = (next: readonly string[]) => {
+    pendingRef.current = next
+    setPendingState(next)
+  }
+  /** A found word's tiles (and picture) flying to its slot. */
+  const [arriving, setArriving] = useState<{
+    word: string
+    slot: number
+    run: number[]
+    key: number
+  } | null>(null)
+  const arriveRef = useRef(0)
+  /** Reduce Motion's fill: this word's slot fades in. */
+  const [fresh, setFresh] = useState<string | null>(null)
+  /** Lit-pulse and wiggle counters, per word. */
+  const [lit, setLit] = useState<Record<string, number>>({})
+  const [wiggle, setWiggle] = useState<Record<string, number>>({})
+  /** The hint's glow on the first empty slot, and its ghost picture. */
+  const [glow, setGlow] = useState<{ ghost: string | null } | null>(null)
+  const glowRef = useRef(false)
+  const glowDueRef = useRef(false)
+  /** The lap of the completion beat: the slot lit now. */
+  const [lap, setLap] = useState<string | null>(null)
+  const [newLetters, setNewLetters] = useState(false)
+  const [beatBurst, setBeatBurst] = useState<number | null>(null)
+  /** Each New letters: the board and meadow cross-fade. */
+  const [dealKey, setDealKey] = useState(0)
+  /** The vowel is being dragged out of its burrow (it has no twin). */
+  const [vowelDrag, setVowelDrag] = useState(false)
+  const vowelShown = useSharedValue(1)
+  /** Runs of three since the last new target; the idle timer's token. */
+  const runsRef = useRef(0)
+  const huntIdleRef = useRef(0)
+  /** The beat plays; the completing find's shelf starts it. */
+  const beatRef = useRef(false)
+  const beatDueRef = useRef(false)
+  /** The run of three in play: its word, how it counts, its seats. */
+  const runHuntRef = useRef<{
+    word: string
+    kind: HuntFind
+    run: number[]
+  } | null>(null)
+
+  const letters = record?.letters ?? free!.letters
+  const vowel = record?.letters[0] ?? null
+  const scene: CritterScene | HuntScene =
+    record !== null
+      ? huntScene(kit.area, kit.tablet, kit.landscape, record.targets.length)
+      : critterScene(kit.area, kit.tablet, kit.landscape, letters.length)
+  const hs = record !== null ? (scene as HuntScene) : null
   const sceneRef = useRef(scene)
   useLayoutEffect(() => {
     sceneRef.current = scene
@@ -228,6 +403,8 @@ export function LetterCritters({
   const [picture, setPicture] = useState<{
     word: string
     leaving: boolean
+    /** A new hunt word's card shrinks into its slot's picture box. */
+    into?: Rect
   } | null>(null)
   /** Bounce counters: per seat, and per meadow letter. */
   const [seatBounce, setSeatBounce] = useState([0, 0, 0])
@@ -307,12 +484,40 @@ export function LetterCritters({
 
   // --- A run of three and the shelf (Thomas 2026-10-23) -----------------
 
+  // The hunt's glow, declared here: the background's landing (an effect)
+  // reaches it.
+
+  /** § 4.6: the first empty slot glows, silently; none after completion. */
+  const showGlow = () => {
+    glowDueRef.current = false
+    const r = recordRef.current
+    if (r === null || r.complete || glowRef.current || beatRef.current) return
+    if (huntHintTarget(r, r.found) === undefined) return
+    glowRef.current = true
+    setGlow({ ghost: null })
+  }
+  const endGlow = () => {
+    glowRef.current = false
+    setGlow(null)
+  }
+  /** `HUNT_HINT_IDLE_MS` from now with no drag start: the glow. */
+  const armHuntIdle = () => {
+    const token = ++huntIdleRef.current
+    if (recordRef.current === null || !ranRef.current) return
+    kit.advance(() => {
+      if (huntIdleRef.current !== token || draggingRef.current) return
+      if (lockedRef.current) glowDueRef.current = true
+      else showGlow()
+    }, HUNT_HINT_IDLE_MS)
+  }
+
   /** From the run's first sound the board waits until the shelf is clear. */
   const startRun = () => {
     lock(true)
     ranRef.current = true
     idleRef.current += 1
     endHint()
+    armHuntIdle()
   }
   /** The outcome is over: `after` ms on, the shelf drops home. */
   const settle = (token: number, after = 0) =>
@@ -335,15 +540,41 @@ export function LetterCritters({
       () => {
         droppingRef.current = false
         setFalling(null)
+        // The completing find's shelf is clear: C0, the beat (§ 5.1).
+        if (beatDueRef.current) {
+          beatDueRef.current = false
+          startBeat()
+          return
+        }
         lock(false)
+        if (runsRef.current >= HUNT_HINT_RUNS || glowDueRef.current) {
+          showGlow()
+        }
       },
       reducedMotion ? SHELF_FADE_MS : SHELF_DROP_MS,
     )
+  }
+  /**
+   * § 6.4: a run cut by the background never fills or joins the chip; once
+   * she is back its find lands with no motion (the slot fades in, as Reduce
+   * Motion's fill), before the shelf clears (Dave (3): never a lost find).
+   */
+  const landPending = () => {
+    const r = recordRef.current
+    const landing = pendingRef.current
+    if (r === null || landing.length === 0) return
+    setPending([])
+    const target = landing.find((w) => r.targets.includes(w))
+    if (target === undefined) return
+    setFresh(target)
+    endGlow()
+    armHuntIdle()
   }
 
   // The hint and its open line; unmount: the sound in flight stops, the
   // player is freed.
   useEffect(() => {
+    if (opening?.dealt) saveHuntRecord(opening.record, HUNT_LENGTH)
     kit.later(showHint, CRITTERS_OPEN_DELAY_MS)
     return () => {
       songRef.current += 1
@@ -355,16 +586,27 @@ export function LetterCritters({
 
   // The app goes to the background: the sound stops (it never resumes). A
   // run cut short still ends with the log empty, once she is back.
+  // A new layout (rotation): a fill in flight jumps to its end (§ 6.4).
+  const frame = kit.cancelKey.split('|')[0]
+  const frameRef = useRef(frame)
   useEffect(() => {
     if (kit.cancelKey.endsWith('hidden')) {
       songRef.current += 1
       player.cut()
-      if (lockedRef.current) {
+      // The beat's steps wait for her return (the shelf is already clear).
+      if (lockedRef.current && !beatRef.current) {
         kit.advance(() => {
           kit.setPose('idle')
+          landPending()
           dropShelf()
         }, 0)
       }
+    }
+    if (frameRef.current !== frame) {
+      frameRef.current = frame
+      arriveRef.current += 1
+      setArriving(null)
+      setPicture((p) => (p?.into === undefined ? p : null))
     }
     // Only a new key cancels.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -411,7 +653,10 @@ export function LetterCritters({
     const letters = run.map((i) => current[i]!)
     const word = letters.join('')
     const kind = run.length === 3 ? critterRun(word, { funny }) : null
-    if (kind !== null) startRun()
+    if (kind !== null) {
+      startRun()
+      huntRun(word, run)
+    }
     if (kind === 'picture') {
       pictureWord(word, run)
       return
@@ -470,7 +715,7 @@ export function LetterCritters({
       if (waits === 0) pictureLeave(word, token)
     }
     kit.advance(() => {
-      if (songRef.current === token) joy(run)
+      if (songRef.current === token) joy(run, word)
     }, JOY_AFTER_MS)
     kit.advance(ready, PICTURE_HOLD_MS)
     const praise = crittersPraiseLine(word)
@@ -488,9 +733,16 @@ export function LetterCritters({
   /** The picture is up: it holds, floats away, then the shelf clears. */
   const pictureLeaves = (word: string, token: number) =>
     kit.advance(() => pictureLeave(word, token), PICTURE_HOLD_MS)
-  /** It floats away (Reduce Motion: fades), Emma `idle`, the shelf clears. */
+  /**
+   * It floats away (Reduce Motion: fades), Emma `idle`, the shelf clears;
+   * a new hunt word's picture goes into its slot instead (§ 4.1).
+   */
   const pictureLeave = (word: string, token: number) => {
     if (songRef.current !== token) return
+    if (isNew(word)) {
+      fill(word, token)
+      return
+    }
     setPicture({ word, leaving: true })
     kit.advance(
       () => {
@@ -508,10 +760,13 @@ export function LetterCritters({
    * cheer, the three bounce together (Reduce Motion: their letters light),
    * and Word Song's burst leaves the middle seat (none on Reduce Motion).
    */
-  const joy = (run: number[]) => {
+  const joy = (run: number[], word: string) => {
     kit.setPose('cheering')
     sfx.cheer.play()
     run.forEach(bounceSeat)
+    // A word already on the board: its slot wiggles (§ 4.2).
+    const found = runHuntRef.current
+    if (found?.word === word && found.kind === 'repeat') bump(setWiggle, word)
     if (reducedMotion) return
     const key = ++burstRef.current
     setBurst(key)
@@ -566,13 +821,18 @@ export function LetterCritters({
       recordCritterWord(word)
       void kit.speak(line).then(() => {
         if (songRef.current !== token) return
-        joy(run)
+        joy(run, word)
         if (CRITTER_SAID_PICTURE_WORDS.includes(word)) {
           setPicture({ word, leaving: false })
           pictureLeaves(word, token)
         } else {
           kit.advance(() => {
             if (songRef.current !== token) return
+            if (isNew(word)) {
+              fill(word, token)
+              return
+            }
+            joinChip(word)
             kit.setPose('idle')
             settle(token)
           }, JOY_HOLD_MS)
@@ -607,6 +867,227 @@ export function LetterCritters({
       })
   }
 
+  // --- The word hunt (critters-word-hunt.md § 4, § 5) ----------------------
+
+  const bump = (
+    set: (fn: (m: Record<string, number>) => Record<string, number>) => void,
+    word: string,
+  ) => set((m) => ({ ...m, [word]: (m[word] ?? 0) + 1 }))
+
+  /** The targets on the board, in slot (find) order. */
+  const boardWords = () => {
+    const r = recordRef.current
+    if (r === null) return []
+    return r.found.filter(
+      (w) => r.targets.includes(w) && !pendingRef.current.includes(w),
+    )
+  }
+  const isNew = (word: string) =>
+    runHuntRef.current?.word === word && runHuntRef.current.kind === 'new'
+
+  /**
+   * A run of three in the hunt: how it counts. A new target or extra is
+   * kept at once (Dave (3): never a lost find), and reaches the board when
+   * its outcome is over. A new target restarts the hint's run count.
+   */
+  const huntRun = (word: string, run: number[]) => {
+    const r = recordRef.current
+    runHuntRef.current = null
+    if (r === null) return
+    const seen = r.found.includes(word)
+    const kind: HuntFind | null = r.targets.includes(word)
+      ? seen
+        ? 'repeat'
+        : 'new'
+      : r.extras.includes(word)
+        ? seen
+          ? 'extra-repeat'
+          : 'extra'
+        : null
+    runsRef.current = kind === 'new' ? 0 : runsRef.current + 1
+    if (kind === null) return
+    runHuntRef.current = { word, kind, run }
+    if (kind !== 'new' && kind !== 'extra') return
+    const next = huntFind(r, word)
+    if (kind === 'new' && next.complete && !r.complete) {
+      beatDueRef.current = true
+    }
+    setPending([...pendingRef.current, word])
+    setRecord(next)
+  }
+
+  /**
+   * § 4.1: the outcome is over; the new target fills the next empty slot.
+   * Its picture card shrinks into the slot's picture box and its three
+   * tiles fly up from the seats (Reduce Motion: the card fades where it
+   * is, the slot fades in); the shelf clears 400 ms after the last tile
+   * lands. No sound, no line. The hint's glow goes and its counts restart.
+   */
+  const fill = (word: string, token: number) => {
+    const slot = boardWords().length
+    const run = runHuntRef.current?.run ?? [0, 1, 2]
+    setPending(pendingRef.current.filter((w) => w !== word))
+    endGlow()
+    runsRef.current = 0
+    armHuntIdle()
+    kit.setPose('idle')
+    if (reducedMotion) {
+      setFresh(word)
+      setPicture((p) => (p === null ? p : { ...p, leaving: true }))
+      kit.advance(() => {
+        if (songRef.current === token) setPicture(null)
+      }, 300)
+    } else {
+      const key = ++arriveRef.current
+      setArriving({ word, slot, run, key })
+      const into = hs?.slots[slot]?.picture
+      setPicture((p) => (p === null || into === undefined ? p : { ...p, into }))
+      kit.advance(() => {
+        if (arriveRef.current !== key) return
+        setArriving(null)
+        setPicture(null)
+      }, FILL_LAND_MS + FILL_SETTLE_MS)
+    }
+    settle(token, FILL_LAND_MS)
+  }
+
+  /** § 4.5: a new extra joins the bonus chip; a found one lights there. */
+  const joinChip = (word: string) => {
+    const found = runHuntRef.current
+    if (found?.word !== word) return
+    if (found.kind === 'extra') {
+      setPending(pendingRef.current.filter((w) => w !== word))
+    } else if (found.kind === 'extra-repeat') bump(setLit, word)
+  }
+
+  /**
+   * A found word's own sound (§ 4.3): a picture word's blend clip (the
+   * word part, or `whole` for the hint), else Emma's word clip. Sound only:
+   * no caption, no pose. `onEnd` once it stops.
+   */
+  const playWord = (word: string, whole: boolean, onEnd?: () => void) => {
+    if (CRITTER_PICTURE_WORDS.includes(word)) {
+      const segments = blendSegments(word)
+      const clip = audioForWebPath(blendClipPath(word))
+      if (segments !== null && typeof clip === 'number') {
+        const w = whole ? { from: 0, to: null } : wordWindow(segments)
+        player.play(clip, w.from, w.to, onEnd)
+        return
+      }
+    } else {
+      const src = critterWordLine(word)?.src ?? null
+      const clip = src === null ? undefined : audioForWebPath(src)
+      if (typeof clip === 'number') {
+        player.play(clip, 0, null, onEnd)
+        return
+      }
+    }
+    onEnd?.()
+  }
+
+  /** § 4.3: a filled slot plays its word and lights its tiles. */
+  const onSlotTap = (word: string) => {
+    if (lockedRef.current) return
+    kit.cutLine()
+    bump(setLit, word)
+    playWord(word, false)
+  }
+
+  /**
+   * § 4.6: the glowing slot plays the word to find, whole and sound only,
+   * Emma pointing; from the first tap its picture ghosts at 35 %.
+   */
+  const onHintTap = () => {
+    if (lockedRef.current) return
+    const r = recordRef.current
+    const word = r === null ? undefined : huntHintTarget(r, r.found)
+    if (word === undefined) return
+    kit.cutLine()
+    if (critterHasPicture(word)) setGlow({ ghost: word })
+    kit.setPose('attentive-pointing')
+    playWord(word, true, () => kit.setPose('idle'))
+  }
+
+  /**
+   * § 5.1, the completion beat, at C0 (the completing find's shelf is
+   * clear): the board stays locked, Emma celebrates, each found slot plays
+   * its word in turn, then "You did it!", the cheer and the burst; New
+   * letters comes 900 ms later. The same every time.
+   */
+  const startBeat = () => {
+    beatRef.current = true
+    endGlow()
+    kit.setPose('celebration')
+    const order = boardWords()
+    const step = (i: number) => {
+      if (!beatRef.current) return
+      const w = order[i]
+      if (w === undefined) {
+        kit.advance(sayDone, BEAT_DONE_AFTER_MS)
+        return
+      }
+      setLap(w)
+      bump(setLit, w)
+      playWord(w, false, () => {
+        kit.advance(() => {
+          setLap((l) => (l === w ? null : l))
+          if (i + 1 < order.length) step(i + 1)
+        }, BEAT_LAP_GAP_MS)
+        if (i + 1 === order.length) kit.advance(sayDone, BEAT_DONE_AFTER_MS)
+      })
+    }
+    kit.advance(() => step(0), BEAT_LAP_AFTER_MS)
+  }
+  const sayDone = () => {
+    if (!beatRef.current) return
+    kit.setPose('cheering')
+    void kit.speak('guide.play.critters.done').then(() => {
+      if (!beatRef.current) return
+      sfx.cheer.play()
+      if (!reducedMotion) {
+        const key = ++burstRef.current
+        setBeatBurst(key)
+        kit.later(() => {
+          if (burstRef.current === key) setBeatBurst(null)
+        }, SPARKLE_BURST_MS)
+      }
+      kit.advance(() => {
+        if (!beatRef.current) return
+        beatRef.current = false
+        kit.setPose('idle')
+        lock(false)
+        setNewLetters(true)
+      }, BEAT_TAIL_MS)
+    })
+  }
+
+  /**
+   * § 5.3: New letters plinks, and a fresh round (never the same letters)
+   * replaces the board: no line, no beat, no drag hint.
+   */
+  const onNewLetters = () => {
+    const r = recordRef.current
+    if (r === null || gate.hunt === null || lockedRef.current) return
+    sfx.plink.play()
+    kit.cutLine()
+    setNewLetters(false)
+    const round = huntDeal(gate.hunt.vowels, kit.rng, {
+      last: r.letters,
+      probeGuard: gate.hunt.probeGuard,
+    })
+    setPending([])
+    setLit({})
+    setWiggle({})
+    setFresh(null)
+    endGlow()
+    runsRef.current = 0
+    glowDueRef.current = false
+    runHuntRef.current = null
+    setRecord(freshHuntRecord(round))
+    setDealKey((k) => k + 1)
+    armHuntIdle()
+  }
+
   // --- Moves -------------------------------------------------------------
 
   const seatAtPoint = (p: Point): number => {
@@ -632,6 +1113,8 @@ export function LetterCritters({
   const onMeadowDrop = (letter: string, p: Point): boolean => {
     const seat = seatAtPoint(p)
     if (seat < 0 || lockedRef.current) return false
+    // The vowel has no twin: its burrow is empty from the drop's frame.
+    if (letter === vowel) vowelShown.set(0)
     changed(seatAt(seatsRef.current, seat, letter))
     return true
   }
@@ -673,11 +1156,14 @@ export function LetterCritters({
     draggingRef.current = true
     endHint()
     armIdle()
-    if (letter !== undefined) setTwin(letter)
+    armHuntIdle()
+    if (letter !== undefined && letter === vowel) setVowelDrag(true)
+    else if (letter !== undefined) setTwin(letter)
   }
   const dragEnd = () => {
     draggingRef.current = false
     setTwin(null)
+    setVowelDrag(false)
     armIdle()
     if (singDueRef.current && !lockedRef.current) scheduleSing()
   }
@@ -686,12 +1172,42 @@ export function LetterCritters({
 
   const { c } = scene
   const run = seatedRun(seats)
+  // The vowel out of its burrow: dragged, seated or falling home (§ 2.5).
+  const vowelOut =
+    vowel !== null &&
+    (vowelDrag ||
+      seats.includes(vowel) ||
+      (falling?.some((f) => f.letter === vowel) ?? false))
+  const vowelHidden = vowelOut && !vowelDrag
+  useEffect(() => {
+    vowelShown.set(vowelHidden ? 0 : 1)
+  }, [vowelHidden, vowelShown])
+  const vowelStyle = useAnimatedStyle(() => ({ opacity: vowelShown.get() }))
+  const onBoard =
+    record === null
+      ? []
+      : record.found.filter(
+          (w) => record.targets.includes(w) && !pending.includes(w),
+        )
+  const bonus =
+    record === null
+      ? []
+      : record.found.filter(
+          (w) => record.extras.includes(w) && !pending.includes(w),
+        )
+  const glowAt = glow !== null ? onBoard.length : -1
+  const deal = {
+    entering:
+      dealKey > 0 ? FadeIn.duration(DEAL_IN_MS).delay(DEAL_OUT_MS) : undefined,
+    exiting: FadeOut.duration(DEAL_OUT_MS),
+  }
+  const k = kit.tablet ? 1.5 : 1
   return (
     <View testID="letter-critters" pointerEvents="box-none" style={styles.fill}>
       <Pressable
         testID="critter-log"
         accessibilityRole="button"
-        accessibilityLabel={PLAY_LABELS.log}
+        accessibilityLabel={hs !== null ? PLAY_LABELS.huntLog : PLAY_LABELS.log}
         onPress={onLogTap}
         style={[styles.abs, rectStyle(scene.logBand)]}
       >
@@ -709,6 +1225,62 @@ export function LetterCritters({
           ]}
         />
       </Pressable>
+
+      {hs !== null && (
+        <Animated.View
+          key={`board-${dealKey}`}
+          {...deal}
+          pointerEvents="box-none"
+          style={styles.fill}
+        >
+          <NumeralDisc rect={hs.numeral} length={HUNT_LENGTH} />
+          {hs.slots.map((parts, i) => {
+            const word = arriving?.slot === i ? null : (onBoard[i] ?? null)
+            const glowing = i === glowAt
+            return (
+              <Slot
+                key={i}
+                index={i}
+                parts={parts}
+                step={hs.step}
+                tablet={kit.tablet}
+                word={word}
+                fadeIn={word !== null && word === fresh}
+                glow={glowing}
+                ghost={glowing ? glow!.ghost : null}
+                lapRing={word !== null && lap === word}
+                lit={word === null ? 0 : (lit[word] ?? 0)}
+                wiggle={word === null ? 0 : (wiggle[word] ?? 0)}
+                reducedMotion={reducedMotion}
+                label={
+                  word !== null
+                    ? slotLabel(word)
+                    : glowing
+                      ? PLAY_LABELS.hint
+                      : PLAY_LABELS.emptySlot
+                }
+                onPress={
+                  word !== null
+                    ? () => onSlotTap(word)
+                    : glowing
+                      ? onHintTap
+                      : undefined
+                }
+              />
+            )
+          })}
+          {bonus.length > 0 && (
+            <BonusChip
+              rect={chipRect(hs, bonus.length)}
+              tiles={bonus.map((_, i) => chipTiles(hs, bonus.length, i))}
+              words={bonus}
+              lit={lit}
+              reducedMotion={reducedMotion}
+              label={bonusLabel(bonus)}
+            />
+          )}
+        </Animated.View>
+      )}
 
       <Tumble count={tumble} c={c} reducedMotion={reducedMotion}>
         {seats.map((letter, i) => {
@@ -753,66 +1325,82 @@ export function LetterCritters({
         })}
       </Tumble>
 
-      {visit.letters.map((letter, i) => {
-        const r = scene.cells[i]!
-        return (
-          <View key={letter} pointerEvents="box-none" style={styles.fill}>
-            <View
-              pointerEvents="none"
-              style={[
-                styles.burrow,
-                {
-                  left: r.x + 0.1 * c,
-                  top: r.y + 0.78 * c,
-                  width: 0.8 * c,
-                  height: 0.26 * c,
-                  borderRadius: 0.13 * c,
-                },
-              ]}
-            />
-            {twin === letter && (
+      <Animated.View
+        key={`meadow-${dealKey}`}
+        {...deal}
+        pointerEvents="box-none"
+        style={styles.fill}
+      >
+        {letters.map((letter, i) => {
+          const r = scene.cells[i]!
+          const isVowel = letter === vowel
+          return (
+            <View key={letter} pointerEvents="box-none" style={styles.fill}>
               <View
-                testID={`critter-twin-${letter}`}
                 pointerEvents="none"
-                style={[styles.abs, rectStyle(r)]}
+                style={[
+                  styles.burrow,
+                  {
+                    left: r.x + 0.1 * c,
+                    top: r.y + 0.78 * c,
+                    width: 0.8 * c,
+                    height: 0.26 * c,
+                    borderRadius: 0.13 * c,
+                  },
+                ]}
+              />
+              {isVowel && (
+                <VowelRing cell={r} vowel={letter} shown={vowelOut} />
+              )}
+              {twin === letter && (
+                <View
+                  testID={`critter-twin-${letter}`}
+                  pointerEvents="none"
+                  style={[styles.abs, rectStyle(r)]}
+                >
+                  <Pop reducedMotion={reducedMotion}>
+                    <Critter
+                      letter={letter}
+                      size={c}
+                      bounce={0}
+                      reducedMotion={reducedMotion}
+                    />
+                  </Pop>
+                </View>
+              )}
+              <DragPiece
+                testID={`critter-${letter}`}
+                rect={r}
+                accessibilityLabel={critterLabel(letter, false)}
+                accessibilityActions={[{ name: 'hear', label: 'Hear' }]}
+                onAccessibilityAction={(name) => {
+                  if (name === 'hear') onMeadowTap(letter)
+                }}
+                disabled={locked || (isVowel && vowelHidden)}
+                hidden={isVowel && vowelHidden}
+                reducedMotion={reducedMotion}
+                cancelKey={kit.cancelKey}
+                onTap={() => onMeadowTap(letter)}
+                onActivate={() => onMeadowActivate(letter)}
+                onDragStart={() => dragStart(letter)}
+                onDragEnd={dragEnd}
+                onDrop={(p) => onMeadowDrop(letter, p)}
               >
-                <Pop reducedMotion={reducedMotion}>
+                <Animated.View
+                  style={[styles.fillBox, isVowel ? vowelStyle : null]}
+                >
                   <Critter
                     letter={letter}
                     size={c}
-                    bounce={0}
+                    bounce={meadowHop[letter] ?? 0}
                     reducedMotion={reducedMotion}
                   />
-                </Pop>
-              </View>
-            )}
-            <DragPiece
-              testID={`critter-${letter}`}
-              rect={r}
-              accessibilityLabel={critterLabel(letter, false)}
-              accessibilityActions={[{ name: 'hear', label: 'Hear' }]}
-              onAccessibilityAction={(name) => {
-                if (name === 'hear') onMeadowTap(letter)
-              }}
-              disabled={locked}
-              reducedMotion={reducedMotion}
-              cancelKey={kit.cancelKey}
-              onTap={() => onMeadowTap(letter)}
-              onActivate={() => onMeadowActivate(letter)}
-              onDragStart={() => dragStart(letter)}
-              onDragEnd={dragEnd}
-              onDrop={(p) => onMeadowDrop(letter, p)}
-            >
-              <Critter
-                letter={letter}
-                size={c}
-                bounce={meadowHop[letter] ?? 0}
-                reducedMotion={reducedMotion}
-              />
-            </DragPiece>
-          </View>
-        )
-      })}
+                </Animated.View>
+              </DragPiece>
+            </View>
+          )
+        })}
+      </Animated.View>
 
       {burst !== null && (
         <View
@@ -835,7 +1423,7 @@ export function LetterCritters({
           seat={seat}
           letter={letter}
           from={scene.seats[seat]!}
-          to={scene.cells[visit.letters.indexOf(letter)]!}
+          to={scene.cells[letters.indexOf(letter)]!}
           reducedMotion={reducedMotion}
         />
       ))}
@@ -856,7 +1444,53 @@ export function LetterCritters({
           word={picture.word}
           rect={scene.picture}
           leaving={picture.leaving}
+          into={picture.into}
           reducedMotion={reducedMotion}
+        />
+      )}
+
+      {arriving !== null &&
+        hs !== null &&
+        [...arriving.word].map((l, i) => {
+          const to = hs.slots[arriving.slot]?.boxes[i]
+          const from = scene.seats[arriving.run[i] ?? i]
+          if (to === undefined || from === undefined) return null
+          return (
+            <FlyingTile
+              key={`${arriving.key}-${i}`}
+              letter={l}
+              from={from}
+              to={to}
+              delay={i * TILE_STAGGER_MS}
+              testID={`hunt-fly-${i}`}
+            />
+          )
+        })}
+
+      {beatBurst !== null && hs !== null && (
+        <View
+          key={beatBurst}
+          testID="hunt-burst"
+          pointerEvents="none"
+          style={[styles.abs, styles.over, rectStyle(hs.board)]}
+        >
+          <SparkleBurst
+            testID="hunt-sparkle-burst"
+            distance={75 * k}
+            glyph={16 * k}
+          />
+        </View>
+      )}
+
+      {newLetters && (
+        <NewLetters
+          rect={{
+            ...kit.back,
+            x: kit.back.x + kit.back.width + (kit.tablet ? 24 : 16),
+          }}
+          reducedMotion={reducedMotion}
+          label={PLAY_LABELS.newLetters}
+          onPress={onNewLetters}
         />
       )}
     </View>
@@ -1202,16 +1836,19 @@ function PictureCard({
   word,
   rect,
   leaving,
+  into,
   reducedMotion,
 }: {
   word: string
   rect: Rect
   leaving: boolean
+  into?: Rect
   reducedMotion: boolean
 }) {
   const s = useSharedValue(reducedMotion ? 1 : 0)
   const o = useSharedValue(0)
   const y = useSharedValue(0)
+  const x = useSharedValue(0)
   useEffect(() => {
     if (reducedMotion) o.set(withTiming(1, { duration: 200 }))
     else {
@@ -1230,9 +1867,27 @@ function PictureCard({
     y.set(withTiming(-0.3 * rect.height, { duration: PICTURE_LEAVE_MS }))
     o.set(withDelay(0, withTiming(0, { duration: PICTURE_LEAVE_MS })))
   }, [leaving, reducedMotion, rect.height, o, y])
+  // The word hunt's fill (§ 4.1): it shrinks into the slot's picture box
+  // over 500 ms (ease in-out), replacing the float-away.
+  useEffect(() => {
+    if (into === undefined || reducedMotion) return
+    const move = {
+      duration: PICTURE_LEAVE_MS,
+      easing: Easing.inOut(Easing.quad),
+    }
+    x.set(withTiming(centre(into).x - centre(rect).x, move))
+    y.set(withTiming(centre(into).y - centre(rect).y, move))
+    s.set(withTiming(into.width / rect.width, move))
+    // A new target only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [into === undefined])
   const style = useAnimatedStyle(() => ({
     opacity: o.get(),
-    transform: [{ translateY: y.get() }, { scale: s.get() }],
+    transform: [
+      { translateX: x.get() },
+      { translateY: y.get() },
+      { scale: s.get() },
+    ],
   }))
   return (
     <Animated.View
@@ -1249,7 +1904,7 @@ function PictureCard({
     >
       <Image
         testID={`critter-picture-${word}`}
-        source={pictureAsset(word)}
+        source={pictureAsset(critterPictureKey(word))}
         contentFit="contain"
         accessible={false}
         style={{ width: 0.86 * rect.width, height: 0.86 * rect.height }}

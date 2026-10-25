@@ -2,17 +2,20 @@
  * The Play place end to end on an in-memory store (play-place spec § 1.4,
  * § 1.6; ACs N4, N5, N6, N16): Hub → Play → a full Raft crossing trip →
  * the Play place, quiet → Letter critters with a word, a non-word and a
- * pair → Back → Home → the Hub. The Raft writes nothing. Letter critters'
- * one write is each word Emma says, into the progress doc's seen-record
- * (Dave 2026-10-24: the cvc-words probe reserve skips a word she met
- * there); everything else in the doc, the session history and stardust are
- * byte-identical, nothing reaches the network and no Session End mounts.
+ * pair → Back → Home → the Hub. The Raft writes nothing. Letter critters
+ * writes each word Emma says into the progress doc's seen-record (Dave
+ * 2026-10-24: the cvc-words probe reserve skips a word she met there) and,
+ * past blending sounds, its word hunt round (critters-word-hunt.md § 1,
+ * AC H21: at the deal and at each new find); everything else in the doc,
+ * the session history and stardust are byte-identical, nothing reaches the
+ * network and no Session End mounts.
  * Back mid-drag, mid-crossing, while a word's picture shows, and a trip to
  * the background keep that.
  *
  * Lines play their bundled clips on the fake expo-audio players; the test
  * starts and ends each (`finishPlayLine`, as App.game's `finishGameLine`).
  */
+import { HUNT_STORAGE_KEY } from '@marian/core/games/critterHunt'
 import { CRITTER_PICTURE_WORDS } from '@marian/core/games/playPlace'
 import {
   loadProgress,
@@ -162,14 +165,15 @@ function snapshot() {
 }
 
 /**
- * Since `before`, the only change is Letter critters' seen-record write:
+ * Since `before`, the only changes are Letter critters' seen-record write:
  * `words` (the words Emma said) under `word:` keys, the math records as they
- * were (seeded when the doc had none). No other key, no fetch, no history
- * or stardust change.
+ * were (seeded when the doc had none); and `huntWrites` writes of the word
+ * hunt's round. No other key, no fetch, no history or stardust change.
  */
 function expectOnlyWordsMet(
   before: ReturnType<typeof snapshot>,
   words: readonly string[],
+  huntWrites = 0,
 ) {
   const now = snapshot()
   expect({ ...now, progress: null, writes: null }).toEqual({
@@ -192,7 +196,9 @@ function expectOnlyWordsMet(
     Object.entries(seenNow ?? {}).filter(([k]) => !k.startsWith('word:')),
   )
   expect(math).toEqual(seenItemsOf(was))
-  expect(now.writes - before.writes).toBe(words.length)
+  const since = writes.slice(before.writes)
+  expect(since.filter((k) => k === HUNT_STORAGE_KEY)).toHaveLength(huntWrites)
+  expect(since.filter((k) => k !== HUNT_STORAGE_KEY)).toHaveLength(words.length)
 }
 
 const touch = (x: number, y: number) => {
@@ -311,9 +317,11 @@ it('N4, N5: a full raft trip writes nothing; a critters visit writes only the wo
   expect(snapshot()).toEqual(before)
 
   await open('critters')
-  // A word, a non-word and a pair, from the letters this visit shows (16 of
-  // the 22: every picture word for every learner, Thomas 2026-10-22).
+  // A word, a non-word and a pair, from the letters this visit shows: a
+  // cvc-words learner is past blending sounds, so a word hunt round (her
+  // vowel and five consonants, critters-word-hunt.md § 1).
   const here = (l: string) => screen.queryByTestId(`critter-${l}`) !== null
+  expect(screen.queryAllByTestId(/^critter-[a-z]$/)).toHaveLength(6)
   const picture = CRITTER_PICTURE_WORDS.find((w) => [...w].every(here))!
   const nonWord = [...'bcdfghjklmnprstvwxz'].filter(here).slice(0, 3).join('')
   expect(nonWord).toHaveLength(3)
@@ -338,7 +346,8 @@ it('N4, N5: a full raft trip writes nothing; a critters visit writes only the wo
       }
     }
   }
-  for (const letter of picture.slice(0, 2)) {
+  // A pair of consonants (the hunt's vowel has no twin; it may still sit).
+  for (const letter of nonWord.slice(0, 2)) {
     await fireEvent(
       screen.getByTestId(`critter-${letter}`),
       'accessibilityAction',
@@ -353,8 +362,9 @@ it('N4, N5: a full raft trip writes nothing; a critters visit writes only the wo
   expect(screen.getByTestId('play-place')).toBeOnTheScreen()
   expect(screen.queryByTestId('session-end')).not.toBeOnTheScreen()
   // From the Hub's Play tap to here: only the picture word Emma said, in
-  // the seen-record; no fetch.
-  expectOnlyWordsMet(before, [picture])
+  // the seen-record, and the hunt's round (its deal and the new find); no
+  // fetch.
+  expectOnlyWordsMet(before, [picture], 2)
   // Home: the Hub (which decides its own visit on mount, as on any return).
   await fireEvent.press(screen.getByTestId('play-home'))
   await settle(500)
@@ -407,7 +417,8 @@ it('N6: Back mid-drag, mid-crossing and while a picture shows, and a background 
   await fireEvent.press(screen.getByTestId('play-game-back'))
   await settle(3000)
   expect(screen.getByTestId('play-place')).toBeOnTheScreen()
-  expectOnlyWordsMet(before, [picture])
+  // The word Emma said, and the hunt's round: its deal and the find.
+  expectOnlyWordsMet(before, [picture], 2)
 })
 
 it('N16: a learner on numbers and letter names has the Play disc and the critters (Thomas 2026-10-22)', async () => {

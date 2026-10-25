@@ -3,6 +3,11 @@
  * for a learner on blending sounds (11 letters, 8 picture words), with a
  * fake tap-sound player whose sounds end after their window; and, for a
  * learner before blending sounds, Dave's safeguard (non-words sit quietly).
+ *
+ * From blending sounds the word hunt replaces this meadow
+ * (critters-word-hunt.md § 8; `LetterCritters.hunt.test.tsx`). These tests
+ * keep the free meadow with the `hunt: false` seam: its outcomes, moves,
+ * joy beat and praise are the hunt's too, unchanged (§ 3.1, § 4.1).
  */
 import { setKeyValueStore } from '@marian/core'
 import { progressAtStep } from '@marian/core/debug/stepProgress'
@@ -13,6 +18,7 @@ import {
   CRITTER_SOUND_SOURCE,
   CRITTER_PICTURE_WORDS,
   CRITTER_WORDS_BY_STEP,
+  critterPictureKey,
   critterPraise,
   critterRun,
 } from '@marian/core/games/playPlace'
@@ -140,6 +146,7 @@ const seatCentre = (i: number) => {
 async function mount() {
   const s = fakeSounds(wholeMs)
   const g = await mountGame('critters', {
+    hunt: false,
     words: BLENDING_WORDS,
     sounds: s.sounds,
   })
@@ -189,7 +196,7 @@ it('§ 3.1: the visit’s letters, vowels first, for a learner on blending sound
 
 it('§ 3.1 (Thomas 2026-10-22): with no words seam, a visit draws on all 45 picture words, for any learner', async () => {
   const s = fakeSounds(wholeMs)
-  await mountGame('critters', { sounds: s.sounds })
+  await mountGame('critters', { hunt: false, sounds: s.sounds })
   const letters = screen
     .queryAllByTestId(/^critter-[a-z]$/)
     .map((el) => String(el.props.testID).slice(-1))
@@ -354,6 +361,7 @@ describe('N10: songs that are not picture words', () => {
     const asked = jest.spyOn(bundledAudio, 'audioForWebPath')
     const s = fakeSounds(wholeMs)
     const g = await mountGame('critters', {
+      hunt: false,
       words: ['six', 'bed', 'box'],
       sounds: s.sounds,
     })
@@ -533,7 +541,11 @@ describe('Thomas 2026-10-23 (Marian’s play test)', () => {
   describe('1. a line’s caption goes when the line ends or is cut', () => {
     it('the open line: up while it plays, gone when it ends', async () => {
       const s = fakeSounds(wholeMs)
-      await mountGame('critters', { words: BLENDING_WORDS, sounds: s.sounds })
+      await mountGame('critters', {
+        hunt: false,
+        words: BLENDING_WORDS,
+        sounds: s.sounds,
+      })
       expect(ribbon()).toBeNull()
       await advance(CRITTERS_OPEN_DELAY_MS)
       expect(ribbon()?.props.accessibilityLabel).toBe(openText)
@@ -554,7 +566,11 @@ describe('Thomas 2026-10-23 (Marian’s play test)', () => {
 
     it('a tap that cuts the open line takes its caption with it', async () => {
       const s = fakeSounds(wholeMs)
-      await mountGame('critters', { words: BLENDING_WORDS, sounds: s.sounds })
+      await mountGame('critters', {
+        hunt: false,
+        words: BLENDING_WORDS,
+        sounds: s.sounds,
+      })
       await advance(CRITTERS_OPEN_DELAY_MS)
       expect(ribbon()).not.toBeNull()
       await tap(byId('critter-f'))
@@ -680,6 +696,7 @@ describe('Thomas 2026-10-23 (Marian’s play test)', () => {
     it('on entry, with the new open line: the hand, see-through, over every piece', async () => {
       const s = fakeSounds(wholeMs)
       const g = await mountGame('critters', {
+        hunt: false,
         words: BLENDING_WORDS,
         sounds: s.sounds,
       })
@@ -704,6 +721,7 @@ describe('Thomas 2026-10-23 (Marian’s play test)', () => {
     it('again after ~8 s with no drag: the line once more, then the hand alone', async () => {
       const s = fakeSounds(wholeMs)
       const g = await mountGame('critters', {
+        hunt: false,
         words: BLENDING_WORDS,
         sounds: s.sounds,
       })
@@ -729,7 +747,11 @@ describe('Thomas 2026-10-23 (Marian’s play test)', () => {
 
     it('a tap does not put the hint off; a drag does, and ends the hand', async () => {
       const s = fakeSounds(wholeMs)
-      await mountGame('critters', { words: BLENDING_WORDS, sounds: s.sounds })
+      await mountGame('critters', {
+        hunt: false,
+        words: BLENDING_WORDS,
+        sounds: s.sounds,
+      })
       await advance(CRITTERS_OPEN_DELAY_MS)
       await dragStart(byId('critter-b'), { x: 5, y: 5 })
       await advance(STORY_TAP_CUE_CANCEL_OUT_MS)
@@ -764,10 +786,13 @@ describe('Thomas 2026-10-23 (Marian’s play test)', () => {
 })
 
 describe('Thomas 2026-10-23 (build 20): "No picture for rat and there is no m"', () => {
-  it('the said words with a bundled pack picture are exactly CRITTER_SAID_PICTURE_WORDS', () => {
+  it('the said words with a bundled pack picture are exactly CRITTER_SAID_PICTURE_WORDS (mum shows mom’s, Dave’s word hunt ruling § 6)', () => {
     expect(
-      CRITTER_SAID_WORDS.filter((w) => pictureAsset(w) !== undefined),
+      CRITTER_SAID_WORDS.filter(
+        (w) => pictureAsset(critterPictureKey(w)) !== undefined,
+      ),
     ).toEqual(CRITTER_SAID_PICTURE_WORDS)
+    expect(pictureAsset(critterPictureKey('mum'))).toBe(pictureAsset('mom'))
   })
 
   it.each([
@@ -780,6 +805,7 @@ describe('Thomas 2026-10-23 (build 20): "No picture for rat and there is no m"',
       const bounces = starts.count
       const s = fakeSounds(wholeMs)
       const g = await mountGame('critters', {
+        hunt: false,
         words: ['rug', 'cat', 'mop'],
         sounds: s.sounds,
       })
@@ -833,6 +859,7 @@ describe('Thomas 2026-10-23 (build 20): "No picture for rat and there is no m"',
     async (word) => {
       const s = fakeSounds(wholeMs)
       const g = await mountGame('critters', {
+        hunt: false,
         words: ['hut', 'cab', 'pad', 'mop', 'rug'],
         sounds: s.sounds,
       })
@@ -859,6 +886,7 @@ describe('Thomas 2026-10-23 (build 20): "No picture for rat and there is no m"',
     async (seed) => {
       const s = fakeSounds(wholeMs)
       await mountGame('critters', {
+        hunt: false,
         viewport: { width: 820, height: 1180, insets: T },
         rng: seeded(seed),
         sounds: s.sounds,
@@ -875,6 +903,7 @@ describe('Thomas 2026-10-23 (build 20): "No picture for rat and there is no m"',
   ])('%s: the 16 rotating, every vowel', async (_, width, height, insets) => {
     const s = fakeSounds(wholeMs)
     await mountGame('critters', {
+      hunt: false,
       viewport: { width, height, insets },
       sounds: s.sounds,
     })
@@ -888,7 +917,11 @@ describe('Thomas on build 21 (2026-10-25): "mom" tumbled; Dave’s ruling', () =
   const WORDS_21 = ['mop', 'leg', 'cat', 'rug']
   async function mount21() {
     const s = fakeSounds(wholeMs)
-    const g = await mountGame('critters', { words: WORDS_21, sounds: s.sounds })
+    const g = await mountGame('critters', {
+      hunt: false,
+      words: WORDS_21,
+      sounds: s.sounds,
+    })
     await advance(CRITTERS_OPEN_DELAY_MS + LINE_MS)
     return { ...g, ...s }
   }

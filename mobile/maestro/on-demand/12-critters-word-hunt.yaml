@@ -1,0 +1,70 @@
+# Letter critters' word hunt, one round to completion, on an iPad in
+# landscape (`design/native/critters-word-hunt.md` § 10.3, H26; the shared
+# steps are `../subflows/critters-hunt-{open,beat,end}.yaml`).
+#
+# The `critters-hunt` seed: a learner past cvc-words with short o current
+# (Marian, 2026-10-25) and the round a b g h p t in progress, bag, hat,
+# bat and tap found. The meadow is 3 a row in 2 rows, in round order:
+#
+#   a b g  /  h p t
+#
+# The points are for the iPad Pro 11-inch (M5) simulator in landscape
+# (the README's device; 1210 x 834, insets t0 b20), from `huntScene` with
+# 6 targets: slots at S1, the meadow's rows at y 526 and 630, cells at x
+# 373, 477 and 581; the seats at y 395, x 351, 477 and 603.
+#
+# Screenshots go to Maestro's output (run.sh `--debug-output`, under
+# MAESTRO_OUT/12-critters-word-hunt/).
+appId: host.exp.Exponent
+name: Critters word hunt (iPad landscape)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: critters-hunt
+- setOrientation: LANDSCAPE_LEFT
+- runFlow:
+    file: ../subflows/critters-hunt-open.yaml
+    env:
+      SHOT: hunt-tablet-landscape
+# t-a-g, the completing find. The vowel has no twin: its burrow is ringed.
+- swipe:
+    start: 581, 630
+    end: 351, 395
+    duration: 800
+- swipe:
+    start: 373, 526
+    end: 477, 395
+    duration: 800
+- assertVisible:
+    id: critter-burrow-empty-a
+- swipe:
+    start: 581, 526
+    end: 603, 395
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-hunt-beat.yaml
+    env:
+      SHOT: hunt-tablet-landscape
+# p-a-t, the last slot, after the beat.
+- swipe:
+    start: 477, 630
+    end: 351, 395
+    duration: 800
+- swipe:
+    start: 373, 526
+    end: 477, 395
+    duration: 800
+- swipe:
+    start: 581, 630
+    end: 603, 395
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-hunt-end.yaml
+    env:
+      SHOT: hunt-tablet-landscape
+- setOrientation: PORTRAIT

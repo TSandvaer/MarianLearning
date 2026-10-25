@@ -78,6 +78,8 @@ export interface PlayGameScreenProps {
   /** Critters: the tap-sound player, and the visit's picture words. */
   sounds?: TapClipPlayer
   words?: readonly string[]
+  /** Critters: the word hunt on or off (default: from her steps). */
+  hunt?: boolean
 }
 
 export function PlayGameScreen({
@@ -93,6 +95,7 @@ export function PlayGameScreen({
   shore,
   sounds,
   words,
+  hunt,
 }: PlayGameScreenProps) {
   const reducedMotion = useReducedMotion()
   const [player] = useState<PlayLinePlayer>(
@@ -233,19 +236,20 @@ export function PlayGameScreen({
 
   const A = playArea(layout)
   const frameKey = `${A.x},${A.y},${A.width},${A.height}`
+  const back = backRect(layout)
   const kit: GameKit = {
     ...kitBase,
     area: A,
     tablet: layout.tablet,
     landscape: layout.landscape,
     viewport,
+    back,
     reducedMotion,
     sfx,
     rng,
     cancelKey: `${frameKey}|${hidden ? 'hidden' : 'shown'}`,
   }
 
-  const back = backRect(layout)
   const { ribbon } = layout
   return (
     <>
@@ -269,6 +273,7 @@ export function PlayGameScreen({
             kit={kit}
             sounds={sounds}
             words={words}
+            hunt={hunt}
           />
         )}
 
