@@ -379,7 +379,7 @@ export const CRITTER_NOT_SAID: ReadonlySet<string> = new Set([
  * The words Emma says after the critters sing them, sorted: every real word
  * that is not a picture word, not on `CRITTER_NEVER_SAY` and not on
  * `CRITTER_NOT_SAID`. Each has a whole-word Lily clip
- * (`critterWordLine(word)` in `emmasPath/guidanceLines.ts`); the 17 on
+ * (`critterWordLine(word)` in `emmasPath/guidanceLines.ts`); the 21 on
  * `CRITTER_SAID_PICTURE_WORDS` also have a pack picture.
  */
 export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
@@ -397,9 +397,11 @@ export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
  * 2026-10-23, build 20: "No picture for 'rat'"). The probe reserve's
  * pictured said words (cab, ham, pad, ram) pop by the same rule (Thomas
  * 2026-10-24), and so do _mom_ (Word Song teaches it), _rag_ and _egg_
- * (Dave 2026-10-25), and _mum_, with mom's picture (Dave's word hunt
- * ruling, 2026-10-25, § 6). Pinned here, since core never reads the
- * app's registry; `playPlace.test.ts` checks them against it.
+ * (Dave 2026-10-25); and, for the word hunt (Dave's ruling of
+ * 2026-10-25, § 6), _mum_ with mom's picture and the new pack pictures
+ * _mug_, _sad_, _mud_ and _hug_ (batch 19, Thomas's picks 2026-10-25).
+ * Pinned here, since core never reads the app's registry;
+ * `playPlace.test.ts` checks them against it.
  */
 export const CRITTER_SAID_PICTURE_WORDS: readonly string[] = [
   'bun',
@@ -407,9 +409,12 @@ export const CRITTER_SAID_PICTURE_WORDS: readonly string[] = [
   'egg',
   'gum',
   'ham',
+  'hug',
   'hut',
   'map',
   'mom',
+  'mud',
+  'mug',
   'mum',
   'nap',
   'pad',
@@ -417,6 +422,7 @@ export const CRITTER_SAID_PICTURE_WORDS: readonly string[] = [
   'rag',
   'ram',
   'rat',
+  'sad',
   'tap',
   'top',
 ]

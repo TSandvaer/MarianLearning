@@ -711,22 +711,26 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     ).toEqual([])
   })
 
-  it('C10 (Thomas 2026-10-23, build 20): CRITTER_SAID_PICTURE_WORDS is exactly the said words with a bundled pack picture: 17, sorted', () => {
+  it('C10 (Thomas 2026-10-23, build 20): CRITTER_SAID_PICTURE_WORDS is exactly the said words with a bundled pack picture: 21, sorted', () => {
     const bundled = bundledPictures()
     // The registry read works: every picture word's picture is found.
     for (const w of ALL_45) expect(bundled.has(w)).toBe(true)
     // The probe reserve's pictured said words pop like rat (Thomas
     // 2026-10-24): cab, ham, pad and ram; and mom, rag and egg (Dave
-    // 2026-10-25); and mum, with mom's picture (the word hunt ruling, § 6).
+    // 2026-10-25); and mum, with mom's picture, and the word hunt's four
+    // new pictures, mug, sad, mud and hug (the word hunt ruling, § 6).
     expect(CRITTER_SAID_PICTURE_WORDS).toEqual([
       'bun',
       'cab',
       'egg',
       'gum',
       'ham',
+      'hug',
       'hut',
       'map',
       'mom',
+      'mud',
+      'mug',
       'mum',
       'nap',
       'pad',
@@ -734,6 +738,7 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
       'rag',
       'ram',
       'rat',
+      'sad',
       'tap',
       'top',
     ])
