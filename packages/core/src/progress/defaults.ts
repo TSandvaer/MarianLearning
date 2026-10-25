@@ -327,5 +327,9 @@ export function defaultProgress(childName = 'Marian'): Progress {
     // has no good days yet; `withSeededGoodDays` seeds it from history
     // for any blob that predates the field. See types.ts comment.
     goodDays: {},
+    // Check fold-in migration marker (Dave 2026-10-25 (4b)): a new doc
+    // has no row to keep full. `withKeptFullRows` fills it for any blob
+    // that predates the field. See types.ts comment.
+    keptFullRows: [],
   }
 }

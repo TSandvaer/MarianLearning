@@ -24,6 +24,7 @@ import {
 } from '../progress'
 import {
   goodDayKeysFromHistory,
+  graduationGateClears,
   isGraduationGated,
   nextNode,
   trackOf,
@@ -37,7 +38,8 @@ import type { SessionEndBeat } from '../progress/pathBeats'
  * `world-done`: the flower that finishes the world's last step.
  * `not-yet`: under the good-day score and no flower today yet.
  * `practice`: today's flower was already earned (same-day replay), the
- *   step is already grown, or its full row waits on the graduation check.
+ *   step is already grown, or its row waits on the graduation check (one
+ *   flower short of full, or full, with no flower today).
  */
 export type EndDay =
   | 'good-day'
@@ -184,13 +186,20 @@ function rowOf(input: SessionEndGuidanceInput): Row {
   }
 }
 
-/** Did the row already bank a good day today, before this session? */
+/**
+ * Did the row already bank a good day today, before this session? A good
+ * day held for the graduation check is not today's flower: only a shown
+ * flower sleeps (check fold-in, Dave 2026-10-25 (4)).
+ */
 function earnedTodayBefore(
   input: SessionEndGuidanceInput,
   world: MasteryTrack,
   row: Row,
 ): boolean {
   const p = input.before
+  if (row.vowel === null && nodeProgress(p, input.node).flowerHeld) {
+    return false
+  }
   const percent = getSettings(p).masteryThreshold[world].percent
   const focused = p.history.filter(
     (entry) =>
@@ -308,19 +317,28 @@ export function sessionEndGuidance(
     }
   }
 
-  // A graduation-gated step whose full row did not grow: check half 1, a
-  // check not passed, and the sessions until the retake. No flower can
-  // come today, so the practice ending with every flower grown (Dave's
-  // ruling 2026-10-25): never "Play again to get today's flower."
+  // A graduation-gated step whose row did not grow and waits on the check
+  // (check fold-in, Dave 2026-10-25 (5)): one flower short of full with
+  // the check not passed (part 1, a failed part 2, a held good day, the
+  // plain session after a fail, retake part 1, a weak session), or full
+  // (a row the migration kept full; auto-promote off, in the parent's
+  // queue). No session can promise the flower, so the practice ending:
+  // never "Play again to get today's flower."
+  const gated = !mastered && isGraduationGated(input.node)
+  const fullWaiting = gated && row.now >= row.required
   const waitsOnCheck =
-    !mastered && isGraduationGated(input.node) && row.now >= row.required
+    fullWaiting ||
+    (gated &&
+      !graduationGateClears(input.after.history, input.node) &&
+      row.now >= row.required - 1)
   const earnedToday = !mastered && earnedTodayBefore(input, world, row)
   const praise = line('guide.end.not-yet.praise', 'praise')!
   if (mastered || earnedToday || waitsOnCheck) {
+    // Today's shown flower sleeps; a full row's never does.
     const slots = tray(
       row.required,
       row.now,
-      earnedToday && !waitsOnCheck && crossDay && row.now > 0
+      earnedToday && !fullWaiting && crossDay && row.now > 0
         ? row.now - 1
         : null,
     )

@@ -52,6 +52,7 @@ describe('nodeProgress — basic fields', () => {
     expect(nodeProgress(p, 'add-to-10')).toEqual({
       level: 'locked',
       goodDays: 0,
+      flowerHeld: false,
       requiredDays: 3,
       lastSuccessRate: null,
       unlocksNext: 'add-to-20',
@@ -191,15 +192,29 @@ describe('nodeProgress — cvc-words novel-pool gate', () => {
     entry(3, 'cvc-words', 1),
   ]
 
-  it('days banked but no novel-word check yet → awaiting, rule does not promote', () => {
+  it('days banked but no novel-word check yet → the 3rd flower held, awaiting, rule does not promote (fold-in (4))', () => {
     const p = build(levels({ 'cvc-words': 'practicing' }), threeCanonicalDays)
     const np = nodeProgress(p, 'cvc-words')
-    expect([np.goodDays, np.requiredDays, np.awaitingNovelWordCheck]).toEqual([
-      3,
-      3,
-      true,
-    ])
+    expect([
+      np.goodDays,
+      np.requiredDays,
+      np.flowerHeld,
+      np.awaitingNovelWordCheck,
+    ]).toEqual([2, 3, true, true])
     expect(applyMasteryRule(p).skillLevels['cvc-words']).toBe('practicing')
+  })
+
+  it('a row the migration kept full shows full and is not awaiting (fold-in (4b))', () => {
+    const p = {
+      ...build(levels({ 'cvc-words': 'practicing' }), threeCanonicalDays),
+      keptFullRows: ['cvc-words' as const],
+    }
+    const np = nodeProgress(p, 'cvc-words')
+    expect([np.goodDays, np.flowerHeld, np.awaitingNovelWordCheck]).toEqual([
+      3,
+      false,
+      false,
+    ])
   })
 
   it('novel-word check failed (<0.8) → still awaiting', () => {
@@ -220,13 +235,39 @@ describe('nodeProgress — cvc-words novel-pool gate', () => {
     expect(applyMasteryRule(p).skillLevels['cvc-words']).toBe('mastered')
   })
 
-  it('days not yet banked → not awaiting', () => {
+  it('two of three days, check not passed → shown 2, nothing held, awaiting: one more flower opens the path', () => {
     const p = build(
       levels({ 'cvc-words': 'practicing' }),
       threeCanonicalDays.slice(0, 2),
     )
     const np = nodeProgress(p, 'cvc-words')
-    expect([np.goodDays, np.awaitingNovelWordCheck]).toEqual([2, false])
+    expect([np.goodDays, np.flowerHeld, np.awaitingNovelWordCheck]).toEqual([
+      2,
+      false,
+      true,
+    ])
+  })
+
+  it('one of three days → not awaiting', () => {
+    const p = build(
+      levels({ 'cvc-words': 'practicing' }),
+      threeCanonicalDays.slice(0, 1),
+    )
+    const np = nodeProgress(p, 'cvc-words')
+    expect([np.goodDays, np.awaitingNovelWordCheck]).toEqual([1, false])
+  })
+
+  it('check passed, two days → shown 2, not awaiting (the row fills normally)', () => {
+    const p = build(levels({ 'cvc-words': 'practicing' }), [
+      entry(1, 'cvc-words', 1, { novelPoolSuccessRate: 1 }),
+      entry(2, 'cvc-words', 1),
+    ])
+    const np = nodeProgress(p, 'cvc-words')
+    expect([np.goodDays, np.flowerHeld, np.awaitingNovelWordCheck]).toEqual([
+      2,
+      false,
+      false,
+    ])
   })
 
   it('a non-gated step is never awaiting', () => {

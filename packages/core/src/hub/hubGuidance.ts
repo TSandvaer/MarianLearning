@@ -150,10 +150,17 @@ export function suggestWorld(
  *  - then one next action: "One more flower, and a new path opens!"
  *    after a wake-up when the suggested world is one flower from its
  *    unlock; "Your flower is sleeping. Let's play <other>!" when one
- *    world already has today's flower; "Let's grow a flower in <world>!
- *    Or pick <other>." otherwise;
+ *    world already shows today's flower asleep; "Let's grow a flower in
+ *    <world>! Or pick <other>." otherwise;
  *  - "Both flowers are sleeping. Want to practise more?" when both
- *    worlds have today's flower (no suggestion).
+ *    worlds show today's flower asleep (no suggestion).
+ *
+ * Check fold-in (Dave 2026-10-25 (5)): a suggested world whose row shows
+ * all but its last flower with the check not passed gets "One more
+ * flower, and a new path opens!" in place of the grow line (true, and it
+ * says nothing about today); a row the migration kept full gets no line.
+ * A good day the check holds is not a sleeping flower, so it never brings
+ * a sleeping line.
  */
 export function pickGuidanceLines(opts: {
   numberGarden: HubCardModel
@@ -177,12 +184,16 @@ export function pickGuidanceLines(opts: {
       sug.unlocksNext !== null
     ) {
       lines.push('guide.one-more')
-    } else if (other.earnedToday) {
-      lines.push(`guide.sleeping.${suggestion}`)
-    } else {
-      lines.push(`guide.grow.${suggestion}`)
+    } else if (!sug.keptFullRow) {
+      if (other.flowerSleeping) {
+        lines.push(`guide.sleeping.${suggestion}`)
+      } else if (sug.oneMore) {
+        lines.push('guide.one-more')
+      } else {
+        lines.push(`guide.grow.${suggestion}`)
+      }
     }
-  } else if (numberGarden.earnedToday && wordSong.earnedToday) {
+  } else if (numberGarden.flowerSleeping && wordSong.flowerSleeping) {
     lines.push('guide.both-sleeping')
   }
   return lines

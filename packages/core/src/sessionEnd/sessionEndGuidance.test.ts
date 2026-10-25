@@ -55,6 +55,9 @@ function run(
 
 const ids = (g: ReturnType<typeof run>) => g.lines.map((l) => l.id)
 
+/** The doc with cat words' row kept full by the fold-in's migration. */
+const kept = (p: Progress): Progress => ({ ...p, keptFullRows: ['cvc-words'] })
+
 describe('sessionEndGuidance (Guidance G2)', () => {
   it('good day (1st flower → slot 2 of 3): praise, flower, "Two of three", sleeps tonight', () => {
     const d1 = entry('add-to-10', 4, 1)
@@ -170,9 +173,7 @@ describe('sessionEndGuidance (Guidance G2)', () => {
     expect(last.seconds).toBe(2.4)
   })
 
-  it('a pass with the row already full (the graduation check): the unlock day, tray full, no flower, "A new path opens. Look!"', () => {
-    // Build 21: the row was 3 of 3 before the check, so no flower could
-    // land, and the passed check read as the not-yet day.
+  it('a pass releases the held flower: the unlock day, the 3rd flower lands (check fold-in (2), (5))', () => {
     const days = [3, 4, 5].map((d) => entry('cvc-words', d, 1))
     const today = entry('cvc-words', 6, 1)
     const open = { 'cvc-words': 'practicing' } as const
@@ -183,6 +184,32 @@ describe('sessionEndGuidance (Guidance G2)', () => {
       open,
     )
     const g = run(before, after, 'cvc-words', 8)
+    expect(g.day).toBe('unlock')
+    expect(g.slotsBefore).toEqual(['grown', 'grown', 'empty'])
+    expect(g.slotsAfter).toEqual(['grown', 'grown', 'grown'])
+    expect(g.newSlot).toBe(2)
+    expect(g.countText).toBe('3 of 3!')
+    expect(ids(g)).toEqual([
+      'guide.end.right.8',
+      'guide.end.flower',
+      'guide.end.count.3',
+      'guide.end.path-opens',
+    ])
+  })
+
+  it('a pass with the row already full (a row the migration kept full): the unlock day, tray full, no flower, "A new path opens. Look!"', () => {
+    // Build 21: the row was 3 of 3 before the check, so no flower could
+    // land, and the passed check read as the not-yet day.
+    const days = [3, 4, 5].map((d) => entry('cvc-words', d, 1))
+    const today = entry('cvc-words', 6, 1)
+    const open = { 'cvc-words': 'practicing' } as const
+    const before = kept(doc(days, open, open))
+    const after = doc(
+      [...days, today],
+      { 'cvc-words': 'mastered', 'cvc-words-short-o': 'intro' },
+      open,
+    )
+    const g = run(before, kept(after), 'cvc-words', 8)
     expect(g.day).toBe('unlock')
     expect(g.world).toBe('word-song')
     expect(g.slotsBefore).toEqual(['grown', 'grown', 'grown'])
@@ -252,27 +279,36 @@ describe('sessionEndGuidance (Guidance G2)', () => {
     })
   })
 
-  describe('a cvc-words row full and not grown this session (Dave 2026-10-25)', () => {
-    // Check half 1, a check not passed, and the sessions until the retake
-    // end alike: the practice ending, every flower grown, effort praise
-    // only. No flower can come today, so never "Play again…".
+  describe('a cvc-words row waiting on its check, not grown this session (check fold-in (5))', () => {
+    // Part 1, a failed part 2, a held good day, the plain session after a
+    // fail, retake part 1, a weak session: with the row one flower short
+    // and the check not passed they end alike: the practice ending, effort
+    // praise only. No session can promise the flower, so never "Play
+    // again…".
     const open = { 'cvc-words': 'practicing' } as const
-    const waiting = (todayEarned: boolean) => {
-      const days = [3, 4, todayEarned ? 6 : 5].map((d) =>
-        entry('cvc-words', d, 1),
-      )
-      return run(
-        doc(days, open, open),
-        doc([...days, entry('cvc-words', 6, 1)], open, open),
+    const waiting = (dayList: number[], todayRate = 1) =>
+      run(
+        doc(
+          dayList.map((d) => entry('cvc-words', d, 1)),
+          open,
+          open,
+        ),
+        doc(
+          [
+            ...dayList.map((d) => entry('cvc-words', d, 1)),
+            entry('cvc-words', 6, todayRate),
+          ],
+          open,
+          open,
+        ),
         'cvc-words',
-        8,
+        Math.round(todayRate * 8),
       )
-    }
 
-    it('first session of the day: practice, not the not-yet day', () => {
-      const g = waiting(false)
+    it('the 3rd good day held: practice, the row stays 2 of 3, not the not-yet day', () => {
+      const g = waiting([3, 4])
       expect(g.day).toBe('practice')
-      expect(g.slotsBefore).toEqual(['grown', 'grown', 'grown'])
+      expect(g.slotsBefore).toEqual(['grown', 'grown', 'empty'])
       expect(g.slotsAfter).toEqual(g.slotsBefore)
       expect(g.newSlot).toBeNull()
       expect(g.bonusSlots).toEqual([])
@@ -280,8 +316,43 @@ describe('sessionEndGuidance (Guidance G2)', () => {
       expect(ids(g)).toEqual(['guide.end.not-yet.praise'])
     })
 
-    it('the third flower earned today stays grown, no sleeping slot (separate days on)', () => {
-      const g = waiting(true)
+    it('a weak session at 2 of 3: practice, never "Play again…"', () => {
+      const g = waiting([3, 4], 5 / 8)
+      expect(g.day).toBe('practice')
+      expect(ids(g)).toEqual(['guide.end.not-yet.praise'])
+    })
+
+    it('a good day held earlier today never sleeps (separate days on)', () => {
+      const g = waiting([3, 4, 6])
+      expect(g.day).toBe('practice')
+      expect(g.slotsAfter).toEqual(['grown', 'grown', 'empty'])
+      expect(ids(g)).toEqual(['guide.end.not-yet.praise'])
+    })
+
+    it('today’s 2nd flower, shown, still sleeps on a replay (separate days on)', () => {
+      const g = waiting([4, 6])
+      expect(g.day).toBe('practice')
+      expect(g.slotsAfter).toEqual(['grown', 'sleeping', 'empty'])
+      expect(ids(g)).toEqual(['guide.end.not-yet.praise'])
+    })
+
+    it('a weak session with fewer than 2 of 3 shown: the not-yet day as today', () => {
+      const g = waiting([4], 5 / 8)
+      expect(g.day).toBe('not-yet')
+      expect(ids(g)).toEqual([
+        'guide.end.not-yet.praise',
+        'guide.end.not-yet.again',
+      ])
+    })
+
+    it('a row the migration kept full: practice, every flower grown, no sleeping slot', () => {
+      const days = [3, 4, 6].map((d) => entry('cvc-words', d, 1))
+      const g = run(
+        kept(doc(days, open, open)),
+        kept(doc([...days, entry('cvc-words', 6, 1)], open, open)),
+        'cvc-words',
+        8,
+      )
       expect(g.day).toBe('practice')
       expect(g.slotsAfter).toEqual(['grown', 'grown', 'grown'])
       expect(ids(g)).toEqual(['guide.end.not-yet.praise'])

@@ -326,12 +326,13 @@ export interface SessionHistoryEntry {
    * pool — the existing semantics, unchanged.
    *
    * For graduation sessions (ticket 86c9m3aec, novel-word generalization
-   * check on cvc-words): `canonicalCorrect / canonicalCount` over ONLY
-   * the canonical-pool slice (5–6 problems). The novel-pool slice (2–3
-   * problems drawn from `nap, rat, map, tap`) is recorded separately on
-   * `novelPoolSuccessRate` below. The split is required because the
-   * canonical 90/3 mastery rule per PR #127 gates on the canonical pool
-   * only; the novel pool gates promotion separately at ≥80%.
+   * check on cvc-words): the practised words only, on the 8-problem
+   * scale, `(8 - practised misses) / 8` (check fold-in, Dave 2026-10-25
+   * (2)): a probe never counts for or against the flower, and a probe
+   * session needs the same misses as a plain one (1 at 0.8 and 0.875, 0
+   * at 0.9 and 0.95). Entries written before the fold-in hold
+   * `canonicalCorrect / canonicalCount`. The probe words are recorded
+   * separately on `novelPoolSuccessRate` below.
    */
   successRate: number
   /**
@@ -347,12 +348,11 @@ export interface SessionHistoryEntry {
    * `novelPoolSuccessRate >= 0.80`.
    *
    * Absence is meaningful: it signals "this was a regular (non-
-   * graduation) session" to the graduation-pending detector. Once a
-   * graduation entry has been recorded, the next `threshold.sessions`
-   * cross-day qualifying entries must again all be regular (no
-   * `novelPoolSuccessRate`) before the engine reflags graduation —
-   * matches the AC contract that a failed graduation doesn't
-   * immediately re-trigger another attempt.
+   * graduation) session" to the graduation-pending detector. An entry
+   * with it is a decided attempt; the latest one decides the check
+   * (`mastery.ts` `graduationGateClears`). After a failed attempt the
+   * next forward session is plain practice, then the retake starts
+   * (check fold-in, Dave 2026-10-25 (3)).
    *
    * The reserve check (Dave 2026-10-24, `mastery.ts`
    * `graduationCheckFirstHalf`) spreads 6 probe words over two sessions:
@@ -889,6 +889,18 @@ export interface Progress {
    * history and the Leitner box when read (`seenItems.ts` `seenItemsOf`).
    */
   seenItems?: SeenItems
+  /**
+   * The check fold-in's migration marker (Dave 2026-10-25, ruling (4b)):
+   * the graduation-gated steps whose flower row was already full, its
+   * check not passed, when this build first loaded the doc. Their row
+   * stays full (never take a flower from a child); every other gated row
+   * holds its last flower until the check passes (`nodeProgress.ts`).
+   * Stored once (`storage.ts:withKeptFullRows`, the cloud install mirrors
+   * it), never re-derived: a derived rule would shrink the row after a
+   * failed check. Optional + additive — no `schemaVersion` bump. Absent =
+   * a doc this build has not loaded yet; `[]` = loaded, nothing kept.
+   */
+  keptFullRows?: SkillNode[]
 }
 
 /**

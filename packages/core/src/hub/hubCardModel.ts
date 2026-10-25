@@ -23,7 +23,10 @@ import {
 import { startProgressForActive } from '../learners/startDoc'
 import { landOf } from '../progress/lands'
 import { nodeProgress } from '../progress/nodeProgress'
-import { goodDayKeysFromHistory } from '../progress/mastery'
+import {
+  goodDayKeysFromHistory,
+  graduationGateClears,
+} from '../progress/mastery'
 import { landArtId, type LandArtId } from '../emmasPath/pathArt'
 import { todayKey } from '../progress/clock'
 
@@ -59,8 +62,31 @@ export interface HubCardModel {
    * wake-up (`hubGuidance.ts`).
    */
   slotDays: (string | null)[]
-  /** The current step already banked today's good day (a sleeping flower). */
+  /**
+   * The current step already banked today's good day: no flower can come
+   * today (the suggestion, `canEarnToday`) and a replay is a review
+   * (`reviewPlan.ts` `isReviewSession`). A good day held for the
+   * graduation check counts here but does not sleep (`flowerSleeping`).
+   */
   earnedToday: boolean
+  /**
+   * Today's good day is a SHOWN flower, asleep until tomorrow (the slot,
+   * Emma's sleeping lines). Check fold-in, Dave 2026-10-25 (4): a good day
+   * the check holds never shows as a sleeping slot.
+   */
+  flowerSleeping: boolean
+  /**
+   * The row shows all but its last flower and the graduation check has not
+   * passed: one more flower opens the path (`nodeProgress`'s
+   * `awaitingNovelWordCheck`, the map's nearly-there stop).
+   */
+  oneMore: boolean
+  /**
+   * A row the check fold-in's migration kept full (`Progress.keptFullRows`)
+   * while its check has not passed: it can grow no flower, so Emma says
+   * nothing about the world (Dave 2026-10-25 (5)).
+   */
+  keptFullRow: boolean
   /** Good days still needed before the next step opens; 0 when complete. */
   flowersToUnlock: number
   /** True when every step of the world is mastered. */
@@ -145,9 +171,14 @@ export function buildHubCardModel(
       ? goodDayKeysOf(p, world, current, vowel)
       : []
   const earnedToday = days.includes(today)
+  const flowerSleeping = earnedToday && !cur.flowerHeld
 
   const slots: FlowerSlot[] = Array.from({ length: required }, (_, i) =>
-    i >= good ? 'empty' : earnedToday && i === good - 1 ? 'sleeping' : 'grown',
+    i >= good
+      ? 'empty'
+      : flowerSleeping && i === good - 1
+        ? 'sleeping'
+        : 'grown',
   )
   const pastDays = days.filter((d) => d < today)
   const slotDays = slots.map((slot, i) =>
@@ -164,6 +195,14 @@ export function buildHubCardModel(
     slots,
     slotDays,
     earnedToday,
+    flowerSleeping,
+    oneMore: !complete && cur.awaitingNovelWordCheck,
+    keptFullRow:
+      !complete &&
+      cur.level !== 'mastered' &&
+      cur.goodDays >= cur.requiredDays &&
+      (p.keptFullRows ?? []).includes(current) &&
+      !graduationGateClears(p.history, current),
     flowersToUnlock: complete ? 0 : Math.max(0, required - good),
     complete,
   }

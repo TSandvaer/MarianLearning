@@ -31,7 +31,10 @@ export interface MapStop {
    * true = open (a banked good day). Empty for mastered / locked stops.
    */
   buds: boolean[][]
-  /** cvc-words with every bud open but the novel-word check pending. */
+  /**
+   * cvc-words with every bud open but the last, its check not passed: one
+   * more flower opens the path (`nodeProgress`'s `awaitingNovelWordCheck`).
+   */
   nearlyThere: boolean
 }
 
