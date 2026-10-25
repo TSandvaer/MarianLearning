@@ -218,6 +218,8 @@ P  phone portrait (375×667)              L  phone landscape (667×375)
 
 ## 2. Raft crossing (Number Garden content)
 
+**The island goal and the raft for 20** (Thomas 2026-10-25, "Yes, phase 1"; Dave's ruling): each raft's island has nine homes, one per animal kind, a full island throws a party, and the 10 island's party opens a raft for 20 with its own island. Its spec is `raft-island-goal.md`, a sibling of this file. This section still holds for everything that spec does not change; its build PR makes the amendments listed in that spec's § 12.3.
+
 ### 2.1 Content: the shore (core)
 
 In `playPlace.ts`:
