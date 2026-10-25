@@ -67,6 +67,10 @@ import type { PlannerTrack } from './_planner.js'
 import type { SessionStartResponse } from './_types.js'
 import { isSessionStartResponse } from './_types.js'
 import { renderElevenLabsText } from './_tts_elevenlabs.js'
+import {
+  isCanonPoolLineId,
+  servedCanon,
+} from '../packages/core/src/wire/canonPool.js'
 
 /**
  * Lookup key for a canon entry. Mirrors what the canon generator writes
@@ -249,8 +253,13 @@ export function getCanonEntry(
     return null
   }
 
-  cache.set(cacheKey, parsed)
-  return parsed
+  // The served session only: problems 9+ are the step's pool, which only
+  // the device draws (no-Claude plan phase 5a, `wire/canonPool.ts`). The
+  // web, a review, a peek, a replay and a warm-up get the 8 problems the
+  // file held before its pool.
+  const served = servedCanon(parsed)
+  cache.set(cacheKey, served)
+  return served
 }
 
 /**
@@ -298,11 +307,14 @@ export function getCanonAudioIndex(
             readFileSync(join(canonRoot, track, level, file), 'utf8'),
           ) as {
             utterances?: Array<{
+              id?: string
               text?: string
               audio?: { kind?: string; base64?: string }
             }>
           }
           for (const u of doc.utterances ?? []) {
+            // Served lines only: a pool clip (problems 9+) is the device's.
+            if (typeof u.id === 'string' && isCanonPoolLineId(u.id)) continue
             if (
               typeof u.text === 'string' &&
               u.audio?.kind === 'inline' &&

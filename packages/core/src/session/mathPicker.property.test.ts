@@ -22,6 +22,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { servedCanon } from '../wire/canonPool'
 import {
   mathCompositionViolations,
   parseAddToTenReadLine,
@@ -58,8 +59,12 @@ const LOOP_BUDGET_MS = 60_000
 const CANON = JSON.parse(
   readFileSync('mobile/assets/canon/canon-text.json', 'utf8'),
 ) as Record<string, CanonText>
-const resolve: CanonTextResolver = (key) =>
-  CANON[`${key.track}/level-${key.level}/${key.focusNode}`] ?? null
+// The served 8 of each step: what the device draws until a pool block
+// (problem 9+) is voiced (no-Claude plan phase 5a, composeSession.pool.test.ts).
+const resolve: CanonTextResolver = (key) => {
+  const entry = CANON[`${key.track}/level-${key.level}/${key.focusNode}`]
+  return entry === undefined ? null : servedCanon(entry)
+}
 
 // ── A seeded generator (mulberry32) ───────────────────────────────────────
 

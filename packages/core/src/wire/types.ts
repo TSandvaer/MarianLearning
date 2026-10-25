@@ -123,7 +123,11 @@ export interface SessionStartResponse {
 // track payload names them, and the server copies those blocks out of the
 // canon files with their baked audio (`api/_review.ts`): no planner, no TTS.
 
-/** One canon problem: problem `problem` (1..8) of step `node`'s canon file. */
+/**
+ * One canon problem: problem `problem` of step `node`'s canon file. The
+ * server serves problems 1..8 (`SERVED_CANON_PROBLEMS`, `./canonPool.ts`);
+ * a file's problems 9..N are its pool, which only the device draws.
+ */
 export interface CanonBlockRef {
   node: string
   problem: number

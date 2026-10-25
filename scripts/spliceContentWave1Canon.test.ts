@@ -15,6 +15,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { servedCanon } from '@marian/core/wire/canonPool'
 import {
   PENDING_CANON_NODES,
   activeCombos,
@@ -39,7 +40,9 @@ describe('the content wave 1 math canon is the splice', () => {
   it.each(Object.keys(WAVE_1_PLANS) as Wave1File[])(
     '%s equals spliceWave1()',
     (file) => {
-      expect(spliceWave1(file)).toEqual(committed(file))
+      // The splice writes the served session; problems 9+ are the step's
+      // pool, `generateMathPools.ts`'s (its own drift test).
+      expect(spliceWave1(file)).toEqual(servedCanon(committed(file)))
     },
   )
 
@@ -165,12 +168,14 @@ describe('the pending-canon gate keeps every bake off the spliced files', () => 
   })
 })
 
-describe('every math canon line has rendered audio', () => {
+describe('every served math canon line has rendered audio', () => {
+  // A pool line (problem 9+) may wait for its render: no one serves it
+  // (`canonIntegrity.ts` `unrenderedPoolSlots`).
   it('no empty clip (RED until the Lily render of the new lines)', () => {
     const empty = readdirSync(MATH_CANON_DIR)
       .filter((f) => f.endsWith('.json'))
       .flatMap((f) =>
-        committed(f.replace(/\.json$/, ''))
+        servedCanon(committed(f.replace(/\.json$/, '')))
           .utterances.filter((u) => u.audio.base64 === '')
           .map((u) => `${f} ${u.id} "${u.text}"`),
       )

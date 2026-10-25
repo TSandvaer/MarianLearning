@@ -10,7 +10,11 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { emptyAudioSlots, missingCanonFiles } from './canonIntegrity.ts'
+import {
+  emptyAudioSlots,
+  missingCanonFiles,
+  unrenderedPoolSlots,
+} from './canonIntegrity.ts'
 import { activeCombos } from './generateSessionCanon.ts'
 
 const CANON_ROOT = join(
@@ -21,7 +25,7 @@ const CANON_ROOT = join(
 )
 
 describe('committed canon (public/canon)', () => {
-  it('(a) every committed canon utterance has audio', () => {
+  it('(a) every committed canon utterance the server or the app serves has audio', () => {
     // A failure lists { file, id } for each silent line. Fix: run
     // `npx tsx scripts/revoiceCanonLily.ts --unrendered` before committing.
     expect(emptyAudioSlots(CANON_ROOT)).toEqual([])
@@ -72,6 +76,24 @@ describe('the checks catch a doctored canon', () => {
         file: join('word-song', 'level-1', 'cvc-words.json'),
         id: 'word.p1.read',
       },
+    ])
+  })
+
+  it("(a) leaves a step's pool out: a pool line waits for its render, never served", () => {
+    // No-Claude plan phase 5a: problems 9+ are the step's pool. The server
+    // serves the file without them and the device draws a pool block only
+    // once all its clips are bundled, so an empty pool slot is not silent
+    // to anyone. `unrenderedPoolSlots` lists them (the render's to-do).
+    write('math/level-1/add-to-10.json', {
+      utterances: [
+        { id: 'math.p8.read', text: 'One plus one.', audio: audio('//s=') },
+        { id: 'math.p9.read', text: 'Two plus two.', audio: audio('') },
+        { id: 'math.p9.correct', text: 'Yes!', audio: audio('//s=') },
+      ],
+    })
+    expect(emptyAudioSlots(root)).toEqual([])
+    expect(unrenderedPoolSlots(root)).toEqual([
+      { file: join('math', 'level-1', 'add-to-10.json'), id: 'math.p9.read' },
     ])
   })
 

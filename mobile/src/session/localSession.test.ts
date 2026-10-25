@@ -9,6 +9,7 @@
  */
 import { setApiBase } from '@marian/core/platform/apiUrl'
 import type { CanonText } from '@marian/core/session/composeSession'
+import { servedCanon } from '@marian/core/wire/canonPool'
 import canonText from '../../assets/canon/canon-text.json'
 import { fakePlayerFactory, resetFakePlayers } from '../../test/fakeAudio'
 import { _resetAudioLogForTests, readAudioLog } from '../audio/audioLog'
@@ -95,11 +96,11 @@ describe('startSessionLocalFirst', () => {
       { fetch: fetch as never, engine, files },
     )
     expect(fetch).not.toHaveBeenCalled()
-    expect(prepared.plan).toEqual(CANON['math/level-1/add-to-20']!.plan)
+    // The served session: the file without its pool (phase 5a).
+    const served = servedCanon(CANON['math/level-1/add-to-20']!)
+    expect(prepared.plan).toEqual(served.plan)
     expect(prepared.track).toBe('math')
-    const texts = new Set(
-      CANON['math/level-1/add-to-20']!.utterances.map((u) => u.text),
-    )
+    const texts = new Set(served.utterances.map((u) => u.text))
     expect(prepared.audio.bundledCount).toBe(texts.size)
     expect(prepared.audio.fileCount).toBe(0)
     expect(files.writes).toBe(0)
@@ -281,10 +282,11 @@ describe('startSessionLocalFirst', () => {
     expect(currentSessionAudio()).toBeNull()
   })
 
-  it('every line of every bundled canon file has its bundled clip', () => {
+  it('every served line of every bundled canon file has its bundled clip', () => {
+    // A pool line may wait for its render (phase 5a): `./mathPools.test.ts`.
     const missing: string[] = []
     for (const [path, entry] of Object.entries(CANON)) {
-      for (const u of entry.utterances) {
+      for (const u of servedCanon(entry).utterances) {
         if (canonClipFor(u.text) === undefined) missing.push(`${path} ${u.id}`)
       }
     }
@@ -299,7 +301,13 @@ describe('startSessionLocalFirst', () => {
         level: 1,
         focusNode: 'two-digit-addsub-no-regroup',
       }),
-    ).toBe(CANON['math/level-1/two-digit-addsub'])
+    ).toEqual(
+      bundledCanonText({
+        track: 'math',
+        level: 1,
+        focusNode: 'two-digit-addsub',
+      }),
+    )
   })
 })
 

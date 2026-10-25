@@ -101,7 +101,7 @@ describe('takeAwayTickIndex (AC 2)', () => {
   })
 
   it.each(['sub-to-10', 'sub-to-20'])(
-    'every read and hint 3 in %s.json finds a trigger word',
+    'every read and hint 3 in %s.json, its pool too, finds a trigger word',
     (stem) => {
       const file = join(
         process.cwd(),
@@ -117,7 +117,8 @@ describe('takeAwayTickIndex (AC 2)', () => {
       const lines = doc.plan.utterances.filter((u) =>
         /\.(read|hint3)$/.test(u.id),
       )
-      expect(lines).toHaveLength(16)
+      // 22 facts: the served 8 and the pool's 14 (no-Claude plan phase 5a).
+      expect(lines).toHaveLength(44)
       for (const { text } of lines) {
         const words = text.split(/\s+/).filter(Boolean)
         const word = words[takeAwayTickIndex(text)]!.toLowerCase().replace(

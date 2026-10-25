@@ -9,7 +9,9 @@
  * or replay, a times mix, a warm-up), core's `composeSession` builds the
  * same plan and lines from the bundled canon text
  * (`assets/canon/canon-text.json`, written by `npm run export-audio`), and
- * every line plays its bundled clip (phase 1). No network call, no wait.
+ * every line plays its bundled clip (phase 1). No network call, no wait. A
+ * step's pool block (phase 5a) is drawn only once all its clips are bundled
+ * (`bundledCanonText`).
  * A letter-sounds vowel map past greenfield is built here too (phase 4),
  * with the `currentTargetVowel` the server stamps for the session-end
  * write.
@@ -32,6 +34,7 @@
 import {
   canonTextKey,
   composeSession,
+  playablePoolText,
   type CanonText,
   type CanonTextResolver,
   type ComposeOptions,
@@ -40,6 +43,7 @@ import {
 import type { PlayableUtterance } from '@marian/core/wire/types'
 import canonText from '../../assets/canon/canon-text.json'
 import { recordAudio } from '../audio/audioLog'
+import { canonClipFor } from '../audio/bundledAudio'
 import { loadSessionAudio } from '../audio/sessionAudio'
 import {
   SessionStartError,
@@ -52,12 +56,26 @@ import {
 
 const CANON_TEXT = canonText as unknown as Readonly<Record<string, CanonText>>
 
-/** A canon file's text from the app's bundle; `null`: this build has none. */
+const playable = new Map<string, CanonText>()
+
+/**
+ * A canon file's text from the app's bundle; `null`: this build has none.
+ * A pool block (problem 9+, no-Claude plan phase 5a) is in it only when
+ * every one of its lines has a bundled clip: a block awaiting its Lily
+ * render is never drawn.
+ */
 export const bundledCanonText: CanonTextResolver = (key) => {
   const path = canonTextKey(key)
-  return Object.prototype.hasOwnProperty.call(CANON_TEXT, path)
-    ? CANON_TEXT[path]!
-    : null
+  if (!Object.prototype.hasOwnProperty.call(CANON_TEXT, path)) return null
+  let entry = playable.get(path)
+  if (entry === undefined) {
+    entry = playablePoolText(
+      CANON_TEXT[path]!,
+      (text) => canonClipFor(text) !== undefined,
+    )
+    playable.set(path, entry)
+  }
+  return entry
 }
 
 export interface LocalSessionDeps extends SessionStartDeps {

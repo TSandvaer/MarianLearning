@@ -10,6 +10,7 @@
 
 import type { Page, Request, Route } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
+import { servedCanon } from '@marian/core/wire/canonPool'
 import { holdHubSuggestionStill } from './hubSuggestionStill'
 import {
   canonicalMathSessionResponse,
@@ -165,8 +166,20 @@ export async function installClaudeMock(
 }
 
 /**
+ * A canon file's text as `/api/claude` serves it: without the step's pool
+ * (problems 9+, no-Claude plan phase 5a; `api/_canon.ts` `getCanonEntry`).
+ * A file with no pool comes back byte for byte.
+ */
+export function servedCanonBody(raw: string): string {
+  const doc = JSON.parse(raw) as { utterances: unknown[] }
+  const served = servedCanon(doc)
+  return served === doc ? raw : JSON.stringify(served)
+}
+
+/**
  * Install a `/api/claude` mock that serves the on-disk math canon JSON
- * (read verbatim from `canonPath`) for `track === 'math'` requests.
+ * (read from `canonPath`, as the server serves it: `servedCanonBody`) for
+ * `track === 'math'` requests.
  *
  * Ticket 86c9y490t — promoted to this shared helper after the
  * copy-paste-adapted canon-bytes pattern crossed the third-adopter
@@ -186,7 +199,7 @@ export async function installClaudeMock(
  *   - `canonPath` missing on disk → throws loudly at install time
  *     (canon is required for chip-walk tests; a silent-MP3 placeholder
  *     also fails decode and masks the regression — see §4.1.2/§4.1.3).
- *   - `track === 'math'` → 200 with the canon bytes verbatim,
+ *   - `track === 'math'` → 200 with the served canon's bytes,
  *     regardless of `focusNode`. Tests assert against the served
  *     canon's structural envelope; a non-matching seeded focus fails
  *     loudly (correct behaviour).
@@ -215,7 +228,7 @@ export async function installMathCanonClaudeMock(
         `silently masks the regression.`,
     )
   }
-  const canonBody = readFileSync(canonPath, 'utf-8')
+  const canonBody = servedCanonBody(readFileSync(canonPath, 'utf-8'))
   const requests: Request[] = []
   await page.route('**/api/claude', async (route: Route) => {
     const req = route.request()

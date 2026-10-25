@@ -7,6 +7,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { servedCanon } from '../wire/canonPool'
 import { localDateKey } from '../progress/clock'
 import {
   PICK_PLAN_ID_PREFIX,
@@ -20,8 +21,12 @@ import type { MathPickRequest } from './mathPicker'
 const CANON = JSON.parse(
   readFileSync('mobile/assets/canon/canon-text.json', 'utf8'),
 ) as Record<string, CanonText>
-const resolve: CanonTextResolver = (key) =>
-  CANON[`${key.track}/level-${key.level}/${key.focusNode}`] ?? null
+// The served 8 of each step: what the device draws until a pool block
+// (problem 9+) is voiced (no-Claude plan phase 5a, composeSession.pool.test.ts).
+const resolve: CanonTextResolver = (key) => {
+  const entry = CANON[`${key.track}/level-${key.level}/${key.focusNode}`]
+  return entry === undefined ? null : servedCanon(entry)
+}
 
 const NOW = new Date('2026-10-24T09:00:00.000Z').getTime()
 
@@ -92,7 +97,9 @@ describe('composeSession with a math pick', () => {
   it('without a pick request the session is the canon one (phase 2, unchanged)', () => {
     const out = composeSession(math('add-to-10'), resolve)
     expect(out.kind === 'local' && out.served).toBe('canon')
-    expect(local(out).plan).toBe(CANON['math/level-1/add-to-10']!.plan)
+    expect(local(out).plan).toEqual(
+      servedCanon(CANON['math/level-1/add-to-10']!).plan,
+    )
   })
 
   it('a pick for another step leaves the session alone', () => {
