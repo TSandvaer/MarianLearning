@@ -100,3 +100,22 @@ _2026-10-16 to 2026-10-17 entries are archived verbatim in [`log/decisions-archi
   2. Build 20 (EAS 48a0943c, from f10a29d2) on TestFlight.
   3. e2e's Playwright job runs in mcr.microsoft.com/playwright:v1.59.1-noble (#667): a slow Ubuntu apt mirror had made the browser-deps install take 47-53 min and cancel runs at the 70-min cap (twice on #666, twice on main). Thomas chose a second rerun for #666 and the fix (popups).
 - **Decided by:** Thomas (popups, ear test); Kevin (#667 approach), Devon review.
+
+## 2026-10-24 — No-Claude phases 3-4 merged; Expo 57.0.31; phase 5a starts with no spend; the cat-words probe reserve
+
+- **Decided:**
+  1. #677 (phase 3, the math picker on the device) → 64b8f821, #676 (phase 4, the vowel map) → a24e0560, #679 (Expo 57.0.31) → dace7ab4. Build 22 is held for Marian's build-21 play.
+  2. Phase 5a is built with no render: Kevin writes the closed math pools, scenario C (sizing § 3), as a draft PR. The Lily render gets its own popup with the exact bill.
+  3. Cat-words probe reserve, from Dave's 8 (not 12):
+     - Keep map, nap and rat.
+     - Drop tap.
+     - Add ham, cab, rag, ram and pad.
+     - The check draws the best 6 per learner and passes at 5 of 6.
+     - The 5 new words get pack pictures (OpenAI Flare, contact sheet). Their audio joins the 5a render popup.
+     - Pictured reserve words pop in Letter Critters, the same rule as rat.
+- **Decided by:** Thomas (popups); Dave (the reserve and its ranking); orchestrator (fact set C, as the spec named it). 4. Probe pictures batch 18 ($0.39) approved by Thomas from the contact sheet: ham v1, cab v1, rag v1, ram v2, pad v1. 5. Dave's two rulings for the check:
+  - Reserve order: each attempt takes 6 of the 8, in tiers: never met, then met only in Critters, then last result right, then last result missed (oldest miss first). Every attempt is always 6 words at 5 of 6.
+  - Scoring: probe words are scored on the FIRST tap only. Today a child who taps every chip always passes. Practised words and the 90/3 rule are unchanged.
+  6. Thomas by popup (2026-10-24, late): merge #680 (math pools) and #681 (probe reserve) unrendered, and hold the build. Then render all 291 lines (7,402 Lily chars: #680 266/6,970 + #681 25/432) in one follow-up PR, ear-tested on one filtered voice-QA link.
+  7. 2026-10-25: #681 rebased onto #680 and merged (ae1a2cb6). Render PR #682 merged (b466c93c): 291 lines rendered, of which 272 were billed (~6,917 chars). The other 19 reused cached Lily takes, which the orchestrator approved as under the approved spend. Byte proof (Kevin, re-run by Devon): 3,954 unchanged / 351 newly voiced / 0 other. Thomas by popup: "Merge now, listen after". He ear-tests on #682's per-group links, because `?filter=new` shows 473 against the stale release baseline. Flagged lines go to a re-take PR. Build 22 stays held.
+  8. 2026-10-25: Thomas ear-tested all 311 rows of #682 on its preview (266 math + 45 cvc-words-probe, which includes the 25 new rows) and all passed, 0 fails (voice-QA issues #683-#692). The submit limit (5 per hour per IP) was cleared by switching networks; no code change. No re-take PR is needed. Build 22 stays held for Marian's play on build 21.
