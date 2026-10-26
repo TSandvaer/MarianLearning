@@ -427,6 +427,54 @@ export const CRITTER_SAID_PICTURE_WORDS: readonly string[] = [
   'top',
 ]
 
+/**
+ * The four-letter rounds' targets (Dave's ruling of 2026-10-26, (B), "The
+ * targets, exact"; `design/native/critters-four-letter.md` § 1): 82 CCVC
+ * and CVCC words, by vowel (a 18, o 15, i 7, u 19, e 23). Each has a
+ * whole-word Lily clip (`critterWordLine(word)`). Content only so far: no
+ * round deals them until the four-letter core (F1-F9).
+ */
+export const HUNT_FOUR_TARGETS: ReadonlySet<string> = new Set(
+  [
+    'flag hand lamp clap flap slap snap drag glad flat plan swam camp damp ramp band land sand',
+    'frog pond stop spot plot drop crop flop plop prop trot blob cost soft from',
+    'gift drip grip trip flip clip lift',
+    'drum plum club plug slug spun stun jump bump dump lump pump dust must rust just hunt gulp bulb',
+    'tent nest belt bend lend went sent rent bent dent best rest test vest west felt melt left step stem sled next text',
+  ]
+    .join(' ')
+    .split(' '),
+)
+
+/**
+ * The nine 3-letter words the four-letter phase gives a clip (Dave
+ * 2026-10-26, (B), "New audio"). They stay on `CRITTER_NOT_SAID`, so they
+ * sing and sit, until the four-letter core moves them off it.
+ */
+export const CRITTER_SAID_LATER: readonly string[] = [
+  'act',
+  'add',
+  'ant',
+  'elf',
+  'end',
+  'ill',
+  'its',
+  'odd',
+  'off',
+]
+
+/**
+ * Every word with a whole-word Lily clip, sorted: the said words, the nine
+ * to be said later and the four-letter targets (`critterWordLine(word)`).
+ */
+export const CRITTER_CLIP_WORDS: readonly string[] = [
+  ...new Set([
+    ...CRITTER_SAID_WORDS,
+    ...CRITTER_SAID_LATER,
+    ...HUNT_FOUR_TARGETS,
+  ]),
+].sort()
+
 /** A word whose pack picture is another word's (Dave 2026-10-25, § 6). */
 const CRITTER_PICTURE_ALIAS: Readonly<Record<string, string>> = { mum: 'mom' }
 

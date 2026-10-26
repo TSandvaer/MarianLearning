@@ -7,12 +7,14 @@ import type { Progress, SkillNode, WordSongNode } from '../progress/types'
 import * as PlayPlace from './playPlace'
 import {
   CRITTER_CAP,
+  CRITTER_CLIP_WORDS,
   CRITTER_FUNNY_FROM,
   CRITTER_LEFT_OUT,
   CRITTER_NEVER_SAY,
   CRITTER_NOT_SAID,
   CRITTER_PICTURE_WORDS,
   CRITTER_REAL_WORDS,
+  CRITTER_SAID_LATER,
   CRITTER_SAID_PICTURE_WORDS,
   critterHasPicture,
   critterPictureKey,
@@ -23,6 +25,7 @@ import {
   critterPraise,
   critterRun,
   critterSet,
+  HUNT_FOUR_TARGETS,
   openPlayGames,
   PLAY_GAMES,
   RAFT_ANIMALS,
@@ -777,6 +780,38 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
       expect(critterRun(w)).toBe('quiet')
     for (const w of ['mup', 'egb', 'baf', 'aaa'])
       expect(critterRun(w)).toBe('funny')
+  })
+
+  it('critters four-letter content (Dave 2026-10-26, (B)): HUNT_FOUR_TARGETS is his 82, the nine said later still sit, and every one has a clip word', () => {
+    const byVowel = (v: string) =>
+      [...HUNT_FOUR_TARGETS].filter((w) => w.includes(v))
+    expect(HUNT_FOUR_TARGETS.size).toBe(82)
+    expect(['a', 'o', 'i', 'u', 'e'].map((v) => byVowel(v).length)).toEqual([
+      18, 15, 7, 19, 23,
+    ])
+    for (const w of HUNT_FOUR_TARGETS) {
+      // One short vowel, over the 22 critter letters, never hump.
+      expect(w).toMatch(/^[bcdfghjlmnprstvwx]*[aeiou][bcdfghjlmnprstvwx]*$/)
+      expect(w).toHaveLength(4)
+    }
+    expect(HUNT_FOUR_TARGETS.has('hump')).toBe(false)
+    // Content only: a run of three never spells one, and the nine still
+    // sing and sit until the four-letter core moves them.
+    expect(CRITTER_SAID_LATER).toEqual(
+      'act add ant elf end ill its odd off'.split(' '),
+    )
+    for (const w of CRITTER_SAID_LATER) {
+      expect(CRITTER_NOT_SAID.has(w)).toBe(true)
+      expect(critterRun(w)).toBe('quiet')
+    }
+    expect(CRITTER_CLIP_WORDS).toEqual(
+      [
+        ...CRITTER_SAID_WORDS,
+        ...CRITTER_SAID_LATER,
+        ...HUNT_FOUR_TARGETS,
+      ].sort(),
+    )
+    expect(CRITTER_CLIP_WORDS).toHaveLength(254)
   })
 
   it('C10 (Dave’s safeguard, Thomas 2026-10-22): with funny false, a non-word is quiet; every other run is unchanged', () => {

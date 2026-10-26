@@ -4,10 +4,13 @@ import { describe, expect, it } from 'vitest'
 import { LITERACY_TREE, MATH_TREE } from '../progress/mastery'
 import type { SkillNode } from '../progress/types'
 import {
+  CRITTER_CLIP_WORDS,
   CRITTER_NEVER_SAY,
   CRITTER_NOT_SAID,
   CRITTER_PICTURE_WORDS,
+  CRITTER_SAID_LATER,
   CRITTER_SAID_WORDS,
+  HUNT_FOUR_TARGETS,
 } from '../games/playPlace'
 import { STAGE_SPOKEN_NAMES } from '../sessionEnd/friendlyNodeName'
 import {
@@ -66,23 +69,26 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'story-word': 87,
       // Learner profiles § 1.3 (T5): the picker's "Who is playing?".
       'picker-who': 1,
-      // The Play place and its two games (play-place spec § 4.1).
-      play: 19,
+      // The Play place and its two games (play-place spec § 4.1), and the
+      // four-letter rounds' open line (Dave 2026-10-26).
+      play: 20,
       // The locked-stop peek prompt (locked-stop-peek-prompt § 3).
       'map-peek-ask-locked': 1,
       'map-peek-ask': 1,
       // The letter critters' said words (Thomas 2026-10-22; Dave
-      // 2026-10-25: 7 more).
-      'play-word': 163,
+      // 2026-10-25: 7 more; Dave 2026-10-26: the nine said later and the
+      // 82 four-letter targets).
+      'play-word': 254,
     })
-    expect(GUIDANCE_LINES).toHaveLength(490)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(490)
+    expect(GUIDANCE_LINES).toHaveLength(582)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(582)
     // Bee, car, snail and moon words' leads are duck words' text (content
-    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories', and five
+    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories', and twelve
     // critter words' captions are story words' ("And.", "Got.", "Hid.",
-    // "Ran.", "Sat."): 490 ids, 480 texts, 490 files.
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(480)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(490)
+    // "Ran.", "Sat."; since Dave 2026-10-26 "Drum.", "Frog.", "Lamp.",
+    // "Nest.", "Plum.", "Pond.", "Tent."): 582 ids, 565 texts, 582 files.
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(565)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(582)
   })
 
   it('AC8: both replay sets, one line per STAGE_SPOKEN_NAMES step, with the exact texts (map-tap-to-play § 6, T1 approved 2026-10-17)', () => {
@@ -407,7 +413,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(490)
+    ).toHaveLength(582)
   })
 
   it('repeats no Emma’s Path line', () => {
@@ -518,7 +524,10 @@ const NUMBER = [
 ] as const
 const Cap = (w: string) => `${w.charAt(0).toUpperCase()}${w.slice(1)}`
 
-/** Play-place spec § 4.1, row by row: the 19 lines of the Play place. */
+/**
+ * Play-place spec § 4.1, row by row: the 19 lines of the Play place, then
+ * the four-letter rounds' open line (critters four-letter spec § 1).
+ */
 function expectedPlayLines(): { id: string; text: string; input?: string }[] {
   return [
     { id: 'guide.play.open', text: 'What shall we play?' },
@@ -545,13 +554,17 @@ function expectedPlayLines(): { id: string; text: string; input?: string }[] {
     },
     { id: 'guide.play.critters.funny.2', text: 'Hmm! What could that mean?' },
     { id: 'guide.play.critters.funny.3', text: 'Hee hee! Is that a word?' },
+    {
+      id: 'guide.play.critters.open.four',
+      text: 'Drag four letters up to the log. Can you make these words?',
+    },
   ]
 }
 
 describe('the Play place lines (play-place spec § 4)', () => {
   const play = GUIDANCE_LINES.filter((l) => l.kind === 'play')
 
-  it('C7: leaves the 306 shipped lines unchanged and appends the 19 play lines', () => {
+  it('C7: leaves the 306 shipped lines unchanged and appends the 20 play lines', () => {
     // FNV-1a over the JSON of id, kind, world, text, input and src, in
     // order, of the 306 lines before the play lines: the 336 on main at
     // a8abb91b (50199, 9a6b2645) less the 30 game lines retired by the
@@ -574,7 +587,7 @@ describe('the Play place lines (play-place spec § 4)', () => {
       hash = Math.imul(hash, 0x01000193) >>> 0
     }
     expect([shipped.length, hash.toString(16)]).toEqual([46755, 'c9263c74'])
-    expect(GUIDANCE_LINES.slice(306, 325)).toEqual(play)
+    expect(GUIDANCE_LINES.slice(306, 326)).toEqual(play)
   })
 
   it('C7: has the exact texts of § 4.1, world-free, the path src, inputs only on the totals', () => {
@@ -593,13 +606,14 @@ describe('the Play place lines (play-place spec § 4)', () => {
     )
     // About 250 Lily characters (T3); 242 when "Splash!" left, 308 with the
     // critters' new open line and three non-word lines (Thomas 2026-10-22),
-    // 322 with the open line naming the drag (53 → 67, Thomas 2026-10-23).
-    // The inputs are as long as the texts.
-    expect(play.reduce((n, l) => n + l.text.length, 0)).toBe(322)
-    expect(play.reduce((n, l) => n + (l.input ?? l.text).length, 0)).toBe(322)
+    // 322 with the open line naming the drag (53 → 67, Thomas 2026-10-23),
+    // 380 with the four-letter open line (58, Dave 2026-10-26). The inputs
+    // are as long as the texts.
+    expect(play.reduce((n, l) => n + l.text.length, 0)).toBe(380)
+    expect(play.reduce((n, l) => n + (l.input ?? l.text).length, 0)).toBe(380)
   })
 
-  it('C7: the 19 play lines are rendered in Lily (none awaits its render)', () => {
+  it('C7: the 20 play lines are rendered in Lily (none awaits its render)', () => {
     expect(
       play.filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id)),
     ).toEqual([])
@@ -613,14 +627,15 @@ describe('the Play place lines (play-place spec § 4)', () => {
       (l) => l.id.startsWith('guide.play.') && l.kind !== 'play-word',
     )
     expect(scoped).toEqual(play)
-    expect(scoped).toHaveLength(19)
+    expect(scoped).toHaveLength(20)
     for (const l of scoped) expect(l.text).not.toMatch(banned)
-    // Out of scope by name: "Win." is the one read-back word that hits.
+    // Out of scope by name: "Next." and "Win." are the read-back words
+    // that hit.
     expect(
       GUIDANCE_LINES.filter(
         (l) => l.kind === 'play-word' && banned.test(l.text),
       ).map((l) => l.id),
-    ).toEqual(['guide.play.critters.word.win'])
+    ).toEqual(['guide.play.critters.word.next', 'guide.play.critters.word.win'])
   })
 
   it('C8: no line outside guide.play.* is a play line', () => {
@@ -638,7 +653,7 @@ describe('the locked-stop peek prompt lines (locked-stop-peek-prompt § 3)', () 
   const ask = GUIDANCE_LINES.filter((l) => l.kind.startsWith('map-peek-ask'))
 
   it('AC 1: appends the two lines with the exact texts, world-free, the path src', () => {
-    expect(GUIDANCE_LINES.slice(325, 327)).toEqual(ask)
+    expect(GUIDANCE_LINES.slice(326, 328)).toEqual(ask)
     expect(ask).toEqual([
       {
         id: 'guide.map.peek-ask.locked',
@@ -677,10 +692,10 @@ describe('the letter critters’ said words (Thomas 2026-10-22)', () => {
   const words = GUIDANCE_LINES.filter((l) => l.kind === 'play-word')
   const cap = (w: string) => `${w.charAt(0).toUpperCase()}${w.slice(1)}`
 
-  it('one line per CRITTER_SAID_WORDS word, in its order, last in the catalogue', () => {
-    expect(GUIDANCE_LINES.slice(327)).toEqual(words)
+  it('one line per CRITTER_CLIP_WORDS word, in its order, last in the catalogue', () => {
+    expect(GUIDANCE_LINES.slice(328)).toEqual(words)
     expect(words).toEqual(
-      CRITTER_SAID_WORDS.map((w) => ({
+      CRITTER_CLIP_WORDS.map((w) => ({
         id: `guide.play.critters.word.${w}`,
         kind: 'play-word',
         world: null,
@@ -693,14 +708,15 @@ describe('the letter critters’ said words (Thomas 2026-10-22)', () => {
       })),
     )
     // 163 inputs of four characters each, two of them five (Dave
-    // 2026-10-25's seven: 28 characters).
-    expect(words.reduce((n, l) => n + l.input!.length, 0)).toBe(654)
+    // 2026-10-25's seven: 28 characters); then the nine said later (36)
+    // and the 82 four-letter targets (410, Dave 2026-10-26).
+    expect(words.reduce((n, l) => n + l.input!.length, 0)).toBe(1100)
     expect(
       words.filter((l) => /^(Sat|Wed),$/.test(l.input!)).map((l) => l.id),
     ).toEqual([])
   })
 
-  it('the 163 are rendered in Lily (none awaits its render)', () => {
+  it('the 254 are rendered in Lily (none awaits its render)', () => {
     expect(
       words.filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id)),
     ).toEqual([])
@@ -712,9 +728,29 @@ describe('the letter critters’ said words (Thomas 2026-10-22)', () => {
     for (const w of [
       ...CRITTER_PICTURE_WORDS,
       ...CRITTER_NEVER_SAY,
-      ...CRITTER_NOT_SAID,
+      ...[...CRITTER_NOT_SAID].filter((w) => !CRITTER_SAID_LATER.includes(w)),
       'tup',
     ])
       expect(critterWordLine(w)).toBeUndefined()
+  })
+
+  it('F9 (critters four-letter spec): critterWordLine finds the 82 four-letter targets and the nine said later, caption "<W>.", input "<W>,"', () => {
+    const clipped = [...HUNT_FOUR_TARGETS, ...CRITTER_SAID_LATER]
+    expect(clipped).toHaveLength(91)
+    for (const w of clipped)
+      expect(critterWordLine(w)).toEqual({
+        id: `guide.play.critters.word.${w}`,
+        kind: 'play-word',
+        world: null,
+        text: `${cap(w)}.`,
+        input: `${cap(w)},`,
+        src: `/assets/audio/path/guide-play-critters-word-${w}.mp3`,
+      })
+    // The render's bill (Dave 2026-10-26): 92 lines, 504 input characters.
+    const open = guidanceLine('guide.play.critters.open.four')!
+    expect(
+      clipped.reduce((n, w) => n + critterWordLine(w)!.input!.length, 0) +
+        open.text.length,
+    ).toBe(504)
   })
 })
