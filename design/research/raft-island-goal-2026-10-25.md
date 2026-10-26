@@ -50,6 +50,8 @@ RULING. E = cited or computed evidence, R = my reasoning. "Computed" means an in
   - It changes play-place.md:304 and ACs N8 and V5.
   - Developer note: RaftCrossing.tsx:378-380 runs kit.done from the close line's end, so the bounce must run it instead.
 
+  > **Superseded 2026-10-26 (an editor's note, not Dave's text):** there is no ordinary trip end any more (Dave's build-23 ruling (C), `build23-games-2026-10-26.md`).
+
 (3) LEVEL UP
 
 - What opens the 20 raft: a full 10 island, and nothing else, for every learner who has the raft (add-to-10 current or mastered, playPlace.ts:24). It does not wait for add-to-20, and no step opens it without the island: one door. It stays open (no re-lock).
@@ -85,6 +87,9 @@ RULING. E = cited or computed evidence, R = my reasoning. "Computed" means an in
 (4) TRIP AND GOAL TOGETHER
 
 - A trip is still one visit of up to 3 crossings (RAFT_CROSSINGS, playPlace.ts:56) from a fresh shore. It ends at the third crossing or at the party, whichever comes first.
+
+  > **Superseded 2026-10-26 (an editor's note, not Dave's text):** Dave's build-23 ruling (C) (`build23-games-2026-10-26.md`) removes the cap: "ends at the third crossing or at the party, whichever comes first" becomes "ends at the party", and a trip also ends when she taps Back. See `design/native/raft-island-goal.md` § 6.
+
 - The island carries over between trips (1). The shore, the crossing count and the stuck counter do not.
 - Back mid-trip: the island keeps every kind that has landed.
 - With one raft open the game starts on its shore, as today, and a trip end goes to the Play place (play-place.md:305).
