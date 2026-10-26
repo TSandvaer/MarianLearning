@@ -17,12 +17,15 @@
 #
 # Drags are swipes between points: Maestro can't VoiceOver-activate. The
 # points are for the iPad Pro 11-inch (M5) simulator in portrait (the
-# README's device; 834 x 1210, insets t0 b20), from `critterScene` there
-# with all 22 critters (c 88, g 16, 7 a row, 4 rows), which this screen
-# shows on every visit (`crittersFitBothWays`): the meadow is the vowels,
-# then the consonants alphabetically, so every cell is fixed. Rows at y
-# 707, 811, 915 and 1019, cell k of a row at x 105 + 104 k (the last row,
-# x alone, at 417); the log's seats at y 576, x 291, 417 and 543.
+# README's device; 834 x 1210, insets t32 b20 in Expo Go 58, whose status
+# bar shows: SDK 58's scene life cycle ignores `<StatusBar hidden />`, and
+# only a native build hides it, through app.json), from `critterScene`
+# there with all 22 critters (c 88, g 16, 7 a row, 4 rows), which this
+# screen shows on every visit (`crittersFitBothWays`): the meadow is the
+# vowels, then the consonants alphabetically, so every cell is fixed. Rows
+# at y 723, 827, 931 and 1035, cell k of a row at x 105 + 104 k (the last
+# row, x alone, at 417); the log's seats at y 592, x 291, 417 and 543.
+# (Expo Go 57 hid the bar: t0, and every y here was 16 less.)
 #
 #   a e i o u b c  /  d f g h j l m  /  n p r s t v w  /  x
 #
@@ -98,16 +101,16 @@ tags:
 
 # A run of three: a, e, i (row 1, cells 0, 1, 2) onto the three seats.
 - swipe:
-    start: 105, 707
-    end: 291, 576
+    start: 105, 723
+    end: 291, 592
     duration: 800
 - swipe:
-    start: 209, 707
-    end: 417, 576
+    start: 209, 723
+    end: 417, 592
     duration: 800
 - swipe:
-    start: 313, 707
-    end: 543, 576
+    start: 313, 723
+    end: 543, 592
     duration: 800
 - extendedWaitUntil:
     visible:
@@ -136,16 +139,16 @@ tags:
 # A picture word: "bib" (b is row 1 cell 5, i cell 2; the burrow's twin
 # lets a letter sit twice).
 - swipe:
-    start: 625, 707
-    end: 291, 576
+    start: 625, 723
+    end: 291, 592
     duration: 800
 - swipe:
-    start: 313, 707
-    end: 417, 576
+    start: 313, 723
+    end: 417, 592
     duration: 800
 - swipe:
-    start: 625, 707
-    end: 543, 576
+    start: 625, 723
+    end: 543, 592
     duration: 800
 - extendedWaitUntil:
     visible:
@@ -172,16 +175,16 @@ tags:
 # barely waits to settle: Emma's breathing keeps the screen from settling,
 # and the default wait (8-12 s) outlasts the whole run.
 - swipe:
-    start: 313, 915
-    end: 291, 576
+    start: 313, 931
+    end: 291, 592
     duration: 800
 - swipe:
-    start: 105, 707
-    end: 417, 576
+    start: 105, 723
+    end: 417, 592
     duration: 800
 - swipe:
-    start: 521, 915
-    end: 543, 576
+    start: 521, 931
+    end: 543, 592
     duration: 800
     waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
@@ -205,16 +208,16 @@ tags:
 # a row 1 cell 0, m row 2 cell 6). The sounds, Emma says "Ham.", then the
 # ham picture, then the shelf clears, as for rat.
 - swipe:
-    start: 417, 811
-    end: 291, 576
+    start: 417, 827
+    end: 291, 592
     duration: 800
 - swipe:
-    start: 105, 707
-    end: 417, 576
+    start: 105, 723
+    end: 417, 592
     duration: 800
 - swipe:
-    start: 729, 811
-    end: 543, 576
+    start: 729, 827
+    end: 543, 592
     duration: 800
     waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
@@ -237,16 +240,16 @@ tags:
 # 3) and "egg" (e row 1 cell 1, g row 2 cell 2 twice). The sounds, Emma
 # says the word, her caption with it, then its picture.
 - swipe:
-    start: 729, 811
-    end: 291, 576
+    start: 729, 827
+    end: 291, 592
     duration: 800
 - swipe:
-    start: 417, 707
-    end: 417, 576
+    start: 417, 723
+    end: 417, 592
     duration: 800
 - swipe:
-    start: 729, 811
-    end: 543, 576
+    start: 729, 827
+    end: 543, 592
     duration: 800
     waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
@@ -270,16 +273,16 @@ tags:
 - waitForAnimationToEnd:
     timeout: 1500
 - swipe:
-    start: 209, 707
-    end: 291, 576
+    start: 209, 723
+    end: 291, 592
     duration: 800
 - swipe:
-    start: 313, 811
-    end: 417, 576
+    start: 313, 827
+    end: 417, 592
     duration: 800
 - swipe:
-    start: 313, 811
-    end: 543, 576
+    start: 313, 827
+    end: 543, 592
     duration: 800
     waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
