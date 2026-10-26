@@ -10,9 +10,10 @@
  * Save-on-change, as on the web: every control writes the next Progress
  * through `deps.save` at once. Nothing is written on mount (the device ID
  * read creates one only if none is stored, idempotently), so re-entry and
- * the QA route are safe. On mount the held iOS audio session is released
- * (§ 6). Done and Android back → Hub. The screen handles the keyboard
- * itself (§ 4): bottom padding plus scroll-into-view for the restore field.
+ * the QA route are safe. While it is up the held iOS audio session is
+ * released, and re-enabled before any exit (§ 6). Done and Android back →
+ * Hub. The screen handles the keyboard itself (§ 4): bottom padding plus
+ * scroll-into-view for the restore field.
  *
  * Debug only: with `onQaJump` (App passes it only when the debug launch
  * flag is on) a "QA: jump to a step" row ends the column and opens the
@@ -81,7 +82,7 @@ import {
   type ScrollViewInstance,
 } from 'react-native'
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated'
-import { releaseAudioSession } from '../../audio/lifecycle'
+import { quietAudioSession } from '../../audio/lifecycle'
 import type { ParentSettingsLayout } from '../../layout/parentSettingsLayout'
 import { FILL } from '../../theme'
 import { BackupSection } from './BackupSection'
@@ -136,8 +137,11 @@ export interface ParentSettingsProps {
   depsFor?: (learner: LearnerEntry) => ParentSettingsDeps
   /** Test seam: Add from a code's read. */
   addFromBackup?: AddFromBackupFn
-  /** Test seam: releases the held iOS audio session on mount. */
-  releaseAudio?: () => void
+  /**
+   * Test seam: releases the held iOS audio session while the screen is
+   * up; the returned end re-enables playback.
+   */
+  quietAudio?: () => () => Promise<void>
   /**
    * Debug only: shows the QA step picker. Called after a jump (or the
    * reset to the real start) was written; App restarts on the Hub.
@@ -175,7 +179,7 @@ export function ParentSettings({
   deps: fixedDeps,
   depsFor = learnerParentSettingsDeps,
   addFromBackup,
-  releaseAudio = releaseAudioSession,
+  quietAudio = quietAudioSession,
   onQaJump,
 }: ParentSettingsProps) {
   const reducedMotion = useReducedMotion()
@@ -205,10 +209,21 @@ export function ParentSettings({
   }>({ line: null, seq: 0 })
   const [focusName, setFocusName] = useState(false)
 
-  // § 6: this screen plays nothing; let music Emma paused resume.
+  // § 6: this screen plays nothing; let music Emma paused resume. Every
+  // way out re-enables playback first (expo-audio 58 ignores play() until
+  // then), so the next screen's first line is heard.
+  const endQuiet = useRef<(() => Promise<void>) | null>(null)
   useEffect(() => {
-    releaseAudio()
-  }, [releaseAudio])
+    const end = quietAudio()
+    endQuiet.current = end
+    return () => {
+      void end()
+    }
+  }, [quietAudio])
+  const leaveQuiet = useCallback(
+    () => endQuiet.current?.() ?? Promise.resolve(),
+    [],
+  )
 
   const [sheet, setSheet] = useState<Sheet>({ kind: 'none' })
   const leaving = useRef(false)
@@ -216,14 +231,15 @@ export function ParentSettings({
     if (leaving.current) return
     leaving.current = true
     Keyboard.dismiss()
-    onExit({
+    const exit = {
       learnersChanged: !sameLearners(
         entryList,
         readList(fixedDeps !== undefined),
       ),
       playingDocMoved: movedPlaying.current,
-    })
-  }, [onExit, entryList, fixedDeps])
+    }
+    void leaveQuiet().then(() => onExit(exit))
+  }, [onExit, entryList, fixedDeps, leaveQuiet])
   const back = useCallback(() => {
     if (sheet.kind !== 'none') setSheet({ kind: 'none' })
     else done()
@@ -500,7 +516,7 @@ export function ParentSettings({
           layout={layout}
           current={sheet.current}
           onClose={closeSheet}
-          onJumped={onQaJump}
+          onJumped={() => void leaveQuiet().then(onQaJump)}
           copy={learnerSettingsCopy(
             playing?.name ??
               (deps.load() ?? startProgressForActive()).profile.childName,

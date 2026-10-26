@@ -128,7 +128,7 @@ async function mount(
     <ParentSettings
       layout={PHONE}
       onExit={onExit}
-      releaseAudio={() => {}}
+      quietAudio={() => () => Promise.resolve()}
       {...props}
     />,
   )

@@ -98,17 +98,18 @@ export async function mount(
   onQaJump?: () => void,
 ) {
   const onExit = jest.fn()
-  const releaseAudio = jest.fn()
+  const endQuiet = jest.fn(() => Promise.resolve())
+  const quietAudio = jest.fn(() => endQuiet)
   const utils = await render(
     <ParentSettings
       layout={layout}
       onExit={onExit}
       deps={fake.deps}
-      releaseAudio={releaseAudio}
+      quietAudio={quietAudio}
       onQaJump={onQaJump}
     />,
   )
-  return { ...fake, onExit, releaseAudio, ...utils }
+  return { ...fake, onExit, quietAudio, endQuiet, ...utils }
 }
 
 export async function advance(ms: number): Promise<void> {

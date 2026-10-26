@@ -9,15 +9,23 @@ import {
   defaultProgress,
   type Progress,
 } from '@marian/core/progress'
-import { fireEvent, screen } from '@testing-library/react-native'
+import { fireEvent, render, screen } from '@testing-library/react-native'
 import { BackHandler, Keyboard } from 'react-native'
+import { _resetAudioSessionForTests } from '../../audio/lifecycle'
+import {
+  FakePlayer,
+  fakeAudioEnabled,
+  resetFakePlayers,
+} from '../../../test/fakeAudio'
 import {
   fakeDeps,
   flat,
+  flushPromises,
   mount,
   PHONE,
   TABLET,
 } from '../../../test/parentSettingsHarness'
+import { ParentSettings } from './ParentSettings'
 
 const ROW_ID = /^parent-settings-(toggle|row)-(.+)$/
 
@@ -198,7 +206,40 @@ describe('pending-promotion banner', () => {
 describe('entry and exit', () => {
   it('releases the iOS audio session once on mount', async () => {
     const h = await mount()
-    expect(h.releaseAudio).toHaveBeenCalledTimes(1)
+    expect(h.quietAudio).toHaveBeenCalledTimes(1)
+    expect(h.endQuiet).not.toHaveBeenCalled()
+  })
+
+  it('Done re-enables playback, then exits', async () => {
+    const h = await mount()
+    await fireEvent.press(screen.getByTestId('parent-settings-done'))
+    expect(h.endQuiet).toHaveBeenCalled()
+    expect(h.endQuiet.mock.invocationCallOrder[0]).toBeLessThan(
+      h.onExit.mock.invocationCallOrder[0]!,
+    )
+  })
+
+  it('open → Done: a play is allowed by the time the next screen mounts (expo-audio 58 gate)', async () => {
+    resetFakePlayers()
+    _resetAudioSessionForTests()
+    let audioAtExit: boolean | null = null
+    const onExit = jest.fn(() => {
+      audioAtExit = fakeAudioEnabled()
+    })
+    // The real session wiring: no quietAudio seam.
+    await render(
+      <ParentSettings layout={PHONE} onExit={onExit} deps={fakeDeps().deps} />,
+    )
+    await flushPromises()
+    expect(fakeAudioEnabled()).toBe(false) // released while up (§ 6)
+
+    await fireEvent.press(screen.getByTestId('parent-settings-done'))
+    await flushPromises()
+    expect(onExit).toHaveBeenCalledTimes(1)
+    expect(audioAtExit).toBe(true)
+    const next = new FakePlayer(1)
+    next.play()
+    expect(next.calls).toEqual(['play'])
   })
 
   it('Done closes the keyboard, then exits once (a double tap exits once)', async () => {
@@ -218,6 +259,7 @@ describe('entry and exit', () => {
     const h = await mount()
     const handler = add.mock.calls.at(-1)![1] as () => boolean
     expect(handler()).toBe(true)
+    await flushPromises()
     expect(h.onExit).toHaveBeenCalledTimes(1)
     add.mockRestore()
   })

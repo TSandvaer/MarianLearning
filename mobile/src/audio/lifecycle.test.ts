@@ -3,10 +3,14 @@ import {
   type AppStateSource,
 } from '../lifecycle/appVisibility'
 import {
+  FakePlayer,
+  fakeAudioEnabled,
   fakePlayerFactory,
   fakePlayers,
+  flush,
   resetFakePlayers,
   setAudioModeAsync,
+  setIsAudioActiveAsync,
 } from '../../test/fakeAudio'
 import { createAudioEngine } from './engine'
 import {
@@ -14,6 +18,8 @@ import {
   _resetAudioSessionForTests,
   configureAudioSession,
   installAudioLifecycle,
+  quietAudioSession,
+  reactivateAudioSession,
   releaseAudioSession,
 } from './lifecycle'
 import { START_TIMEOUT_MS } from './linePlayback'
@@ -83,6 +89,7 @@ describe('audio session', () => {
 describe('audio lifecycle (web: useHowlerSuspendOnHide + pendingResumeGate)', () => {
   beforeEach(() => {
     resetFakePlayers()
+    _resetAudioSessionForTests()
     jest.useFakeTimers()
   })
   afterEach(() => jest.useRealTimers())
@@ -107,6 +114,7 @@ describe('audio lifecycle (web: useHowlerSuspendOnHide + pendingResumeGate)', ()
     expect(ticks).toEqual([0, 1])
 
     appState.set('active')
+    await flush() // play() is allowed again (expo-audio 58)
     expect(p.calls).toEqual(['play', 'pause', 'play'])
     p.emit({ playing: true, currentTime: 1.1 })
     expect(ticks).toEqual([0, 1, 2])
@@ -115,7 +123,7 @@ describe('audio lifecycle (web: useHowlerSuspendOnHide + pendingResumeGate)', ()
     expect(ticks).toEqual([0, 1, 2, 3])
   })
 
-  it('does not double-play when expo-audio already resumed the clip on foreground', () => {
+  it('does not double-play when expo-audio already resumed the clip on foreground', async () => {
     const { appState, speak } = setup()
     void speak('greet:hi', 'Hi!')
     const p = fakePlayers[0]
@@ -123,6 +131,7 @@ describe('audio lifecycle (web: useHowlerSuspendOnHide + pendingResumeGate)', ()
     appState.set('background')
     p.emit({ playing: true }) // the native foreground resume landed first
     appState.set('active')
+    await flush()
     expect(p.calls).toEqual(['play', 'pause'])
   })
 
@@ -132,6 +141,7 @@ describe('audio lifecycle (web: useHowlerSuspendOnHide + pendingResumeGate)', ()
     appState.set('background')
     jest.advanceTimersByTime(START_TIMEOUT_MS * 3)
     appState.set('active')
+    await flush()
     const p = fakePlayers[0]
     expect(p.calls).toEqual(['play', 'pause', 'play'])
     p.start(0.6)
@@ -153,8 +163,10 @@ describe('audio lifecycle (web: useHowlerSuspendOnHide + pendingResumeGate)', ()
     expect(engine.voice.activeLabel).toBeNull()
 
     appState.set('active')
+    await flush()
     expect(fakePlayers).toHaveLength(2)
     expect(engine.voice.activeLabel).toBe('session:s:p1')
+    expect(fakePlayers[1].calls).toEqual(['play'])
     fakePlayers[1].start(1)
     fakePlayers[1].finish()
     await expect(math).resolves.toBeUndefined()
@@ -167,6 +179,7 @@ describe('audio lifecycle (web: useHowlerSuspendOnHide + pendingResumeGate)', ()
     const second = speak('session:s:p2', 'Two.')
     await expect(first).rejects.toThrow('cancelled')
     appState.set('active')
+    await flush()
     expect(engine.voice.activeLabel).toBe('session:s:p2')
     fakePlayers[0].start(0.5)
     fakePlayers[0].finish()
@@ -180,6 +193,7 @@ describe('audio lifecycle (web: useHowlerSuspendOnHide + pendingResumeGate)', ()
     engine.cancelVoice()
     await expect(queued).rejects.toThrow('cancelled')
     appState.set('active')
+    await flush()
     expect(fakePlayers).toHaveLength(0)
   })
 
@@ -239,9 +253,54 @@ describe('audio lifecycle (web: useHowlerSuspendOnHide + pendingResumeGate)', ()
     mathPlayer.start(1)
     appState.set('background')
     appState.set('active')
+    await flush()
     expect(hubPlayer.calls).toEqual(['play', 'pause', 'remove', 'release'])
     mathPlayer.finish()
     await expect(math).resolves.toBeUndefined()
+  })
+
+  it('background → foreground: the first play() after the return is allowed (expo-audio 58 gate)', async () => {
+    const { appState, speak } = setup()
+    const greet = speak('greet:hi', 'Hi!')
+    appState.set('background')
+    await flush()
+    expect(fakeAudioEnabled()).toBe(false) // released
+
+    appState.set('active')
+    // No play() before the re-enable has run: it would be dropped.
+    expect(fakePlayers[0].calls).toEqual(['play', 'pause'])
+    await flush()
+    expect(fakeAudioEnabled()).toBe(true)
+    expect(fakePlayers[0].calls).toEqual(['play', 'pause', 'play'])
+
+    // A new line on the returned app plays too.
+    void speak('hub:a', 'Hi! What today?')
+    await expect(greet).rejects.toThrow('cancelled')
+    await flush()
+    expect(fakePlayers[1].calls).toEqual(['play'])
+  })
+
+  it('a line requested between the visible edge and the re-enable waits for it', async () => {
+    const { engine, appState, speak } = setup()
+    appState.set('background')
+    appState.set('active')
+    void speak('session:s:p1', 'One.')
+    expect(fakePlayers).toHaveLength(0) // queued, as while hidden
+    await flush()
+    expect(engine.voice.activeLabel).toBe('session:s:p1')
+    expect(fakePlayers[0].calls).toEqual(['play'])
+  })
+
+  it('hidden again before the re-enable lands: the line stays parked, playback off', async () => {
+    const { engine, appState, speak } = setup()
+    void speak('greet:hi', 'Hi!')
+    appState.set('background')
+    appState.set('active')
+    appState.set('background')
+    await flush()
+    expect(engine.voice.hidden).toBe(true)
+    expect(fakeAudioEnabled()).toBe(false)
+    expect(fakePlayers[0].calls).toEqual(['play', 'pause'])
   })
 
   it('uninstall stops following the app state', () => {
@@ -271,13 +330,61 @@ describe('held audio session (native spec § 3)', () => {
   })
 
   it('releases through setIsAudioActiveAsync(false) on iOS only', () => {
+    _resetAudioSessionForTests()
     const setActive = jest.fn(() => Promise.resolve())
     releaseAudioSession('ios', setActive)
     expect(setActive).toHaveBeenCalledTimes(1)
     expect(setActive).toHaveBeenCalledWith(false)
-    // Android: the option is iOS-only, and setIsAudioActiveAsync(false)
-    // would disable playback there until re-enabled.
+    // Android: never released (lifecycle header).
     releaseAudioSession('android', setActive)
     expect(setActive).toHaveBeenCalledTimes(1)
+  })
+
+  it('re-enables through setIsAudioActiveAsync(true) on iOS, only after a release', async () => {
+    _resetAudioSessionForTests()
+    const setActive = jest.fn(() => Promise.resolve())
+    await reactivateAudioSession('ios', setActive)
+    expect(setActive).not.toHaveBeenCalled()
+    releaseAudioSession('ios', setActive)
+    await reactivateAudioSession('ios', setActive)
+    await reactivateAudioSession('ios', setActive)
+    expect(setActive.mock.calls).toEqual([[false], [true]])
+    releaseAudioSession('android', setActive)
+    await reactivateAudioSession('android', setActive)
+    expect(setActive).toHaveBeenCalledTimes(2)
+  })
+
+  it('a failed re-enable is logged and still resolves (the caller un-parks)', async () => {
+    _resetAudioSessionForTests()
+    const setActive = jest.fn((active: boolean) =>
+      active ? Promise.reject(new Error('busy')) : Promise.resolve(),
+    )
+    releaseAudioSession('ios', setActive)
+    await expect(
+      reactivateAudioSession('ios', setActive),
+    ).resolves.toBeUndefined()
+  })
+
+  it('a quiet screen (Parent Settings) keeps it released across a background and return; its end re-enables', async () => {
+    resetFakePlayers()
+    _resetAudioSessionForTests()
+    setIsAudioActiveAsync.mockClear()
+    const engine = createAudioEngine({ createPlayer: fakePlayerFactory })
+    const appState = fakeAppState()
+    installAudioLifecycle(engine.voice, createAppVisibility(appState), appState)
+
+    const end = quietAudioSession()
+    appState.set('background')
+    appState.set('active')
+    await flush()
+    expect(fakeAudioEnabled()).toBe(false) // music may still play here
+
+    await end()
+    expect(fakeAudioEnabled()).toBe(true)
+    await end() // a second end is a no-op
+    expect(setIsAudioActiveAsync.mock.calls).toEqual([[false], [false], [true]])
+    const p = new FakePlayer(1)
+    p.play()
+    expect(p.calls).toEqual(['play'])
   })
 })

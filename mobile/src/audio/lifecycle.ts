@@ -15,11 +15,19 @@
  * - Held across lines: every player is created with
  *   `keepAudioSessionActive: true` (`playerPort.ts`), so the session stays
  *   active between Emma's lines and other audio stays paused while her
- *   screens are up. It is released (`setIsAudioActiveAsync(false)`) only
- *   when the app goes to the background
- *   (`design/native/greet-math-native.md` § 3). iOS only: the option is
- *   iOS-only, and on Android `setIsAudioActiveAsync(false)` would disable
- *   playback until re-enabled (`AudioModule.kt` `audioEnabled`).
+ *   screens are up. It is released (`setIsAudioActiveAsync(false)`) when
+ *   the app goes to the background (`design/native/greet-math-native.md`
+ *   § 3) and while Parent Settings is up (`parent-settings-native.md`
+ *   § 6), on iOS only.
+ * - Released means silenced: since expo-audio 58, on iOS as on Android,
+ *   `setIsAudioActiveAsync(false)` makes every `play()` a no-op until
+ *   `setIsAudioActiveAsync(true)` (`ios/AudioModule.swift`
+ *   `setIsAudioActive` writes `audioEnabled`; `Function("play")` returns
+ *   on `canStartPlayback()`). So every release is paired with a
+ *   re-enable: on the visible edge, and when Parent Settings is left. The
+ *   call runs on expo-modules' serial async queue, but `play()` runs on
+ *   the JS thread at once, so nothing may play until the `true` call's
+ *   promise has resolved: the voice line un-parks only then.
  *
  * Lifecycle (semantics in `voiceChannel.ts`):
  * - Phase 2a's `appVisibility` (hidden ⇔ AppState `background`) parks and
@@ -67,28 +75,84 @@ export function configureAudioSession(
   return audioModeSet
 }
 
+/** iOS: the last `setIsAudioActiveAsync` call was `false`. */
+let released = false
+/** The last `setIsAudioActiveAsync` call; resolves once it has run. */
+let lastActiveCall: Promise<void> = Promise.resolve()
+/** Screens up that play nothing and keep the session released. */
+let quietScreens = 0
+
 /** Test seam. */
 export function _resetAudioSessionForTests(): void {
   audioModeSet = null
+  released = false
+  lastActiveCall = Promise.resolve()
+  quietScreens = 0
+}
+
+function callSetActive(
+  active: boolean,
+  setActive: typeof setIsAudioActiveAsync,
+): Promise<void> {
+  released = !active
+  lastActiveCall = setActive(active).catch((err: unknown) => {
+    recordAudio({
+      kind: 'note',
+      label: 'audio-session',
+      detail: `${active ? 're-enable' : 'release'} failed: ${err instanceof Error ? err.message : String(err)}`,
+    })
+  })
+  return lastActiveCall
 }
 
 /**
  * Release the held iOS audio session (other audio may resume). Called
  * when the app goes to the background, after the voice line is parked.
- * No-op on Android: see the header.
+ * Playback stays off until {@link reactivateAudioSession}. No-op on
+ * Android: see the header.
  */
 export function releaseAudioSession(
   platform: string = Platform.OS,
   setActive: typeof setIsAudioActiveAsync = setIsAudioActiveAsync,
 ): void {
   if (platform !== 'ios') return
-  setActive(false).catch((err: unknown) => {
-    recordAudio({
-      kind: 'note',
-      label: 'audio-session',
-      detail: `release failed: ${err instanceof Error ? err.message : String(err)}`,
-    })
-  })
+  void callSetActive(false, setActive)
+}
+
+/**
+ * Re-enable playback after a release. Resolves once `play()` is allowed
+ * again (never rejects); play nothing before. Stays released while a
+ * quiet screen is up ({@link quietAudioSession}).
+ */
+export function reactivateAudioSession(
+  platform: string = Platform.OS,
+  setActive: typeof setIsAudioActiveAsync = setIsAudioActiveAsync,
+): Promise<void> {
+  if (platform !== 'ios' || !released || quietScreens > 0) {
+    return lastActiveCall
+  }
+  return callSetActive(true, setActive)
+}
+
+/**
+ * A screen that plays nothing (Parent Settings, § 6): releases the
+ * session while it is up, so music Emma paused can resume, including
+ * after a background and return. The returned end re-enables playback;
+ * the next screen may play once it resolves. Calling it again is a no-op.
+ */
+export function quietAudioSession(
+  platform: string = Platform.OS,
+  setActive: typeof setIsAudioActiveAsync = setIsAudioActiveAsync,
+): () => Promise<void> {
+  quietScreens += 1
+  releaseAudioSession(platform, setActive)
+  let ended = false
+  return () => {
+    if (ended) return lastActiveCall
+    ended = true
+    quietScreens -= 1
+    return reactivateAudioSession(platform, setActive)
+  }
 }
 
 /**
@@ -99,12 +163,21 @@ export function installAudioLifecycle(
   visibility: AppVisibility = appVisibility,
   appState: AppStateSource = AppState,
   release: () => void = releaseAudioSession,
+  reactivate: () => Promise<void> = reactivateAudioSession,
 ): () => void {
+  let installed = true
   voice.setHidden(visibility.getIsHidden())
   const offVisibility = visibility.subscribe(() => {
-    const hidden = visibility.getIsHidden()
-    voice.setHidden(hidden)
-    if (hidden) release()
+    if (visibility.getIsHidden()) {
+      voice.setHidden(true)
+      release()
+      return
+    }
+    // Un-park (and drain the queue) only once play() is allowed again;
+    // lines requested meanwhile queue as while hidden.
+    void reactivate().then(() => {
+      if (installed && !visibility.getIsHidden()) voice.setHidden(false)
+    })
   })
   // Interruption recovery only: `inactive → active`. The `background →
   // active` return is the visibility edge above (unpark + queue drain).
@@ -114,6 +187,7 @@ export function installAudioLifecycle(
     last = state
   })
   return () => {
+    installed = false
     offVisibility()
     sub.remove()
   }

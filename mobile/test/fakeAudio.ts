@@ -14,6 +14,20 @@ import type {
   PlayerStatus,
 } from '../src/audio/playerPort'
 
+/**
+ * expo-audio 58's iOS playback gate: `setIsAudioActiveAsync(false)` makes
+ * every `play()` a no-op until `setIsAudioActiveAsync(true)`
+ * (`ios/AudioModule.swift` `audioEnabled`). The native call runs on a
+ * queue, so the flag flips after the call returns, before its promise
+ * resolves.
+ */
+let audioEnabled = true
+
+/** Whether a `play()` now would play (the native `audioEnabled`). */
+export function fakeAudioEnabled(): boolean {
+  return audioEnabled
+}
+
 export class FakePlayer implements PlayerLike {
   readonly source: PlayerSource
   readonly options: unknown
@@ -32,8 +46,9 @@ export class FakePlayer implements PlayerLike {
     this.options = options
   }
 
+  /** Recorded as `play (ignored)` while audio is disabled (above). */
   play(): void {
-    this.calls.push('play')
+    this.calls.push(audioEnabled ? 'play' : 'play (ignored)')
   }
   pause(): void {
     this.calls.push('pause')
@@ -107,8 +122,10 @@ export const fakePlayerFactory: PlayerFactory = (source) => {
   return p
 }
 
+/** Also re-enables audio, as a fresh launch would. */
 export function resetFakePlayers(): void {
   fakePlayers.length = 0
+  audioEnabled = true
 }
 
 /** Lets pending promise callbacks (e.g. the rewind before play) run. */
@@ -127,4 +144,8 @@ export const createAudioPlayer = jest.fn(
 )
 
 export const setAudioModeAsync = jest.fn(() => Promise.resolve())
-export const setIsAudioActiveAsync = jest.fn(() => Promise.resolve())
+export const setIsAudioActiveAsync = jest.fn((active: boolean) =>
+  Promise.resolve().then(() => {
+    audioEnabled = active
+  }),
+)
