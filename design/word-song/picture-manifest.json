@@ -23,7 +23,8 @@
       "hot",
       "pad",
       "sun",
-      "hug"
+      "hug",
+      "jump"
     ]
   },
   {
@@ -54,7 +55,8 @@
       "ram",
       "sun",
       "van",
-      "sad"
+      "sad",
+      "jump"
     ]
   },
   {
@@ -94,7 +96,8 @@
       "pot",
       "rat",
       "ring",
-      "sun"
+      "sun",
+      "elf"
     ]
   },
   {
@@ -290,7 +293,7 @@
       "a shower head",
       "a running stream of water"
     ],
-    "distinctFrom": ["cap", "cup", "dog", "nest", "pan", "tent"]
+    "distinctFrom": ["cap", "cup", "dog", "nest", "pan", "tent", "drip", "drop"]
   },
   {
     "word": "tag",
@@ -807,7 +810,8 @@
       "mop",
       "pop",
       "rock",
-      "mud"
+      "mud",
+      "ramp"
     ]
   },
   {
@@ -1205,7 +1209,8 @@
       "star",
       "tub",
       "van",
-      "sad"
+      "sad",
+      "sand"
     ]
   },
   {
@@ -1244,7 +1249,8 @@
       "sun",
       "swing",
       "tag",
-      "tub"
+      "tub",
+      "ant"
     ]
   },
   {
@@ -1286,7 +1292,17 @@
       "a bowling pin",
       "a drawing pin in a board"
     ],
-    "distinctFrom": ["bib", "bin", "fig", "kite", "lid", "pine", "sip", "wig"]
+    "distinctFrom": [
+      "bib",
+      "bin",
+      "fig",
+      "kite",
+      "lid",
+      "pine",
+      "sip",
+      "wig",
+      "clip"
+    ]
   },
   {
     "word": "sip",
@@ -1779,7 +1795,8 @@
       "rock",
       "swing",
       "wig",
-      "wing"
+      "wing",
+      "elf"
     ]
   },
   {
@@ -1912,7 +1929,7 @@
       "a tag on a string",
       "letters or symbols"
     ],
-    "distinctFrom": ["net", "kite", "bag", "cup", "dog", "frog", "web"]
+    "distinctFrom": ["net", "kite", "bag", "cup", "dog", "frog", "web", "sand"]
   },
   {
     "word": "frog",
@@ -1925,7 +1942,16 @@
       "a crown",
       "a cartoon face with eyebrows"
     ],
-    "distinctFrom": ["bag", "bed", "clock", "crab", "cup", "dog", "flag"]
+    "distinctFrom": [
+      "bag",
+      "bed",
+      "clock",
+      "crab",
+      "cup",
+      "dog",
+      "flag",
+      "jump"
+    ]
   },
   {
     "word": "crab",
@@ -2015,7 +2041,7 @@
       "a candle or a torch",
       "a ceiling light"
     ],
-    "distinctFrom": ["bus", "dog", "hand", "lock"]
+    "distinctFrom": ["bus", "dog", "hand", "lock", "bulb"]
   },
   {
     "word": "hand",
@@ -2028,7 +2054,16 @@
       "an arm or a sleeve",
       "a glove"
     ],
-    "distinctFrom": ["bus", "hat", "lamp", "lock", "pond", "pot"]
+    "distinctFrom": [
+      "bus",
+      "hat",
+      "lamp",
+      "lock",
+      "pond",
+      "pot",
+      "clap",
+      "stop"
+    ]
   },
   {
     "word": "tent",
@@ -2166,7 +2201,7 @@
       "training wheels",
       "a car"
     ],
-    "distinctFrom": ["bib", "dog", "king", "kite", "pen"]
+    "distinctFrom": ["bib", "dog", "king", "kite", "pen", "pump"]
   },
   {
     "word": "seed",
@@ -2213,7 +2248,16 @@
     "batch": 11,
     "subject": "One big green leaf: an oval with a pointed tip, a centre vein and side veins, and a short stem.",
     "avoid": ["a branch or a tree", "several leaves", "a feather"],
-    "distinctFrom": ["box", "hat", "leg", "loaf", "peach", "pen", "seal"]
+    "distinctFrom": [
+      "box",
+      "hat",
+      "leg",
+      "loaf",
+      "peach",
+      "pen",
+      "seal",
+      "slug"
+    ]
   },
   {
     "word": "seal",
@@ -2311,7 +2355,7 @@
       "a big smiling face",
       "flowers"
     ],
-    "distinctFrom": ["bug", "bed", "cup", "fan", "tent", "tree"]
+    "distinctFrom": ["bug", "bed", "cup", "fan", "tent", "tree", "ant"]
   },
   {
     "word": "card",
@@ -2519,7 +2563,7 @@
       "a box with tall sides",
       "a picture frame"
     ],
-    "distinctFrom": ["mat", "chain", "cup", "hen", "train", "tree"]
+    "distinctFrom": ["mat", "chain", "cup", "hen", "train", "tree", "sled"]
   },
   {
     "word": "snail",
@@ -2532,7 +2576,7 @@
       "a spiral bun",
       "a big smiling face"
     ],
-    "distinctFrom": ["bug", "bed", "cup", "sack", "seal"]
+    "distinctFrom": ["bug", "bed", "cup", "sack", "seal", "slug"]
   },
   {
     "word": "coat",
@@ -2545,7 +2589,7 @@
       "a scarf",
       "a dress"
     ],
-    "distinctFrom": ["cape", "bus", "cot", "goat", "gum", "hen"]
+    "distinctFrom": ["cape", "bus", "cot", "goat", "gum", "hen", "vest"]
   },
   {
     "word": "boat",
@@ -2558,7 +2602,7 @@
       "people",
       "big waves"
     ],
-    "distinctFrom": ["ship", "tub", "bat", "bone", "jug", "sun"]
+    "distinctFrom": ["ship", "tub", "bat", "bone", "jug", "sun", "sled"]
   },
   {
     "word": "roof",
@@ -2783,7 +2827,7 @@
       "a grey rock or a wooden log",
       "a pig, a boot or any animal or person"
     ],
-    "distinctFrom": ["log", "pond", "rock"]
+    "distinctFrom": ["log", "pond", "rock", "sand"]
   },
   {
     "word": "hug",
@@ -2798,5 +2842,216 @@
       "a heart, text or a background scene"
     ],
     "distinctFrom": ["dad", "mom"]
+  },
+  {
+    "word": "sand",
+    "tier": "tent-words",
+    "batch": 20,
+    "subject": "A small heap of golden sand seen from the front, with a little red toy spade stuck in its top.",
+    "avoid": [
+      "a beach, the sea or a sun",
+      "a sandcastle or a flag",
+      "a brown heap of mud or dirt",
+      "a bucket"
+    ],
+    "distinctFrom": ["flag", "mud", "sun"]
+  },
+  {
+    "word": "ramp",
+    "tier": "tent-words",
+    "batch": 20,
+    "subject": "A sloped wooden ramp, big in the frame: one long plank resting on a stack of wooden blocks at its high end, with its low end touching the ground, and a small toy car rolling down the slope. The plank is held up only at one end, with no pivot or balance point in the middle.",
+    "avoid": [
+      "a seesaw, or a plank balanced on a middle point",
+      "a playground slide",
+      "a log or a plank lying flat",
+      "stairs or steps",
+      "a person"
+    ],
+    "distinctFrom": ["log"]
+  },
+  {
+    "word": "clap",
+    "tier": "crab-words",
+    "batch": 20,
+    "subject": "A child's two hands caught mid-clap, seen from the side: palms just meeting, fingers relaxed and slightly curved, warm peach skin cut off cleanly at the wrists, with small curved motion lines and a tiny burst where the palms meet.",
+    "avoid": [
+      "praying hands: palms pressed flat with the fingers straight up together",
+      "one open hand on its own, like the hand",
+      "a high-five",
+      "arms, sleeves or a person"
+    ],
+    "distinctFrom": ["hand"]
+  },
+  {
+    "word": "vest",
+    "tier": "tent-words",
+    "batch": 20,
+    "subject": "A bright yellow hi-vis safety vest laid flat, seen from the front: sleeveless, open down the front, with two silver reflective stripes around it and no text or logo.",
+    "avoid": [
+      "a coat or a jacket: no sleeves, no hood, no zip and no buttons",
+      "a shirt or a T-shirt",
+      "a waistcoat",
+      "text, a logo or a badge"
+    ],
+    "distinctFrom": ["coat"]
+  },
+  {
+    "word": "sled",
+    "tier": "crab-words",
+    "batch": 20,
+    "subject": "An empty wooden sled in three-quarter view: a slatted wooden seat on two red runners that curl up at the front.",
+    "avoid": [
+      "a boat",
+      "a tray",
+      "a person, a dog or a rope pulling it",
+      "skis or a snowboard"
+    ],
+    "distinctFrom": ["boat", "tray"]
+  },
+  {
+    "word": "clip",
+    "tier": "crab-words",
+    "batch": 20,
+    "subject": "One chunky hair clip, big in the frame and seen from above: a thick bright-pink snap clip with rounded ends and a small yellow star on it.",
+    "avoid": [
+      "a thin wire paper clip",
+      "a pin or a safety pin",
+      "a bow or a ribbon",
+      "a hair band or a comb",
+      "hair or a head"
+    ],
+    "distinctFrom": ["pin"]
+  },
+  {
+    "word": "drip",
+    "tier": "crab-words",
+    "batch": 20,
+    "subject": "The end of a plain grey pipe coming in from the left, with three small blue water drops falling from it one below the other into a little round puddle.",
+    "avoid": [
+      "a tap with a handle or a spout, like the tap",
+      "one big single drop, like the drop",
+      "a running stream of water",
+      "a sink or a bath"
+    ],
+    "distinctFrom": ["drop", "tap"]
+  },
+  {
+    "word": "stop",
+    "tier": "crab-words",
+    "batch": 20,
+    "subject": "A red octagonal stop sign on a grey pole, seen from the front, with a white rim and no letters on it.",
+    "avoid": [
+      "a raised hand, like the hand",
+      "letters, words or text",
+      "a round sign or a traffic light",
+      "a road or cars"
+    ],
+    "distinctFrom": ["hand"]
+  },
+  {
+    "word": "drop",
+    "tier": "crab-words",
+    "batch": 20,
+    "subject": "One big clear-blue water drop on its own: a rounded teardrop shape with a small white shine.",
+    "avoid": [
+      "rain or many drops",
+      "a puddle",
+      "a tap or a pipe dripping, like the drip",
+      "a face on the drop"
+    ],
+    "distinctFrom": ["drip", "tap"]
+  },
+  {
+    "word": "jump",
+    "tier": "tent-words",
+    "batch": 20,
+    "subject": "A child in mid-air jumping, seen from the front: arms up, knees bent and two small curved arcs under the feet; short dark-brown hair, a sky-blue T-shirt and red shorts.",
+    "avoid": [
+      "a frog, like the frog",
+      "a child standing or walking",
+      "a grown-up, like the man or the dad",
+      "a skipping rope or a trampoline"
+    ],
+    "distinctFrom": ["dad", "frog", "man"]
+  },
+  {
+    "word": "pump",
+    "tier": "tent-words",
+    "batch": 20,
+    "subject": "A bicycle hand pump on its own, standing upright: a red tube with a black T-shaped handle on top, a small foot rest at the bottom and a short black hose.",
+    "avoid": [
+      "a bike, like the bike",
+      "a petrol pump",
+      "a fire extinguisher",
+      "a person using it"
+    ],
+    "distinctFrom": ["bike"]
+  },
+  {
+    "word": "plug",
+    "tier": "crab-words",
+    "batch": 20,
+    "subject": "One chunky white electric plug with two metal prongs on a short, curly white cable, seen in three-quarter view.",
+    "avoid": [
+      "a wall socket on its own",
+      "a phone charger or a USB plug",
+      "a bath plug on a chain",
+      "sparks or lightning"
+    ],
+    "distinctFrom": []
+  },
+  {
+    "word": "slug",
+    "tier": "crab-words",
+    "batch": 20,
+    "subject": "A slug in side view: a soft, smooth orange-brown body with no shell and two eye stalks.",
+    "avoid": [
+      "a snail: no shell and no spiral",
+      "a leaf under it, like the leaf",
+      "a worm with no eye stalks",
+      "a caterpillar with legs",
+      "a big smiling face"
+    ],
+    "distinctFrom": ["leaf", "snail"]
+  },
+  {
+    "word": "bulb",
+    "tier": "tent-words",
+    "batch": 20,
+    "subject": "One glowing light bulb on its own, upright: a round clear glass bulb with a warm yellow glow and a silver screw base.",
+    "avoid": [
+      "a lamp with a shade or a stand, like the lamp",
+      "a candle",
+      "a torch",
+      "an idea cloud or a thought bubble"
+    ],
+    "distinctFrom": ["lamp"]
+  },
+  {
+    "word": "ant",
+    "tier": "short-a",
+    "batch": 20,
+    "subject": "One big red ant in side view, with six thin legs, two antennae and three round body parts.",
+    "avoid": [
+      "a bug or a beetle, like the bug",
+      "a bee with wings or stripes, like the bee",
+      "a spider with eight legs",
+      "many ants or an anthill"
+    ],
+    "distinctFrom": ["bee", "bug"]
+  },
+  {
+    "word": "elf",
+    "tier": "short-e",
+    "batch": 20,
+    "subject": "A small friendly elf standing, seen from the front: pointed ears, a green pointed hat and a green tunic, smiling.",
+    "avoid": [
+      "a king with a crown, like the king",
+      "a hat on its own, like the hat",
+      "Santa Claus or a beard",
+      "wings, like a fairy"
+    ],
+    "distinctFrom": ["hat", "king"]
   }
 ]

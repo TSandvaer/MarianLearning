@@ -18,7 +18,7 @@
  * already uses, both loadable by the node-typed render scripts).
  */
 import type { MapStop } from '../map/mapModel'
-import { CRITTER_SAID_WORDS } from '../games/playPlace'
+import { CRITTER_CLIP_WORDS } from '../games/playPlace'
 import type { Land } from '../progress/lands'
 import type { SkillNode } from '../progress/types'
 import {
@@ -316,6 +316,14 @@ function buildLines(): GuidanceLine[] {
   add(crittersFunnyId(1), 'play', "Is this a word? I don't know what it means!")
   add(crittersFunnyId(2), 'play', 'Hmm! What could that mean?')
   add(crittersFunnyId(3), 'play', 'Hee hee! Is that a word?')
+  // The four-letter rounds' open line (Dave 2026-10-26, (B); critters
+  // four-letter spec § 1): a word that is not on the board sits, so it
+  // does not promise to say every word.
+  add(
+    CRITTERS_OPEN_FOUR_ID,
+    'play',
+    'Drag four letters up to the log. Can you make these words?',
+  )
   // The locked-stop peek prompt (design/native/locked-stop-peek-prompt.md
   // § 3; T1, the texts, approved for rendering by Thomas 2026-10-20 and
   // judged at the ear test). World-free: they play after the stop's own
@@ -327,10 +335,11 @@ function buildLines(): GuidanceLine[] {
   )
   add(PEEK_ASK_ID, 'map-peek-ask', 'Want to try it?')
   // The letter critters' real words, said whole after the sounds (Thomas
-  // 2026-10-22; play-place spec § 3.3): one clip per `CRITTER_SAID_WORDS`
-  // word, its caption "Map." and its input "Map," (the one-word rule, as
-  // the story words since wave 4).
-  for (const word of CRITTER_SAID_WORDS)
+  // 2026-10-22; play-place spec § 3.3): one clip per `CRITTER_CLIP_WORDS`
+  // word (the said words, and since Dave 2026-10-26 the nine said later
+  // and the 82 four-letter targets), its caption "Map." and its input
+  // "Map," (the one-word rule, as the story words since wave 4).
+  for (const word of CRITTER_CLIP_WORDS)
     add(
       critterWordId(word),
       'play-word',
@@ -423,6 +432,7 @@ const RAFT_SPLASH_ID = 'guide.play.raft.splash'
 const RAFT_SILLY_ID = 'guide.play.raft.silly'
 const RAFT_CLOSE_ID = 'guide.play.raft.close'
 const CRITTERS_OPEN_ID = 'guide.play.critters.open'
+const CRITTERS_OPEN_FOUR_ID = 'guide.play.critters.open.four'
 const crittersFunnyId = (n: 1 | 2 | 3) => `guide.play.critters.funny.${n}`
 const PEEK_ASK_LOCKED_ID = 'guide.map.peek-ask.locked'
 const PEEK_ASK_ID = 'guide.map.peek-ask'
@@ -475,7 +485,9 @@ export function storyWordLine(word: string): GuidanceLine | undefined {
 
 /**
  * A letter-critter word's whole-word clip ("Map."), or undefined for a word
- * Emma does not say (not on `CRITTER_SAID_WORDS`).
+ * without one (not on `CRITTER_CLIP_WORDS`). Whether Emma says a run is
+ * `critterRun`'s call: the nine on `CRITTER_SAID_LATER` have a clip and
+ * still sit.
  */
 export function critterWordLine(word: string): GuidanceLine | undefined {
   return BY_ID.get(critterWordId(word))
