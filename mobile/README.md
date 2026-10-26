@@ -24,7 +24,7 @@ npx expo run:ios                      # builds, installs, starts Metro
 npx expo run:ios --device "iPad (A16)"
 ```
 
-Known blocker (2026-10-08): with Xcode 27 the build succeeds, but an **iOS 27** simulator refuses to launch it: `Application failed to launch: UIScene life cycle is required for apps built with this SDK.` Expo SDK 57's prebuild template (up to `expo-template-bare-minimum@57.0.29`) has no scene delegate; the SDK 58 template (`58.0.15`, beta) adds one. Until that is resolved, use Expo Go.
+Resolved by SDK 58 (2026-10-26): on SDK 57 an **iOS 27** simulator refused the Xcode 27 build (`Application failed to launch: UIScene life cycle is required for apps built with this SDK.`), because SDK 57's prebuild template had no scene delegate. SDK 58's prebuild generates `SceneDelegate.swift` and the `UIApplicationSceneManifest`, and a Release build (`npx expo run:ios --configuration Release`) launches on iOS 27 iPad and iPhone simulators.
 
 **Expo Go** (no build). The shell uses only modules that ship in Expo Go SDK 58:
 
