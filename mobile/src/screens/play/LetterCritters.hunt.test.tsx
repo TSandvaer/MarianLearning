@@ -1220,6 +1220,50 @@ describe('P6: the hint', () => {
     await advance(5000)
     expect(g.calls).toHaveLength(calls)
   })
+
+  it('the glow stays on the hint word’s slot until its fill starts', async () => {
+    learnerAt('cvc-words-short-o', { letters: ROUND, found: ['bag'] })
+    await mount()
+    for (let n = 0; n < HUNT_HINT_RUNS; n++) await build('hag')
+    expect(glowing()).toEqual([1])
+    await seat('b', 'a', 't')
+    const seen: string[] = []
+    for (let t = 0; t < 6000; t += 50) {
+      const now = JSON.stringify(glowing())
+      if (seen.at(-1) !== now) seen.push(now)
+      await advance(50)
+    }
+    expect(seen).toEqual(['[1]', '[]'])
+  })
+
+  it('a meadow tap mid-hint ends the hint’s sounds', async () => {
+    learnerAt('cvc-words-short-o', {
+      letters: OG,
+      found: ['hot', 'pot', 'pop', 'top'],
+    })
+    const g = await mount()
+    for (let n = 0; n < HUNT_HINT_RUNS; n++) await build('hgp')
+    await fireEvent.press(byId('hunt-slot-4'))
+    await advance(50)
+    const calls = g.calls.length
+    await activate(byId('critter-h'), 'hear')
+    await advance(4000)
+    expect(g.calls.slice(calls)).toEqual([letterCall('h')])
+  })
+
+  it('a run seated mid-hint sings its own three sounds first', async () => {
+    learnerAt('cvc-words-short-o', {
+      letters: OG,
+      found: ['hot', 'pot', 'pop', 'top'],
+    })
+    const g = await mount()
+    for (let n = 0; n < HUNT_HINT_RUNS; n++) await build('hgp')
+    await fireEvent.press(byId('hunt-slot-4'))
+    const calls = g.calls.length
+    await seat('g', 'o', 't')
+    await advance(SING_AFTER_MS + 3000)
+    expect(g.calls.slice(calls).slice(0, 3)).toEqual([...'got'].map(letterCall))
+  })
 })
 
 describe('P7: the lap in board order', () => {

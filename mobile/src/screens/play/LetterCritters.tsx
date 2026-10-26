@@ -514,6 +514,19 @@ export function LetterCritters({
     glowRef.current = false
     setGlow(false)
   }
+  /**
+   * The tap player is cut (`onEnd` fires on a cut too): a slot's sound in
+   * flight, and the hint's sounds-then-word with it, end there; Emma
+   * points no longer. Returns the new tap's token.
+   */
+  const cutTap = () => {
+    const token = ++tapRef.current
+    if (pointingRef.current) {
+      pointingRef.current = false
+      kit.setPose('idle')
+    }
+    return token
+  }
   /** `HUNT_HINT_IDLE_MS` from now with no drag start: the glow. */
   const armHuntIdle = () => {
     const token = ++huntIdleRef.current
@@ -608,11 +621,7 @@ export function LetterCritters({
     if (kit.cancelKey.endsWith('hidden')) {
       songRef.current += 1
       // A slot's sound stops with the rest; a hint cut short ends Emma's point.
-      tapRef.current += 1
-      if (pointingRef.current) {
-        pointingRef.current = false
-        kit.setPose('idle')
-      }
+      cutTap()
       player.cut()
       // The beat's steps wait for her return (the shelf is already clear).
       if (lockedRef.current && !beatRef.current) {
@@ -651,6 +660,7 @@ export function LetterCritters({
     setSeats(next)
     setLean(false)
     songRef.current += 1
+    cutTap()
     player.cut()
     endHint()
     armIdle()
@@ -671,6 +681,8 @@ export function LetterCritters({
     const current = seatsRef.current
     const run = seatedRun(current)
     if (run === null) return
+    // Its song cuts a slot's sound: the hint ends before the run's pose.
+    cutTap()
     const letters = run.map((i) => current[i]!)
     const word = letters.join('')
     const kind = run.length === 3 ? critterRun(word, { funny }) : null
@@ -1019,11 +1031,7 @@ export function LetterCritters({
   const slotTap = (word: string): number | null => {
     if (lockedRef.current) return null
     kit.cutLine()
-    const token = ++tapRef.current
-    if (pointingRef.current) {
-      pointingRef.current = false
-      kit.setPose('idle')
-    }
+    const token = cutTap()
     bump(setBoxLit, word)
     return token
   }
@@ -1169,6 +1177,7 @@ export function LetterCritters({
   const onMeadowTap = (letter: string) => {
     if (lockedRef.current) return
     kit.cutLine()
+    cutTap()
     setMeadowHop((h) => ({ ...h, [letter]: (h[letter] ?? 0) + 1 }))
     singLetter(letter)
   }
@@ -1177,8 +1186,10 @@ export function LetterCritters({
     if (lockedRef.current) return
     kit.cutLine()
     const free = seatsRef.current.indexOf(null)
-    if (free < 0) singLetter(letter)
-    else changed(seatAt(seatsRef.current, free, letter))
+    if (free < 0) {
+      cutTap()
+      singLetter(letter)
+    } else changed(seatAt(seatsRef.current, free, letter))
   }
 
   const onMeadowDrop = (letter: string, p: Point): boolean => {
@@ -1195,6 +1206,7 @@ export function LetterCritters({
     const letter = seatsRef.current[seat]
     if (letter === null || letter === undefined) return
     kit.cutLine()
+    cutTap()
     bounceSeat(seat)
     singLetter(letter)
   }
@@ -1218,6 +1230,7 @@ export function LetterCritters({
     if (lockedRef.current || draggingRef.current) return
     kit.cutLine()
     songRef.current += 1
+    cutTap()
     player.cut()
     sing()
   }
@@ -1267,8 +1280,15 @@ export function LetterCritters({
           (w) => record.extras.includes(w) && !pending.includes(w),
         )
   const order = record === null ? [] : huntBoardOrder(record)
+  // A pending find is not on the board yet: the glow stays put until its
+  // fill starts (§ 15.7).
   const hintWord =
-    glow && record !== null ? huntHintTarget(record, record.found) : undefined
+    glow && record !== null
+      ? huntHintTarget(
+          record,
+          record.found.filter((w) => !pending.includes(w)),
+        )
+      : undefined
   const glowAt = hintWord === undefined ? -1 : order.indexOf(hintWord)
   const deal = {
     entering:
