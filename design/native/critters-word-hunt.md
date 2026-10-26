@@ -444,8 +444,10 @@ The day a learner reaches blending sounds, her next visit opens on a fresh hunt 
 
 ## 9. Room left for phase 2 (not designed)
 
+**Designed 2026-10-26 in `design/native/critters-four-letter.md`** (Dave's build-23 ruling (B), Dave 23 (D) items 6-12): the four-box board on all four forms, the 4 + 3 meadow, the four-seat log, the roll-in, the length picker and the core rules. The notes below are what phase 1 left room for.
+
 - **The numeral disc** sits inside the log's footprint, so a four-seat log keeps it and shows "4" (§ 3.2).
-- **Slots are "X boxes",** so a four-letter slot is the same card with 4 boxes. **It does not fit a phone in portrait at S4** (Q8): 4 × 22 + 3 × 2 + 8 = 102 wide, so 4 per row is 432 > 343. (With the amended S4 of 2026-10-26, pad 3, it is 4 × 22 + 3 × 2 + 6 = 100 wide and 67 tall; Dave 23 (B) used 102. The phase-2 spec measures it.) Seven critters also need a third meadow row at 3 per row. Phase 2 needs its own measure on that form.
+- **Slots are "X boxes",** so a four-letter slot is the same card with 4 boxes. **It does not fit a phone in portrait at S4** (Q8): 4 × 22 + 3 × 2 + 8 = 102 wide, so 4 per row is 432 > 343. (With the amended S4 of 2026-10-26, pad 3, it is 4 × 22 + 3 × 2 + 6 = 100 wide and 67 tall; Dave 23 (B) used 102. Measured and settled at 100 in `critters-four-letter.md` § 2.) Seven critters also need a third meadow row at 3 per row. Phase 2 needs its own measure on that form.
 - **The beat** has a marked step for the four-seat log's roll-in (§ 5.1).
 - **The record** is per length (Dave (7)), so a second length adds a record and nothing here changes.
 - **The length picker** of logs (Dave (5)) replaces the meadow only when more than one length is open, so phase 1 never shows it.
@@ -525,7 +527,7 @@ Line numbers are this branch's (`origin/main` 5c253593 plus the pointer paragrap
 5. **Q5 (Dave, Thomas). Emma `cheering` from "You did it!"** (Decision 9). Dave's step 2 gives `celebration` and does not say she changes.
 6. **Q6 (Dave, FYI). The bonus chip's place** (Decision 5): beside the meadow in portrait and in the board's next cell in landscape, because there is no room beside an 8-slot row on a phone.
 7. **Q7 (Dave). Back during the beat** stores the round complete, so the next visit deals fresh and she misses the end. The alternative is replaying the beat on return; I recommend against that, since a beat that greets her on arrival is a lure.
-8. **Q8 (coordinator, phase 2). Four-letter slots do not fit a phone in portrait** at today's critter size (§ 9). Phase 2 needs its own measure there; nothing in phase 1 blocks it.
+8. **Q8 (coordinator, phase 2). Four-letter slots do not fit a phone in portrait** at today's critter size (§ 9). Phase 2 needs its own measure there; nothing in phase 1 blocks it. **Answered 2026-10-26** by `critters-four-letter.md` § 2: three four-box slots of 100 a row (312 ≤ 343) and a 4 + 3 meadow.
 9. **Q9 (Kevin, Dave). A write at the deal,** besides Dave's "on each new find and on each unlock", so that "never the same letter set as her last round" holds for a round she left before finding anything (§ 1).
 10. **Q10 (Dave, watch). No new letters mid-round.** Dave (3) shows the control only after completion, so a learner who dislikes a round can only finish it, with the hint's help. I kept that. Watch on device for a learner who leaves a round and stops coming back to the game.
 11. **Q11 (Kevin). Pictures that are not bundled yet** (mug, sad, mud, hug) do not count toward "at least 3 with a picture" until their files land, so the round counts change slightly the day they do. Kevin pins the core picture set as `CRITTER_SAID_PICTURE_WORDS` is pinned and tested against the registry.
