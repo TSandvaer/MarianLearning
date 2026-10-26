@@ -22,7 +22,14 @@ import {
 } from '@marian/core/learners'
 import type { MasteryTrack, Progress } from '@marian/core/progress'
 import { forwardRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type TextInputInstance,
+} from 'react-native'
 import { AvatarDisc } from '../picker/AvatarDisc'
 import {
   Card,
@@ -194,7 +201,7 @@ export function PicturePicker({
 
 /** A name field: 1–24 characters, § 3.2's set. */
 export const NameField = forwardRef<
-  TextInput,
+  TextInputInstance,
   {
     value: string
     onChangeText: (text: string) => void

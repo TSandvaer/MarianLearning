@@ -78,6 +78,7 @@ import {
   Text,
   View,
   type KeyboardEvent,
+  type ScrollViewInstance,
 } from 'react-native'
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated'
 import { releaseAudioSession } from '../../audio/lifecycle'
@@ -318,7 +319,7 @@ export function ParentSettings({
   }
 
   // ── Keyboard (§ 4) ──────────────────────────────────────────────────
-  const scrollRef = useRef<ScrollView>(null)
+  const scrollRef = useRef<ScrollViewInstance>(null)
   const [keyboardPad, setKeyboardPad] = useState(0)
   const columnY = useRef(0)
   const cloudY = useRef(0)

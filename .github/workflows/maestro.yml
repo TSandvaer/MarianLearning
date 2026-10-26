@@ -16,8 +16,8 @@
 #     release's own checksums_sha256.txt).
 #   - Expo Go for the iOS Simulator: the tarball from
 #     github.com/expo/expo-go-releases, the same URL the Expo versions API
-#     (exp.host/--/api/v2/versions, sdkVersions["57.0.0"].iosClientUrl) and
-#     `npx expo start --go --ios` use for SDK 57.
+#     (exp.host/--/api/v2/versions, sdkVersions["58.0.0"].iosClientUrl) and
+#     `npx expo start --go --ios` use for SDK 58.
 #
 # Two jobs:
 #   - `maestro`: the four flows, on pull requests, pushes to main and a
@@ -60,8 +60,8 @@ concurrency:
 env:
   MAESTRO_VERSION: '2.11.0'
   MAESTRO_SHA256: 5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
-  EXPO_GO_VERSION: '57.0.9'
-  EXPO_GO_SHA256: faff18034c9f3504ea4786f07350efab604610c61cfcabd0f2191fc4416a7614
+  EXPO_GO_VERSION: '58.0.7'
+  EXPO_GO_SHA256: 17ab20f856c72690a750e79826ab5c90550a1441b1d1d67db6cd252af979b903
   SIM_DEVICE_TYPE: iPad Pro 11-inch (M5)
   SIM_RUNTIME: com.apple.CoreSimulator.SimRuntime.iOS-26-5
   # A cold hosted runner starts Maestro's XCTest driver slowly (default

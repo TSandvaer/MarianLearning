@@ -52,7 +52,7 @@ The steps to get **Emma's Path** (bundle ID `dk.sandvaer.emmaspath`, version `0.
    - If it fails at once with "Failed to resolve plugin for module expo-dev-client", `mobile/node_modules` is missing: run step 1's `npm ci` (seen 2026-10-13).
 
 5. **Read the build log** on the build's expo.dev page before submitting. Tell the orchestrator what you see for a and b:
-   1. **Build image** ("Spin up build environment" section [9]): expected `macos-tahoe-26.5-xcode-26.6` (Xcode 26.6). The profile pins `"image": "sdk-57"`.
+   1. **Build image** ("Spin up build environment" section [9]): expected an Xcode 27.1 image: Expo's SDK 58 upgrade post says the `sdk-58` alias points to it (build 23 and earlier ran SDK 57 on `macos-tahoe-26.5-xcode-26.6`). The profile pins `"image": "sdk-58"`.
    2. **Which install ran** (the install-dependencies phase): `npm` in `mobile/`, or `yarn install` at the repo root. The repo root has a `yarn.lock` and a `packages/*` workspace, but `mobile/` is a standalone npm project. EAS's documented rule is "Run `npm install` in the project root (or `yarn install` if **yarn.lock** exists)" [10]. If the build fails here, stop and send the log link to the orchestrator; don't retry blindly (each run counts against the 15).
    3. The build page shows version `0.1.0`, build `1`, and the status Finished.
 

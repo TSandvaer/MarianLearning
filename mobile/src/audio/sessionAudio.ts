@@ -84,7 +84,9 @@ export function createExpoSessionFileStore(): SessionFileStore {
       dir.create({ intermediates: true, idempotent: true })
       const file = new File(dir, `${safeName(utteranceId)}.mp3`)
       file.create({ overwrite: true })
-      file.write(base64, { encoding: 'base64' })
+      // SDK 58 made File.write() async; writeSync keeps the size read below
+      // after the bytes are on disk.
+      file.writeSync(base64, { encoding: 'base64' })
       return { uri: file.uri, bytes: file.size ?? 0 }
     },
     removeSession(sessionId) {
