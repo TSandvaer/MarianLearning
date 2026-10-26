@@ -230,15 +230,46 @@ const CRITTER_PRAISE_OWN: Readonly<Record<string, string>> = {
 }
 
 /**
+ * The four-letter targets that crab words and tent words teach (Dave
+ * 2026-10-26, (B)), sorted: each has the lesson's pack picture and its
+ * praise ("Yes! That's a flag."). The lessons' other words (brick, crab,
+ * swing, clock, desk) are no critter target.
+ */
+export const HUNT_FOUR_LESSON_WORDS: readonly string[] = [
+  'belt',
+  'drum',
+  'flag',
+  'frog',
+  'gift',
+  'hand',
+  'lamp',
+  'nest',
+  'plum',
+  'pond',
+  'tent',
+]
+
+/**
  * A picture word's praise (Thomas 2026-10-25, Dave's ruling): the lesson's
  * own `word.p*.correct` line for it ("Yes! That's a fan."), which Emma says
- * the first time the word is built in a visit. Every one is a bundled
+ * the first time the word is built in a visit; since the four-letter
+ * rounds (F9) also the 11 `HUNT_FOUR_LESSON_WORDS`. Every one is a bundled
  * canon clip, so it costs no render. Undefined for any other run.
  */
 export function critterPraise(word: string): string | undefined {
-  if (!CRITTER_PICTURE_WORDS.includes(word)) return undefined
+  if (
+    !CRITTER_PICTURE_WORDS.includes(word) &&
+    !HUNT_FOUR_LESSON_WORDS.includes(word)
+  )
+    return undefined
   return CRITTER_PRAISE_OWN[word] ?? `Yes! That's a ${word}.`
 }
+
+/** Every word with a praise line, sorted: the 45 and the 11 four-letter. */
+export const CRITTER_PRAISE_WORDS: readonly string[] = [
+  ...CRITTER_PICTURE_WORDS,
+  ...HUNT_FOUR_LESSON_WORDS,
+].sort()
 
 /**
  * The real 3-letter words over the 22 critter letters (D5): the CVC words,
@@ -303,7 +334,9 @@ export const CRITTER_NEVER_SAY: ReadonlySet<string> = new Set([
  * row, low; saw, paw, jaw, raw; new, few; ton; huh) and eleven of the
  * other 3-letter words (the, see, she, bee, are, all, two, one, too, out,
  * eat). They sing their sounds and sit. Since Dave's word hunt ruling
- * (2026-10-25, § 6) also his 17 text-only words, _owl_ among them.
+ * (2026-10-25, § 6) also eight of his 17 text-only words, _owl_ among them;
+ * the other nine left with their clips (`CRITTER_SAID_LATER`, critters
+ * four-letter F7).
  */
 export const CRITTER_NOT_SAID: ReadonlySet<string> = new Set([
   'gem',
@@ -352,10 +385,8 @@ export const CRITTER_NOT_SAID: ReadonlySet<string> = new Set([
   'out',
   'eat',
   // Dave's word hunt ruling (2026-10-25, § 6): owl (o-w sings /ɒ/ /w/,
-  // as cow), seven words the sounds don't spell (own, old, arm, art, ash,
-  // who, flu) and nine they do (act, add, ant, elf, end, ill, its, odd,
-  // off), quiet until the four-letter phase gives them clips. No hunt
-  // round deals letters that spell one (`critterHunt.ts`).
+  // as cow) and seven words the sounds don't spell. No hunt round deals
+  // letters that spell one (`critterHunt.ts`).
   'owl',
   'own',
   'old',
@@ -364,15 +395,6 @@ export const CRITTER_NOT_SAID: ReadonlySet<string> = new Set([
   'ash',
   'who',
   'flu',
-  'act',
-  'add',
-  'ant',
-  'elf',
-  'end',
-  'ill',
-  'its',
-  'odd',
-  'off',
 ])
 
 /**
@@ -399,14 +421,17 @@ export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
  * 2026-10-24), and so do _mom_ (Word Song teaches it), _rag_ and _egg_
  * (Dave 2026-10-25); and, for the word hunt (Dave's ruling of
  * 2026-10-25, § 6), _mum_ with mom's picture and the new pack pictures
- * _mug_, _sad_, _mud_ and _hug_ (batch 19, Thomas's picks 2026-10-25).
+ * _mug_, _sad_, _mud_ and _hug_ (batch 19, Thomas's picks 2026-10-25);
+ * and _ant_ and _elf_ (critters four-letter F7, pictures in #709).
  * Pinned here, since core never reads the app's registry;
  * `playPlace.test.ts` checks them against it.
  */
 export const CRITTER_SAID_PICTURE_WORDS: readonly string[] = [
+  'ant',
   'bun',
   'cab',
   'egg',
+  'elf',
   'gum',
   'ham',
   'hug',
@@ -431,8 +456,9 @@ export const CRITTER_SAID_PICTURE_WORDS: readonly string[] = [
  * The four-letter rounds' targets (Dave's ruling of 2026-10-26, (B), "The
  * targets, exact"; `design/native/critters-four-letter.md` § 1): 82 CCVC
  * and CVCC words, by vowel (a 18, o 15, i 7, u 19, e 23). Each has a
- * whole-word Lily clip (`critterWordLine(word)`). Content only so far: no
- * round deals them until the four-letter core (F1-F9).
+ * whole-word Lily clip (`critterWordLine(word)`). Four-letter rounds
+ * (`huntRounds(vowel, { length: 4 })`) deal them; a run of four that spells
+ * one is `'word'` (F8).
  */
 export const HUNT_FOUR_TARGETS: ReadonlySet<string> = new Set(
   [
@@ -447,9 +473,10 @@ export const HUNT_FOUR_TARGETS: ReadonlySet<string> = new Set(
 )
 
 /**
- * The nine 3-letter words the four-letter phase gives a clip (Dave
- * 2026-10-26, (B), "New audio"). They stay on `CRITTER_NOT_SAID`, so they
- * sing and sit, until the four-letter core moves them off it.
+ * The nine 3-letter words the four-letter phase gave a clip (Dave
+ * 2026-10-26, (B), "New audio"). Since the four-letter core (F7) they are
+ * said words: act, add, end, ill, its, odd and off are `HUNT_FAMILIAR`
+ * targets, and ant and elf have pack pictures.
  */
 export const CRITTER_SAID_LATER: readonly string[] = [
   'act',
@@ -464,15 +491,12 @@ export const CRITTER_SAID_LATER: readonly string[] = [
 ]
 
 /**
- * Every word with a whole-word Lily clip, sorted: the said words, the nine
- * to be said later and the four-letter targets (`critterWordLine(word)`).
+ * Every word with a whole-word Lily clip, sorted: the said words (the nine
+ * said later among them) and the four-letter targets
+ * (`critterWordLine(word)`).
  */
 export const CRITTER_CLIP_WORDS: readonly string[] = [
-  ...new Set([
-    ...CRITTER_SAID_WORDS,
-    ...CRITTER_SAID_LATER,
-    ...HUNT_FOUR_TARGETS,
-  ]),
+  ...new Set([...CRITTER_SAID_WORDS, ...HUNT_FOUR_TARGETS]),
 ].sort()
 
 /** A word whose pack picture is another word's (Dave 2026-10-25, § 6). */
@@ -482,17 +506,58 @@ const CRITTER_PICTURE_ALIAS: Readonly<Record<string, string>> = { mum: 'mom' }
 export const critterPictureKey = (word: string): string =>
   CRITTER_PICTURE_ALIAS[word] ?? word
 
-/** A picture word, or a said word with a bundled pack picture. */
+/**
+ * The four-letter targets with a bundled pack picture, sorted: the 11
+ * lesson words and the 14 of #709 (Dave 2026-10-26, (B), the starred
+ * words). Pinned here, since core never reads the app's registry;
+ * `playPlace.test.ts` checks them against it.
+ */
+export const HUNT_FOUR_PICTURE_WORDS: readonly string[] = [
+  'belt',
+  'bulb',
+  'clap',
+  'clip',
+  'drip',
+  'drop',
+  'drum',
+  'flag',
+  'frog',
+  'gift',
+  'hand',
+  'jump',
+  'lamp',
+  'nest',
+  'plug',
+  'plum',
+  'pond',
+  'pump',
+  'ramp',
+  'sand',
+  'sled',
+  'slug',
+  'stop',
+  'tent',
+  'vest',
+]
+
+/**
+ * A picture word, a said word with a bundled pack picture, or a pictured
+ * four-letter target.
+ */
 export const critterHasPicture = (word: string): boolean =>
   CRITTER_PICTURE_WORDS.includes(word) ||
-  CRITTER_SAID_PICTURE_WORDS.includes(word)
+  CRITTER_SAID_PICTURE_WORDS.includes(word) ||
+  HUNT_FOUR_PICTURE_WORDS.includes(word)
 
 /**
  * What a 3-letter run does: `'picture'` pops its clip and picture, `'word'`
  * sings its sounds and Emma says it (`CRITTER_SAID_WORDS`), `'quiet'` sings
  * and sits (a real word on `CRITTER_NEVER_SAY` or `CRITTER_NOT_SAID`), and
  * `'funny'` (not a word) boings and tumbles. With `funny: false` a non-word
- * is `'quiet'` too (`critterFunnyOpen`).
+ * is `'quiet'` too (`critterFunnyOpen`). A run of four (critters
+ * four-letter F8) is `'word'` for a `HUNT_FOUR_TARGETS` word and `'quiet'`
+ * for anything else: no four-letter word has a blend clip, and nothing
+ * judges a four-letter miss.
  */
 export type CritterRun = 'picture' | 'word' | 'quiet' | 'funny'
 
@@ -513,6 +578,7 @@ export function critterRun(
   run: string,
   { funny = true }: { funny?: boolean } = {},
 ): CritterRun {
+  if (run.length === 4) return HUNT_FOUR_TARGETS.has(run) ? 'word' : 'quiet'
   if (CRITTER_PICTURE_WORDS.includes(run)) return 'picture'
   if (!CRITTER_REAL_WORDS.has(run)) return funny ? 'funny' : 'quiet'
   return CRITTER_NEVER_SAY.has(run) || CRITTER_NOT_SAID.has(run)

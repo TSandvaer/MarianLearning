@@ -16,7 +16,7 @@ import {
   CRITTER_SAID_PICTURE_WORDS,
   CRITTER_SAID_WORDS,
   CRITTER_SOUND_SOURCE,
-  CRITTER_PICTURE_WORDS,
+  CRITTER_PRAISE_WORDS,
   CRITTER_WORDS_BY_STEP,
   critterPictureKey,
   critterPraise,
@@ -1089,8 +1089,9 @@ describe('Thomas 2026-10-25 (Dave’s ruling): a real word’s joy beat, and a p
     expect(g.sfx.cheer.play).not.toHaveBeenCalled()
   })
 
-  it('the 45 praise lines play the lessons’ bundled canon clips; a said word has none', () => {
-    for (const w of CRITTER_PICTURE_WORDS) {
+  it('the 56 praise lines (the 45 and the 11 four-letter lesson words) play the lessons’ bundled canon clips; a said word has none', () => {
+    expect(CRITTER_PRAISE_WORDS).toHaveLength(56)
+    for (const w of CRITTER_PRAISE_WORDS) {
       const id = crittersPraiseLine(w)!
       const clip = canonClipFor(critterPraise(w)!)
       expect(clip).toBeDefined()
