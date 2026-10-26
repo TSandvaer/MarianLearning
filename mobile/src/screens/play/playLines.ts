@@ -108,9 +108,11 @@ export const PLAY_LABELS = {
   back: 'Back',
   raft: 'Raft',
   log: 'Log',
-  // The word hunt (critters-word-hunt.md § 6.3).
+  // The word hunt (critters-word-hunt.md § 6.3, § 15.9). One label for
+  // every empty slot, whatever its word: a label that held the word would
+  // be the answer (VoiceOver speaks it, a braille display spells it).
   huntLog: 'Log, three letters',
-  emptySlot: 'Empty word',
+  emptySlot: 'Word to find',
   hint: 'Hint',
   bonus: 'Bonus words',
   newLetters: 'New letters',

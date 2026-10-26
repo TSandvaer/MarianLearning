@@ -1,15 +1,20 @@
 /**
  * Letter critters' word hunt, drawn (`design/native/critters-word-hunt.md`
- * § 2-§ 5): the slots (a picture box over three tile boxes, the log's
- * seats in miniature), the bonus chip, the numeral disc on the log's end,
- * the vowel's ringed burrow, the found word's tiles flying up, and New
- * letters. Every piece is a View; the only shipped art is `ui-critters`
- * in New letters. The game (`LetterCritters.tsx`) owns every state and
- * time; these only draw and animate what they are given.
+ * § 2-§ 5, § 15): the slots (a picture box over three tile boxes, the log's
+ * seats in miniature; the word's pack picture or the listen mark from the
+ * deal), the bonus chip, the numeral disc on the log's end, the vowel's
+ * ringed burrow, the found word's tiles flying up, and New letters. Every
+ * piece is a View or react-native-svg; the only shipped art is the pack
+ * pictures and `ui-critters` in New letters. The game (`LetterCritters.tsx`)
+ * owns every state and time; these only draw and animate what they are
+ * given.
  */
-import { critterPictureKey } from '@marian/core/games/playPlace'
+import {
+  critterHasPicture,
+  critterPictureKey,
+} from '@marian/core/games/playPlace'
 import { Image } from 'expo-image'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   Easing,
@@ -22,9 +27,11 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated'
+import Svg, { Path, Rect as SvgRect } from 'react-native-svg'
 import { pictureAsset } from '../../assets'
 import type { Rect } from '../../layout/layout'
 import { colors, fonts } from '../../theme'
+import { PRESS_MS } from '../hub/clay'
 import { ClayDisc } from '../map/mapChrome'
 import { OVER_PIECE_Z } from './dragLock'
 import type { SlotParts, SlotStep } from './playGeometry'
@@ -47,6 +54,11 @@ export const GLOW_IN_MS = 300
 export const GLOW_OUT_MS = 200
 /** § 5.1: the lap's ring fades in over 150 ms, out over 200 ms. */
 export const LAP_RING_IN_MS = 150
+/** § 15.5: the picture box's lit pulse, 1 → 1.15 → 1. */
+export const BOX_PULSE_MS = 400
+/** § 15.5: a pressed card sinks by half its ledge, on a phone and a tablet. */
+export const SLOT_SINK_PHONE = 2
+export const SLOT_SINK_TABLET = 3
 
 const EASE_IN_OUT = Easing.inOut(Easing.quad)
 
@@ -136,35 +148,82 @@ export function Tile({
   )
 }
 
-/** A pack picture `contain` in a box (a slot's, or the hint's ghost). */
-function SlotPicture({
+/**
+ * The listen mark (§ 15.4): a speaker with two sound waves in Word Song
+ * honey's ledge, drawn in a 100 × 100 viewBox that fills the picture box,
+ * the waves' stroke 9 % of the box. It stands for a word with no picture:
+ * "hear this", not "spell this". No motion of its own.
+ */
+const WAVE_FROM = (-50 * Math.PI) / 180
+const wave = (r: number) => {
+  const [x, y] = [58 + r * Math.cos(WAVE_FROM), 50 + r * Math.sin(WAVE_FROM)]
+  return `M ${x} ${y} A ${r} ${r} 0 0 1 ${x} ${100 - y}`
+}
+export function ListenMark({ box, testID }: { box: Rect; testID: string }) {
+  return (
+    <View
+      testID={testID}
+      pointerEvents="none"
+      accessible={false}
+      style={[styles.abs, rectStyle(box)]}
+    >
+      <Svg width={box.width} height={box.height} viewBox="0 0 100 100">
+        <SvgRect
+          x={14}
+          y={37}
+          width={16}
+          height={26}
+          rx={4}
+          fill={HONEY_LEDGE}
+        />
+        <Path
+          d="M 30 37 L 52 20 Q 56 18 56 23 L 56 77 Q 56 82 52 80 L 30 63 Z"
+          fill={HONEY_LEDGE}
+        />
+        {[14, 28].map((r) => (
+          <Path
+            key={r}
+            d={wave(r)}
+            fill="none"
+            stroke={HONEY_LEDGE}
+            strokeWidth={9}
+            strokeLinecap="round"
+          />
+        ))}
+      </Svg>
+    </View>
+  )
+}
+
+/**
+ * The picture box's face (§ 15.3): the word's pack picture `contain`,
+ * drawn to the whole box and clipped to its radius, or the listen mark
+ * for a word with no picture (or none bundled: never a blank box).
+ */
+function SlotFace({
+  index,
   word,
   box,
-  opacity = 1,
-  testID,
 }: {
+  index: number
   word: string
   box: Rect
-  opacity?: number
-  testID: string
 }) {
-  const source = pictureAsset(critterPictureKey(word))
-  if (source === undefined) return null
+  const key = critterPictureKey(word)
+  const source = critterHasPicture(word) ? pictureAsset(key) : undefined
+  if (source === undefined) {
+    return <ListenMark box={box} testID={`hunt-slot-${index}-listen`} />
+  }
   return (
     <Image
-      testID={testID}
+      testID={`hunt-slot-${index}-picture-${key}`}
       source={source}
       contentFit="contain"
       accessible={false}
       style={[
         styles.abs,
-        {
-          left: box.x + 0.07 * box.width,
-          top: box.y + 0.07 * box.height,
-          width: 0.86 * box.width,
-          height: 0.86 * box.height,
-          opacity,
-        },
+        rectStyle(box),
+        { borderRadius: 0.18 * box.width, overflow: 'hidden' },
       ]}
     />
   )
@@ -215,30 +274,38 @@ export interface SlotProps {
   parts: SlotParts
   step: SlotStep
   tablet: boolean
-  /** The found word in it, once its tiles have landed; else empty. */
-  word: string | null
-  /** Reduce Motion's fill: the tiles and picture fade in (200 ms). */
+  /** Its word from the deal: slot i holds board word i (§ 15.2). */
+  word: string
+  /** Its tiles are in: found, and landed. */
+  filled: boolean
+  /** Reduce Motion's fill: the tiles fade in (200 ms). */
   fadeIn?: boolean
-  /** The hint: the glow; and, after its first tap, its word's ghost. */
+  /** The hint's glow (§ 15.7). */
   glow?: boolean
-  ghost?: string | null
   /** The lap of the completion beat lights this slot. */
   lapRing?: boolean
   /** Each new value: the lit pulse on its tiles. */
   lit?: number
+  /** Each new value: the picture box's lit pulse (§ 15.5). */
+  boxLit?: number
   /** Each new value: the repeat wiggle (§ 4.2). */
   wiggle?: number
+  /** The board waits or the beat plays: a press does not sink. */
+  still?: boolean
   reducedMotion: boolean
   label: string
-  onPress?: () => void
+  onPress: () => void
 }
 
 /**
- * A slot (§ 2.2): a cream card, its picture box over three tile boxes.
- * Filled, its tiles and (if bundled) the word's picture; a word whose
- * picture is not bundled leaves the box blank cream. The repeat wiggle
- * turns it 0 → −5° → +5° → −3° → 0 around its centre (400 ms); Reduce
- * Motion: no turn, the tiles light.
+ * A slot (§ 2.2, § 15.3): a cream card, its picture box over three tile
+ * boxes. From the deal the box shows the word's picture or the listen
+ * mark, the same before and after the find; found, its three tiles stand
+ * in the boxes. A press sinks the card by half its ledge over 120 ms, as
+ * the clay disc's does (kept on Reduce Motion: it follows the finger). The
+ * picture box takes the lit pulse when its word plays (none on Reduce
+ * Motion). The repeat wiggle turns it 0 → −5° → +5° → −3° → 0 around its
+ * centre (400 ms); Reduce Motion: no turn, the tiles light.
  */
 export function Slot({
   index,
@@ -246,12 +313,14 @@ export function Slot({
   step,
   tablet,
   word,
+  filled,
   fadeIn = false,
   glow = false,
-  ghost = null,
   lapRing = false,
   lit = 0,
+  boxLit = 0,
   wiggle = 0,
+  still = false,
   reducedMotion,
   label,
   onPress,
@@ -263,8 +332,27 @@ export function Slot({
       withTiming(deg, { duration: WIGGLE_STEP_MS })
     turn.set(withSequence(step100(-5), step100(5), step100(-3), step100(0)))
   }, [wiggle, reducedMotion, turn])
+  const [down, setDown] = useState(false)
+  const sink = useSharedValue(0)
+  const depth = tablet ? SLOT_SINK_TABLET : SLOT_SINK_PHONE
+  useEffect(() => {
+    sink.set(withTiming(down && !still ? depth : 0, { duration: PRESS_MS }))
+  }, [down, still, depth, sink])
   const turned = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${turn.get()}deg` }],
+    transform: [{ translateY: sink.get() }, { rotate: `${turn.get()}deg` }],
+  }))
+  const grow = useSharedValue(1)
+  useEffect(() => {
+    if (boxLit === 0 || reducedMotion) return
+    grow.set(
+      withSequence(
+        withTiming(1.15, { duration: BOX_PULSE_MS / 2 }),
+        withTiming(1, { duration: BOX_PULSE_MS / 2 }),
+      ),
+    )
+  }, [boxLit, reducedMotion, grow])
+  const pulsed = useAnimatedStyle(() => ({
+    transform: [{ scale: grow.get() }],
   }))
   const { card, picture, boxes } = parts
   // Inner rects are drawn relative to the card.
@@ -272,26 +360,21 @@ export function Slot({
   const ring = tablet ? 6 : 4
   // A repeat lights the tiles with the wiggle (Reduce Motion: alone).
   const pulse = lit + wiggle
-  const fill =
-    word === null ? null : (
-      <View pointerEvents="none" style={styles.fill}>
-        <SlotPicture
-          word={word}
-          box={rel(picture)}
-          testID={`hunt-slot-${index}-picture-${critterPictureKey(word)}`}
+  const box = rel(picture)
+  const tiles = !filled ? null : (
+    <View pointerEvents="none" style={styles.fill}>
+      {[...word].map((l, k) => (
+        <Tile
+          key={k}
+          letter={l}
+          rect={rel(boxes[k]!)}
+          lit={pulse}
+          reducedMotion={reducedMotion}
+          testID={`hunt-slot-${index}-tile-${k}`}
         />
-        {[...word].map((l, k) => (
-          <Tile
-            key={k}
-            letter={l}
-            rect={rel(boxes[k]!)}
-            lit={pulse}
-            reducedMotion={reducedMotion}
-            testID={`hunt-slot-${index}-tile-${k}`}
-          />
-        ))}
-      </View>
-    )
+      ))}
+    </View>
+  )
   return (
     <>
       {glow && (
@@ -318,22 +401,27 @@ export function Slot({
         <Pressable
           testID={`hunt-slot-${index}`}
           accessible
-          accessibilityRole={onPress ? 'button' : undefined}
+          accessibilityRole="button"
           accessibilityLabel={label}
           accessibilityState={{ selected: glow }}
+          onPressIn={() => setDown(true)}
+          onPressOut={() => setDown(false)}
           onPress={onPress}
-          disabled={onPress === undefined}
           style={[styles.card, { borderRadius: 0.18 * card.height }]}
         >
-          <View
+          <Animated.View
+            testID={`hunt-slot-${index}-box`}
             pointerEvents="none"
             style={[
               styles.abs,
               styles.pictureBox,
-              rectStyle(rel(picture)),
+              rectStyle(box),
               { borderRadius: 0.18 * step.T },
+              pulsed,
             ]}
-          />
+          >
+            <SlotFace index={index} word={word} box={{ ...box, x: 0, y: 0 }} />
+          </Animated.View>
           {boxes.map((b, k) => (
             <View
               key={k}
@@ -346,31 +434,17 @@ export function Slot({
               ]}
             />
           ))}
-          {ghost !== null && word === null && (
-            <Animated.View
-              pointerEvents="none"
-              entering={FadeIn.duration(200)}
-              style={styles.fill}
-            >
-              <SlotPicture
-                word={ghost}
-                box={rel(picture)}
-                opacity={0.35}
-                testID={`hunt-slot-${index}-ghost-${critterPictureKey(ghost)}`}
-              />
-            </Animated.View>
-          )}
-          {fill !== null &&
+          {tiles !== null &&
             (fadeIn ? (
               <Animated.View
                 pointerEvents="none"
                 entering={FadeIn.duration(200)}
                 style={styles.fill}
               >
-                {fill}
+                {tiles}
               </Animated.View>
             ) : (
-              fill
+              tiles
             ))}
         </Pressable>
       </Animated.View>

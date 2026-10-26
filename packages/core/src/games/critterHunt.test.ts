@@ -23,6 +23,7 @@ import {
   HUNT_STORAGE_KEY,
   huntComplete,
   huntDeal,
+  huntBoardOrder,
   huntFind,
   huntHintTarget,
   huntProbeGuard,
@@ -272,17 +273,69 @@ describe('H4: huntComplete', () => {
   )
 })
 
-describe('H5: huntHintTarget', () => {
-  it('picture words a-z first, then the other targets a-z; undefined when every target is found', () => {
+describe('P1: huntBoardOrder and huntHintTarget (§ 15.2)', () => {
+  // § 15.2's table: picture words a-z · said words with a picture a-z ·
+  // targets with no picture a-z.
+  const TABLE: [string, string[]][] = [
+    ['abghpt', ['bag', 'bat', 'hat', 'tag', 'tap', 'pat']],
+    ['abhmpt', ['bat', 'hat', 'mat', 'ham', 'map', 'tap', 'pat']],
+    ['ochmpt', ['cot', 'hot', 'mop', 'pot', 'mom', 'pop', 'top', 'hop']],
+    ['oghjpt', ['hot', 'pot', 'pop', 'top', 'got', 'hog', 'hop', 'jog']],
+    ['ubgmst', ['bug', 'bus', 'tub', 'gum', 'mug', 'mum', 'but', 'tug']],
+  ]
+
+  it.each(TABLE)('%s gives § 15.2’s board order', (letters, order) => {
+    const r = huntRoundOf([...letters])!
+    expect(huntBoardOrder(r)).toEqual(order)
+  })
+
+  it('orders picture words, then the other pictured targets, then the rest, each a-z', () => {
+    const band = (w: string) =>
+      CRITTER_PICTURE_WORDS.includes(w) ? 0 : critterHasPicture(w) ? 1 : 2
+    for (const vowel of 'aeiou') {
+      for (const r of huntRounds(vowel)) {
+        const order = huntBoardOrder(r)
+        expect([...order].sort()).toEqual([...r.targets].sort())
+        for (let i = 1; i < order.length; i++) {
+          const [x, y] = [order[i - 1]!, order[i]!]
+          expect(band(x) < band(y) || (band(x) === band(y) && x < y)).toBe(true)
+        }
+      }
+    }
+  })
+
+  it('the hint is the first unfound word in board order, for every round and 20 random found sets', () => {
+    for (const vowel of 'aeiou') {
+      for (const [k, r] of huntRounds(vowel).entries()) {
+        const order = huntBoardOrder(r)
+        const rng = seeded(k + 1)
+        for (let t = 0; t < 20; t++) {
+          const found = [...r.targets, ...r.extras].filter(() => rng() < 0.5)
+          expect(huntHintTarget(r, found)).toBe(
+            order.find((w) => !found.includes(w)),
+          )
+        }
+        expect(huntHintTarget(r, [...r.targets])).toBeUndefined()
+      }
+    }
+  })
+
+  it('the seed’s round: tap (pictured) before pat (no picture)', () => {
     const r = huntRoundOf(['a', 'b', 'g', 'h', 'p', 't'])!
-    expect(r.targets).toEqual(['bag', 'bat', 'hat', 'pat', 'tag', 'tap'])
     expect(huntHintTarget(r, [])).toBe('bag')
-    expect(huntHintTarget(r, ['bag', 'bat'])).toBe('hat')
-    // tap is a said word with a picture, not a picture word: after tag.
     expect(huntHintTarget(r, ['bag', 'bat', 'hat'])).toBe('tag')
-    expect(huntHintTarget(r, ['bag', 'bat', 'hat', 'tag'])).toBe('pat')
-    expect(huntHintTarget(r, ['bag', 'bat', 'hat', 'tag', 'pat'])).toBe('tap')
-    expect(huntHintTarget(r, r.targets)).toBeUndefined()
+    expect(huntHintTarget(r, ['bag', 'bat', 'hat', 'tag'])).toBe('tap')
+    expect(huntHintTarget(r, ['bag', 'bat', 'hat', 'tag', 'tap'])).toBe('pat')
+  })
+
+  it('the record keeps its shape: the order is derived, never stored', () => {
+    const r = huntRoundOf(['a', 'b', 'g', 'h', 'p', 't'])!
+    const rec = huntFind(huntFind(freshHuntRecord(r), 'tap'), 'bag')
+    expect(Object.keys(rec).sort()).toEqual(
+      ['complete', 'extras', 'found', 'letters', 'targets'].sort(),
+    )
+    expect(rec.found).toEqual(['tap', 'bag'])
+    expect(rec.targets).toEqual(r.targets)
   })
 })
 
