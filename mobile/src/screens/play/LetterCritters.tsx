@@ -45,15 +45,17 @@
  * From blending sounds (the same gate), the meadow is a word hunt
  * (`design/native/critters-word-hunt.md`, Dave's ruling of 2026-10-25):
  * six critters, her vowel (no twin, its burrow ringed while it is out)
- * and five consonants; a "3" on the log's end; and a board of empty slots,
- * one per word to find. A new word plays its outcome as above, then its
- * picture shrinks into the next empty slot and its letters fly up as
- * tiles; an extra joins the bonus chip; a repeat wiggles its slot. After
- * five runs without a new word, or 45 s without a drag, the first empty
- * slot glows: a tap plays the word to spell. At all but one word the
- * completion beat plays (each found word in turn, "You did it!", the
- * cheer and the burst), then New letters deals another round. The round
- * is kept per learner (`critterHunt.ts`): toy state, never progress.
+ * and five consonants; a "3" on the log's end; and a board of slots, one
+ * per word to find, in board order (§ 15.2: the easiest first), each with
+ * its word's picture or the listen mark from the deal; a tap on one plays
+ * its word. A new word plays its outcome as above, then its picture
+ * shrinks onto its own slot's picture and its letters fly up as tiles; an
+ * extra joins the bonus chip; a repeat wiggles its slot. After five runs
+ * without a new word, or 45 s without a drag, the first empty slot glows:
+ * a tap plays its sounds, then the word. At all but one word the
+ * completion beat plays (each found word in board order, "You did it!",
+ * the cheer and the burst), then New letters deals another round. The
+ * round is kept per learner (`critterHunt.ts`): toy state, never progress.
  *
  * Reduce Motion (§ 3.7): no bounce, hop, spring, tumble or burst; the
  * singing letter lights (and at the joy beat the three light together),
@@ -63,6 +65,7 @@ import { critterWordLine } from '@marian/core/emmasPath/guidanceLines'
 import {
   freshHuntRecord,
   HUNT_LENGTH,
+  huntBoardOrder,
   huntDeal,
   huntFind,
   huntHintTarget,
@@ -78,7 +81,6 @@ import {
   CRITTER_SAID_PICTURE_WORDS,
   CRITTER_SOUND_SOURCE,
   critterFunnyOpen,
-  critterHasPicture,
   critterPictureKey,
   critterRun,
   critterSet,
@@ -236,6 +238,14 @@ export interface LetterCrittersProps {
   hunt?: boolean
 }
 
+/** The picture card draws its picture at this share of its side. */
+const CARD_PICTURE = 0.86
+/**
+ * How far a slot's picture box grows to be the card that lands on it
+ * (§ 15.6): the card's picture is then exactly the slot's.
+ */
+const cardBleed = (box: Rect) => (box.width / CARD_PICTURE - box.width) / 2
+
 /** A letter's own sound: its source clip and tap window (§ 3.4). */
 function letterSound(letter: string) {
   const source = CRITTER_SOUND_SOURCE[letter]
@@ -354,11 +364,15 @@ export function LetterCritters({
   const arriveRef = useRef(0)
   /** Reduce Motion's fill: this word's slot fades in. */
   const [fresh, setFresh] = useState<string | null>(null)
-  /** Lit-pulse and wiggle counters, per word. */
+  /** Lit-pulse (tiles, picture box) and wiggle counters, per word. */
   const [lit, setLit] = useState<Record<string, number>>({})
+  const [boxLit, setBoxLit] = useState<Record<string, number>>({})
   const [wiggle, setWiggle] = useState<Record<string, number>>({})
-  /** The hint's glow on the first empty slot, and its ghost picture. */
-  const [glow, setGlow] = useState<{ ghost: string | null } | null>(null)
+  /** The hint's glow on the first empty slot (§ 15.7). */
+  const [glow, setGlow] = useState(false)
+  /** A slot's sound in flight: a new tap cuts it; the hint's, Emma points. */
+  const tapRef = useRef(0)
+  const pointingRef = useRef(false)
   const glowRef = useRef(false)
   const glowDueRef = useRef(false)
   /** The lap of the completion beat: the slot lit now. */
@@ -494,11 +508,24 @@ export function LetterCritters({
     if (r === null || r.complete || glowRef.current || beatRef.current) return
     if (huntHintTarget(r, r.found) === undefined) return
     glowRef.current = true
-    setGlow({ ghost: null })
+    setGlow(true)
   }
   const endGlow = () => {
     glowRef.current = false
-    setGlow(null)
+    setGlow(false)
+  }
+  /**
+   * The tap player is cut (`onEnd` fires on a cut too): a slot's sound in
+   * flight, and the hint's sounds-then-word with it, end there; Emma
+   * points no longer. Returns the new tap's token.
+   */
+  const cutTap = () => {
+    const token = ++tapRef.current
+    if (pointingRef.current) {
+      pointingRef.current = false
+      kit.setPose('idle')
+    }
+    return token
   }
   /** `HUNT_HINT_IDLE_MS` from now with no drag start: the glow. */
   const armHuntIdle = () => {
@@ -578,6 +605,7 @@ export function LetterCritters({
     kit.later(showHint, CRITTERS_OPEN_DELAY_MS)
     return () => {
       songRef.current += 1
+      tapRef.current += 1
       player.release()
     }
     // Mount-once.
@@ -592,6 +620,8 @@ export function LetterCritters({
   useEffect(() => {
     if (kit.cancelKey.endsWith('hidden')) {
       songRef.current += 1
+      // A slot's sound stops with the rest; a hint cut short ends Emma's point.
+      cutTap()
       player.cut()
       // The beat's steps wait for her return (the shelf is already clear).
       if (lockedRef.current && !beatRef.current) {
@@ -630,6 +660,7 @@ export function LetterCritters({
     setSeats(next)
     setLean(false)
     songRef.current += 1
+    cutTap()
     player.cut()
     endHint()
     armIdle()
@@ -650,6 +681,8 @@ export function LetterCritters({
     const current = seatsRef.current
     const run = seatedRun(current)
     if (run === null) return
+    // Its song cuts a slot's sound: the hint ends before the run's pose.
+    cutTap()
     const letters = run.map((i) => current[i]!)
     const word = letters.join('')
     const kind = run.length === 3 ? critterRun(word, { funny }) : null
@@ -874,12 +907,12 @@ export function LetterCritters({
     word: string,
   ) => set((m) => ({ ...m, [word]: (m[word] ?? 0) + 1 }))
 
-  /** The targets on the board, in slot (find) order. */
+  /** The found targets on the board, in board order (§ 15.6). */
   const boardWords = () => {
     const r = recordRef.current
     if (r === null) return []
-    return r.found.filter(
-      (w) => r.targets.includes(w) && !pendingRef.current.includes(w),
+    return huntBoardOrder(r).filter(
+      (w) => r.found.includes(w) && !pendingRef.current.includes(w),
     )
   }
   const isNew = (word: string) =>
@@ -917,14 +950,17 @@ export function LetterCritters({
   }
 
   /**
-   * § 4.1: the outcome is over; the new target fills the next empty slot.
-   * Its picture card shrinks into the slot's picture box and its three
-   * tiles fly up from the seats (Reduce Motion: the card fades where it
-   * is, the slot fades in); the shelf clears 400 ms after the last tile
-   * lands. No sound, no line. The hint's glow goes and its counts restart.
+   * § 4.1, § 15.6: the outcome is over; the new target fills its own slot
+   * (its place in board order). Its picture card shrinks onto the slot's
+   * picture (the card draws its picture at 0.86 of its side, so it ends
+   * at the picture box grown to T / 0.86) and its three tiles fly up from
+   * the seats (Reduce Motion: the card fades where it is, the tiles fade
+   * in); the shelf clears 400 ms after the last tile lands. No sound, no
+   * line. The hint's glow goes and its counts restart.
    */
   const fill = (word: string, token: number) => {
-    const slot = boardWords().length
+    const r = recordRef.current
+    const slot = r === null ? -1 : huntBoardOrder(r).indexOf(word)
     const run = runHuntRef.current?.run ?? [0, 1, 2]
     setPending(pendingRef.current.filter((w) => w !== word))
     endGlow()
@@ -940,7 +976,8 @@ export function LetterCritters({
     } else {
       const key = ++arriveRef.current
       setArriving({ word, slot, run, key })
-      const into = hs?.slots[slot]?.picture
+      const box = hs?.slots[slot]?.picture
+      const into = box === undefined ? undefined : grow(box, cardBleed(box))
       setPicture((p) => (p === null || into === undefined ? p : { ...p, into }))
       kit.advance(() => {
         if (arriveRef.current !== key) return
@@ -985,27 +1022,68 @@ export function LetterCritters({
     onEnd?.()
   }
 
-  /** § 4.3: a filled slot plays its word and lights its tiles. */
-  const onSlotTap = (word: string) => {
-    if (lockedRef.current) return
+  /**
+   * A slot tap (§ 4.3, § 15.5): any line and any slot sound in flight are
+   * cut, and the picture box takes the lit pulse. A hint cut short leaves
+   * Emma pointing no longer. Ignored while the board waits or the beat
+   * plays. Not a run and not a drag start: no hint count changes, no write.
+   */
+  const slotTap = (word: string): number | null => {
+    if (lockedRef.current) return null
     kit.cutLine()
+    const token = cutTap()
+    bump(setBoxLit, word)
+    return token
+  }
+
+  /** A filled slot plays its word and lights its tiles. */
+  const onSlotTap = (word: string) => {
+    if (slotTap(word) === null) return
     bump(setLit, word)
     playWord(word, false)
   }
 
+  /** § 15.5: an empty slot plays its word, sound only; Emma as she is. */
+  const onEmptyTap = (word: string) => {
+    if (slotTap(word) === null) return
+    playWord(word, false)
+  }
+
   /**
-   * § 4.6: the glowing slot plays the word to find, whole and sound only,
-   * Emma pointing; from the first tap its picture ghosts at 35 %.
+   * § 15.7: the glowing slot plays its word as sounds, then the word, Emma
+   * pointing, sound only: a picture word's whole blend clip; any other
+   * target its three critter sounds in order, `SOUND_GAP_MS` after each,
+   * then its word clip. No critter lights or bounces. Then Emma `idle`.
    */
   const onHintTap = () => {
-    if (lockedRef.current) return
     const r = recordRef.current
     const word = r === null ? undefined : huntHintTarget(r, r.found)
     if (word === undefined) return
-    kit.cutLine()
-    if (critterHasPicture(word)) setGlow({ ghost: word })
+    const token = slotTap(word)
+    if (token === null) return
+    pointingRef.current = true
     kit.setPose('attentive-pointing')
-    playWord(word, true, () => kit.setPose('idle'))
+    const done = () => {
+      if (tapRef.current !== token) return
+      pointingRef.current = false
+      kit.setPose('idle')
+    }
+    if (CRITTER_PICTURE_WORDS.includes(word)) {
+      playWord(word, true, done)
+      return
+    }
+    const next = (k: number) => {
+      if (tapRef.current !== token) return
+      if (k === word.length) {
+        playWord(word, false, done)
+        return
+      }
+      singLetter(word[k]!, () => {
+        if (tapRef.current !== token) return
+        kit.later(() => next(k + 1), SOUND_GAP_MS)
+      })
+    }
+    next(0)
   }
 
   /**
@@ -1077,6 +1155,7 @@ export function LetterCritters({
     })
     setPending([])
     setLit({})
+    setBoxLit({})
     setWiggle({})
     setFresh(null)
     endGlow()
@@ -1098,6 +1177,7 @@ export function LetterCritters({
   const onMeadowTap = (letter: string) => {
     if (lockedRef.current) return
     kit.cutLine()
+    cutTap()
     setMeadowHop((h) => ({ ...h, [letter]: (h[letter] ?? 0) + 1 }))
     singLetter(letter)
   }
@@ -1106,8 +1186,10 @@ export function LetterCritters({
     if (lockedRef.current) return
     kit.cutLine()
     const free = seatsRef.current.indexOf(null)
-    if (free < 0) singLetter(letter)
-    else changed(seatAt(seatsRef.current, free, letter))
+    if (free < 0) {
+      cutTap()
+      singLetter(letter)
+    } else changed(seatAt(seatsRef.current, free, letter))
   }
 
   const onMeadowDrop = (letter: string, p: Point): boolean => {
@@ -1124,6 +1206,7 @@ export function LetterCritters({
     const letter = seatsRef.current[seat]
     if (letter === null || letter === undefined) return
     kit.cutLine()
+    cutTap()
     bounceSeat(seat)
     singLetter(letter)
   }
@@ -1147,6 +1230,7 @@ export function LetterCritters({
     if (lockedRef.current || draggingRef.current) return
     kit.cutLine()
     songRef.current += 1
+    cutTap()
     player.cut()
     sing()
   }
@@ -1195,7 +1279,17 @@ export function LetterCritters({
       : record.found.filter(
           (w) => record.extras.includes(w) && !pending.includes(w),
         )
-  const glowAt = glow !== null ? onBoard.length : -1
+  const order = record === null ? [] : huntBoardOrder(record)
+  // A pending find is not on the board yet: the glow stays put until its
+  // fill starts (§ 15.7).
+  const hintWord =
+    glow && record !== null
+      ? huntHintTarget(
+          record,
+          record.found.filter((w) => !pending.includes(w)),
+        )
+      : undefined
+  const glowAt = hintWord === undefined ? -1 : order.indexOf(hintWord)
   const deal = {
     entering:
       dealKey > 0 ? FadeIn.duration(DEAL_IN_MS).delay(DEAL_OUT_MS) : undefined,
@@ -1235,7 +1329,9 @@ export function LetterCritters({
         >
           <NumeralDisc rect={hs.numeral} length={HUNT_LENGTH} />
           {hs.slots.map((parts, i) => {
-            const word = arriving?.slot === i ? null : (onBoard[i] ?? null)
+            const word = order[i]
+            if (word === undefined) return null
+            const filled = onBoard.includes(word) && arriving?.word !== word
             const glowing = i === glowAt
             return (
               <Slot
@@ -1245,26 +1341,28 @@ export function LetterCritters({
                 step={hs.step}
                 tablet={kit.tablet}
                 word={word}
-                fadeIn={word !== null && word === fresh}
+                filled={filled}
+                fadeIn={filled && word === fresh}
                 glow={glowing}
-                ghost={glowing ? glow!.ghost : null}
-                lapRing={word !== null && lap === word}
-                lit={word === null ? 0 : (lit[word] ?? 0)}
-                wiggle={word === null ? 0 : (wiggle[word] ?? 0)}
+                lapRing={filled && lap === word}
+                lit={filled ? (lit[word] ?? 0) : 0}
+                boxLit={boxLit[word] ?? 0}
+                wiggle={filled ? (wiggle[word] ?? 0) : 0}
+                still={locked}
                 reducedMotion={reducedMotion}
                 label={
-                  word !== null
+                  filled
                     ? slotLabel(word)
                     : glowing
                       ? PLAY_LABELS.hint
                       : PLAY_LABELS.emptySlot
                 }
                 onPress={
-                  word !== null
+                  filled
                     ? () => onSlotTap(word)
                     : glowing
                       ? onHintTap
-                      : undefined
+                      : () => onEmptyTap(word)
                 }
               />
             )
@@ -1907,7 +2005,10 @@ function PictureCard({
         source={pictureAsset(critterPictureKey(word))}
         contentFit="contain"
         accessible={false}
-        style={{ width: 0.86 * rect.width, height: 0.86 * rect.height }}
+        style={{
+          width: CARD_PICTURE * rect.width,
+          height: CARD_PICTURE * rect.height,
+        }}
       />
     </Animated.View>
   )

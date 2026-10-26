@@ -287,11 +287,11 @@ const HUNT_TABLE: readonly (readonly [
     vp(375, 667),
     'S4',
     {
-      board: [22.5, 265, 330, 138],
-      logBand: [58.5, 415, 258, 86],
-      meadow: [95.5, 509, 184, 120],
-      chip: [287.5, 565, 60, 64],
-      picture: [87.5, 422, 200],
+      board: [26.5, 264, 322, 140],
+      logBand: [58.5, 416, 258, 86],
+      meadow: [95.5, 510, 184, 120],
+      chip: [287.5, 570, 58, 60],
+      picture: [87.5, 423, 200],
     },
   ],
   [
@@ -299,10 +299,10 @@ const HUNT_TABLE: readonly (readonly [
     vp(667, 375),
     'S4',
     {
-      board: [405, 149.6, 246, 210],
+      board: [411, 148.1, 240, 213],
       logBand: [160, 160.6, 228, 76],
       meadow: [194, 244.6, 160, 104],
-      chip: [582, 294.6, 60, 64],
+      chip: [584, 297.6, 58, 60],
       picture: [180, 160.6, 188],
     },
   ],
@@ -311,11 +311,11 @@ const HUNT_TABLE: readonly (readonly [
     vp(390, 844, { top: 47, bottom: 34 }),
     'S4',
     {
-      board: [30, 370.5, 330, 138],
-      logBand: [66, 520.5, 258, 86],
-      meadow: [103, 614.5, 184, 120],
-      chip: [295, 670.5, 60, 64],
-      picture: [95, 527.5, 200],
+      board: [34, 369.5, 322, 140],
+      logBand: [66, 521.5, 258, 86],
+      meadow: [103, 615.5, 184, 120],
+      chip: [295, 675.5, 58, 60],
+      picture: [95, 528.5, 200],
     },
   ],
   [
@@ -323,11 +323,11 @@ const HUNT_TABLE: readonly (readonly [
     vp(844, 390, { left: 47, right: 47, bottom: 21 }),
     'S4',
     {
-      board: [507, 146.1, 246, 210],
-      logBand: [255, 157.1, 228, 76],
-      meadow: [289, 241.1, 160, 104],
-      chip: [684, 291.1, 60, 64],
-      picture: [275, 157.1, 188],
+      board: [510, 144.6, 240, 213],
+      logBand: [258, 157.1, 228, 76],
+      meadow: [292, 241.1, 160, 104],
+      chip: [683, 294.1, 58, 60],
+      picture: [278, 157.1, 188],
     },
   ],
   [
@@ -506,7 +506,7 @@ describe('H7: the word hunt scene (critters-word-hunt.md § 2.4)', () => {
     const phone = sceneOf(vp(375, 667), 6).s
     expect(phone.cells).toHaveLength(6)
     expect(new Set(phone.cells.map((r) => r.y)).size).toBe(2)
-    expect(phone.cells.slice(0, 3).map((r) => r.y)).toEqual([509, 509, 509])
+    expect(phone.cells.slice(0, 3).map((r) => r.y)).toEqual([510, 510, 510])
     expectRect(phone.numeral, [58.5, phone.log.y - 4, 32, 32])
     const tablet = sceneOf(vp(820, 1180, { top: 24, bottom: 20 }), 6).s
     expectRect(tablet.numeral, [213, 868.4, 40, 40])

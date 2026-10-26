@@ -254,20 +254,34 @@ export function huntComplete(
   return foundTargets(round, found).length >= need
 }
 
+/** The board's three bands (§ 15.2): 0 easiest. */
+const boardBand = (word: string): number =>
+  CRITTER_PICTURE_WORDS.includes(word) ? 0 : critterHasPicture(word) ? 1 : 2
+
 /**
- * The word a hint plays: the first unfound target, picture words a-z
- * first (their blend clip sings each sound), then the other targets a-z.
- * `undefined` when every target is found.
+ * The targets in board order (`critters-word-hunt.md` § 15.2, Dave 23
+ * (A).1): picture words (each has a blend clip) a-z, then the other
+ * targets with a picture a-z, then the targets with no picture a-z. Slot
+ * i holds word i from the deal. Derived, never stored: the record keeps
+ * `found` in find order, so a round dealt before the board order reopens
+ * with every find in its own slot (Q17).
+ */
+export function huntBoardOrder(round: HuntRound): string[] {
+  return [...round.targets].sort(
+    (x, y) => boardBand(x) - boardBand(y) || (x < y ? -1 : x > y ? 1 : 0),
+  )
+}
+
+/**
+ * The word a hint plays: the first empty slot's word, i.e. the first
+ * unfound target in board order (§ 15.2). `undefined` when every target
+ * is found.
  */
 export function huntHintTarget(
   round: HuntRound,
   found: readonly string[],
 ): string | undefined {
-  const left = round.targets.filter((w) => !found.includes(w)).sort()
-  return (
-    left.find((w) => CRITTER_PICTURE_WORDS.includes(w)) ??
-    left.find((w) => !CRITTER_PICTURE_WORDS.includes(w))
-  )
+  return huntBoardOrder(round).find((w) => !found.includes(w))
 }
 
 // ── The record (Dave (7)) ─────────────────────────────────────────────────

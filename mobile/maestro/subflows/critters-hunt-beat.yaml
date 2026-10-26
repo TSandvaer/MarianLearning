@@ -11,10 +11,10 @@ appId: host.exp.Exponent
       id: critter-picture-tag
     timeout: 15000
 - takeScreenshot: ${SHOT}-tag-picture
-# The fill: tag's tiles and picture in slot 5.
+# The fill: tag's tiles in its own slot (3), under its picture.
 - extendedWaitUntil:
     visible:
-      id: hunt-slot-4-picture-tag
+      id: hunt-slot-3-tile-0
     timeout: 20000
 # The beat: the lap lights each found slot in turn, then "You did it!".
 - extendedWaitUntil:

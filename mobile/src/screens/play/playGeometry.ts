@@ -383,12 +383,15 @@ export interface SlotStep {
   bx: number
 }
 
-/** § 2.2's ladder: tablets take the first that fits; phones take S4. */
+/**
+ * § 2.2's ladder: tablets take the first that fits; phones take S4 (pad 3,
+ * T 36 since § 15.10: the largest picture box the tightest phone fits).
+ */
 export const SLOT_STEPS: readonly SlotStep[] = [
   { name: 'S1', b: 40, gb: 4, pad: 8, T: 72, bx: 28 },
   { name: 'S2', b: 32, gb: 4, pad: 8, T: 56, bx: 24 },
   { name: 'S3', b: 28, gb: 3, pad: 6, T: 44, bx: 20 },
-  { name: 'S4', b: 22, gb: 2, pad: 4, T: 32, bx: 16 },
+  { name: 'S4', b: 22, gb: 2, pad: 3, T: 36, bx: 16 },
 ]
 
 /** The hunt's 6 critters: 3 a row, 2 rows (Decision 2). */
