@@ -27,14 +27,20 @@ appId: host.exp.Exponent
       TARGET: play-tile-critters
       NEXT: letter-critters
 # The round in progress: the 3 on the log, four slots filled, two empty.
+# In board order (§ 15.2) the slots hold bag, bat, hat, tag, tap, pat:
+# every slot shows its picture from the deal, pat's the listen mark.
 - extendedWaitUntil:
     visible:
       id: critter-log-numeral
     timeout: 15000
 - assertVisible:
-    id: hunt-slot-3-picture-tap
-- assertNotVisible:
     id: hunt-slot-4-tile-0
+- assertVisible:
+    id: hunt-slot-3-picture-tag
+- assertNotVisible:
+    id: hunt-slot-3-tile-0
+- assertVisible:
+    id: hunt-slot-5-listen
 - assertNotVisible:
     id: hunt-new-letters
 # The open line and the drag hint end (the hand loops 6 s).

@@ -754,6 +754,29 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
       found: ['bag', 'hat', 'bat', 'tap'],
     },
   },
+
+  // The word hunt's pictured board on a short-i round (critters-word-hunt.md
+  // § 15): short o and u mastered, short i current, and the round i b n p
+  // t w in progress with bib and pit found. Its board order is bib, bin,
+  // pin (pictures; pin is one of § 15.10's thin-line pictures), then bit,
+  // pit, tin, tip, win under the listen mark: N 8, a found listen slot.
+  'critters-hunt-i': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'sounding-out': 'mastered',
+      'cvc-words': 'mastered',
+      'cvc-words-short-o': 'mastered',
+      'cvc-words-short-u': 'mastered',
+      'cvc-words-short-i': 'practicing',
+    },
+    skipGreet: true,
+    hunt: {
+      letters: ['i', 'b', 'n', 'p', 't', 'w'],
+      found: ['bib', 'pit'],
+    },
+  },
 }
 
 /** Every recognized seed name, in table order. */
