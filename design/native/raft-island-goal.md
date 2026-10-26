@@ -10,6 +10,8 @@
 
 **Scope:** spec only. No code, no renders, no paid calls, no tickets.
 
+**Amended 2026-10-26 (build 23): no crossing cap.** Thomas on build 23, as the coordinator's brief relays him: the raft trip "stops after 3 crossings" (too short). Dave ruled (his (C), committed verbatim as `design/research/build23-games-2026-10-26.md`, quoted here as "Dave 23 (C)"): "no crossing cap. A trip ends at its island's party or when she taps Back." § 6, the ordinary trip end, goes; Dave raft (4)'s "ends at the third crossing or at the party, whichever comes first" becomes "ends at the party"; ACs I8 and I16 change. **It ships with this island-goal build, not before it** (Dave 23 (C), "Vehicle": today's island has no homes, so with no cap the animals would stack after about 8-10, `islandSpot`, `mobile/src/screens/play/playGeometry.ts:222-235`). The places it changes are marked "(amended 2026-10-26)": § 1.4, § 5.1, § 6, § 9, § 11.2 (I8, I11, I16), § 12.3 and § 16.
+
 **Measurements** are hand-computed by a scratch script (2026-10-25, not committed) that ports `raftScene` and `islandSpot` (`mobile/src/screens/play/playGeometry.ts:89-214`, `:222-235`) and takes `A` from `play-place.md:198-201`: P = phone portrait 375 × 667, L = phone landscape 667 × 375, W = tablet portrait 820 × 1180 (t24 b20), TL = tablet landscape 1180 × 820 (b20). `a` is the animal cell (64 phones, 104 tablets, `playGeometry.ts:94`). A home "fits" when its nest circle lies inside the island's clay oval face, inset 2 pt (the face is the mound rect less the restyle's drop, 7 phones / 10 tablets, `play-games-restyle.md:108`). Line numbers are on `origin/main` at `414ad2fa`.
 
 ## Goal
@@ -81,7 +83,7 @@ Replaces `play-place.md:301-303` (arrival, scene, return). Exactly ten (or twent
 | arrival + 300             | The silly scene, played by the seated animals on the deck (`SCENE_AT_MS` 300, `RaftCrossing.tsx:94`; the scenes' offsets, `:1081-1120`, from each seat). "Topple onto the sand" becomes "onto the logs"; the cannonball jumps from the deck into the water (its −40 / +30 pt offset lands in water on all four forms). Emma `cheering`, `guide.play.raft.silly`, and the shipped cheer, as today. |
 | scene end + 400 (`H0`)    | **The walk home.** In weight order, lightest first, each animal hops from its seat to its home: a 0.2 a arc over 300 ms (the take-off hop, `play-place.md:272`), shrinking from the seat (0.7 a) to `h`. Hop k starts at `H0 + 300 k`. Emma `idle`.                                                                                                                                               |
 | each hop's end            | A new kind fills its home (§ 2.1); a kind already home merges and its home wiggles (§ 2.2).                                                                                                                                                                                                                                                                                                       |
-| last hop's beat end + 400 | **Ninth kind just filled:** the party (§ 3). **Otherwise, crossings 1 and 2:** the raft glides back empty and newcomers walk in, as today (`play-place.md:303`). **Crossing 3:** the ordinary trip end (§ 6).                                                                                                                                                                                     |
+| last hop's beat end + 400 | **Ninth kind just filled:** the party (§ 3). **Otherwise, on every crossing** (amended 2026-10-26, no cap): the raft glides back empty and newcomers walk in, as today's crossings 1 and 2 do (`play-place.md:307`). It was: crossing 3 ended the trip (§ 6).                                                                                                                                     |
 
 A load of 2-5 animals takes 0.6-1.5 s to walk home (`H0` to the last hop's end), so a crossing is about 1-2 s longer than today's.
 
@@ -204,8 +206,8 @@ As the 10 raft's (`play-place.md` § 2.3), with "The raft can carry twenty!" as 
 
 ### 5.1 When it shows
 
-- **One raft open:** no picker. The game opens on the 10 shore and a trip end goes to the Play place, as today (Dave (4)).
-- **Two open:** the game opens on the picker; a trip end returns to it (fade 200 / 200 ms, silent); Back from the picker goes to the Play place (Dave (4)). **Back mid-trip goes to the picker**, at once and silently: a trip ends on the screen it started from (Dave (4)). This changes `play-place.md:209` for the raft with two rafts open.
+- **One raft open:** no picker. The game opens on the 10 shore, and Back goes to the Play place, as today (Dave (4)). (Amended 2026-10-26: with no crossing cap, a trip with one raft open ends only on Back or at the 10 island's party, whose reveal lands on the picker, § 3.1. It was: a trip end goes to the Play place.)
+- **Two open:** the game opens on the picker; a trip end (the 20 island's party, amended 2026-10-26) returns to it (fade 200 / 200 ms, silent); Back from the picker goes to the Play place (Dave (4)). **Back mid-trip goes to the picker**, at once and silently: a trip ends on the screen it started from (Dave (4)). This changes `play-place.md:209` for the raft with two rafts open.
 - It is part of the raft's `play-game` screen, not a new route. Emma stays at her frame, `idle`; the ribbon is empty. **The picker never speaks** (0 lines, Dave (6)); Q7.
 
 ### 5.2 Layout
@@ -234,18 +236,17 @@ On the restyle's garden (T1). One pond per raft: portrait stacks them (10 on top
 
 ---
 
-## 6. The ordinary trip end (Dave's item 6)
+## 6. The trip end (amended 2026-10-26: no crossing cap, Dave 23 (C))
 
-The third crossing with no party. Replaces `play-place.md:304-305`. `T0` = the end of the third crossing's last hop beat.
+**A trip ends at its island's party (§ 3.1) or when she taps Back, and nowhere else.** The ordinary trip end that stood here (the third crossing with no party: every filled home bounced, Emma `waving`, then the fade out after 2000 ms) is **removed**. Dave's item 6 is superseded by Dave 23 (C).
 
-| t         | What happens                                                                                                                                                       |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| T0 + 400  | Every filled home's animal bounces once, together (up 0.45 h and down, 150 + 150 ms). Empty homes stay still. Emma `waving` (`emmaPose.ts:32`). No line, no sound. |
-| T0 + 2000 | Emma `idle`. The game fades out (200 ms) to the picker (two rafts) or the Play place (one), silent.                                                                |
-
-About the same length as today's close line plus its 800 ms gap. Developer note (Dave (2)): `kit.done` runs from the close line's end today (`RaftCrossing.tsx:379`); it now runs from this timer. Reduce Motion: no bounce; the pose and the timing hold.
-
----
+- **Every crossing without a party** ends as crossings 1 and 2 did (§ 1.4's last row): the raft glides back empty, newcomers walk in, boarding opens when it docks, and the raft waits for ever (`play-place.md:175`). Nothing counts crossings, and nothing on screen or in a line marks one.
+- **The party** ends the trip as § 3.1 has it: the 10 island's party runs the reveal and lands on the picker; the 20 island's fades to the picker.
+- **Back** ends it at any moment, as `play-place.md` § 1.7 and § 5.1 have it: to the Play place with one raft open, to the picker with two. The island keeps every kind already home (I7).
+- **A full island** (one party per island, ever, § 3.1) gets ordinary crossings with no party, so its trip ends only on Back. Dave: once both islands are full, "the raft is a toy, and a toy may have no end" (Dave 23 (C)).
+- **Developer note** (Dave 23 (C)): `RAFT_CROSSINGS` (`packages/core/src/games/playPlace.ts:60`) and `tripOver` (`mobile/src/screens/play/raftModel.ts:310`) go. Nothing ends a trip on a count any more: its only ends are the party's last step (§ 3.1: the reveal, or the fade to the picker) and Back. Today the third crossing's scene ends the trip: `afterScene` checks `tripOver`, says the close line and then `kit.done` (`RaftCrossing.tsx:429-438` at fe366267); that branch goes with the cap.
+- **Kept** (Dave 23 (C), "Safeguards kept"): no autoplay; no line invites another crossing (C8); Emma never suggests the raft; no new writes.
+- **Reduce Motion:** nothing to change (the bounce went with § 6).
 
 ## 7. The level-up music (Thomas OK'd in principle, 2026-10-25)
 
@@ -380,7 +381,7 @@ Lines, sounds and their times are unchanged; dragging still follows the finger (
 | Repeat                  | § 2.3: fade at the seat, the home's animal dims 1 → 0.6 → 1                                           |
 | Party lap, dance, burst | § 3.3: filled animals brighten 0.85 → 1 (200 ms) at the lap's start; no hop, no dance, no burst       |
 | Reveal                  | § 3.3: the 20 pond, island and raft fade in together (400 ms)                                         |
-| Ordinary trip end       | No bounce; `waving` and the timing hold                                                               |
+| Ordinary trip end       | Removed 2026-10-26 with § 6's ordinary trip end (no crossing cap)                                     |
 | Picker press            | A 150 ms dim (opacity 1 → 0.85 → 1) instead of the sink                                               |
 
 ---
@@ -430,10 +431,10 @@ Dave's examples ("Pig, home", "Pig home, empty") gain the number, because the sh
 **Native (jest, `mobile`; Devon):**
 
 7. **I7** (amends N5). On an in-memory store, a raft trip writes only the island key, once per new kind and never otherwise; a trip that brings no new kind writes nothing. Progress, session history, stardust, Leitner and the streak are byte-identical, and `fetch` is never called. Back mid-crossing keeps every kind already home.
-8. **I8** (amends N8). Exactly 10 (or 20) departs as today. At arrival the animals stay seated; the scene plays on the deck; then each animal hops home in weight order 300 ms apart. A new kind: `raft-home-burst-<w>`, the sparkle, the home's shape gone. A repeat: no burst, no sound, the wiggle. Crossings 1-2 then return. Crossing 3 without a party: § 6 (`waving`, no line), then the picker or the Play place. `guide.play.raft.close` plays only in a party.
+8. **I8** (amends N8). Exactly 10 (or 20) departs as today. At arrival the animals stay seated; the scene plays on the deck; then each animal hops home in weight order 300 ms apart. A new kind: `raft-home-burst-<w>`, the sparkle, the home's shape gone. A repeat: no burst, no sound, the wiggle. (Amended 2026-10-26, Dave 23 (C).) **Every crossing without a party then returns:** the raft glides back empty and newcomers walk in, the shore is 6 again, and boarding opens when it docks. With fake timers, 12 crossings in a row with no party (on a full island, or with no new kind) all return this way: the game never leaves on its own, Emma never takes `waving`, no line plays after the scene, and no exported `RAFT_CROSSINGS` or `tripOver` remains. Back mid-trip still leaves at once (I10). `guide.play.raft.close` plays only in a party.
 9. **I9.** The party, with fake timers: when the ninth kind fills, § 3.1's steps play once, in order and at their times: `celebration`, the lap 120 ms apart, `cheering` and the "You did it!" canon clip with its caption, J1 or `sfx.cheer` with `raft-party-burst`, then the close line. After the 10 island's party the picker shows and § 3.2's reveal runs; after the 20 island's there is no reveal. Touch is locked from P0 until the picker unlocks; Back works throughout. A trip to a full island never parties.
 10. **I10.** The picker: absent with one raft; with two it opens first. A pond tap starts that raft's trip with its open line ("The raft can carry twenty!" for 20); a trip end returns to the picker; Back from a trip goes to the picker and from the picker to the Play place.
-11. **I11** (amends N13). `islandHomes`, `targetBoard`, the 20 deck and `raftPicker` equal §§ 1.2, 4.1, 4.3, 4.4 and 5.2's rects on the four viewports; every nest lies inside its oval face inset 2 pt; nothing overlaps another part except where § 4.3 says the board covers seats; a viewport change mid-trip keeps the island, what is aboard and the crossing number.
+11. **I11** (amends N13). `islandHomes`, `targetBoard`, the 20 deck and `raftPicker` equal §§ 1.2, 4.1, 4.3, 4.4 and 5.2's rects on the four viewports; every nest lies inside its oval face inset 2 pt; nothing overlaps another part except where § 4.3 says the board covers seats; a viewport change mid-trip keeps the island and what is aboard (amended 2026-10-26: there is no crossing number to keep).
 12. **I12** (N7a, widened). On a stuck 20 raft, after two splashes in a row a newcomer of `raftNewcomer`'s weight walks in with no line, sound or pose; boarding it can reach 20.
 13. **I13.** The flag shows totals up to the target; the board shows the target and never changes during a trip.
 14. **I14** (N12). With Reduce Motion on (mocked), no hop, wiggle, settle, lap, dance, burst, glide-in or bounce starts; § 9's fades run; lines and sounds keep their times.
@@ -441,7 +442,7 @@ Dave's examples ("Pig, home", "Pig home, empty") gain the number, because the sh
 
 **Device (Jessica first; phone P and L, iPad portrait and landscape; Emma muted for local runs):**
 
-16. **I16** (amends V5). A trip: the scene on the raft, the walk home, a fill with its burst, a repeat's wiggle. The third crossing: the bounce and the wave, no line, then the Play place. Screenshots on all four forms: every home and tag inside the island, readable (the phone tag numeral is 11.8 pt).
+16. **I16** (amends V5). (Amended 2026-10-26, Dave 23 (C).) A trip: the scene on the raft, the walk home, a fill with its burst, a repeat's wiggle. **Crossings 3, 4 and 5 return like the first:** no bounce, no wave, no close line, and the game stays open. The trip ends only at the party (I9) or on Back: with one raft open Back goes to the Play place, with two to the picker. Screenshots on all four forms: every home and tag inside the island, readable (the phone tag numeral is 11.8 pt).
 17. **I17.** Seeded with eight kinds home: the ninth fills, the party plays, the picker shows and the 20 raft docks. Tap it: "The raft can carry twenty!". On a phone in landscape, its crossing reads as a crossing (24.5 pt, Q5).
 18. **I18.** Thomas's eye (§ 14): the homes, the board, the 20 island, the picker. Thomas's ear: J1 and J2 candidates (§ 7), after their spend popup.
 
@@ -468,6 +469,8 @@ Dave's examples ("Pig, home", "Pig home, empty") gain the number, because the sh
 ### 12.3 `play-place.md` amendments for the build PR
 
 Line numbers are this branch's (`origin/main` 414ad2fa plus the two-line pointer at § 2's top, the only edit this PR makes there).
+
+**Amended 2026-10-26 (no crossing cap, Dave 23 (C)):** the build-23 docs PR already marks `play-place.md`'s crossing-cap lines as superseded (at fe366267: `:35` Decision 5, `:181` § 1.6's natural stops, `:308` § 2.3's crossing-3 row, `:320` § 2.3's length, `:838` D7, `:864` § 9's autoplay row). The build PR replaces them with this spec's text: a trip ends at the party or on Back, and every other crossing returns. Below, "§ 6" now means § 6's no-cap rule, not an ordinary trip end.
 
 - `:34` Decision 4 and `:35` Decision 5 → the raft keeps its island record (Dave (1)); a trip also ends at the party.
 - `:168`, `:177`, `:179` (§ 1.6: no unlock, toy state, natural stops) → the island, the 20 raft and the party, by Thomas's call (Dave (5)).
@@ -518,13 +521,14 @@ The 100 raft (Dave (3)) adds a third island and pond, its target "100" on the sa
 
 ## 16. Child-safety and dark-pattern check (the island goal only)
 
-| Risk                         | Here                                                                                                                                                                                                |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Currency, prizes, streaks    | None: no stardust, score, count or total of homes; the island is its own record (Dave (5))                                                                                                          |
-| A meter of what is missing   | The empty shapes, by Thomas's call (Dave (5) supersedes the rail for the raft only); no count, no "5 of 9", no line about it. Dave's watch: distress at the pig → remove the shapes, keep the party |
-| Lures, autoplay, "one more?" | The picker waits silently; nothing starts on its own; no line names an island, a kind or a raft outside the game; the reveal plays once and never greets a return                                   |
-| Variable reward              | The fill, the party and the reveal are the same every time; the shore guarantee means a new kind is never a lucky roll (Dave (1))                                                                   |
-| Grind                        | Nine kinds per island, one party per island, a natural stop at the party, free choice of raft (Dave (5))                                                                                            |
-| Failure feedback             | Unchanged: the wobble and splash are funny and instant to retry; nothing lost, no re-lock, no decay (Dave (5))                                                                                      |
-| Untaught content judged      | The 20 raft always has a ten-and-ten load, so a learner on adding to ten can reach 20 with facts they have (Dave (3))                                                                               |
-| Music                        | Two short stings at two fixed moments, never over a line, never during loading; no music loop anywhere                                                                                              |
+| Risk                               | Here                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Currency, prizes, streaks          | None: no stardust, score, count or total of homes; the island is its own record (Dave (5))                                                                                                                                                                                                                                                                                                           |
+| A meter of what is missing         | The empty shapes, by Thomas's call (Dave (5) supersedes the rail for the raft only); no count, no "5 of 9", no line about it. Dave's watch: distress at the pig → remove the shapes, keep the party                                                                                                                                                                                                  |
+| Lures, autoplay, "one more?"       | The picker waits silently; nothing starts on its own; no line names an island, a kind or a raft outside the game; the reveal plays once and never greets a return                                                                                                                                                                                                                                    |
+| Variable reward                    | The fill, the party and the reveal are the same every time; the shore guarantee means a new kind is never a lucky roll (Dave (1))                                                                                                                                                                                                                                                                    |
+| Grind                              | Nine kinds per island, one party per island, a natural stop at the party, free choice of raft (Dave (5))                                                                                                                                                                                                                                                                                             |
+| Natural stops (amended 2026-10-26) | No crossing cap (Dave 23 (C)): every crossing is a stop, where the raft comes back empty and waits for ever with nothing said; Back is always live. Dave's watch: lessons at least about 2/3 of app time over a week (`real-games-2026-10-20.md:119`). If the raft displaces lessons, the documented lever is the Parent Settings play limit, which is unbuilt and Thomas's call (`play-place.md:9`) |
+| Failure feedback                   | Unchanged: the wobble and splash are funny and instant to retry; nothing lost, no re-lock, no decay (Dave (5))                                                                                                                                                                                                                                                                                       |
+| Untaught content judged            | The 20 raft always has a ten-and-ten load, so a learner on adding to ten can reach 20 with facts they have (Dave (3))                                                                                                                                                                                                                                                                                |
+| Music                              | Two short stings at two fixed moments, never over a line, never during loading; no music loop anywhere                                                                                                                                                                                                                                                                                               |
