@@ -447,9 +447,10 @@ describe('the lines (§ 11, AC 7)', () => {
   // 18; the flower bed's move into adding to ten takes the game lines out,
   // the locked-stop peek prompt adds its 2 (peek prompt § 3), and the letter
   // critters their third non-word line and 156 said words (Thomas 2026-10-22),
-  // then 7 more said words (Dave 2026-10-25).
-  it('counts: guidance 354 → 324 ids after the game lines left (490 with the peek prompt and the critter words), path lines 814 → 851, baked 254 → 259', () => {
-    expect(GUIDANCE_LINES).toHaveLength(490)
+  // then 7 more said words (Dave 2026-10-25), then the four-letter rounds'
+  // 82 targets, 9 said-later words and open line (Dave 2026-10-26, (B)).
+  it('counts: guidance 354 → 324 ids after the game lines left (582 with the peek prompt and the critter words), path lines 814 → 851, baked 254 → 259', () => {
+    expect(GUIDANCE_LINES).toHaveLength(582)
     expect(PATH_LINES).toHaveLength(851)
     expect(BAKED_PATH_LINES).toHaveLength(259)
   })
