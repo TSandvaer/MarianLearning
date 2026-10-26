@@ -822,18 +822,23 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
   })
 
   it('F8 (critters four-letter § 1): a run of four is word for a HUNT_FOUR_TARGETS word and quiet for every other, never picture or funny', () => {
+    // Every run over the 22 letters, both ways; one expect at the end (an
+    // expect per run timed out on CI's runner).
     const kinds = new Map<string, number>()
+    const wrong: string[] = []
     for (const a of CRITTER_LETTERS)
       for (const b of CRITTER_LETTERS)
         for (const c of CRITTER_LETTERS)
           for (const d of CRITTER_LETTERS) {
             const run = a + b + c + d
+            const want = HUNT_FOUR_TARGETS.has(run) ? 'word' : 'quiet'
             for (const funny of [true, false]) {
               const kind = critterRun(run, { funny })
-              expect(kind).toBe(HUNT_FOUR_TARGETS.has(run) ? 'word' : 'quiet')
+              if (kind !== want) wrong.push(`${run}:${kind}`)
               kinds.set(kind, (kinds.get(kind) ?? 0) + 1)
             }
           }
+    expect(wrong).toEqual([])
     // 22^4 runs, twice: 82 words each time.
     expect(kinds.get('word')).toBe(2 * 82)
     expect(kinds.get('quiet')).toBe(2 * (22 ** 4 - 82))
