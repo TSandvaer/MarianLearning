@@ -34,7 +34,7 @@
         "EXPO_PUBLIC_API_BASE": "https://marian-learning.vercel.app"
       },
       "ios": {
-        "image": "sdk-57"
+        "image": "sdk-58"
       }
     }
   },

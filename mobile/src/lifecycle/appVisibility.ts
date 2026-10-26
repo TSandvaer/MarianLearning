@@ -20,14 +20,14 @@ import { AppState } from 'react-native'
 
 /** The subset of React Native's `AppState` this module uses. */
 export interface AppStateSource {
-  readonly currentState: string | null
+  readonly currentState: string | null | undefined
   addEventListener(
     type: 'change',
     listener: (state: string) => void,
   ): { remove(): void }
 }
 
-export function isHiddenAppState(state: string | null): boolean {
+export function isHiddenAppState(state: string | null | undefined): boolean {
   return state === 'background'
 }
 

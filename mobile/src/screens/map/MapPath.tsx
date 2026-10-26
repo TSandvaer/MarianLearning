@@ -17,7 +17,13 @@ import {
   type StopLayout,
 } from '@marian/core/map/mapLayout'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  type ScrollViewInstance,
+} from 'react-native'
 import {
   focusBox,
   mapPathScale,
@@ -230,7 +236,7 @@ function ScrollablePath({
   locked: boolean
   children: ReactNode
 }) {
-  const ref = useRef<ScrollView>(null)
+  const ref = useRef<ScrollViewInstance>(null)
   const opened = useRef(false)
   return (
     <ScrollView

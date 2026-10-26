@@ -96,7 +96,7 @@ export function DragPiece({
 }: DragPieceProps) {
   const [me] = useState(() => Symbol(testID))
   const start = useRef<Point | null>(null)
-  const finger = useRef<string | null>(null)
+  const finger = useRef<number | null>(null)
   const dragging = useRef(false)
   // The drag's finger lifted at this point; drops or taps once confirmed.
   const lifted = useRef<Point | null>(null)

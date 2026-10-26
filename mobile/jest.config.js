@@ -9,6 +9,10 @@ module.exports = {
   maxWorkers: 4,
   roots: ['<rootDir>/src', '<rootDir>/test'],
   setupFiles: ['<rootDir>/test/setup.ts'],
+  // Reanimated 4.7 (SDK 58) initialises its native module on import; its
+  // resolver loads the web build under Jest instead (Reanimated testing
+  // guide). It also wraps react-native-worklets' resolver.
+  resolver: 'react-native-reanimated/jest/resolver',
   testPathIgnorePatterns: ['/node_modules/', '/ios/', '/android/'],
   moduleNameMapper: {
     // Babel adds `@babel/runtime/helpers/*` imports to core's files, and

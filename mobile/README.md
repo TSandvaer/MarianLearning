@@ -4,7 +4,7 @@ The React Native app from `design/react-native-migration-plan.md`. Phase 2a: the
 
 ## Shape
 
-- **Standalone npm project**, with its own `package-lock.json`. It is _not_ a yarn workspace, so the web app's `yarn install`, `yarn.lock`, React 19.2.5, CI and Vercel never see it. This app runs React 19.2.3 / React Native 0.86.3 (Expo SDK 57).
+- **Standalone npm project**, with its own `package-lock.json`. It is _not_ a yarn workspace, so the web app's `yarn install`, `yarn.lock`, React 19.2.5, CI and Vercel never see it. This app runs React 19.3.0 / React Native 0.88.0 (Expo SDK 58).
 - **Shared logic** comes from `@marian/core` (`../packages/core`), installed as `"file:../packages/core"` (an npm symlink) and served by Metro through one watch folder (`metro.config.js`). Metro does not watch the repo root, so nothing resolves from the web app's `node_modules`. `npm run check:bundle` proves it.
 - **Native projects are generated** (`ios/`, `android/` are gitignored). `app.json` is the source of truth; `npx expo run:ios` / `npx expo prebuild` regenerate them.
 
@@ -24,9 +24,9 @@ npx expo run:ios                      # builds, installs, starts Metro
 npx expo run:ios --device "iPad (A16)"
 ```
 
-Known blocker (2026-10-08): with Xcode 27 the build succeeds, but an **iOS 27** simulator refuses to launch it: `Application failed to launch: UIScene life cycle is required for apps built with this SDK.` Expo SDK 57's prebuild template (up to `expo-template-bare-minimum@57.0.29`) has no scene delegate; the SDK 58 template (`58.0.15`, beta) adds one. Until that is resolved, use Expo Go.
+Resolved by SDK 58 (2026-10-26): on SDK 57 an **iOS 27** simulator refused the Xcode 27 build (`Application failed to launch: UIScene life cycle is required for apps built with this SDK.`), because SDK 57's prebuild template had no scene delegate. SDK 58's prebuild generates `SceneDelegate.swift` and the `UIApplicationSceneManifest`, and a Release build (`npx expo run:ios --configuration Release`) launches on iOS 27 iPad and iPhone simulators.
 
-**Expo Go** (no build). The shell uses only modules that ship in Expo Go SDK 57:
+**Expo Go** (no build). The shell uses only modules that ship in Expo Go SDK 58:
 
 ```bash
 npx expo start --go          # scan the QR code with the store Expo Go app
@@ -105,7 +105,7 @@ Reset to a first launch: delete the app from the simulator/device (storage lives
 
 - **One Emma line at a time** across Greet, Hub/guidance/path lines and session lines (a new line cancels the one in flight). SFX play over her.
 - **Captions** use the web's formula (word i at `i × duration / wordCount`, 165 wpm fallback), read from the player clock at a 50 ms status interval. expo-audio's default is 500 ms, which is too coarse for the captions.
-- **Audio session:** plays in silent mode, `doNotMix`, never in the background. On iOS every player keeps the session active between lines (`keepAudioSessionActive`), so other audio stays paused while Emma's screens are up; it is released when the app goes to the background. Android has no equivalent in expo-audio 57.0.5: it abandons audio focus at the end of every line (see the Greet PR).
+- **Audio session:** plays in silent mode, `doNotMix`, never in the background. On iOS every player keeps the session active between lines (`keepAudioSessionActive`), so other audio stays paused while Emma's screens are up; it is released when the app goes to the background. Android had no equivalent in expo-audio 57.0.5 (it abandoned audio focus at the end of every line, see the Greet PR); expo-audio 58 applies `keepAudioSessionActive` to Android audio focus too, not yet checked on an Android device.
 - **Lifecycle:** going to the background parks the line and freezes its caption; the foreground resumes it where it stopped. A line requested while hidden waits for the foreground (most recent wins). After a call or Siri, the OS resumes the line, or else the next `inactive → active` edge does.
 - **Session audio:** `startSession()` posts to `/api/claude` through core's `apiUrl()` and writes one MP3 per distinct text to `<cache>/session-audio/<sessionId>/` in the background. `unload()` deletes the files, and a boot sweep removes the files a killed app left. `sessionPrefetcher` holds the Hub's Number Garden prefetch, which Math's kick adopts (`src/session/mathSession.ts`).
 - **Players:** created lazily, with at most 4 live voice players (LRU). On Android every live player holds an MP3 decoder.

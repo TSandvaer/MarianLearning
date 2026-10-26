@@ -12,7 +12,13 @@ import {
 } from '@marian/core/parentSettings/parentSettingsModel'
 import type { Progress } from '@marian/core/progress'
 import { useRef } from 'react'
-import { findNodeHandle, StyleSheet, Text, View } from 'react-native'
+import {
+  findNodeHandle,
+  StyleSheet,
+  Text,
+  View,
+  type ViewInstance,
+} from 'react-native'
 import { Card, PsButton, StatusSlot, type StatusLine } from './controls'
 import type { LearnerSettingsCopy } from './learnerCopy'
 import { NATIVE_COPY } from './nativeCopy'
@@ -46,7 +52,7 @@ export function BackupSection({
   copy: learnerCopy,
 }: BackupSectionProps) {
   const status = useTransientStatus<BackupStatus>('idle', resets)
-  const shareAnchor = useRef<View>(null)
+  const shareAnchor = useRef<ViewInstance>(null)
 
   const json = () =>
     buildBackupJson(
@@ -64,7 +70,7 @@ export function BackupSection({
 
   const share = () => {
     const anchor = shareAnchor.current
-      ? findNodeHandle(shareAnchor.current)
+      ? (findNodeHandle(shareAnchor.current) ?? null)
       : null
     // A dismissed sheet shows nothing; only a failure to open says so.
     deps.share(json(), anchor).catch(() => {

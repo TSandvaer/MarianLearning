@@ -50,7 +50,12 @@ if (!mapFile) {
   console.error(`no source map in ${jsDir}`)
   process.exit(1)
 }
-const { sources } = JSON.parse(readFileSync(join(jsDir, mapFile), 'utf8'))
+const map = JSON.parse(readFileSync(join(jsDir, mapFile), 'utf8'))
+// SDK 58's Metro writes an indexed source map: one `sections[].map` per
+// module instead of one flat `sources` list.
+const sources = map.sections
+  ? map.sections.flatMap((s) => s.map.sources)
+  : map.sources
 rmSync(outDir, { recursive: true, force: true })
 
 const isFile = (p) => p.startsWith('/')
