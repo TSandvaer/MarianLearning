@@ -149,6 +149,23 @@ it('the threaded session focus wins over the re-derived one', () => {
   expect(loadProgress()?.history[0]?.skillFocus).toEqual(['add-to-20'])
 })
 
+it("a Word Song entry stores the session's target words in played order; math stores none (Dave 2026-10-25 (6g))", () => {
+  const targetWords = ['fan', 'van', 'man', 'cat', 'hat', 'bag', 'tag', 'pan']
+  writeSessionEnd(
+    {
+      ...MATH,
+      surface: 'word-song',
+      targetWords,
+      sessionFocus: { node: 'cvc-words', mode: 'forward' },
+    },
+    { clock },
+  )
+  writeSessionEnd({ ...MATH, targetWords }, { clock })
+  const [word, math] = loadProgress()!.history
+  expect(word?.targetWords).toEqual(targetWords)
+  expect(math).not.toHaveProperty('targetWords')
+})
+
 it('Word Song grants the +5 completion bonus; math does not', () => {
   writeSessionEnd({ ...MATH, surface: 'word-song' }, { clock })
   expect(loadStardust().total).toBe(5)

@@ -267,6 +267,13 @@ function isHistoryEntry(v: unknown): v is SessionHistoryEntry {
       if (w !== null && typeof w !== 'string') return false
     }
   }
+  // targetWords is optional (Dave 2026-10-25, 5b ruling (6g); additive, no
+  // schemaVersion bump): an array of strings. Not checked against the
+  // pack, as for `perProblemAnswerWord`.
+  if ('targetWords' in v && v.targetWords !== undefined) {
+    if (!Array.isArray(v.targetWords)) return false
+    if (!v.targetWords.every((w) => typeof w === 'string')) return false
+  }
   // perProblemDistractorClass is optional (Kevin schema-first PR,
   // 2026-05-22 — Wave 5 prereq pairing with Dave's PR #300 two-digit
   // add/sub WITH-regroup research). Same additive posture as

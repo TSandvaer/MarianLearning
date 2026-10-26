@@ -133,7 +133,30 @@ async function answerRight(h: Harness, plan: WordSongSessionPlan, i: number) {
 beforeEach(() => jest.useFakeTimers())
 afterEach(() => jest.useRealTimers())
 
-describe('introSpotlight: snail words’ ending pair, moon words’ team pair (§ 4.3, § 5.3)', () => {
+describe('introSpotlight: snail and moon words’ team pair (§ 4.3, § 5.3)', () => {
+  it('snail: the team where it is, on any opening word (core wordOrder.ts)', () => {
+    expect(introSpotlight(SNAIL_INTRO, 'boat', false)).toEqual([
+      null,
+      0,
+      0,
+      null,
+    ])
+    expect(introSpotlight(SNAIL_INTRO, 'train', false)).toEqual([
+      null,
+      null,
+      0,
+      0,
+      null,
+    ])
+    expect(introSpotlight(SNAIL_INTRO, 'chain', true)).toEqual([
+      null,
+      null,
+      0,
+      0,
+      null,
+    ])
+  })
+
   it('snail: the last two cells (a y on tray); with Reduce Motion too', () => {
     expect(introSpotlight(SNAIL_INTRO, 'tray', false)).toEqual([
       null,

@@ -452,6 +452,18 @@ export interface SessionHistoryEntry {
    */
   perProblemAnswerWord?: (string | null)[]
   /**
+   * The session's target words in the order they played, indexed 0..N-1
+   * (the 8 scored problems; a check's probe words in their slots) — Word
+   * Song forward sessions only (Dave 2026-10-25, 5b ruling (6g)). The next
+   * session of the step reads its P1 and order from it
+   * (`wordSong/wordOrder.ts` `lastWordOrder`).
+   *
+   * Optional + additive — entries written before it do not carry it, and
+   * the order reads them as the canon order (every such session played
+   * it). No `schemaVersion` bump.
+   */
+  targetWords?: string[]
+  /**
    * Per-problem distractor-class tag, indexed 0..N-1 — Wave 5 schema
    * prereq (Kevin schema-first PR, 2026-05-22, pairing with Dave's
    * PR #300 two-digit add/sub WITH-regroup research).

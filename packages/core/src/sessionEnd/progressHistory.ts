@@ -300,6 +300,12 @@ export interface RecordProgressInput {
    */
   perProblemAnswerWord?: readonly (string | null)[]
   /**
+   * The session's target words in played order (Dave 2026-10-25, 5b
+   * ruling (6g)). Word-song only. When supplied, persists onto the
+   * recorded `SessionHistoryEntry.targetWords` field (a copy).
+   */
+  targetWords?: readonly string[]
+  /**
    * Per-problem distractor-class tag (Kevin schema-first PR,
    * 2026-05-22 — Wave 5 prereq pairing with Dave's PR #300 two-digit
    * add/sub WITH-regroup research). When supplied, persists onto the
@@ -365,7 +371,7 @@ export function recordProgressOnSessionEnd(
 ): Progress {
   const existing = loadProgress() ?? startProgressForActive()
 
-  const entry = buildEntry(input, existing)
+  const entry = withTargetWords(buildEntry(input, existing), input.targetWords)
 
   // M4 Leitner update (ticket 86c9pwgc8), once a day since no-Claude
   // phase 3 (`progress/seenItems.ts`). Math-surface sessions that ship
@@ -532,6 +538,20 @@ export function recordReviewOnSessionEnd(input: RecordReviewInput): Progress {
   saveProgress(next)
   void pushProgressToCloud(getOrCreateDeviceId(), next)
   return next
+}
+
+/**
+ * `entry` with the session's target words in played order (a copy), which
+ * the step's next session reads (`wordSong/wordOrder.ts`); as it is when
+ * the caller sent none.
+ */
+function withTargetWords(
+  entry: SessionHistoryEntry,
+  targetWords: readonly string[] | undefined,
+): SessionHistoryEntry {
+  return targetWords === undefined
+    ? entry
+    : { ...entry, targetWords: Array.from(targetWords) }
 }
 
 /**

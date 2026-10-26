@@ -63,6 +63,31 @@ const CVC = canonDoc('cvc-words')
 const PROBE = canonDoc('cvc-words-probe')
 const CANON_WORDS = ['hat', 'fan', 'man', 'van', 'cat', 'bag', 'pan', 'tag']
 
+/**
+ * A session's words are read from the session, not from fixed slots: the
+ * device plays the 8 in a new order each session (core `wordOrder.ts`, Dave
+ * 2026-10-25). A check's probes stay at problems 2, 5 and 7, in order; the
+ * other five are canon words, and P1 is not the last session's P1.
+ */
+function expectCheck(
+  words: readonly string[],
+  probes: readonly string[],
+  lastP1: string,
+) {
+  expect([words[1], words[4], words[6]]).toEqual(probes)
+  const practised = words.filter((_, i) => ![1, 4, 6].includes(i))
+  expect(new Set(practised).size).toBe(5)
+  for (const w of practised) expect(CANON_WORDS).toContain(w)
+  expect(words[0]).not.toBe(lastP1)
+}
+
+/** A plain session: the 8 canon words, P1 not the last session's P1. */
+function expectPlain(words: readonly string[], last: readonly string[]) {
+  expect([...words].sort()).toEqual([...CANON_WORDS].sort())
+  expect(words[0]).not.toBe(last[0])
+  expect(words).not.toEqual(last)
+}
+
 const DAY = '2026-10-23'
 const NEXT_MORNING = new Date('2026-10-24T09:00:00')
 let clockNow = NEXT_MORNING
@@ -269,16 +294,12 @@ it('the due session holds three probe words in canon problem shape', async () =>
     startWordSong(todaysCheck)
   const snap = await settle()
   const scored = snap.plan!.problems.slice(snap.warmupCount)
-  expect(scored.map((p) => p.target.word)).toEqual([
+  // Her cvc-words sessions so far played the canon order (hat first).
+  expectCheck(
+    scored.map((p) => p.target.word),
+    ['nap', 'rat', 'map'],
     'hat',
-    'nap',
-    'man',
-    'van',
-    'rat',
-    'bag',
-    'map',
-    'tag',
-  ])
+  )
   const nap = scored[1]!
   expect(nap.contentType).toBe(scored[0]!.contentType)
   expect(nap.utterances).toEqual({
@@ -292,10 +313,11 @@ it('the due session holds three probe words in canon problem shape', async () =>
   // The probe lines play from the bundled probe audio, the rest from the
   // session's.
   expect(loadProbeAudio).toHaveBeenCalledTimes(1)
+  const p1 = scored[0]!.utterances.read
   await snap.playUtterance!('Read the nap.')
-  await snap.playUtterance!('Read the hat.')
+  await snap.playUtterance!(p1)
   expect(probe.playUtterance).toHaveBeenCalledWith('Read the nap.', undefined)
-  expect(main.playUtterance).toHaveBeenCalledWith('Read the hat.', undefined)
+  expect(main.playUtterance).toHaveBeenCalledWith(p1, undefined)
   expect(main.playUtterance).not.toHaveBeenCalledWith(
     'Read the nap.',
     undefined,
@@ -339,7 +361,7 @@ it('a missed check (novel < 0.8) does not master, and the re-check waits one pla
   expect(todaysCheck().isGraduationSession).toBe(false)
   const s = startWordSong(todaysCheck)
   const plain = endSession(await s.settle(), s.session, () => true, false)
-  expect(plain).toEqual(CANON_WORDS)
+  expectPlain(plain, words)
   expect(s.loadProbeAudio).not.toHaveBeenCalled()
   after = loadProgress()!
   expect(after.skillLevels['cvc-words']).toBe('practicing')
@@ -348,9 +370,11 @@ it('a missed check (novel < 0.8) does not master, and the re-check waits one pla
   expect(todaysCheck().isGraduationSession).toBe(true)
   const again = startWordSong(todaysCheck)
   const snap = await again.settle()
-  expect(
+  expectCheck(
     snap.plan!.problems.slice(snap.warmupCount).map((p) => p.target.word),
-  ).toEqual(['hat', 'rat', 'man', 'van', 'map', 'bag', 'tap', 'tag'])
+    ['rat', 'map', 'tap'],
+    plain[0]!,
+  )
 })
 
 it('with no check due, the session is the one today ships: same requests, plain canon round', async () => {
@@ -402,12 +426,18 @@ it('with no check due, the session is the one today ships: same requests, plain 
     ...warmup,
   })
   const snap = await settle()
-  expect(
-    snap.plan!.problems.slice(snap.warmupCount).map((p) => p.target.word),
-  ).toEqual(CANON_WORDS)
+  const scored = snap.plan!.problems.slice(snap.warmupCount)
+  // The canon words in this session's order (her last sessions: canon).
+  expectPlain(
+    scored.map((p) => p.target.word),
+    CANON_WORDS,
+  )
   expect(loadProbeAudio).not.toHaveBeenCalled()
-  await snap.playUtterance!('Read the hat.')
-  expect(main.playUtterance).toHaveBeenCalledWith('Read the hat.', undefined)
+  await snap.playUtterance!(scored[0]!.utterances.read)
+  expect(main.playUtterance).toHaveBeenCalledWith(
+    scored[0]!.utterances.read,
+    undefined,
+  )
   session.tearDown()
 })
 
@@ -475,16 +505,7 @@ describe('the probe reserve on the device (Dave 2026-10-24)', () => {
     saveProgress(dueLearner())
     const first = startWordSong()
     const one = scoredWords(await first.settle())
-    expect(one).toEqual([
-      'hat',
-      'map',
-      'man',
-      'van',
-      'nap',
-      'bag',
-      'rat',
-      'tag',
-    ])
+    expectCheck(one, ['map', 'nap', 'rat'], 'hat')
     clockNow = new Date('2026-10-24T09:15:00')
     endSession(await first.settle(), first.session, () => true)
     let after = loadProgress()!
@@ -501,16 +522,7 @@ describe('the probe reserve on the device (Dave 2026-10-24)', () => {
     expect(readWordSongProgressHints().isGraduationSession).toBe(true)
     const second = startWordSong()
     const two = scoredWords(await second.settle())
-    expect(two).toEqual([
-      'hat',
-      'ham',
-      'man',
-      'van',
-      'cab',
-      'bag',
-      'rag',
-      'tag',
-    ])
+    expectCheck(two, ['ham', 'cab', 'rag'], one[0]!)
     clockNow = new Date('2026-10-24T09:40:00')
     endSession(await second.settle(), second.session, (w) => w !== 'cab')
     after = loadProgress()!

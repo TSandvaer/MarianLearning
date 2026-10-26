@@ -130,7 +130,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { BackHandler, StyleSheet, View } from 'react-native'
+import { BackHandler, StyleSheet, Text, View } from 'react-native'
 import Animated, {
   Easing,
   FadeIn,
@@ -1879,6 +1879,16 @@ export function WordSong({
           warmupCount={warmups}
           peek={isPeek}
         />
+        {/* QA autoplay only (debug): the scored problem's word, which the
+            Maestro word-order flow reads (`on-demand/12-word-order.yaml`). */}
+        {qaAutoAnswerAfterMs !== undefined && problemIndex >= warmups && (
+          <Text
+            testID={`word-song-qa-scored-${problemIndex - warmups + 1}`}
+            style={styles.qaMarker}
+          >
+            {plan.problems[problemIndex]?.target.word}
+          </Text>
+        )}
 
         {caption.visible && caption.text !== '' && (
           <CaptionRibbon
@@ -2070,6 +2080,15 @@ const styles = StyleSheet.create({
       'radial-gradient(circle at 50% 30%, rgba(255, 210, 235, 0.55) 0%, rgba(255, 245, 250, 0) 60%), linear-gradient(180deg, #FFF5FA 0%, #FFF8F8 100%)',
   },
   foreground: { ...FILL, zIndex: 2, pointerEvents: 'box-none' },
+  // QA autoplay's marker: on screen for Maestro, unseen by her.
+  qaMarker: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    fontSize: 10,
+    color: 'transparent',
+    pointerEvents: 'none',
+  },
   stageLayer: { ...FILL, pointerEvents: 'box-none' },
   abs: { position: 'absolute' },
   center: { alignItems: 'center', justifyContent: 'center' },

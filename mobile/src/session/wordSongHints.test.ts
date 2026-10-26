@@ -360,3 +360,57 @@ describe('letter sounds: the vowel map and its seed (no-Claude plan phase 4)', (
     expect(buildWordSongSessionPayload(h, true)).not.toHaveProperty('seed')
   })
 })
+
+describe('the word order hint (core wordOrder.ts, Dave 2026-10-25)', () => {
+  const upTo = (node: (typeof WORD_SONG_NODES_IN_ORDER)[number]) =>
+    Object.fromEntries(
+      WORD_SONG_NODES_IN_ORDER.slice(
+        0,
+        WORD_SONG_NODES_IN_ORDER.indexOf(node),
+      ).map((n) => [n, 'mastered' as SkillLevel]),
+    )
+  const entry = (targetWords?: string[]) => ({
+    dateISO: '2026-10-24T17:00:00.000Z',
+    skillFocus: ['cvc-words' as const],
+    successRate: 0.875,
+    ...(targetWords !== undefined ? { targetWords } : {}),
+  })
+
+  it("a forward cvc-words session carries the seed and the step's last order", () => {
+    seed(
+      { ...upTo('cvc-words'), 'cvc-words': 'practicing' },
+      { history: [entry()] },
+    )
+    recordSessionEnd(3)
+    recordSessionEnd(5)
+    const h = readWordSongProgressHints()
+    expect(h.focusNode).toBe('cvc-words')
+    // An entry from before the order was stored: the canon order.
+    expect(h.wordOrder).toEqual({ seed: 2, last: 'canon' })
+    // The order is the device's: the request is unchanged.
+    expect(buildWordSongSessionPayload(h, true)).not.toHaveProperty('seed')
+  })
+
+  it('reads the stored order; no entry is a first session', () => {
+    const order = ['fan', 'man', 'van', 'cat', 'bag', 'hat', 'pan', 'tag']
+    seed(
+      { ...upTo('cvc-words'), 'cvc-words': 'practicing' },
+      { history: [entry(order)] },
+    )
+    expect(readWordSongProgressHints().wordOrder?.last).toEqual(order)
+    seed({ ...upTo('cvc-words'), 'cvc-words': 'practicing' })
+    expect(readWordSongProgressHints().wordOrder).toEqual({
+      seed: 0,
+      last: null,
+    })
+  })
+
+  it('letter sounds and the little stories carry none', () => {
+    seed({ 'letter-names': 'mastered', 'letter-sounds': 'practicing' })
+    expect(readWordSongProgressHints().wordOrder).toBeUndefined()
+    seed({ ...upTo('fox-stories'), 'fox-stories': 'practicing' })
+    const h = readWordSongProgressHints()
+    expect(h.focusNode).toBe('fox-stories')
+    expect(h.wordOrder).toBeUndefined()
+  })
+})

@@ -158,6 +158,11 @@ export function writeSessionEnd(
     ...(p.surface === 'word-song' && p.perProblemAnswerWord !== undefined
       ? { perProblemAnswerWord: p.perProblemAnswerWord }
       : {}),
+    // The step's next session reads this one's P1 and order (Dave
+    // 2026-10-25, 5b ruling (6g)).
+    ...(p.surface === 'word-song' && p.targetWords !== undefined
+      ? { targetWords: p.targetWords }
+      : {}),
     ...(math && p.perProblemDistractorClass !== undefined
       ? { perProblemDistractorClass: p.perProblemDistractorClass }
       : {}),

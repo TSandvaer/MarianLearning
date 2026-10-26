@@ -1,0 +1,84 @@
+# Word order (Dave 2026-10-25, 5b ruling (6e) and "SHUFFLE NOW"; Thomas,
+# build 22: "every cat word session starts with 'read the hat'"): two
+# consecutive cat-words days start on different words.
+#
+# The `cvc-words` seed puts a returning child on cvc-words with no history
+# of it, so day 1 is her first cvc-words session and plays the canon order
+# (hat first; core `wordOrder.ts`). Day 2 (`dayOffset: 1`) reads the order
+# day 1 stored on its history entry and starts on another word.
+#
+# Each day's first session opens with two warm-up hearts, so the scored
+# problem 1's word is read from the QA autoplay's marker
+# (`word-song-qa-scored-1`, debug builds only, `WordSong.tsx`). The waits
+# are the sweep's (sweep/step.yaml).
+appId: host.exp.Exponent
+name: Word order
+tags:
+  - sessions
+---
+# Day 1 (today): her first cvc-words session.
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: cvc-words
+- runFlow: ../subflows/open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 120000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: hub-card-word-song
+      NEXT: word-song
+- extendedWaitUntil:
+    visible:
+      id: word-song-qa-scored-1
+    timeout: 120000
+- copyTextFrom:
+    id: word-song-qa-scored-1
+- evalScript: ${output.day1 = maestro.copiedText}
+- takeScreenshot: word-order-day-1-problem-1
+- assertTrue: ${output.day1 == 'hat'}
+- extendedWaitUntil:
+    visible:
+      id: session-end
+    timeout: 300000
+- extendedWaitUntil:
+    visible:
+      id: session-end-cta
+    timeout: 420000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: session-end-cta
+      NEXT: hub
+
+# Day 2: the next cvc-words session starts on another word.
+- launchApp:
+    stopApp: true
+    arguments:
+      dayOffset: 1
+- runFlow: ../subflows/open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub
+    timeout: 120000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: hub-card-word-song
+      NEXT: word-song
+- extendedWaitUntil:
+    visible:
+      id: word-song-qa-scored-1
+    timeout: 120000
+- copyTextFrom:
+    id: word-song-qa-scored-1
+- evalScript: ${output.day2 = maestro.copiedText}
+- takeScreenshot: word-order-day-2-problem-1
+- assertTrue: ${output.day2 != '' && output.day2 != output.day1}
+- extendedWaitUntil:
+    visible:
+      id: session-end
+    timeout: 300000
