@@ -70,9 +70,8 @@ export const HUNT_FAMILIAR: ReadonlySet<string> = new Set(
 )
 
 /**
- * Dave's rude four-letter words (Dave 23 (B)), as he prints them (he calls
- * them 17; the list has 18): no four-letter round deals letters that spell
- * one.
+ * Dave's 18 rude four-letter words (Dave 23 (B)), as he prints them: no
+ * four-letter round deals letters that spell one.
  */
 export const HUNT_RUDE_FOUR: ReadonlySet<string> = new Set(
   'cunt shit piss twat slut crap turd damn hell butt slag prat bums tits cums fags gits guns'.split(

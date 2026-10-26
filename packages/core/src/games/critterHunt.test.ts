@@ -433,8 +433,8 @@ const davesPictured = Object.values(DAVES_82)
   .map((w) => w.slice(0, -1))
 
 /**
- * Dave 23 (B), the rude four-letter words, as he prints them: he calls them
- * "17", and the list has 18 words. All 18 reject a round.
+ * Dave 23 (B), the 18 rude four-letter words, as he prints them. All 18
+ * reject a round.
  */
 const DAVES_RUDE =
   'cunt shit piss twat slut crap turd damn hell butt slag prat bums tits cums fags gits guns'.split(
@@ -476,7 +476,7 @@ function expectFourRound(r: HuntRound, vowel: string) {
 const FOUR = { length: 4 } as const
 
 describe('F2: the four-letter lists (Dave 23 (B); Q21)', () => {
-  it('HUNT_FOUR_TARGETS is Dave’s 82 (a 18, o 15, i 7, u 19, e 23); HUNT_RUDE_FOUR his printed list (18 words, called 17); hump on neither', () => {
+  it('HUNT_FOUR_TARGETS is Dave’s 82 (a 18, o 15, i 7, u 19, e 23); HUNT_RUDE_FOUR his printed 18; hump on neither', () => {
     expect([...HUNT_FOUR_TARGETS].sort()).toEqual(
       [...'aoiue'].flatMap(daves82).sort(),
     )
