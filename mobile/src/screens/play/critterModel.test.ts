@@ -7,8 +7,11 @@ import {
   blendClipPath,
   blendSegments,
   blendText,
+  emptySeats,
   seatAt,
   seatedRun,
+  seatedWithGaps,
+  seatGroups,
   swapSeats,
   unseat,
   EMPTY_SEATS,
@@ -61,5 +64,35 @@ describe('every critter sound has a bundled clip and marks (§ 3.4)', () => {
       expect(blendSegments(word)).not.toBeNull()
       expect(audioForWebPath(blendClipPath(word))).toBeDefined()
     }
+  })
+})
+
+describe('four seats (critters-four-letter.md § 4.1)', () => {
+  it('the groups of seated neighbours, left to right', () => {
+    expect(seatGroups(['s', 't', null, 'p'])).toEqual([[0, 1], [3]])
+    expect(seatGroups([null, 'a', 'b', 'c'])).toEqual([[1, 2, 3]])
+    expect(seatGroups(['a', null, 'b', null])).toEqual([[0], [2]])
+    expect(seatGroups(emptySeats(4))).toEqual([])
+  })
+
+  it('a partial run: each seated critter with the empty seats before it; ends skipped', () => {
+    expect(seatedWithGaps(['f', null, 'o', 'g'])).toEqual([
+      { seat: 0, emptyBefore: 0 },
+      { seat: 2, emptyBefore: 1 },
+      { seat: 3, emptyBefore: 0 },
+    ])
+    expect(seatedWithGaps(['f', null, null, 'g'])).toEqual([
+      { seat: 0, emptyBefore: 0 },
+      { seat: 3, emptyBefore: 2 },
+    ])
+    expect(seatedWithGaps([null, 's', 't', null])).toEqual([
+      { seat: 1, emptyBefore: 0 },
+      { seat: 2, emptyBefore: 0 },
+    ])
+  })
+
+  it('all four seated is one unbroken run', () => {
+    expect(seatedRun(['c', 'l', 'a', 'p'])).toEqual([0, 1, 2, 3])
+    expect(seatedRun(['c', null, 'a', 'p'])).toBeNull()
   })
 })

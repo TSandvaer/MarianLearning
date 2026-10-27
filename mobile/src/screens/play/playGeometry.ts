@@ -249,7 +249,7 @@ export interface CritterScene {
   /** The log's band (seats + log) and the log itself. */
   logBand: Rect
   log: Rect
-  /** The 3 seats, each 1.25 c, g apart. */
+  /** The seats (3, or 4 in a four-letter round), each 1.25 c, g apart. */
   seats: readonly Rect[]
   meadow: Rect
   /** One burrow cell per critter, in meadow order. */
@@ -259,12 +259,19 @@ export interface CritterScene {
   picture: Rect
 }
 
+/** The log band's width: `n` seats of 1.25 c, `g` apart, 16 a side. */
+const logBandWidth = (c: number, g: number, n: number) =>
+  n * SEATED_SCALE * c + (n - 1) * g + 32
+
 export function critterScene(
   A: Rect,
   tablet: boolean,
   landscape: boolean,
   count: number,
-  { perRow: fixedPerRow }: { perRow?: number } = {},
+  {
+    perRow: fixedPerRow,
+    seatCount = 3,
+  }: { perRow?: number; seatCount?: number } = {},
 ): CritterScene {
   const c = tablet ? 88 : landscape ? 48 : 56
   const g = tablet ? 16 : 8
@@ -275,7 +282,7 @@ export function critterScene(
   const meadowW = cols * c + (cols - 1) * g
   const seat = SEATED_SCALE * c
   const bandH = seat + 16
-  const logW = 3 * seat + 2 * g + 32
+  const logW = logBandWidth(c, g, seatCount)
   const total = bandH + g + meadowH
   const top = A.y + (A.height - total) / 2
   const logBand = {
@@ -284,7 +291,7 @@ export function critterScene(
     width: logW,
     height: bandH,
   }
-  const seats = [0, 1, 2].map((i) => ({
+  const seats = Array.from({ length: seatCount }, (_, i) => ({
     x: logBand.x + 16 + i * (seat + g),
     y: top,
     width: seat,
@@ -375,7 +382,7 @@ export function crittersFitBothWays(v: Viewport, count: number): boolean {
 
 /** § 2.2: a slot's box, box gap, padding and picture box; the chip's tile. */
 export interface SlotStep {
-  name: 'S1' | 'S2' | 'S3' | 'S4'
+  name: 'S1' | 'S2' | 'S3' | 'S4' | 'S5'
   b: number
   gb: number
   pad: number
@@ -386,19 +393,25 @@ export interface SlotStep {
 /**
  * § 2.2's ladder: tablets take the first that fits; phones take S4 (pad 3,
  * T 36 since § 15.10: the largest picture box the tightest phone fits).
+ * S5 is the four-letter rounds' (critters-four-letter.md § 2.2): S4 with
+ * b 20, for a phone where a four-box S4 does not fit (667 × 375).
  */
 export const SLOT_STEPS: readonly SlotStep[] = [
   { name: 'S1', b: 40, gb: 4, pad: 8, T: 72, bx: 28 },
   { name: 'S2', b: 32, gb: 4, pad: 8, T: 56, bx: 24 },
   { name: 'S3', b: 28, gb: 3, pad: 6, T: 44, bx: 20 },
   { name: 'S4', b: 22, gb: 2, pad: 3, T: 36, bx: 16 },
+  { name: 'S5', b: 20, gb: 2, pad: 3, T: 36, bx: 16 },
 ]
 
 /** The hunt's 6 critters: 3 a row, 2 rows (Decision 2). */
 export const HUNT_PER_ROW = 3
 export const HUNT_CRITTERS = 6
+/** A four-letter round's 7: 4 + 3, vowel first (four-letter Decision 1). */
+export const HUNT_FOUR_PER_ROW = 4
+export const HUNT_FOUR_CRITTERS = 7
 
-/** A slot: its card, picture box and 3 tile boxes. */
+/** A slot: its card, picture box and a tile box per letter. */
 export interface SlotParts {
   card: Rect
   picture: Rect
@@ -406,31 +419,41 @@ export interface SlotParts {
 }
 
 export interface HuntScene extends CritterScene {
+  /** The round's word length: the seats, boxes and numeral. */
+  length: 3 | 4
   step: SlotStep
   /** The log band and the meadow together. */
   block: Rect
   /** The N slots (and, in landscape, the chip's cell). */
   board: Rect
   slots: readonly SlotParts[]
-  /** Landscape: the board's cell after the last slot; portrait: none. */
+  /**
+   * Landscape: the board's cell after the last slot; portrait, and every
+   * four-letter round (no extras): none.
+   */
   chipCell: Rect | null
   /** The numeral disc on the log's left end (§ 3.2). */
   numeral: Rect
 }
 
-/** § 2.2: a slot's side for `step`. */
-export const slotSize = ({ b, gb, pad, T }: SlotStep) => ({
-  width: 3 * b + 2 * gb + 2 * pad,
+/** § 2.2: a slot's side for `step`, with a box per letter. */
+export const slotSize = ({ b, gb, pad, T }: SlotStep, letters = 3) => ({
+  width: letters * b + (letters - 1) * gb + 2 * pad,
   height: pad + T + pad + b + pad,
 })
 
-function slotParts(x: number, y: number, step: SlotStep): SlotParts {
+function slotParts(
+  x: number,
+  y: number,
+  step: SlotStep,
+  letters: number,
+): SlotParts {
   const { b, gb, pad, T } = step
-  const { width, height } = slotSize(step)
+  const { width, height } = slotSize(step, letters)
   return {
     card: { x, y, width, height },
     picture: { x: x + (width - T) / 2, y: y + pad, width: T, height: T },
-    boxes: [0, 1, 2].map((k) => ({
+    boxes: Array.from({ length: letters }, (_, k) => ({
       x: x + pad + k * (b + gb),
       y: y + pad + T + pad,
       width: b,
@@ -478,21 +501,26 @@ export function chipTiles(scene: HuntScene, k: number, i: number): Rect[] {
   }))
 }
 
-/** § 2.3: the scene for `n` targets with `step`. */
+/**
+ * § 2.3: the scene for `n` targets with `step`. A four-letter round
+ * (critters-four-letter.md § 2): 4 seats, 7 critters 4 + 3, four-box
+ * slots, no chip; landscape boards in 2 columns (Decision 3).
+ */
 function huntSceneAt(
   A: Rect,
   tablet: boolean,
   landscape: boolean,
   n: number,
   step: SlotStep,
+  length: 3 | 4 = 3,
 ): HuntScene {
   const c = tablet ? 88 : landscape ? 48 : 56
   const g = tablet ? 16 : 8
   const seat = SEATED_SCALE * c
-  const blockW = 3 * seat + 2 * g + 32
+  const blockW = logBandWidth(c, g, length)
   const blockH = seat + 16 + g + 2 * c + g
   const sg = tablet ? 16 : 6
-  const { width: W, height: H } = slotSize(step)
+  const { width: W, height: H } = slotSize(step, length)
   const rowW = (k: number) => k * W + (k - 1) * sg
 
   let rows: number[]
@@ -512,10 +540,15 @@ function huntSceneAt(
     }
     blockAt = { x: A.x + (A.width - blockW) / 2, y: top + boardH + gap }
   } else {
-    const cells = n + 1
+    // Three letters: the slots and the chip's cell, 3 a row. Four: the
+    // slots alone, 2 a row.
+    const perRow = length === 4 ? 2 : 3
+    const cells = length === 4 ? n : n + 1
     rows = []
-    for (let left = cells; left > 0; left -= 3) rows.push(Math.min(3, left))
-    const boardW = rowW(3)
+    for (let left = cells; left > 0; left -= perRow) {
+      rows.push(Math.min(perRow, left))
+    }
+    const boardW = rowW(perRow)
     const boardH = rows.length * H + (rows.length - 1) * sg
     const gap = Math.min(24, A.width - blockW - boardW)
     const x0 = A.x + (A.width - (blockW + gap + boardW)) / 2
@@ -541,9 +574,14 @@ function huntSceneAt(
     }
   })
   const block = { ...blockAt, width: blockW, height: blockH }
-  const base = critterScene(block, tablet, landscape, HUNT_CRITTERS, {
-    perRow: HUNT_PER_ROW,
-  })
+  const four = length === 4
+  const base = critterScene(
+    block,
+    tablet,
+    landscape,
+    four ? HUNT_FOUR_CRITTERS : HUNT_CRITTERS,
+    { perRow: four ? HUNT_FOUR_PER_ROW : HUNT_PER_ROW, seatCount: length },
+  )
   const p = Math.min(blockH, blockW, tablet ? 300 : 200)
   const D = tablet ? 40 : 32
   return {
@@ -555,11 +593,12 @@ function huntSceneAt(
       width: p,
       height: p,
     },
+    length,
     step,
     block,
     board: boardRect,
-    slots: cellRects.slice(0, n).map((r) => slotParts(r.x, r.y, step)),
-    chipCell: landscape ? cellRects[n]! : null,
+    slots: cellRects.slice(0, n).map((r) => slotParts(r.x, r.y, step, length)),
+    chipCell: landscape && !four ? cellRects[n]! : null,
     numeral: {
       x: base.log.x,
       y: base.log.y + base.log.height / 2 - D / 2,
@@ -577,7 +616,7 @@ const BURROW_HANG = 0.04
  * each slot clear of the other slots, the log band, the numeral, every
  * seat's drop zone, every meadow cell and the bonus chip (3 extras); the
  * chip clear of the meadow and the drop zones; the picture card off the
- * board.
+ * board. A four-letter round has no chip (critters-four-letter.md § 2.2).
  */
 export function huntSceneFits(scene: HuntScene, A: Rect): boolean {
   const e = 0.01
@@ -586,7 +625,7 @@ export function huntSceneFits(scene: HuntScene, A: Rect): boolean {
     r.y >= A.y - e &&
     right(r) <= right(A) + e &&
     bottom(r) <= bottom(A) + e
-  const chip = chipRect(scene, 3)
+  const chips = scene.length === 4 ? [] : [chipRect(scene, 3)]
   const cards = scene.slots.map((s) => s.card)
   const drops = scene.seats.map((r) => grow(r, 0.2 * scene.c))
   const burrows = scene.cells.map((r) => ({
@@ -598,16 +637,24 @@ export function huntSceneFits(scene: HuntScene, A: Rect): boolean {
     scene.logBand,
     scene.numeral,
     ...burrows,
-    chip,
+    ...chips,
     scene.picture,
   ]
   if (!parts.every(inA)) return false
-  const others = [scene.logBand, scene.numeral, ...drops, ...scene.cells, chip]
+  const others = [
+    scene.logBand,
+    scene.numeral,
+    ...drops,
+    ...scene.cells,
+    ...chips,
+  ]
   for (let i = 0; i < cards.length; i++) {
     if (others.some((o) => overlaps(cards[i]!, o))) return false
     if (cards.some((o, j) => j !== i && overlaps(cards[i]!, o))) return false
   }
-  if ([...scene.cells, ...drops].some((o) => overlaps(chip, o))) return false
+  for (const chip of chips) {
+    if ([...scene.cells, ...drops].some((o) => overlaps(chip, o))) return false
+  }
   return !overlaps(scene.picture, scene.board)
 }
 
@@ -615,14 +662,31 @@ export function huntSceneFits(scene: HuntScene, A: Rect): boolean {
  * The word hunt's scene (§ 2): a phone takes S4; a tablet the first of
  * S1, S2, S3 that fits for every N from 5 to 8 in this orientation (else
  * S3, logged). The step depends on `A` alone, so slots keep their size
- * from round to round.
+ * from round to round. A four-letter round (critters-four-letter.md
+ * § 2.2): a tablet the first of S1-S4 that fits for N 4, 5 and 6, a phone
+ * the first of S4, S5 (else the last, logged).
  */
 export function huntScene(
   A: Rect,
   tablet: boolean,
   landscape: boolean,
   n: number,
+  length: 3 | 4 = 3,
 ): HuntScene {
+  if (length === 4) {
+    const ladder = tablet ? SLOT_STEPS.slice(0, 4) : SLOT_STEPS.slice(3, 5)
+    const step = ladder.find((st) =>
+      [4, 5, 6].every((k) =>
+        huntSceneFits(huntSceneAt(A, tablet, landscape, k, st, 4), A),
+      ),
+    )
+    if (step === undefined) {
+      console.warn(
+        `[layout] four-letter rounds do not fit ${A.width} x ${A.height} at ${ladder.at(-1)!.name}`,
+      )
+    }
+    return huntSceneAt(A, tablet, landscape, n, step ?? ladder.at(-1)!, 4)
+  }
   const s4 = SLOT_STEPS[3]!
   if (!tablet) return huntSceneAt(A, false, landscape, n, s4)
   const step = SLOT_STEPS.slice(0, 3).find((st) =>
@@ -636,4 +700,159 @@ export function huntScene(
     )
   }
   return huntSceneAt(A, true, landscape, n, step ?? SLOT_STEPS[2]!)
+}
+
+// --------------------------------------------------------------------------
+// Four-letter rounds: the length picker, the roll-in, the door
+// (critters-four-letter.md § 5, § 6)
+// --------------------------------------------------------------------------
+
+/** A log on its own: its band (seats + log), its bar and its numeral disc. */
+export interface LogParts {
+  band: Rect
+  bar: Rect
+  disc: Rect
+  /** The seats' rects (empty garden here), one socket under each. */
+  seats: readonly Rect[]
+}
+
+/** The log of `seatCount` seats at its in-round size, its band at (x, y). */
+function logAt(
+  x: number,
+  y: number,
+  tablet: boolean,
+  landscape: boolean,
+  seatCount: 3 | 4,
+): LogParts {
+  const c = tablet ? 88 : landscape ? 48 : 56
+  const g = tablet ? 16 : 8
+  const seat = SEATED_SCALE * c
+  const D = tablet ? 40 : 32
+  const band = {
+    x,
+    y,
+    width: logBandWidth(c, g, seatCount),
+    height: seat + 16,
+  }
+  const bar = { x, y: y + seat - 8, width: band.width, height: 24 }
+  return {
+    band,
+    bar,
+    disc: { x, y: bar.y + bar.height / 2 - D / 2, width: D, height: D },
+    seats: Array.from({ length: seatCount }, (_, i) => ({
+      x: x + 16 + i * (seat + g),
+      y,
+      width: seat,
+      height: seat,
+    })),
+  }
+}
+
+/** One socket under each seat, on the log's bar (T8). */
+export function logSockets(seats: readonly Rect[], bar: Rect): Rect[] {
+  return seats.map((s) => ({
+    x: s.x + 0.18 * s.width,
+    y: bar.y + 0.18 * bar.height,
+    width: 0.64 * s.width,
+    height: 0.64 * bar.height,
+  }))
+}
+
+export interface PickerScene {
+  /** "3" on top, "4" below, each with its log. */
+  slabs: readonly { length: 3 | 4; slab: Rect; log: LogParts }[]
+  /** The slab's radius, `min(R, 0.5 c)` (T9). */
+  radius: number
+}
+
+/**
+ * § 5.2: two slabs the full width of `A`, each `(A.height − 16) / 2` tall,
+ * 16 apart, "3" on top. In each, that length's log band at its in-round
+ * size, centred vertically; both start at the "4" log's centred x, so
+ * their discs line up and the "4" log reaches one seat further.
+ */
+export function pickerScene(
+  A: Rect,
+  tablet: boolean,
+  landscape: boolean,
+): PickerScene {
+  const c = tablet ? 88 : landscape ? 48 : 56
+  const g = tablet ? 16 : 8
+  const h = (A.height - 16) / 2
+  const x = A.x + (A.width - logBandWidth(c, g, 4)) / 2
+  const bandH = SEATED_SCALE * c + 16
+  const slabs = ([3, 4] as const).map((length, i) => {
+    const slab = { x: A.x, y: A.y + i * (h + 16), width: A.width, height: h }
+    return {
+      length,
+      slab,
+      log: logAt(x, slab.y + (h - bandH) / 2, tablet, landscape, length),
+    }
+  })
+  return { slabs, radius: Math.min(48 * (tablet ? 1 : 7 / 12), 0.5 * c) }
+}
+
+export interface ArrivalScene {
+  /** The slab at rest, and its log (bar, sockets, disc) on it. */
+  slab: Rect
+  log: LogParts
+  /** The slab's left edge as it starts: the screen width + 8. */
+  startX: number
+}
+
+/**
+ * § 6.1: the arrival slab, the four-seat log's footprint (its length × the
+ * disc's D) grown by `g` on every side, no wider than `A`, at rest centred
+ * in `A`; it enters from beyond the screen's right edge.
+ */
+export function arrivalScene(
+  A: Rect,
+  tablet: boolean,
+  landscape: boolean,
+  screenWidth: number,
+): ArrivalScene {
+  const c = tablet ? 88 : landscape ? 48 : 56
+  const g = tablet ? 16 : 8
+  const D = tablet ? 40 : 32
+  const logW = logBandWidth(c, g, 4)
+  const width = Math.min(A.width, logW + 2 * g)
+  const height = D + 2 * g
+  const slab = {
+    x: A.x + (A.width - width) / 2,
+    y: A.y + (A.height - height) / 2,
+    width,
+    height,
+  }
+  const logX = A.x + (A.width - logW) / 2
+  const barY = slab.y + (height - 24) / 2
+  const seat = SEATED_SCALE * c
+  return {
+    slab,
+    log: logAt(logX, barY - seat + 8, tablet, landscape, 4),
+    startX: screenWidth + 8,
+  }
+}
+
+/** The smallest door (§ 6.2): phone landscape's, clear of the ribbon. */
+const DOOR_MIN = 44
+
+/**
+ * § 6.2: the door, beside New letters as New letters is beside Back
+ * (Back's size + 16 on phones, + 24 on tablets), Back's size, or 44 where
+ * that would reach the ribbon (phone landscape: the ribbon starts at y
+ * 56.2 under the right pane's HUD row).
+ */
+export function doorRect(
+  back: Rect,
+  ribbon: { x: number; y: number; width: number },
+  tablet: boolean,
+): Rect {
+  const step = back.width + (tablet ? 24 : 16)
+  const full = { ...back, x: back.x + 2 * step }
+  const reaches =
+    full.x < ribbon.x + ribbon.width &&
+    ribbon.x < right(full) &&
+    bottom(full) > ribbon.y
+  if (!reaches) return full
+  return { ...full, width: DOOR_MIN, height: DOOR_MIN }
 }

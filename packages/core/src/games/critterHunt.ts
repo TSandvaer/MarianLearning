@@ -520,6 +520,35 @@ export function huntOpenLengths(): HuntLength[] {
   }
 }
 
+/**
+ * Debug seeds only (`debug/seeds.ts`, the four-letter maestro flows F20 and
+ * F21): sets the open lengths outright, `[3]` removing the field. Play
+ * opens "4" only through `saveHuntRecord`'s `unlock`.
+ */
+export function setHuntOpenLengths(open: readonly HuntLength[]): void {
+  const store = getKeyValueStore()
+  if (store === null) return
+  try {
+    let all: Record<string, unknown> = {}
+    try {
+      all = readAll()
+    } catch {
+      // An unreadable record is replaced.
+    }
+    const rest = Object.fromEntries(
+      Object.entries(all).filter(([k]) => k !== OPEN_FIELD),
+    )
+    store.setItem(
+      HUNT_STORAGE_KEY,
+      JSON.stringify(
+        open.includes(4) ? { ...rest, [OPEN_FIELD]: [3, 4] } : rest,
+      ),
+    )
+  } catch (err) {
+    console.warn('[Critters] could not save the open lengths:', err)
+  }
+}
+
 /** A record for a fresh round, nothing found. */
 export const freshHuntRecord = (round: HuntRound): HuntRecord => ({
   ...round,

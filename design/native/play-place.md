@@ -152,7 +152,7 @@ P  phone portrait (375×667)              L  phone landscape (667×375)
 - **Routes:** `Route` gains `'play-place'` and `'play-game'` (`packages/core/src/router/route.ts`; K5). `ROUTE_EXITS` (`mobile/src/router/routes.ts:48-61`): `hub` adds `'play-place'`; `'play-place': ['hub', 'play-game', 'picker']`; `'play-game': ['play-place']`. `ROUTE_LABELS` (`routes.ts:67`) gains "Play place" and "Play game". Both maps are `Record<Route, …>`, so the `Route` members and their rows land in one PR (§ 7). The game id lives in App state, as the flower bed's does.
 - **Hub → Play place:** the Hub fades out on its own exit (`HUB_EXIT_MS`), the place fades in over 200 ms.
 - **Picking a game:** a tile tap plinks, cuts Emma's line, and about 200 ms after the release the route is `play-game` with that id. The place fades out, the game fades in (200 ms each).
-- **Back from a game** (its back disc, or Android back): the place at once, silently (no open line). The same at a game's natural stop (§ 2.6, § 3.6). Never into another round.
+- **Back from a game** (its back disc, or Android back): the place at once, silently (no open line). The same at a game's natural stop (§ 2.6, § 3.6). Never into another round. Letter critters with "3" and "4" open: Back from a round goes to its length picker first, and Back from the picker to the place (`critters-four-letter.md` § 5.1).
 - **Home from the Play place** (the Home disc, or Android back): the Hub. The Hub decides its visit afresh on mount, as on any return; its 30 s rapid-remount rule (`hub-native.md` § 5) keeps a quick round trip quiet.
 - **The return rule** (`mobile/src/lifecycle/pickerReturn.ts:14-19`): `PICKER_RETURN_ROUTES` gains `'play-place'`, a chooser screen like the Hub and the Map. `'play-game'` stays out, as Math, Word Song and the flower bed's `game` do: a game writes nothing, so a learner switch mid-game loses nothing and can wait.
 - **No Session End, ever.** Nothing in either game reaches a session result.
@@ -536,7 +536,7 @@ The drop: each seated critter falls from its seat to its burrow and shrinks from
 - **Emma's line comes with it twice a visit at most:** on entry and at the first idle return; after that, the hand alone, silent (coordinator 2026-10-23: no nagging).
 - **What puts it off:** a drag start (the hand fades out over 200 ms) or a seat change, a VoiceOver seat included. A plain critter tap does not: she may be tapping without knowing she can drag. A tap still cuts the line, as below.
 
-**Open and leave.** At the start, 300 ms after the fade-in, Emma (`listening`) says `guide.play.critters.open`, "Drag three letters up to the log. If they make a word, I'll say it!" (CHANGE, Thomas 2026-10-23 (Marian's play test): it names the move; was "Join three letters. If they make a word, I'll say it!", Thomas 2026-10-22), with the drag hint. A critter tap or drag during the line cuts it (`cancelActive()`), and its caption goes. Before blending sounds, Letter critters is a toy: it has no rounds and no end of its own (from blending sounds, the word hunt has rounds, `critters-word-hunt.md`). She leaves with Back (§ 1.4), and the Play place returns silently.
+**Open and leave.** At the start, 300 ms after the fade-in, Emma (`listening`) says `guide.play.critters.open`, "Drag three letters up to the log. If they make a word, I'll say it!" (CHANGE, Thomas 2026-10-23 (Marian's play test): it names the move; was "Join three letters. If they make a word, I'll say it!", Thomas 2026-10-22), with the drag hint. A critter tap or drag during the line cuts it (`cancelActive()`), and its caption goes. Before blending sounds, Letter critters is a toy: it has no rounds and no end of its own (from blending sounds, the word hunt has rounds, `critters-word-hunt.md`). She leaves with Back (§ 1.4), and the Play place returns silently (with "3" and "4" open, a round's Back goes to the length picker first, `critters-four-letter.md` § 5.1).
 
 ### 3.4 Which sounds, and which clips (audio)
 
@@ -608,8 +608,8 @@ PHONE PORTRAIT  375×667                     PHONE LANDSCAPE  667×375
 
 - A meadow critter: `accessibilityRole="button"`, label "Letter <x>"; activate seats it in the first free seat (if the log is full, it sings its sound). A custom action "Hear" plays its sound.
 - A seated critter: label "Letter <x>, on the log"; activate sends it home.
-- The log: label "Log" ("Log, three letters" in the word hunt); activate sings the run again.
-- The word hunt's slots, bonus chip, New letters and the vowel's empty burrow: `critters-word-hunt.md` § 6.3.
+- The log: label "Log" ("Log, three letters" in the word hunt, "Log, four letters" in a four-letter round); activate sings the run again (on a four-seat log, the seated critters, a partial run too).
+- The word hunt's slots, bonus chip, New letters and the vowel's empty burrow: `critters-word-hunt.md` § 6.3. The length picker's slabs and the door: `critters-four-letter.md` § 8.2.
 - Touch targets: meadow critters 48-88 pt, seats 60-110 pt.
 
 ---

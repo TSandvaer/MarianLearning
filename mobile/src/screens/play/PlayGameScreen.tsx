@@ -10,7 +10,9 @@
  * It runs what both games share: one line player (`playLines.ts`), the
  * effects, and beats that Back clears and that wait while the app is
  * hidden. Back (the disc, or Android back) returns to the Play place at
- * once, silent: mid-line, mid-drag or mid-crossing. A background or a new
+ * once, silent: mid-line, mid-drag or mid-crossing; a game may take the
+ * step first (Letter critters' rounds go back to their length picker,
+ * critters-four-letter.md § 5.1). A background or a new
  * layout springs a drag in flight home. Separate from Math, Word Song and
  * the flower bed's `GameScreen`, and it writes nothing: no progress,
  * stardust, streak, history, Leitner, cloud call or network call (§ 1.6).
@@ -43,7 +45,7 @@ import {
 import { FILL } from '../../theme'
 import { HubBackdrop } from '../hub/HubBackdrop'
 import { BackButton } from '../math/MathHud'
-import { LetterCritters } from './LetterCritters'
+import { CrittersGame } from './CrittersGame'
 import { backRect, playArea } from './playGeometry'
 import {
   createPlaySfx,
@@ -144,6 +146,17 @@ export function PlayGameScreen({
   useLayoutEffect(() => {
     exitRef.current = exit
   })
+  /** A game's own Back step (the critters' picker), else the exit. */
+  const backRef = useRef<(() => boolean) | null>(null)
+  const back = () => {
+    if (exitedRef.current) return
+    if (backRef.current?.() === true) return
+    exit()
+  }
+  const backPressRef = useRef(back)
+  useLayoutEffect(() => {
+    backPressRef.current = back
+  })
 
   // The kit is fixed for the mount; its functions read refs.
   const kitBase = useMemo(() => {
@@ -200,6 +213,9 @@ export function PlayGameScreen({
         if (!exitedRef.current) setPose(p)
       },
       done: () => exitRef.current(),
+      setBack: (handler: (() => boolean) | null) => {
+        backRef.current = handler
+      },
     }
   }, [player, visibility])
 
@@ -220,7 +236,7 @@ export function PlayGameScreen({
   // Android back = Back.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      exitRef.current()
+      backPressRef.current()
       return true
     })
     return () => sub.remove()
@@ -240,14 +256,15 @@ export function PlayGameScreen({
 
   const A = playArea(layout)
   const frameKey = `${A.x},${A.y},${A.width},${A.height}`
-  const back = backRect(layout)
+  const backDisc = backRect(layout)
   const kit: GameKit = {
     ...kitBase,
     area: A,
     tablet: layout.tablet,
     landscape: layout.landscape,
     viewport,
-    back,
+    back: backDisc,
+    ribbon: layout.ribbon,
     reducedMotion,
     sfx,
     rng,
@@ -272,7 +289,7 @@ export function PlayGameScreen({
         {game === 'raft' ? (
           <RaftCrossing kit={kit} shore={shore} />
         ) : (
-          <LetterCritters
+          <CrittersGame
             key="critters"
             kit={kit}
             sounds={sounds}
@@ -302,16 +319,16 @@ export function PlayGameScreen({
           style={[
             styles.abs,
             {
-              left: back.x,
-              top: back.y,
-              width: back.width,
-              height: back.height,
+              left: backDisc.x,
+              top: backDisc.y,
+              width: backDisc.width,
+              height: backDisc.height,
             },
           ]}
         >
           <BackButton
-            size={back.width}
-            onPress={exit}
+            size={backDisc.width}
+            onPress={back}
             testID="play-game-back"
           />
         </View>

@@ -44,8 +44,12 @@ const VOWELS = new Set(['a', 'e', 'i', 'o', 'u'])
 /** § 4.1: a found word's tiles fly up, 60 ms apart, 500 ms each. */
 export const TILE_STAGGER_MS = 60
 export const TILE_FLIGHT_MS = 500
-/** The last tile lands at 620 ms; the three settle over 120 ms. */
+/**
+ * The last of a word's tiles lands: 620 ms for three, 680 for four
+ * (critters-four-letter.md § 4.2); they settle over 120 ms.
+ */
 export const FILL_LAND_MS = 2 * TILE_STAGGER_MS + TILE_FLIGHT_MS
+export const FILL_LAND_FOUR_MS = 3 * TILE_STAGGER_MS + TILE_FLIGHT_MS
 export const FILL_SETTLE_MS = 120
 /** § 4.2: the repeat wiggle, four 100 ms steps. */
 export const WIGGLE_STEP_MS = 100
@@ -585,19 +589,22 @@ export function VowelRing({
  * One tile of a found word flying from its seated critter to its box
  * (§ 4.1): from the critter's centre at 0.6 × the seat, `delay` ms in,
  * shrinking to the box over 500 ms (ease in-out); it lands a touch large
- * and settles (1.08 → 1, 120 ms) when the last one lands, at 620 ms.
+ * and settles (1.08 → 1, 120 ms) when the last one lands, at `landMs`
+ * (620 ms for three, 680 for four).
  */
 export function FlyingTile({
   letter,
   from,
   to,
   delay,
+  landMs = FILL_LAND_MS,
   testID,
 }: {
   letter: string
   from: Rect
   to: Rect
   delay: number
+  landMs?: number
   testID: string
 }) {
   const p = useSharedValue(0)
@@ -609,9 +616,7 @@ export function FlyingTile({
         withTiming(1, { duration: TILE_FLIGHT_MS, easing: EASE_IN_OUT }),
       ),
     )
-    settle.set(
-      withDelay(FILL_LAND_MS, withTiming(1, { duration: FILL_SETTLE_MS })),
-    )
+    settle.set(withDelay(landMs, withTiming(1, { duration: FILL_SETTLE_MS })))
     // Mount-once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

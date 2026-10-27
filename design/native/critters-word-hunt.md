@@ -233,7 +233,7 @@ An extra (a said word that is not a target, Dave (1)) plays its outcome as any s
 | last word's end + 300 | Emma `cheering` and says **"You did it!"**: Word Song's `session.end.opener`, the bundled canon clip keyed by that text (`mobile/src/audio/canonAudioRegistry.ts:1575`), with its caption in her ribbon. It plays through the canon-text seam the praise clips need (`kit.speak` takes a `PlayLineId`, `playKit.ts:56`). |
 | its end               | `sfx.cheer` (0.5, `playKit.ts:34`) and **the burst**: Word Song's six-sparkle burst (`WordChip.tsx:11-13`, `:40-63`, `SPARKLE_BURST_MS` 850 at `:33`) from the board's centre, distance 75 × k and glyph 16 × k, with k = 1 on phones and 1.5 on tablets. It draws over the slots. `testID="hunt-burst"`.                |
 | its end + 900         | (The cheer is 862 ms, Dave's afinfo.) Emma `idle`. The board unlocks. **New letters** enters beside Back (§ 5.3).                                                                                                                                                                                                        |
-| (phase 2)             | Phase 2 puts the four-seat log's roll-in here, before New letters (Dave (3) "Unlock"). Not in phase 1.                                                                                                                                                                                                                   |
+| (phase 2)             | On her first complete three-letter round while "4" is not open, the four-seat log's roll-in plays here, before New letters: `critters-four-letter.md` § 6 (built 2026-10-27).                                                                                                                                            |
 
 **Length:** 0.3 s + the lap + 0.3 s + "You did it!" + 0.9 s. The lap's words are about 0.5-0.9 s each plus 0.25 s gaps (an estimate: I did not measure the clips). With 4-7 found words the beat is about **6-9 s**, against Dave's "about 8-10 s". The beat plays once per round, never on a return (§ 6.4). Nothing in it says "again", "next", "more" or "round" (AC C8 holds, Dave (3)).
 
@@ -396,16 +396,16 @@ Lines, sounds and their times are unchanged. Dragging still follows the finger.
 
 They go beside `PLAY_LABELS` in `mobile/src/screens/play/playLines.ts:65-71`, so a language version swaps rows.
 
-| Element                  | Label                                        | Role, activate                          |
-| ------------------------ | -------------------------------------------- | --------------------------------------- |
-| A filled slot            | the word, capitalised ("Fan")                | button; plays it (§ 4.3)                |
-| An empty slot            | "Word to find" (amended 2026-10-26, § 15.9)  | button; plays its word (§ 15.5)         |
-| The glowing slot         | "Hint"                                       | button; plays the hint (§ 15.7)         |
-| The bonus chip           | "Bonus words, <w>, <w>" ("Bonus words, tan") | none                                    |
-| The log (hunt)           | "Log, three letters"                         | button; sings the run again (was "Log") |
-| New letters              | "New letters"                                | button; deals a fresh round             |
-| The vowel's empty burrow | none (`accessible={false}`)                  |                                         |
-| The numeral disc         | none (part of the log)                       |                                         |
+| Element                  | Label                                                                                            | Role, activate                          |
+| ------------------------ | ------------------------------------------------------------------------------------------------ | --------------------------------------- |
+| A filled slot            | the word, capitalised ("Fan")                                                                    | button; plays it (§ 4.3)                |
+| An empty slot            | "Word to find" (amended 2026-10-26, § 15.9)                                                      | button; plays its word (§ 15.5)         |
+| The glowing slot         | "Hint"                                                                                           | button; plays the hint (§ 15.7)         |
+| The bonus chip           | "Bonus words, <w>, <w>" ("Bonus words, tan")                                                     | none                                    |
+| The log (hunt)           | "Log, three letters" (a four-letter round: "Log, four letters", `critters-four-letter.md` § 8.2) | button; sings the run again (was "Log") |
+| New letters              | "New letters"                                                                                    | button; deals a fresh round             |
+| The vowel's empty burrow | none (`accessible={false}`)                                                                      |                                         |
+| The numeral disc         | none (part of the log)                                                                           |                                         |
 
 The critters keep "Letter <x>" and "Letter <x>, on the log" (`play-place.md` § 4.2). No label states a count of found or remaining words. The beat makes no announcement.
 
@@ -469,9 +469,9 @@ The day a learner reaches blending sounds, her next visit opens on a fresh hunt 
 
 7. **H7.** `huntScene` picks § 2.4's step on each of its 15 viewports and equals its rects for N = 8 (board, log band, meadow, chip zone, picture card): the tablet rows as measured on 2026-10-25, and the four phone rows as amended on 2026-10-26 (S4 pad 3, T 36, slot 76 × 67; P8). For N 5-8, every check of § 2.2's fit rule holds.
 8. **H8.** The hunt meadow has 6 critters, 3 per row in 2 rows, in round order. Dragging the vowel pops no twin and shows `critter-burrow-empty-<v>` until it lands home. A consonant drag still pops a twin.
-9. **H9.** `critter-log-numeral` renders "3" in a hunt round and is absent in the free meadow. The log's label is "Log, three letters" in the hunt and "Log" in the free meadow.
+9. **H9.** `critter-log-numeral` renders the round's length ("3", or "4" in a four-letter round, `critters-four-letter.md` F11) in a hunt round and is absent in the free meadow. The log's label is "Log, three letters" in the hunt and "Log" in the free meadow.
 10. **H10.** (Amended 2026-10-26; the slot is P4's.) A new target, with fake timers and audio: its outcome is the reward ruling's, unchanged. At § 4.1's fill start, **the word's own slot** (`hunt-slot-<k>`, k = its index in `huntBoardOrder`) gets its tiles, with the vowel pink, consonants honey, letters `#6b3f1f`. The shelf clears 400 ms after the last tile lands. No sound plays at the fill.
-11. **H11.** No rendered text in the hunt contains a digit other than the numeral "3". No line or label states how many words are found or left.
+11. **H11.** No rendered text in the hunt contains a digit other than the numeral, the round's length. No line or label states how many words are found or left.
 12. **H12.** A repeat find plays the joy beat and no praise, wiggles its slot, and adds no tile anywhere.
 13. **H13.** An extra is said and plays the joy beat. `hunt-bonus` is absent before the first extra, then lists the extras in find order, at most 3. No slot changes, and the chip ignores a tap.
 14. **H14.** Never-say words, non-words and pairs keep `play-place.md` § 3.3's outcomes and fill nothing.

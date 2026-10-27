@@ -35,6 +35,7 @@ export type PlayLineId =
   | 'guide.play.raft.silly'
   | 'guide.play.raft.close'
   | 'guide.play.critters.open'
+  | 'guide.play.critters.open.four'
   | 'guide.play.critters.funny.1'
   | 'guide.play.critters.funny.2'
   | 'guide.play.critters.funny.3'
@@ -113,6 +114,9 @@ export const PLAY_LABELS = {
   // every empty slot, whatever its word: a label that held the word would
   // be the answer (VoiceOver speaks it, a braille display spells it).
   huntLog: 'Log, three letters',
+  // The four-letter rounds (critters-four-letter.md § 8.2): the picker's
+  // bottom slab, the door and the four-seat log.
+  huntLogFour: 'Log, four letters',
   emptySlot: 'Word to find',
   hint: 'Hint',
   bonus: 'Bonus words',

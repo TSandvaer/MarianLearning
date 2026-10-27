@@ -57,6 +57,17 @@
  * the cheer and the burst), then New letters deals another round. The
  * round is kept per learner (`critterHunt.ts`): toy state, never progress.
  *
+ * Four-letter rounds (`design/native/critters-four-letter.md`, Dave's
+ * ruling of 2026-10-26, (B)) open at her first complete three-letter
+ * round: on that round, after the beat, a four-seat log rolls in and
+ * becomes a door beside New letters (§ 6). A four-letter round has seven
+ * critters (4 + 3), four seats with a "4" on the log, four-box slots and
+ * no extras: four seated sing 400 ms after the last seat change, a target
+ * as a said word (its picture and, for the 11 lesson words, its praise),
+ * anything else sings and sits; 1-3 seated sing only when she taps the
+ * log, an empty seat between two critters a rest, and nothing judges them
+ * (§ 4.1). `CrittersGame.tsx` holds the picker and the visit.
+ *
  * Reduce Motion (§ 3.7): no bounce, hop, spring, tumble or burst; the
  * singing letter lights (and at the joy beat the three light together),
  * the picture fades, a non-word dims. Dragging still follows the finger.
@@ -64,15 +75,14 @@
 import { critterWordLine } from '@marian/core/emmasPath/guidanceLines'
 import {
   freshHuntRecord,
-  HUNT_LENGTH,
   huntBoardOrder,
   huntDeal,
   huntFind,
   huntHintTarget,
-  huntProbeGuard,
-  huntVowels,
+  huntOpenLengths,
   loadHuntRecord,
   saveHuntRecord,
+  type HuntLength,
   type HuntRecord,
 } from '@marian/core/games/critterHunt'
 import {
@@ -80,12 +90,11 @@ import {
   CRITTER_PICTURE_WORDS,
   CRITTER_SAID_PICTURE_WORDS,
   CRITTER_SOUND_SOURCE,
-  critterFunnyOpen,
+  critterHasPicture,
   critterPictureKey,
   critterRun,
   critterSet,
 } from '@marian/core/games/playPlace'
-import { loadProgress } from '@marian/core/progress'
 import { Image } from 'expo-image'
 import {
   useEffect,
@@ -122,19 +131,28 @@ import { SPARKLE_BURST_MS, SparkleBurst } from '../wordSong/WordChip'
 import {
   blendClipPath,
   blendSegments,
-  EMPTY_SEATS,
+  emptySeats,
   seatAt,
   seatedRun,
+  seatedWithGaps,
+  seatGroups,
   swapSeats,
   unseat,
   type Seats,
 } from './critterModel'
 import { recordCritterWord } from './critterSeen'
+import {
+  newCrittersVisit,
+  readCrittersGate,
+  type CrittersGate,
+  type CrittersVisit,
+} from './crittersVisit'
 import { DragHintHand, DRAG_HINT_MS } from './DragHintHand'
 import { OVER_PIECE_Z } from './dragLock'
 import { DragPiece } from './DragPiece'
 import {
   BonusChip,
+  FILL_LAND_FOUR_MS,
   FILL_LAND_MS,
   FILL_SETTLE_MS,
   FlyingTile,
@@ -145,12 +163,22 @@ import {
   VowelRing,
 } from './HuntBoard'
 import {
+  ArrivalSlab,
+  HuntDoor,
+  LogSockets,
+  ROLL_DONE_MS,
+  ROLL_FLY_AT_MS,
+  ROLL_GLIDE_MS,
+} from './HuntLengths'
+import {
+  arrivalScene,
   centre,
   chipRect,
   chipTiles,
   contains,
   critterScene,
   crittersFitBothWays,
+  doorRect,
   grow,
   huntScene,
   type CritterScene,
@@ -174,6 +202,12 @@ export const CRITTERS_OPEN_DELAY_MS = 500
 export const SING_AFTER_MS = 400
 /** Between one critter's sound and the next (the blend clips' rhythm). */
 export const SOUND_GAP_MS = 300
+/**
+ * A partial run on the four-seat log, sung on a log tap: each empty seat
+ * between two seated critters adds this rest (critters-four-letter.md
+ * § 4.1, Dave's Q20: 900 ms across one, + 600 for each further one).
+ */
+export const EMPTY_SEAT_REST_MS = 600
 /** A picture word: clip end → the picture floats away (500 ms). */
 export const PICTURE_HOLD_MS = 2400
 export const PICTURE_LEAVE_MS = 500
@@ -236,6 +270,19 @@ export interface LetterCrittersProps {
   sounds?: TapClipPlayer
   words?: readonly string[]
   hunt?: boolean
+  /** The learner's gate, read once a visit (else read at mount). */
+  gate?: CrittersGate
+  /** The round's length: 3, or 4 (a four-letter round). */
+  length?: HuntLength
+  /** A fresh deal even with a round of this length in progress (the door). */
+  freshDeal?: boolean
+  /** The visit's shared state (else this mount's own). */
+  visit?: CrittersVisit
+  /**
+   * The door's tap (critters-four-letter.md § 6.2): a fresh four-letter
+   * round. With it, a three-letter round that opens "4" plays the roll-in.
+   */
+  onOpenFour?: () => void
 }
 
 /** The picture card draws its picture at this share of its side. */
@@ -261,62 +308,70 @@ type Outcome = 'pair' | 'real' | 'word' | 'funny'
 /** A run of three in the hunt: a new or found target, a new or found extra. */
 type HuntFind = 'new' | 'repeat' | 'extra' | 'extra-repeat'
 
-interface Gate {
-  /** A non-word boings (blending sounds is current or mastered). */
-  funny: boolean
-  /** The word hunt's vowels and probe guard, or null: the free meadow. */
-  hunt: { vowels: string[]; probeGuard: boolean } | null
-}
-
-/**
- * The playing learner's gate, read once at mount (Dave's safeguard; the
- * hunt's gate is the same, critters-word-hunt.md § 8). Unreadable: quiet,
- * the free meadow. `hunt` forces the hunt on or off (a test seam).
- */
-function readGate(hunt?: boolean): Gate {
-  let gate: Gate = { funny: false, hunt: null }
-  try {
-    const progress = loadProgress()
-    const funny = critterFunnyOpen(progress)
-    gate = {
-      funny,
-      hunt: funny
-        ? {
-            vowels: huntVowels(progress),
-            probeGuard: huntProbeGuard(progress),
-          }
-        : null,
-    }
-  } catch {
-    // Quiet, the free meadow.
-  }
-  if (hunt === false) return { ...gate, hunt: null }
-  if (hunt === true && gate.hunt === null) {
-    return { ...gate, hunt: { vowels: ['a'], probeGuard: false } }
-  }
-  return gate
-}
-
 export function LetterCritters({
-  kit,
+  kit: frameKit,
   sounds,
   words = CRITTER_PICTURE_WORDS,
   hunt: huntProp,
+  gate: gateProp,
+  length = 3,
+  freshDeal = false,
+  visit: visitProp,
+  onOpenFour,
 }: LetterCrittersProps) {
+  // Once this round leaves (Back to the picker, the door), nothing it
+  // scheduled runs and no line it started continues: its beats, lines and
+  // poses are dropped (critters-four-letter.md § 5.3).
+  const [scope] = useState(() => {
+    let alive = true
+    return {
+      alive: () => alive,
+      set: (on: boolean) => {
+        alive = on
+      },
+    }
+  })
+  const kit: GameKit = {
+    ...frameKit,
+    later: (fn, ms) =>
+      frameKit.later(() => {
+        if (scope.alive()) fn()
+      }, ms),
+    advance: (fn, ms) =>
+      frameKit.advance(() => {
+        if (scope.alive()) fn()
+      }, ms),
+    speak: (id) =>
+      new Promise((resolve) => {
+        if (!scope.alive()) return
+        void frameKit.speak(id).then((ok) => {
+          if (scope.alive()) resolve(ok)
+        })
+      }),
+    setPose: (pose) => {
+      if (scope.alive()) frameKit.setPose(pose)
+    },
+  }
   const { reducedMotion, sfx } = kit
-  const [gate] = useState(() => readGate(huntProp))
+  const [gate] = useState(() => gateProp ?? readCrittersGate(huntProp))
+  const [visit] = useState(() => visitProp ?? newCrittersVisit())
   const { funny } = gate
+  const four = length === 4
+  const openLine = four
+    ? 'guide.play.critters.open.four'
+    : 'guide.play.critters.open'
   // The hunt's round (§ 6.4): the one in progress, else a fresh deal,
   // never the same letters as her last round. Written at mount.
   const [opening] = useState(() => {
     if (gate.hunt === null) return null
-    const stored = loadHuntRecord()
-    if (stored !== null && !stored.complete) {
+    const stored = loadHuntRecord(length)
+    if (!freshDeal && stored !== null && !stored.complete) {
       return { record: stored, dealt: false }
     }
     const round = huntDeal(gate.hunt.vowels, kit.rng, {
       last: stored?.letters,
       probeGuard: gate.hunt.probeGuard,
+      length,
     })
     return { record: freshHuntRecord(round), dealt: true }
   })
@@ -341,11 +396,15 @@ export function LetterCritters({
     opening?.record ?? null,
   )
   const recordRef = useRef(record)
-  /** A new round or a find: kept, and written (Dave (7)). */
+  /**
+   * A new round or a find: kept, and written (Dave (7)). A complete
+   * three-letter round also opens "4" in the same write
+   * (critters-four-letter.md § 1, F6).
+   */
   const setRecord = (next: HuntRecord) => {
     recordRef.current = next
     setRecordState(next)
-    saveHuntRecord(next, HUNT_LENGTH)
+    saveHuntRecord(next, length, { unlock: length === 3 })
   }
   /** Found, but not on the board yet: the outcome is still playing. */
   const [pending, setPendingState] = useState<readonly string[]>([])
@@ -390,6 +449,15 @@ export function LetterCritters({
   /** The beat plays; the completing find's shelf starts it. */
   const beatRef = useRef(false)
   const beatDueRef = useRef(false)
+  /**
+   * § 6: the completing find opened "4": the roll-in plays after the beat.
+   * Its steps' token; the arrival's phase; the door, once it has landed.
+   */
+  const rollInDueRef = useRef(false)
+  const rollRef = useRef(0)
+  const rollingRef = useRef(false)
+  const [rollIn, setRollIn] = useState<'glide' | 'rest' | 'fly' | null>(null)
+  const [door, setDoor] = useState<'fading' | 'live' | null>(null)
   /** The run of three in play: its word, how it counts, its seats. */
   const runHuntRef = useRef<{
     word: string
@@ -401,7 +469,13 @@ export function LetterCritters({
   const vowel = record?.letters[0] ?? null
   const scene: CritterScene | HuntScene =
     record !== null
-      ? huntScene(kit.area, kit.tablet, kit.landscape, record.targets.length)
+      ? huntScene(
+          kit.area,
+          kit.tablet,
+          kit.landscape,
+          record.targets.length,
+          length,
+        )
       : critterScene(kit.area, kit.tablet, kit.landscape, letters.length)
   const hs = record !== null ? (scene as HuntScene) : null
   const sceneRef = useRef(scene)
@@ -409,8 +483,9 @@ export function LetterCritters({
     sceneRef.current = scene
   })
 
-  const [seats, setSeatsState] = useState<Seats>(EMPTY_SEATS)
-  const seatsRef = useRef<Seats>(EMPTY_SEATS)
+  const empty = emptySeats(length)
+  const [seats, setSeatsState] = useState<Seats>(empty)
+  const seatsRef = useRef<Seats>(empty)
   /** A run of three, until the shelf is clear: the board waits; Back stays live. */
   const [locked, setLocked] = useState(false)
   const lockedRef = useRef(false)
@@ -421,14 +496,12 @@ export function LetterCritters({
     into?: Rect
   } | null>(null)
   /** Bounce counters: per seat, and per meadow letter. */
-  const [seatBounce, setSeatBounce] = useState([0, 0, 0])
+  const [seatBounce, setSeatBounce] = useState(() => empty.map(() => 0))
   const [meadowHop, setMeadowHop] = useState<Record<string, number>>({})
   const [tumble, setTumble] = useState(0)
   /** The joy beat's burst, keyed so each one starts afresh. */
   const [burst, setBurst] = useState<number | null>(null)
   const burstRef = useRef(0)
-  /** The picture words praised this visit (not saved; Dave 2026-10-25). */
-  const praisedRef = useRef(new Set<string>())
   const [lean, setLean] = useState(false)
   const [twin, setTwin] = useState<string | null>(null)
   /** The shelf dropping home: who falls from which seat. */
@@ -443,10 +516,9 @@ export function LetterCritters({
   const singDueRef = useRef(false)
   const gigglesRef = useRef(0)
   const droppingRef = useRef(false)
-  /** She has made a run of three: no more hints this visit. */
-  const ranRef = useRef(false)
+  /** A four-seat partial run singing on a log tap: its song token. */
+  const partialRef = useRef(-1)
   const hintRef = useRef(0)
-  const hintLinesRef = useRef(0)
   const idleRef = useRef(0)
 
   const setSeats = (next: Seats) => {
@@ -460,20 +532,27 @@ export function LetterCritters({
 
   // --- The drag hint (§ 3.3, Thomas 2026-10-23) --------------------------
 
-  /** The hand, with Emma's open line the first `HINT_LINES` times. */
-  const showHint = () => {
-    if (ranRef.current) return
-    const key = ++hintRef.current
-    setHint({ key, leaving: false })
-    kit.later(() => {
-      if (hintRef.current !== key) return
-      setHint(null)
-      armIdle()
-    }, DRAG_HINT_MS)
-    if (hintLinesRef.current >= HINT_LINES) return
-    hintLinesRef.current += 1
+  /**
+   * The hand, until her first run of the visit, with Emma's open line the
+   * first `HINT_LINES` times a visit. On `entry` the line is this length's,
+   * and plays on its first entry in the visit only (critters-four-letter.md
+   * Decision 6); later entries are silent.
+   */
+  const showHint = (entry = false) => {
+    const line = entry ? visit.enter(length) : visit.hintLines() < HINT_LINES
+    if (!visit.hasRun()) {
+      const key = ++hintRef.current
+      setHint({ key, leaving: false })
+      kit.later(() => {
+        if (hintRef.current !== key) return
+        setHint(null)
+        armIdle()
+      }, DRAG_HINT_MS)
+    }
+    if (!line) return
+    visit.hintLine()
     kit.setPose('listening')
-    void kit.speak('guide.play.critters.open').then((ok) => {
+    void kit.speak(openLine).then((ok) => {
       if (ok) kit.setPose('idle')
     })
   }
@@ -488,9 +567,9 @@ export function LetterCritters({
   /** `HINT_IDLE_MS` from now with no drag: the hint again. */
   const armIdle = () => {
     const token = ++idleRef.current
-    if (ranRef.current) return
+    if (visit.hasRun()) return
     kit.advance(() => {
-      if (idleRef.current !== token || ranRef.current) return
+      if (idleRef.current !== token || visit.hasRun()) return
       if (draggingRef.current || lockedRef.current) return
       showHint()
     }, HINT_IDLE_MS)
@@ -530,7 +609,7 @@ export function LetterCritters({
   /** `HUNT_HINT_IDLE_MS` from now with no drag start: the glow. */
   const armHuntIdle = () => {
     const token = ++huntIdleRef.current
-    if (recordRef.current === null || !ranRef.current) return
+    if (recordRef.current === null || !visit.hasRun()) return
     kit.advance(() => {
       if (huntIdleRef.current !== token || draggingRef.current) return
       if (lockedRef.current) glowDueRef.current = true
@@ -541,7 +620,7 @@ export function LetterCritters({
   /** From the run's first sound the board waits until the shelf is clear. */
   const startRun = () => {
     lock(true)
-    ranRef.current = true
+    visit.run()
     idleRef.current += 1
     endHint()
     armHuntIdle()
@@ -558,10 +637,10 @@ export function LetterCritters({
     const home = seatsRef.current.flatMap((letter, seat) =>
       letter === null ? [] : [{ letter, seat }],
     )
-    setSeats(EMPTY_SEATS)
+    setSeats(emptySeats(length))
     setLean(false)
     setPicture(null)
-    setSeatBounce([0, 0, 0])
+    setSeatBounce(emptySeats(length).map(() => 0))
     setFalling(home)
     kit.advance(
       () => {
@@ -601,46 +680,22 @@ export function LetterCritters({
   // The hint and its open line; unmount: the sound in flight stops, the
   // player is freed.
   useEffect(() => {
-    if (opening?.dealt) saveHuntRecord(opening.record, HUNT_LENGTH)
-    kit.later(showHint, CRITTERS_OPEN_DELAY_MS)
+    scope.set(true)
+    if (opening?.dealt) {
+      saveHuntRecord(opening.record, length, { unlock: length === 3 })
+    }
+    kit.later(() => showHint(true), CRITTERS_OPEN_DELAY_MS)
     return () => {
+      scope.set(false)
+      beatRef.current = false
       songRef.current += 1
       tapRef.current += 1
+      rollRef.current += 1
       player.release()
     }
     // Mount-once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  // The app goes to the background: the sound stops (it never resumes). A
-  // run cut short still ends with the log empty, once she is back.
-  // A new layout (rotation): a fill in flight jumps to its end (§ 6.4).
-  const frame = kit.cancelKey.split('|')[0]
-  const frameRef = useRef(frame)
-  useEffect(() => {
-    if (kit.cancelKey.endsWith('hidden')) {
-      songRef.current += 1
-      // A slot's sound stops with the rest; a hint cut short ends Emma's point.
-      cutTap()
-      player.cut()
-      // The beat's steps wait for her return (the shelf is already clear).
-      if (lockedRef.current && !beatRef.current) {
-        kit.advance(() => {
-          kit.setPose('idle')
-          landPending()
-          dropShelf()
-        }, 0)
-      }
-    }
-    if (frameRef.current !== frame) {
-      frameRef.current = frame
-      arriveRef.current += 1
-      setArriving(null)
-      setPicture((p) => (p?.into === undefined ? p : null))
-    }
-    // Only a new key cancels.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kit.cancelKey, player])
 
   const bounceSeat = (i: number) =>
     setSeatBounce((b) => b.map((n, k) => (k === i ? n + 1 : n)))
@@ -655,8 +710,55 @@ export function LetterCritters({
     player.play(sound.clip, sound.window.from, sound.window.to, onEnd)
   }
 
+  /**
+   * A partial run on the four-seat log, on a log tap (critters-four-letter.md
+   * § 4.1): the seated critters sing left to right, each 300 ms after the
+   * one before ends, an empty seat between two of them a 600 ms rest. Emma
+   * listens, then idles. No outcome, no clear, no write, and no run for the
+   * hint's count. Anything else on the tap player cuts it: a drag, a seat
+   * change, a critter or slot tap, the app going to the background.
+   */
+  const singPartial = () => {
+    const current = seatsRef.current
+    const sung = seatedWithGaps(current)
+    if (sung.length === 0) return
+    const token = ++songRef.current
+    partialRef.current = token
+    kit.cutLine()
+    kit.setPose('listening')
+    const next = (k: number) => {
+      if (songRef.current !== token) return
+      const { seat } = sung[k]!
+      bounceSeat(seat)
+      singLetter(current[seat]!, () => {
+        if (songRef.current !== token) return
+        const after = sung[k + 1]
+        if (after === undefined) {
+          kit.setPose('idle')
+          return
+        }
+        kit.later(
+          () => next(k + 1),
+          SOUND_GAP_MS + EMPTY_SEAT_REST_MS * after.emptyBefore,
+        )
+      })
+    }
+    next(0)
+  }
+  /**
+   * The partial song, if one is singing, stops and Emma idles: a new sound
+   * cuts the one in flight, and the song must not carry on after it.
+   */
+  const cutPartial = () => {
+    if (partialRef.current !== songRef.current) return
+    songRef.current += 1
+    player.cut()
+    kit.setPose('idle')
+  }
+
   /** A seat change: any song stops; the run sings 400 ms after the last. */
   const changed = (next: Seats) => {
+    cutPartial()
     setSeats(next)
     setLean(false)
     songRef.current += 1
@@ -679,13 +781,19 @@ export function LetterCritters({
 
   const sing = () => {
     const current = seatsRef.current
+    // Four seats: 1-3 seated make no sound on their own; neighbours lean
+    // toward each other and wait (critters-four-letter.md § 4.1).
+    if (four && current.some((l) => l === null)) {
+      setLean(true)
+      return
+    }
     const run = seatedRun(current)
     if (run === null) return
     // Its song cuts a slot's sound: the hint ends before the run's pose.
     cutTap()
     const letters = run.map((i) => current[i]!)
     const word = letters.join('')
-    const kind = run.length === 3 ? critterRun(word, { funny }) : null
+    const kind = run.length === length ? critterRun(word, { funny }) : null
     if (kind !== null) {
       startRun()
       huntRun(word, run)
@@ -741,22 +849,29 @@ export function LetterCritters({
    * cheering; the picture leaves at the later of `PICTURE_HOLD_MS` and the
    * praise's end + `PRAISE_TAIL_MS`.
    */
-  const pictureEnds = (word: string, run: number[], token: number) => {
+  const pictureEnds = (
+    word: string,
+    run: number[],
+    token: number,
+    { joyAfter = true }: { joyAfter?: boolean } = {},
+  ) => {
     let waits = 1
     const ready = () => {
       waits -= 1
       if (waits === 0) pictureLeave(word, token)
     }
-    kit.advance(() => {
-      if (songRef.current === token) joy(run, word)
-    }, JOY_AFTER_MS)
+    if (joyAfter) {
+      kit.advance(() => {
+        if (songRef.current === token) joy(run, word)
+      }, JOY_AFTER_MS)
+    }
     kit.advance(ready, PICTURE_HOLD_MS)
     const praise = crittersPraiseLine(word)
-    if (praise === undefined || praisedRef.current.has(word)) return
+    if (praise === undefined || visit.isPraised(word)) return
     waits += 1
     kit.advance(() => {
       if (songRef.current !== token) return
-      praisedRef.current.add(word)
+      visit.praise(word)
       void kit.speak(praise).then(() => {
         if (songRef.current === token) kit.advance(ready, PRAISE_TAIL_MS)
       })
@@ -791,7 +906,9 @@ export function LetterCritters({
   /**
    * A real word's joy beat (Dave 2026-10-25): Emma cheers with the shipped
    * cheer, the three bounce together (Reduce Motion: their letters light),
-   * and Word Song's burst leaves the middle seat (none on Reduce Motion).
+   * and Word Song's burst leaves the middle seat (none on Reduce Motion);
+   * on a four-seat log, the log's middle (critters-four-letter.md
+   * Decision 10).
    */
   const joy = (run: number[], word: string) => {
     kit.setPose('cheering')
@@ -855,6 +972,14 @@ export function LetterCritters({
       void kit.speak(line).then(() => {
         if (songRef.current !== token) return
         joy(run, word)
+        if (four && critterHasPicture(word)) {
+          // critters-four-letter.md § 4.1: a pictured target's picture pops
+          // at the joy beat; a lesson word's praise, once a visit, 1200 ms
+          // on; the fill at the later of 2400 and the praise's end + 400.
+          setPicture({ word, leaving: false })
+          pictureEnds(word, run, token, { joyAfter: false })
+          return
+        }
         if (CRITTER_SAID_PICTURE_WORDS.includes(word)) {
           setPicture({ word, leaving: false })
           pictureLeaves(word, token)
@@ -944,6 +1069,11 @@ export function LetterCritters({
     const next = huntFind(r, word)
     if (kind === 'new' && next.complete && !r.complete) {
       beatDueRef.current = true
+      // § 6: her first complete three-letter round opens "4" (this write);
+      // the roll-in follows the beat, once per learner.
+      if (length === 3 && onOpenFour !== undefined) {
+        rollInDueRef.current = !huntOpenLengths().includes(4)
+      }
     }
     setPending([...pendingRef.current, word])
     setRecord(next)
@@ -961,7 +1091,8 @@ export function LetterCritters({
   const fill = (word: string, token: number) => {
     const r = recordRef.current
     const slot = r === null ? -1 : huntBoardOrder(r).indexOf(word)
-    const run = runHuntRef.current?.run ?? [0, 1, 2]
+    const run = runHuntRef.current?.run ?? empty.map((_, i) => i)
+    const landMs = four ? FILL_LAND_FOUR_MS : FILL_LAND_MS
     setPending(pendingRef.current.filter((w) => w !== word))
     endGlow()
     runsRef.current = 0
@@ -983,9 +1114,9 @@ export function LetterCritters({
         if (arriveRef.current !== key) return
         setArriving(null)
         setPicture(null)
-      }, FILL_LAND_MS + FILL_SETTLE_MS)
+      }, landMs + FILL_SETTLE_MS)
     }
-    settle(token, FILL_LAND_MS)
+    settle(token, landMs)
   }
 
   /** § 4.5: a new extra joins the bonus chip; a found one lights there. */
@@ -1031,6 +1162,7 @@ export function LetterCritters({
   const slotTap = (word: string): number | null => {
     if (lockedRef.current) return null
     kit.cutLine()
+    cutPartial()
     const token = cutTap()
     bump(setBoxLit, word)
     return token
@@ -1131,6 +1263,10 @@ export function LetterCritters({
       }
       kit.advance(() => {
         if (!beatRef.current) return
+        if (rollInDueRef.current) {
+          startRollIn()
+          return
+        }
         beatRef.current = false
         kit.setPose('idle')
         lock(false)
@@ -1138,6 +1274,86 @@ export function LetterCritters({
       }, BEAT_TAIL_MS)
     })
   }
+
+  /**
+   * critters-four-letter.md § 6.1, at U0 (the beat's end + 900): the board
+   * stays locked, Back live. The four-seat log glides in on its slab and
+   * rests; the sparkle, the dip, Emma `celebration`; it flies into the
+   * door; the door lands, New letters enters, the board unlocks. Reduce
+   * Motion: no slab; the door fades in at U0 + 1200. Once per learner.
+   */
+  const startRollIn = () => {
+    rollInDueRef.current = false
+    rollingRef.current = true
+    const token = ++rollRef.current
+    const at = (ms: number, fn: () => void) =>
+      kit.advance(() => {
+        if (rollRef.current === token) fn()
+      }, ms)
+    kit.setPose('idle')
+    if (!reducedMotion) setRollIn('glide')
+    at(ROLL_GLIDE_MS, () => {
+      sfx.sparkle.play()
+      kit.setPose('celebration')
+      if (reducedMotion) setDoor('fading')
+      else setRollIn('rest')
+    })
+    at(ROLL_FLY_AT_MS, () => {
+      kit.setPose('idle')
+      if (!reducedMotion) setRollIn('fly')
+    })
+    at(ROLL_DONE_MS, endRollIn)
+  }
+  /** The door in place, New letters in, the board unlocked (§ 6.1, § 6.4). */
+  const endRollIn = () => {
+    rollingRef.current = false
+    rollRef.current += 1
+    setRollIn(null)
+    setDoor('live')
+    beatRef.current = false
+    kit.setPose('idle')
+    lock(false)
+    setNewLetters(true)
+  }
+  /** § 6.2: the door's tap: any line cut; a fresh four-letter round. */
+  const onDoor = () => {
+    sfx.plink.play()
+    kit.cutLine()
+    onOpenFour?.()
+  }
+
+  // The app goes to the background: the sound stops (it never resumes). A
+  // run cut short still ends with the log empty, once she is back.
+  // A new layout (rotation): a fill in flight jumps to its end (§ 6.4).
+  const frame = kit.cancelKey.split('|')[0]
+  const frameRef = useRef(frame)
+  useEffect(() => {
+    if (kit.cancelKey.endsWith('hidden')) {
+      cutPartial()
+      songRef.current += 1
+      // A slot's sound stops with the rest; a hint cut short ends Emma's point.
+      cutTap()
+      player.cut()
+      // The beat's steps wait for her return (the shelf is already clear).
+      if (lockedRef.current && !beatRef.current) {
+        kit.advance(() => {
+          kit.setPose('idle')
+          landPending()
+          dropShelf()
+        }, 0)
+      }
+    }
+    if (frameRef.current !== frame) {
+      frameRef.current = frame
+      arriveRef.current += 1
+      setArriving(null)
+      setPicture((p) => (p?.into === undefined ? p : null))
+      // § 6.4: a roll-in in flight jumps to its end.
+      if (rollingRef.current) endRollIn()
+    }
+    // Only a new key cancels.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kit.cancelKey, player])
 
   /**
    * § 5.3: New letters plinks, and a fresh round (never the same letters)
@@ -1152,6 +1368,7 @@ export function LetterCritters({
     const round = huntDeal(gate.hunt.vowels, kit.rng, {
       last: r.letters,
       probeGuard: gate.hunt.probeGuard,
+      length,
     })
     setPending([])
     setLit({})
@@ -1177,6 +1394,7 @@ export function LetterCritters({
   const onMeadowTap = (letter: string) => {
     if (lockedRef.current) return
     kit.cutLine()
+    cutPartial()
     cutTap()
     setMeadowHop((h) => ({ ...h, [letter]: (h[letter] ?? 0) + 1 }))
     singLetter(letter)
@@ -1187,6 +1405,7 @@ export function LetterCritters({
     kit.cutLine()
     const free = seatsRef.current.indexOf(null)
     if (free < 0) {
+      cutPartial()
       cutTap()
       singLetter(letter)
     } else changed(seatAt(seatsRef.current, free, letter))
@@ -1206,6 +1425,7 @@ export function LetterCritters({
     const letter = seatsRef.current[seat]
     if (letter === null || letter === undefined) return
     kit.cutLine()
+    cutPartial()
     cutTap()
     bounceSeat(seat)
     singLetter(letter)
@@ -1232,11 +1452,13 @@ export function LetterCritters({
     songRef.current += 1
     cutTap()
     player.cut()
-    sing()
+    if (four && seatsRef.current.some((l) => l === null)) singPartial()
+    else sing()
   }
 
   const dragStart = (letter?: string) => {
     kit.cutLine()
+    cutPartial()
     draggingRef.current = true
     endHint()
     armIdle()
@@ -1255,7 +1477,13 @@ export function LetterCritters({
   // --- Drawing -----------------------------------------------------------
 
   const { c } = scene
-  const run = seatedRun(seats)
+  // Seated neighbours lean toward each other: each group's ends inward.
+  const leanOf = new Map<number, number>()
+  for (const group of seatGroups(seats)) {
+    if (group.length < 2) continue
+    leanOf.set(group[0]!, 6)
+    leanOf.set(group.at(-1)!, -6)
+  }
   // The vowel out of its burrow: dragged, seated or falling home (§ 2.5).
   const vowelOut =
     vowel !== null &&
@@ -1301,7 +1529,13 @@ export function LetterCritters({
       <Pressable
         testID="critter-log"
         accessibilityRole="button"
-        accessibilityLabel={hs !== null ? PLAY_LABELS.huntLog : PLAY_LABELS.log}
+        accessibilityLabel={
+          hs === null
+            ? PLAY_LABELS.log
+            : four
+              ? PLAY_LABELS.huntLogFour
+              : PLAY_LABELS.huntLog
+        }
         onPress={onLogTap}
         style={[styles.abs, rectStyle(scene.logBand)]}
       >
@@ -1318,6 +1552,15 @@ export function LetterCritters({
             },
           ]}
         />
+        {hs !== null && (
+          <LogSockets
+            seats={scene.seats}
+            bar={scene.log}
+            origin={scene.logBand}
+            tablet={kit.tablet}
+            testID="critter-log-socket"
+          />
+        )}
       </Pressable>
 
       {hs !== null && (
@@ -1327,7 +1570,7 @@ export function LetterCritters({
           pointerEvents="box-none"
           style={styles.fill}
         >
-          <NumeralDisc rect={hs.numeral} length={HUNT_LENGTH} />
+          <NumeralDisc rect={hs.numeral} length={length} />
           {hs.slots.map((parts, i) => {
             const word = order[i]
             if (word === undefined) return null
@@ -1384,14 +1627,7 @@ export function LetterCritters({
         {seats.map((letter, i) => {
           if (letter === null) return null
           const r = scene.seats[i]!
-          const inRun = lean && run !== null && run.includes(i)
-          const leanDeg = inRun
-            ? i === run![0]
-              ? 6
-              : i === run![run!.length - 1]
-                ? -6
-                : 0
-            : 0
+          const leanDeg = lean ? (leanOf.get(i) ?? 0) : 0
           return (
             <DragPiece
               key={`seat-${i}-${letter}`}
@@ -1505,7 +1741,7 @@ export function LetterCritters({
           key={burst}
           testID="critter-burst"
           pointerEvents="none"
-          style={[styles.abs, rectStyle(scene.seats[1]!)]}
+          style={[styles.abs, rectStyle(burstAt(scene.seats))]}
         >
           <SparkleBurst
             testID="critter-sparkle-burst"
@@ -1560,6 +1796,7 @@ export function LetterCritters({
               from={from}
               to={to}
               delay={i * TILE_STAGGER_MS}
+              landMs={four ? FILL_LAND_FOUR_MS : FILL_LAND_MS}
               testID={`hunt-fly-${i}`}
             />
           )
@@ -1591,8 +1828,43 @@ export function LetterCritters({
           onPress={onNewLetters}
         />
       )}
+
+      {rollIn !== null && (
+        <ArrivalSlab
+          scene={arrivalScene(
+            kit.area,
+            kit.tablet,
+            kit.landscape,
+            kit.viewport.width,
+          )}
+          door={doorRect(kit.back, kit.ribbon, kit.tablet)}
+          phase={rollIn}
+          tablet={kit.tablet}
+        />
+      )}
+
+      {door !== null && (
+        <HuntDoor
+          rect={doorRect(kit.back, kit.ribbon, kit.tablet)}
+          tablet={kit.tablet}
+          live={door === 'live'}
+          fadeIn={reducedMotion && door === 'fading'}
+          label={PLAY_LABELS.huntLogFour}
+          onPress={onDoor}
+        />
+      )}
     </View>
   )
+}
+
+/**
+ * Where the joy beat's burst starts: the middle seat, or on a four-seat
+ * log the log's middle, between seats 2 and 3 (critters-four-letter.md
+ * Decision 10).
+ */
+function burstAt(seats: readonly Rect[]): Rect {
+  if (seats.length !== 4) return seats[1]!
+  return { ...seats[1]!, x: (seats[1]!.x + seats[2]!.x) / 2 }
 }
 
 const rectStyle = (r: Rect) => ({
