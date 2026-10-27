@@ -6,7 +6,7 @@
 
 **Parent specs:** `design/native/critters-word-hunt.md` (phase 1, with § 15, pictures in the word boxes, which Devon is building now on `devon/hunt-pictures`) and `design/native/play-place.md` § 3. Everything there holds for a four-letter round unless this spec says otherwise. **Paint:** the restyle's tokens throughout (`design/native/play-games-restyle.md` T7-T11, `:132-167`). The parts that phase 1 already has take restyle A2's paint when A2 lands (`play-games-restyle.md:232`; it has not, `main` at 6f445073); the parts new here (the picker's logs, the arrival slab, the door) are given in the tokens directly.
 
-**Amended 2026-10-27 (build 25):** the picker (§ 5) drops its two meadow slabs. The logs themselves lie in the meadow and are the buttons, and the picker holds 3-6 (Thomas: "the overview need some polish, i dont like these big boxes"). Decision 4, § 5, § 7's picker wireframe, § 8, § 9, F16, F18, F19, Q28 and § 14 follow.
+**Amended 2026-10-27 (build 25):** the picker (§ 5) drops its two meadow slabs. The two logs themselves lie in the meadow and are the buttons (Thomas: "the overview need some polish, i dont like these big boxes"). It stays at two logs: Dave ruled the same day that there are no 5- or 6-letter rounds (his ruling of 2026-10-27 as the coordinator relayed it, not yet committed; (B), and (D) item 4: "Still two logs; no third length is coming"). Decision 4, § 5, § 7's picker wireframe, § 8, § 9, F16, F18, F19, Q28 and § 14 follow.
 
 **Standing rules:** any learner of about 6-9 (Marian is one); every spoken line and label is a row in a table, so the planned Danish version swaps rows; per learner through `@marian/core/learners`; audio-first; never a red X. **Spend is counted here and asked later**, each under its own popup (§ 9).
 
@@ -27,7 +27,7 @@ She has the word hunt (blending sounds current or mastered, `critters-word-hunt.
 1. **The meadow is 4 + 3 on every form,** vowel first. A third row does not fit a phone in portrait: board 140 + gap 12 + a three-row block (86 + 8 + 184) = 430 > `A`'s 376. With 4 + 3 the four-letter block is as tall as the three-letter one (2 rows), and 4 × 56 + 3 × 8 = 248 fits under the 336 pt log.
 2. **No critter shrinks; the slot steps down instead** (phase 1's Decision 4). A four-box slot is the phase-1 card with a fourth box. Phones take S4, and the one measured phone where S4 does not fit, 667 × 375, takes a new S5 (§ 2.2). **Settled: the phone four-box slot is 100 wide,** not Dave's 102: 4 × 22 + 3 × 2 + 2 × 3. Dave measured with S4's old pad 4; § 15 made it pad 3 (`critters-word-hunt.md:101`). Both fit a phone in portrait three a row (312 or 318 ≤ 343).
 3. **Landscape boards are two columns on every form.** Three columns do not fit beside a four-seat log on a phone at any step, and on tablets only at S4 (1180 × 820: 3 × 100 + 32 + 520 = 852 ≤ 918.8), which would cost the iPads their 72 pt pictures. Two columns keep every tablet's largest step.
-4. **The picker is a woodpile: the logs themselves lie in the meadow, one under another, and each log is its own button** (amended 2026-10-27; it was two meadow slabs with the whole slab the button, which Thomas called "big boxes" on build 25). Each log is as long as its word: one socket per letter, at one picker scale per form, the scale that fits a six-socket log. So a log never changes size when another length opens. The discs line up on the left, so each log reaches one socket further than the one above it, like steps. The picker logs are thicker than a round's (bar 28 / 36, disc 40 / 56, § 5.2): with no slab around it, a round-size log (24 pt) read as a thin stick on an iPad (the mock, § 5.2). The pile holds 3, 4, 5 and 6 and shows only the open lengths. It is stacked on every form because half of `A`'s width is less than a four-socket picker log on all four (P 171.5 < 230.2, L 245.5 < 305.2, W 394 < 525.6, TL 459.4 < 536.2).
+4. **The picker is a woodpile: the logs themselves lie in the meadow, one under another, and each log is its own button** (amended 2026-10-27; it was two meadow slabs with the whole slab the button, which Thomas called "big boxes" on build 25). Each log is as long as its word: one socket per letter, at the round's seat where a four-socket log fits (every form but phone portrait, which takes 65.7 at 375 wide and 69.6 at 390, for 70). The discs line up on the left, so the "4" log reaches one socket further than the "3", like a step. The picker logs are thicker than a round's (bar 28 / 36, disc 40 / 56, § 5.2): with no slab around it, a round-size log (24 pt) read as a thin stick on an iPad (the mock, § 5.2). Two logs only ("3" and "4"; Dave 2026-10-27: no 5- or 6-letter rounds). They are stacked on every form because side by side, 16 apart, they do not fit `A` on any of them (P 596.3 > 343, L 558.4 > 491, W and TL 962.4 > 788 and 918.8).
 5. **The picker never shows a round's state.** A round in progress, a complete round and no round look the same: no mark, no count, no preview (Dave 23 (B): "No text, no count, no board preview"). A "you left one unfinished" mark would be a lure and a meter of what is missing (`critters-word-hunt.md` § 13).
 6. **Each length's open line plays on its first entry in a visit only.** With a picker she may go 3 → picker → 4 → picker → 3. The three-letter line is 4.80 s (`play-place.md:645`), and Emma's line already comes "twice a visit at most" (`play-place.md:536`). Later entries are silent.
 7. **The roll-in rests over the scene on a slab, then becomes a door beside New letters.** After the beat, only a phone in portrait has a free strip for a second full-size log (§ 6.3). The log arrives at full size, so it reads as "a longer log", then shrinks into its own end, the "4" disc, which stays as a button beside New letters. She can open four letters at once, which is the reward Thomas asked for ("be able to move on to 4 letter words", `critters-word-hunt.md:3`). The door shows only on that screen; from then on the picker is the way. The alternative is in Q19.
@@ -223,16 +223,16 @@ Phase 1's beat (`critters-word-hunt.md` § 5.1, as § 15.6 amends it): at N − 
 
 - **Only "3" open:** no picker. Phase 1 as merged: the game opens on the three-letter round and Back goes to the Play place.
 - **"3" and "4" open:** the game opens on the picker. A log tap opens that length's round, in progress or fresh (a complete round is replaced by a fresh deal, `critters-word-hunt.md` § 6.4). **Back from a round goes to the picker,** at once and silently, keeping the round. **Back from the picker goes to the Play place** (Dave 23 (B); the raft picker's rule, `raft-island-goal.md:210`).
-- **Five and six** (Dave is ruling on them): an open length adds its log to the pile, in order. Nothing else here changes; § 5.2 is measured with all four.
+- **No third length:** Dave ruled on 2026-10-27 that there are no 5- or 6-letter rounds, so no third log is coming ((D) item 4). The picker is two logs.
 - It is part of the critters' `play-game` screen, not a new route. Emma stays at her frame, `idle`; the ribbon is empty; **the picker never speaks** (Dave 23 (B)).
 
 ### 5.2 Layout (measured; amended 2026-10-27)
 
-**Thomas on build 25 (2026-10-27), on this picker:** "the overview need some polish, i dont like these big boxes." His screenshot is 1080 × 810 and shows the two slabs as built (`HuntLengths.tsx:212-286`). The slabs go. The logs lie on the meadow the frame already paints (the garden backdrop, `play-games-restyle.md` T1, `PlayGameScreen.tsx:277-282`), and each log is a button.
+**Thomas on build 25 (2026-10-27), on this picker:** "the overview need some polish, i dont like these big boxes." His screenshot is 1080 × 810 and shows the two slabs as built (`HuntLengths.tsx:212-286`). The slabs go. The two logs lie on the meadow the frame already paints (the garden backdrop, `play-games-restyle.md` T1, `PlayGameScreen.tsx:277-282`), and each log is a button.
 
-**Mock:** `tmp/picker-polish/index.html` in the main checkout (not committed): the four forms with 2 and 4 logs open, drawn to the rects below with the real Emma and backdrop, beside Thomas's build-25 screenshot. Its `html/*-live.html` pages run the wave and the press.
+**Mock:** `tmp/picker-polish/index.html` in the main checkout (not committed). It shows the four forms drawn to the rects below with the real Emma and backdrop, beside Thomas's build-25 screenshot. Its `html/*-live.html` pages run the wave and the press.
 
-**Measured** 2026-10-27 by a scratch script (not committed) that calls the shipped `mathLayout`, `playArea`, `backRect`, `logSockets` and `gardenBackground` at `origin/main` 4ccd7570, with this rule ported; line numbers in § 5 are at 4ccd7570. **Method check:** the same script's call to today's `pickerScene` gives the old § 5.2 slabs exactly (P (16, 259) and (16, 455) 343 × 180; L (160, 146.4) and (160, 262.6) 491 × 100.2; W (16, 442.8) and (16, 793.4) 788 × 334.6; TL (245.2, 231) and (245.2, 507.5) 918.8 × 260.5). **Thomas's iPad** is 1080 × 810 with no insets: at insets 0 the script's old slabs, (242.6, 231) and (242.6, 512.5) 821.4 × 265.5, match his screenshot (slab tops at 231 and 512.5 pt, the lower slab's bottom at 778).
+**Measured** 2026-10-27 by a scratch script (not committed). It calls the shipped `mathLayout`, `playArea`, `backRect`, `logSockets` and `gardenBackground` at `origin/main` 4ccd7570, with this rule ported; line numbers in § 5 are at 4ccd7570. **Method check:** the same script's call to today's `pickerScene` gives the old § 5.2 slabs exactly (P (16, 259) and (16, 455) 343 × 180; L (160, 146.4) and (160, 262.6) 491 × 100.2; W (16, 442.8) and (16, 793.4) 788 × 334.6; TL (245.2, 231) and (245.2, 507.5) 918.8 × 260.5). **Thomas's iPad** is 1080 × 810 with no insets: at insets 0 the script's old slabs, (242.6, 231) and (242.6, 512.5) 821.4 × 265.5, match his screenshot (slab tops at 231 and 512.5 pt, the lower slab's bottom at 778).
 
 **The picker log** is a round's log (T8 wood and sockets, T11 disc), thicker:
 
@@ -244,66 +244,56 @@ Phase 1's beat (`critters-word-hunt.md` § 5.1, as § 15.6 amends it): at N − 
 | Ground shadow height `s`; ledge            | 12; 5     | 18; 6     |
 | Wave lift; press sink (6 × k)              | 3 pt; 3.5 | 4 pt; 6   |
 
-- **Socket cell** `σ = min(1.25 c, (A.width − 16 − D + 4 − 16 − 5 g) / 5.82)`: the round's seat (70 P, 60 L, 110 tablets) where a six-socket log fits `A` with 8 pt a side, else the largest cell that fits. (5.82 = 6 − 0.18, from the lead.)
+- **Socket cell** `σ = min(1.25 c, (A.width − 16 − D + 4 − 16 − 3 g) / 3.82)`. That is the round's seat (70 P, 60 L, 110 tablets) where the four-socket log fits `A` with 8 pt a side, else the largest cell that fits. Only phone portrait takes less (65.7 at 375 wide, 69.6 at 390). (3.82 = 4 − 0.18, from the lead.)
 - **Lead** (the bar's left end to the first cell) `= D − 4 − 0.18 σ`, so the disc covers 4 pt of socket 1, as it does in a round (3.4-5.2 pt there). **Tail:** 16 after the last cell.
-- **A log of n:** bar `(x0, y) W(n) × H`, `W(n) = lead + n σ + (n − 1) g + 16`. Disc `D` at `x0`, centred on the bar. n sockets by `logSockets`, with cell i at `x0 + lead + i (σ + g)`, σ wide (oval 0.64 σ × 0.64 `H` at the cell's x + 0.18 σ and the bar's y + 0.18 `H`).
-- **Rows:** pitch `r = min(2.2 D, A.height / 4)`. The k open lengths stack in order, 3 on top, centred in `A`: `top = A.y + (A.height − k r) / 2`. Row i spans `top + i r` to `top + (i + 1) r`, and its bar and disc are centred on the row's middle.
-- **x0** `= A.x + (A.width − W(longest open)) / 2`: the pile is centred on its longest log, and every disc is at `x0`.
-- **The button** (the `Pressable`) is the log's row: `(x0 − 8, row top) (W(n) + 16) × r`. Rows abut. A tap right of a short log's end, or anywhere else off a log, is the meadow (§ 5.3).
+- **A log of n** (3 or 4): bar `(x0, y) W(n) × H`, `W(n) = lead + n σ + (n − 1) g + 16`. Disc `D` at `x0`, centred on the bar. n sockets by `logSockets`, with cell i at `x0 + lead + i (σ + g)`, σ wide (oval 0.64 σ × 0.64 `H` at the cell's x + 0.18 σ and the bar's y + 0.18 `H`).
+- **Rows:** pitch `r = min(2.2 D, A.height / 2)`: 88 on phones, 123.2 on tablets (every viewport measured). "3" on top, "4" below, the pair centred in `A`: `top = A.y + (A.height − 2 r) / 2`. Each log's bar and disc are centred on its row's middle.
+- **x0** `= A.x + (A.width − W(4)) / 2`: the pair is centred on the "4" log, and both discs are at `x0`.
+- **The button** (the `Pressable`) is the log's row: `(x0 − 8, row top) (W(n) + 16) × r`. The rows abut. A tap right of the "3" log's end, or anywhere else off a log, is the meadow (§ 5.3).
 - **Ground shadow** (paint, under the bar, never touchable): `(x0 + 6, bar.y + H + ledge − s / 2) (W(n) − 12) × s`, face `radial-gradient(ellipse at 50% 50%, rgba(60,40,10,0.3) 0%, rgba(60,40,10,0.15) 38%, rgba(60,40,10,0) 70%)`. That is T9's band-shadow brown (`HuntLengths.tsx:77`), darker for a contact shadow, in the `… at …` gradient form `HuntLengths.tsx` already draws (`:63`, `:70`).
 - **Paint:** T8's wood face, ledge and sockets, and T11's disc, as `HuntLengths.tsx:52-72` has them. **No slab, band, critters, slots, text or count** (Dave 23 (B)). The same picker whatever the rounds hold (Decision 5).
 
-**"3" and "4" open** (today). Rects are (x, y) w × h; a disc is (x, y) and its side.
+Rects are (x, y) w × h; a disc is (x, y) and its side.
 
-| Form (insets)                   | σ     | lead | r     | Log 3: button; bar; disc                                                   | Log 4: button; bar; disc                                                   |
-| ------------------------------- | ----- | ---- | ----- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| P 375 × 667                     | 40.4  | 28.7 | 88    | (64.4, 359) 197.9 × 88; (72.4, 389) 181.9 × 28; (72.4, 383) 40             | (64.4, 447) 246.2 × 88; (72.4, 477) 230.2 × 28; (72.4, 471) 40             |
-| L 667 × 375                     | 60    | 25.2 | 54.1  | (244.9, 200.5) 253.2 × 54.1; (252.9, 213.5) 237.2 × 28; (252.9, 207.5) 40  | (244.9, 254.6) 321.2 × 54.1; (252.9, 267.6) 305.2 × 28; (252.9, 261.6) 40  |
-| W 820 × 1180 (t24 b20)          | 107.2 | 32.7 | 123.2 | (139.2, 662.2) 418.4 × 123.2; (147.2, 705.8) 402.4 × 36; (147.2, 695.8) 56 | (139.2, 785.4) 541.6 × 123.2; (147.2, 829) 525.6 × 36; (147.2, 819) 56     |
-| TL 1180 × 820 (b20)             | 110   | 32.2 | 123.2 | (428.5, 376.3) 426.2 × 123.2; (436.5, 419.9) 410.2 × 36; (436.5, 409.9) 56 | (428.5, 499.5) 552.2 × 123.2; (436.5, 543.1) 536.2 × 36; (436.5, 533.1) 56 |
-| Thomas's iPad 1080 × 810 (none) | 110   | 32.2 | 123.2 | (377.2, 381.3) 426.2 × 123.2; (385.2, 424.9) 410.2 × 36; (385.2, 414.9) 56 | (377.2, 504.5) 552.2 × 123.2; (385.2, 548.1) 536.2 × 36; (385.2, 538.1) 56 |
+| Form (insets)                   | σ    | lead | r     | Log 3: button; bar; disc                                                   | Log 4: button; bar; disc                                                   |
+| ------------------------------- | ---- | ---- | ----- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| P 375 × 667                     | 65.7 | 24.2 | 88    | (16, 359) 269.3 × 88; (24, 389) 253.3 × 28; (24, 383) 40                   | (16, 447) 343 × 88; (24, 477) 327 × 28; (24, 471) 40                       |
+| L 667 × 375                     | 60   | 25.2 | 88    | (244.9, 166.6) 253.2 × 88; (252.9, 196.6) 237.2 × 28; (252.9, 190.6) 40    | (244.9, 254.6) 321.2 × 88; (252.9, 284.6) 305.2 × 28; (252.9, 278.6) 40    |
+| W 820 × 1180 (t24 b20)          | 110  | 32.2 | 123.2 | (133.9, 662.2) 426.2 × 123.2; (141.9, 705.8) 410.2 × 36; (141.9, 695.8) 56 | (133.9, 785.4) 552.2 × 123.2; (141.9, 829) 536.2 × 36; (141.9, 819) 56     |
+| TL 1180 × 820 (b20)             | 110  | 32.2 | 123.2 | (428.5, 376.3) 426.2 × 123.2; (436.5, 419.9) 410.2 × 36; (436.5, 409.9) 56 | (428.5, 499.5) 552.2 × 123.2; (436.5, 543.1) 536.2 × 36; (436.5, 533.1) 56 |
+| Thomas's iPad 1080 × 810 (none) | 110  | 32.2 | 123.2 | (377.2, 381.3) 426.2 × 123.2; (385.2, 424.9) 410.2 × 36; (385.2, 414.9) 56 | (377.2, 504.5) 552.2 × 123.2; (385.2, 548.1) 536.2 × 36; (385.2, 538.1) 56 |
 
-Socket 1 is at `x0 + 36` on phones (25.8 × 17.9 P, 38.4 × 17.9 L) and `x0 + 52` on tablets (68.6 × 23 W, 70.4 × 23 TL).
+Socket 1 is at `x0 + 36` on phones (42.1 × 17.9 P, 38.4 × 17.9 L) and `x0 + 52` on tablets (70.4 × 23).
 
-**All four open (3-6, later):** the pile (the union of the four buttons) and log 6's bar. Logs 3-5 sit above it at the same `x0`, one row each.
+**The fit, on § 2.4's 15 viewports and Thomas's iPad:** both buttons inside `A`, and both rows at least 44 pt tall.
 
-| Form                   | Pile                         | Log 6 bar                 |
-| ---------------------- | ---------------------------- | ------------------------- |
-| P 375 × 667            | (16, 271) 343 × 352          | (24, 565) 327 × 28        |
-| L 667 × 375            | (176.9, 146.4) 457.2 × 216.4 | (184.9, 321.7) 441.2 × 28 |
-| W 820 × 1180 (t24 b20) | (16, 539) 788 × 492.8        | (24, 952.2) 772 × 36      |
-| TL 1180 × 820 (b20)    | (302.5, 253.1) 804.2 × 492.8 | (310.5, 666.3) 788.2 × 36 |
-| 1080 × 810 (none)      | (251.2, 258.1) 804.2 × 492.8 | (259.2, 671.3) 788.2 × 36 |
+| Viewport (insets)     | σ    | r     | Log 4 width | Pair (the two buttons)       |
+| --------------------- | ---- | ----- | ----------- | ---------------------------- |
+| 375 × 667             | 65.7 | 88    | 327         | (16, 359) 343 × 176          |
+| 667 × 375             | 60   | 88    | 305.2       | (244.9, 166.6) 321.2 × 176   |
+| 390 × 844 (t47 b34)   | 69.6 | 88    | 342         | (16, 464.5) 358 × 176        |
+| 844 × 390 (l/r47 b21) | 60   | 88    | 305.2       | (343.4, 163.1) 321.2 × 176   |
+| 820 × 1180 (t24 b20)  | 110  | 123.2 | 536.2       | (133.9, 662.2) 552.2 × 246.4 |
+| 1180 × 820 (b20)      | 110  | 123.2 | 536.2       | (428.5, 376.3) 552.2 × 246.4 |
+| 1180 × 820 (t24 b20)  | 110  | 123.2 | 536.2       | (428.5, 388.3) 552.2 × 246.4 |
+| 834 × 1194 (t24 b20)  | 110  | 123.2 | 536.2       | (140.9, 671) 552.2 × 246.4   |
+| 1194 × 834 (t24 b20)  | 110  | 123.2 | 536.2       | (437.3, 395.3) 552.2 × 246.4 |
+| 744 × 1133 (t24 b20)  | 110  | 123.2 | 536.2       | (95.9, 632.6) 552.2 × 246.4  |
+| 1133 × 744 (t24 b20)  | 110  | 123.2 | 536.2       | (395.1, 350.3) 552.2 × 246.4 |
+| 810 × 1080 (t24 b20)  | 110  | 123.2 | 536.2       | (128.9, 599.2) 552.2 × 246.4 |
+| 1080 × 810 (t24 b20)  | 110  | 123.2 | 536.2       | (377.2, 383.3) 552.2 × 246.4 |
+| 1080 × 810 (none)     | 110  | 123.2 | 536.2       | (377.2, 381.3) 552.2 × 246.4 |
+| 768 × 1024 (t24 b20)  | 110  | 123.2 | 536.2       | (107.9, 563.9) 552.2 × 246.4 |
+| 1024 × 768 (t24 b20)  | 110  | 123.2 | 536.2       | (343.7, 362.3) 552.2 × 246.4 |
 
-**The fit, on § 2.4's 15 viewports and Thomas's iPad,** with all four open: every button inside `A`, and every row at least 44 pt tall.
-
-| Viewport (insets)     | σ     | r     | Log 6 width | Pass |
-| --------------------- | ----- | ----- | ----------- | ---- |
-| 375 × 667             | 40.4  | 88    | 327         | yes  |
-| 667 × 375             | 60    | 54.1  | 441.2       | yes  |
-| 390 × 844 (t47 b34)   | 43    | 88    | 342         | yes  |
-| 844 × 390 (l/r47 b21) | 60    | 53.6  | 441.2       | yes  |
-| 820 × 1180 (t24 b20)  | 107.2 | 123.2 | 772         | yes  |
-| 1180 × 820 (b20)      | 110   | 123.2 | 788.2       | yes  |
-| 1180 × 820 (t24 b20)  | 110   | 123.2 | 788.2       | yes  |
-| 834 × 1194 (t24 b20)  | 109.6 | 123.2 | 786         | yes  |
-| 1194 × 834 (t24 b20)  | 110   | 123.2 | 788.2       | yes  |
-| 744 × 1133 (t24 b20)  | 94.2  | 123.2 | 696         | yes  |
-| 1133 × 744 (t24 b20)  | 110   | 109.2 | 788.2       | yes  |
-| 810 × 1080 (t24 b20)  | 105.5 | 123.2 | 762         | yes  |
-| 1080 × 810 (t24 b20)  | 110   | 123.2 | 788.2       | yes  |
-| 1080 × 810 (none)     | 110   | 123.2 | 788.2       | yes  |
-| 768 × 1024 (t24 b20)  | 98.3  | 123.2 | 720         | yes  |
-| 1024 × 768 (t24 b20)  | 105.2 | 115.2 | 760.3       | yes  |
-
-- **The tight phone is 667 × 375:** 4 rows of 54.1 fill `A`'s 216.4 exactly, and log 6 (441.2) leaves 49.8 of `A`'s 491. The shortest rows anywhere are 844 × 390's, at 53.6.
+- **The tight phone is 667 × 375:** the pair is 176 of `A`'s 216.4, and the "4" log (305.2) leaves 185.8 of its 491. At 375 × 667 the "4" log's button fills `A`'s 343 exactly.
 - **Not measured:** other phones (wider ones only gain room), the 1366 × 1024 class, split view.
 
-**For the build (names, so the core can add 5 and 6 without a rename):**
+**For the build (names):**
 
-- `playGeometry.ts`: `PICKER_MAX_LENGTH = 6`, `PICKER_MAX_LOGS = 4`. `pickerScene(A, tablet, landscape, lengths: readonly number[]): PickerScene`, with `PickerScene { logs: readonly PickerLog[]; seat: number; pitch: number }` and `PickerLog { length: number; hit: Rect; log: LogParts; shadow: Rect }`. A picker log's `LogParts` has `band` = its bar's rect and `seats` = its socket cells (`logSockets` uses only their x and width). `slabs` and `radius` go. `logAt` and `arrivalScene` (the roll-in) are unchanged.
+- `playGeometry.ts`: `pickerScene(A, tablet, landscape): PickerScene` (same arguments as today), with `PickerScene { logs: readonly PickerLog[]; seat: number; pitch: number }` ("3" then "4") and `PickerLog { length: 3 | 4; hit: Rect; log: LogParts; shadow: Rect }`. A picker log's `LogParts` has `band` = its bar's rect and `seats` = its socket cells (`logSockets` uses only their x and width). `slabs` and `radius` go. `logAt` and `arrivalScene` (the roll-in) are unchanged.
 - `HuntLengths.tsx`: `LengthPicker` draws a `Pressable` per `PickerLog` at `hit` (`testID="hunt-pick-<n>"`, role button, its label). It holds the ground shadow and an `Animated.View` (`hunt-pick-<n>-log`) carrying `BareLog`, which takes the press and the wave. Under them is the meadow: a `Pressable` at `A`, `accessible={false}`, `testID="hunt-pick-meadow"`. `PickerSlab`, `MEADOW` on the picker and `hunt-pick-<n>-face` go. `hunt-picker`, `hunt-pick-3` and `hunt-pick-4` keep their ids: the Maestro subflows tap them (`mobile/maestro/subflows/critters-four-roll-in.yaml:115-142`, `critters-four-open.yaml:37`). `BareLog` already draws the bar's radius as half its height and the numeral at 0.62 of the disc; it needs only the thicker rects.
-- `CrittersGame.tsx:123`: `pickerScene(kit.area, kit.tablet, kit.landscape, huntOpenLengths())`. The labels stay `PLAY_LABELS.huntLog` and `huntLogFour`; "Log, five letters" and "Log, six letters" join `PLAY_LABELS` when those lengths ship.
+- `CrittersGame.tsx:123` and the labels (`PLAY_LABELS.huntLog`, `huntLogFour`) are unchanged.
 
 ### 5.3 Picking, entering, leaving
 
@@ -478,23 +468,23 @@ New letters beside Back; no door (nothing rolls in after a four-letter round)
 ```
 
 ```
-PICKER, PHONE PORTRAIT 375×667, "3" and "4"     PICKER, PHONE LANDSCAPE 667×375, all four (later)
+PICKER, PHONE PORTRAIT 375×667                  PICKER, PHONE LANDSCAPE 667×375
 +-------------------------------+               +------------------------------------------------+
 |(<)                            |               |(<)          ribbon: empty                      |
 | .-----.  [ribbon: empty]      |               |                                                |
-|( Emma  ) idle, silent         |               | .-----.     (3)=o====o====o==                  |
-| '-----'                       |               |( Emma  )    (4)=o====o====o====o==             |
-|                               |  A from y 259 |( idle  )    (5)=o====o====o====o====o==        |
-|                               |               | '-----'     (6)=o====o====o====o====o====o==   |
-|     (3)=o====o====o==         |  row 3        +------------------------------------------------+
-|       ~~~~~~~~~~~~~~~         |  (64.4, 359)   rows (176.9, 146.4 + 54.1 i), 253.2 / 321.2 /
-|     (4)=o====o====o====o==    |  197.9 × 88      389.2 / 457.2 wide, 54.1 tall: 4 rows fill A's
-|       ~~~~~~~~~~~~~~~~~~~~    |  row 4           216.4; discs at x 184.9; bars 28 tall
-|                               |  (64.4, 447)
-|            (meadow)           |  246.2 × 88    TABLETS: W and TL as § 5.2's tables (bars 36,
-|                               |                  discs 56, rows 123.2)
-+-------------------------------+
- discs (72.4, 383) and (72.4, 471), 40; bars 28 tall at y 389 and 477; ~~ the ground shadow.
+|( Emma  ) idle, silent         |               | .-----.                                        |
+| '-----'                       |               |( Emma  )       (3)=o====o====o==               |
+|                               |  A from y 259 |( idle  )         ~~~~~~~~~~~~~~~               |
+|                               |               |                (4)=o====o====o====o==          |
+| (3)=o=====o=====o===          |  row 3        | '-----'          ~~~~~~~~~~~~~~~~~~~~          |
+|   ~~~~~~~~~~~~~~~~~           |  (16, 359)    +------------------------------------------------+
+| (4)=o=====o=====o=====o===    |  269.3 × 88    row 3 (244.9, 166.6) 253.2 × 88, row 4
+|   ~~~~~~~~~~~~~~~~~~~~~~~     |  row 4           (244.9, 254.6) 321.2 × 88; discs at x 252.9;
+|                               |  (16, 447)       bars 28 tall at y 196.6 and 284.6
+|            (meadow)           |  343 × 88
+|                               |                TABLETS: W and TL as § 5.2's table (bars 36,
++-------------------------------+                  discs 56, rows 123.2)
+ discs (24, 383) and (24, 471), 40; bars 28 tall at y 389 and 477; ~~ the ground shadow.
  A log's row is its button; a tap on no log is the meadow and sends the wave (§ 5.3)
 ```
 
@@ -552,7 +542,7 @@ They go in `PLAY_LABELS` (`mobile/src/screens/play/playLines.ts:105-117`) beside
 | The log in a four-letter round        | "Log, four letters"                         | button; sings the seated critters, a partial run too (§ 4.1) |
 | Slots, the glowing slot               | as § 15.9: "Word to find", the word, "Hint" | button                                                       |
 
-- Picker focus order: the logs top to bottom ("3" first). Five and six, when they ship, take "Log, five letters" and "Log, six letters". The roll-in announces nothing (as the beat, `critters-word-hunt.md:410`); the door becomes an element when it lands. No label states a count.
+- Picker focus order: "3", then "4". The roll-in announces nothing (as the beat, `critters-word-hunt.md:410`); the door becomes an element when it lands. No label states a count.
 
 ---
 
@@ -614,7 +604,7 @@ With the 11 lesson pictures, 25 of the 82 targets are pictured (Dave). **Optiona
 13. **F13.** In a four-letter round, `hunt-bonus` never renders, and no boing, tumble or non-word line plays, over any sequence of runs.
 14. **F14.** An empty slot's tap plays its `critterWordLine` clip, sound only. The hint glows after 5 runs of four with no new target (or 45 s); its tap plays the four critters' windows in order, each 300 ms after the last ends, then the word clip 300 ms after the fourth; no critter's lit state changes; no ghost.
 15. **F15.** At N − 1 the phase-1 beat plays in board order, with no roll-in and no door; New letters deals a fresh four-letter round.
-16. **F16.** The picker: absent with `[3]`; with `[3, 4]` the game opens on it. `pickerScene` equals § 5.2's tables: with `[3, 4]`, each `hunt-pick-<n>` is at its log's button rect, with the bar and disc as listed, on P, L, W and TL; with `[3, 4, 5, 6]`, the pile and log 6's bar as listed, and on all 16 viewports every button is inside `A` and at least 44 pt tall. Rendered: no slab, no `hunt-pick-<n>-face`, no text but the discs' numerals, n sockets on log n. A log tap opens that length's round (in progress, else fresh); a tap on `hunt-pick-meadow` opens nothing. Its open line plays on the first entry of that length in the visit and not on the second. Back from a round goes to the picker, and from the picker to the Play place. The picker plays nothing but the plink, on a log tap only. With fake timers: the wave starts 500 ms after the picker mounts (each log's hop 120 ms after the one above), and again on a meadow press-in, but not twice within 1200 ms; nothing moves after it with no touch for 30 s; a log's press-in cuts it.
+16. **F16.** The picker: absent with `[3]`; with `[3, 4]` the game opens on it. `pickerScene` equals § 5.2's tables: each `hunt-pick-<n>` is at its log's button rect, with the bar and disc as listed, on P, L, W and TL; on all 16 viewports both buttons are inside `A` and at least 44 pt tall. Rendered: no slab, no `hunt-pick-<n>-face`, no text but the discs' numerals, n sockets on log n. A log tap opens that length's round (in progress, else fresh); a tap on `hunt-pick-meadow` opens nothing. Its open line plays on the first entry of that length in the visit and not on the second. Back from a round goes to the picker, and from the picker to the Play place. The picker plays nothing but the plink, on a log tap only. With fake timers: the wave starts 500 ms after the picker mounts (each log's hop 120 ms after the one above), and again on a meadow press-in, but not twice within 1200 ms; nothing moves after it with no touch for 30 s; a log's press-in cuts it.
 17. **F17.** The roll-in, with fake timers: on a learner's first complete three-letter round, § 6.1's steps play once at their times, the door lands at § 6.2's rect and New letters enters after it. A door tap opens a fresh four-letter round. On the next completion, and on any later screen, there is no roll-in and no `hunt-open-four`. Back mid-roll-in goes to the picker, and the roll-in never replays.
 18. **F18.** Reduce Motion (mocked): § 8.1's rows; no glide, flight, dip, bounce, burst or picker wave starts; lines and sounds keep their times.
 19. **F19.** VoiceOver: § 8.2's labels and roles; each picker log's row is one element, in order "3" then "4"; its bar, sockets, disc and shadow, and the meadow, are not elements.
@@ -640,8 +630,8 @@ With the 11 lesson pictures, 25 of the 82 targets are pictured (Dave). **Optiona
 
 ### 11.1 The picker polish (2026-10-27)
 
-- **Prediction (written before Thomas sees it on a device):** on his iPad (1080 × 810) Thomas reads the two logs as the choice with nothing explained, and does not ask for a box or band back. If he finds fault, it is with the empty meadow around a two-log pile ("too empty", "too low"), not with the logs. The lever is § 5.2's pitch (2.2 `D`, 123.2 on tablets); the pile is centred in `A`, which sits right of Emma's column. The 3-to-6 steps read as "longer word, longer log" to him before anyone says so.
-- **Bounded convergence.** **Tested:** the geometry on § 2.4's 15 viewports and his iPad, through the shipped `mathLayout`, `playArea`, `backRect` and `logSockets` (the method check reproduces the old slabs exactly, and his screenshot's slab edges at insets 0); the look, as HTML drawn to those rects with the shipped backdrop gradient, the real Emma and Fredoka (`tmp/picker-polish/`). **Not tested:** anything on a device; React Native's rendering of the ground shadow's `ellipse` gradient (the shipped pieces use `circle`); the wave's feel on a device, and whether a child taps the meadow at all; whether 5 and 6 open as § 5.1 assumes (Dave is ruling); the roll-in's arrival slab (§ 6), which keeps its small green clay pill and was not redesigned here.
+- **Prediction (written before Thomas sees it on a device):** on his iPad (1080 × 810) Thomas reads the two logs as the choice with nothing explained, and does not ask for a box or band back. If he finds fault, it is with the empty meadow around the pair ("too empty", "too low"), not with the logs. The lever is § 5.2's pitch (2.2 `D`, 123.2 on tablets); the pair is centred in `A`, which sits right of Emma's column. The one-socket step from "3" to "4" reads as "longer word, longer log" to him before anyone says so.
+- **Bounded convergence.** **Tested:** the geometry on § 2.4's 15 viewports and his iPad, through the shipped `mathLayout`, `playArea`, `backRect` and `logSockets` (the method check reproduces the old slabs exactly, and his screenshot's slab edges at insets 0); the look, as HTML drawn to those rects with the shipped backdrop gradient, the real Emma and Fredoka (`tmp/picker-polish/`). **Not tested:** anything on a device; React Native's rendering of the ground shadow's `ellipse` gradient (the shipped pieces use `circle`); the wave's feel on a device, and whether a child taps the meadow at all; the roll-in's arrival slab (§ 6), which keeps its small green clay pill and was not redesigned here.
 
 ## 12. Amendments for the build PR
 
