@@ -1,0 +1,42 @@
+# F20 (`design/native/critters-four-letter.md` § 10.3) as
+# 14-critters-four-door.yaml, on a phone in landscape. Run it on an
+# iPhone 17 simulator (874 x 402, insets t0 b20 l62 r62). The points are
+# from Maestro's hierarchy on this round (2026-10-27): the meadow's rows
+# at y 272 and 328, cells at x 331, 387 and 443; the seats at y 194 (the
+# log band's top + half a seat, `playGeometry.ts` huntScene), x 318, 386
+# and 454 (the sockets' centres).
+#
+#   a b g  /  h p t
+appId: host.exp.Exponent
+name: Critters four-letter door (phone landscape)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: critters-hunt
+- setOrientation: LANDSCAPE_LEFT
+- runFlow:
+    file: ../subflows/critters-four-open.yaml
+    env:
+      SHOT: four-phone-landscape
+# t-a-g, the completing find.
+- swipe:
+    start: 443, 328
+    end: 318, 194
+    duration: 800
+- swipe:
+    start: 331, 272
+    end: 386, 194
+    duration: 800
+- swipe:
+    start: 443, 272
+    end: 454, 194
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-four-roll-in.yaml
+    env:
+      SHOT: four-phone-landscape
+- setOrientation: PORTRAIT

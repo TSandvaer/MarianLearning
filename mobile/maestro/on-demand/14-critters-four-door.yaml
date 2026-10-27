@@ -1,0 +1,52 @@
+# Letter critters' four-letter rounds, F20 (`design/native/critters-four-letter.md`
+# § 10.3), on an iPad in landscape: the `critters-hunt` seed (a b g h p t,
+# bag, hat, bat and tap found) for a learner with only "3" open. t-a-g
+# completes it: the beat, the roll-in (the four-seat log glides in and
+# becomes the door, § 6), New letters; the door → a four-letter round
+# (the "4" log, 7 critters, four-box slots); Back → the picker with two
+# logs; Back → the Play place; reopen → the picker. The shared steps are
+# `../subflows/critters-four-{open,roll-in}.yaml`; the other forms are
+# `14-critters-four-door-{ipad-portrait,phone,phone-landscape}.yaml`.
+#
+# The points are 12-critters-word-hunt.yaml's (the same round on the
+# iPad Pro 11-inch (M5) simulator in landscape): the meadow's rows at y
+# 542 and 646, cells at x 373, 477 and 581; the seats at y 411, x 351,
+# 477 and 603.
+#
+#   a b g  /  h p t
+#
+# Screenshots go to Maestro's output (run.sh `--debug-output`, under
+# MAESTRO_OUT/14-critters-four-door/).
+appId: host.exp.Exponent
+name: Critters four-letter door (iPad landscape)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: critters-hunt
+- setOrientation: LANDSCAPE_LEFT
+- runFlow:
+    file: ../subflows/critters-four-open.yaml
+    env:
+      SHOT: four-tablet-landscape
+# t-a-g, the completing find.
+- swipe:
+    start: 581, 646
+    end: 351, 411
+    duration: 800
+- swipe:
+    start: 373, 542
+    end: 477, 411
+    duration: 800
+- swipe:
+    start: 581, 542
+    end: 603, 411
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-four-roll-in.yaml
+    env:
+      SHOT: four-tablet-landscape
+- setOrientation: PORTRAIT
