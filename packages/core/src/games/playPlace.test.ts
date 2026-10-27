@@ -25,6 +25,9 @@ import {
   critterPraise,
   critterRun,
   critterSet,
+  CRITTER_PRAISE_WORDS,
+  HUNT_FOUR_LESSON_WORDS,
+  HUNT_FOUR_PICTURE_WORDS,
   HUNT_FOUR_TARGETS,
   openPlayGames,
   PLAY_GAMES,
@@ -556,6 +559,9 @@ const NEW_17 =
     ' ',
   )
 
+/** The eight of them that still sing and sit; F7 gave the other nine clips. */
+const STILL_QUIET_8 = 'owl own old arm art ash who flu'.split(' ')
+
 /** A consonant, a vowel and a consonant: § 3.1's CVC words. */
 const isCvc = (w: string) =>
   !VOWELS.has(w[0]!) && VOWELS.has(w[1]!) && !VOWELS.has(w[2]!)
@@ -673,12 +679,13 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
         'too',
         'out',
         'eat',
-        // Dave's word hunt ruling (2026-10-25, § 6): owl and 16 more.
-        ...NEW_17,
+        // Dave's word hunt ruling (2026-10-25, § 6): owl and 7 more; the
+        // other nine left with their clips (critters four-letter F7).
+        ...STILL_QUIET_8,
       ].sort(),
     )
     expect(CRITTER_NEVER_SAY.size).toBe(14)
-    expect(CRITTER_NOT_SAID.size).toBe(60)
+    expect(CRITTER_NOT_SAID.size).toBe(51)
     for (const w of [...CRITTER_NEVER_SAY, ...CRITTER_NOT_SAID]) {
       expect(CRITTER_REAL_WORDS.has(w)).toBe(true)
       expect(ALL_45).not.toContain(w)
@@ -688,10 +695,10 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     ).toEqual([])
   })
 
-  it('C10: CRITTER_SAID_WORDS is every other real word that is not a picture word: 163, sorted', () => {
-    expect(CRITTER_SAID_WORDS).toHaveLength(163)
+  it('C10: CRITTER_SAID_WORDS is every other real word that is not a picture word: 172, sorted', () => {
+    expect(CRITTER_SAID_WORDS).toHaveLength(172)
     expect(CRITTER_SAID_WORDS).toEqual([...CRITTER_SAID_WORDS].sort())
-    expect(new Set(CRITTER_SAID_WORDS).size).toBe(163)
+    expect(new Set(CRITTER_SAID_WORDS).size).toBe(172)
     expect([...CRITTER_SAID_WORDS].sort()).toEqual(
       [...CRITTER_REAL_WORDS]
         .filter(
@@ -702,8 +709,8 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
         )
         .sort(),
     )
-    // 282 = 45 pictures + 14 never said + 60 not said + 163 said.
-    expect(45 + CRITTER_NEVER_SAY.size + CRITTER_NOT_SAID.size + 163).toBe(282)
+    // 282 = 45 pictures + 14 never said + 51 not said + 172 said.
+    expect(45 + CRITTER_NEVER_SAY.size + CRITTER_NOT_SAID.size + 172).toBe(282)
     for (const w of ['map', 'cab', 'ham', 'sat', 'hop', 'six', 'win'])
       expect(CRITTER_SAID_WORDS).toContain(w)
     // Dave 2026-10-25: the seven new said words; mum stays said.
@@ -714,18 +721,21 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     ).toEqual([])
   })
 
-  it('C10 (Thomas 2026-10-23, build 20): CRITTER_SAID_PICTURE_WORDS is exactly the said words with a bundled pack picture: 21, sorted', () => {
+  it('C10 (Thomas 2026-10-23, build 20): CRITTER_SAID_PICTURE_WORDS is exactly the said words with a bundled pack picture: 23, sorted', () => {
     const bundled = bundledPictures()
     // The registry read works: every picture word's picture is found.
     for (const w of ALL_45) expect(bundled.has(w)).toBe(true)
     // The probe reserve's pictured said words pop like rat (Thomas
     // 2026-10-24): cab, ham, pad and ram; and mom, rag and egg (Dave
     // 2026-10-25); and mum, with mom's picture, and the word hunt's four
-    // new pictures, mug, sad, mud and hug (the word hunt ruling, § 6).
+    // new pictures, mug, sad, mud and hug (the word hunt ruling, § 6);
+    // and ant and elf (critters four-letter F7, pictures in #709).
     expect(CRITTER_SAID_PICTURE_WORDS).toEqual([
+      'ant',
       'bun',
       'cab',
       'egg',
+      'elf',
       'gum',
       'ham',
       'hug',
@@ -782,7 +792,7 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
       expect(critterRun(w)).toBe('funny')
   })
 
-  it('critters four-letter content (Dave 2026-10-26, (B)): HUNT_FOUR_TARGETS is his 82, the nine said later still sit, and every one has a clip word', () => {
+  it('critters four-letter content (Dave 2026-10-26, (B)): HUNT_FOUR_TARGETS is his 82, the nine said later are said (F7), and every one has a clip word', () => {
     const byVowel = (v: string) =>
       [...HUNT_FOUR_TARGETS].filter((w) => w.includes(v))
     expect(HUNT_FOUR_TARGETS.size).toBe(82)
@@ -795,23 +805,58 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
       expect(w).toHaveLength(4)
     }
     expect(HUNT_FOUR_TARGETS.has('hump')).toBe(false)
-    // Content only: a run of three never spells one, and the nine still
-    // sing and sit until the four-letter core moves them.
+    // F7: the nine left CRITTER_NOT_SAID with their clips, so Emma says
+    // them after a run of three.
     expect(CRITTER_SAID_LATER).toEqual(
       'act add ant elf end ill its odd off'.split(' '),
     )
     for (const w of CRITTER_SAID_LATER) {
-      expect(CRITTER_NOT_SAID.has(w)).toBe(true)
-      expect(critterRun(w)).toBe('quiet')
+      expect(CRITTER_NOT_SAID.has(w)).toBe(false)
+      expect(CRITTER_SAID_WORDS).toContain(w)
+      expect(critterRun(w)).toBe('word')
     }
     expect(CRITTER_CLIP_WORDS).toEqual(
-      [
-        ...CRITTER_SAID_WORDS,
-        ...CRITTER_SAID_LATER,
-        ...HUNT_FOUR_TARGETS,
-      ].sort(),
+      [...CRITTER_SAID_WORDS, ...HUNT_FOUR_TARGETS].sort(),
     )
     expect(CRITTER_CLIP_WORDS).toHaveLength(254)
+  })
+
+  it('F8 (critters four-letter § 1): a run of four is word for a HUNT_FOUR_TARGETS word and quiet for every other, never picture or funny', () => {
+    // Every run over the 22 letters, both ways; one expect at the end (an
+    // expect per run timed out on CI's runner).
+    const kinds = new Map<string, number>()
+    const wrong: string[] = []
+    for (const a of CRITTER_LETTERS)
+      for (const b of CRITTER_LETTERS)
+        for (const c of CRITTER_LETTERS)
+          for (const d of CRITTER_LETTERS) {
+            const run = a + b + c + d
+            const want = HUNT_FOUR_TARGETS.has(run) ? 'word' : 'quiet'
+            for (const funny of [true, false]) {
+              const kind = critterRun(run, { funny })
+              if (kind !== want) wrong.push(`${run}:${kind}`)
+              kinds.set(kind, (kinds.get(kind) ?? 0) + 1)
+            }
+          }
+    expect(wrong).toEqual([])
+    // 22^4 runs, twice: 82 words each time.
+    expect(kinds.get('word')).toBe(2 * 82)
+    expect(kinds.get('quiet')).toBe(2 * (22 ** 4 - 82))
+    for (const w of ['crab', 'send', 'cats', 'shit', 'hump', 'tupx'])
+      expect(critterRun(w)).toBe('quiet')
+  })
+
+  it('F2/F1: HUNT_FOUR_PICTURE_WORDS is exactly the four-letter targets with a bundled pack picture: 25 (the 11 lesson pictures and 14 of #709)', () => {
+    const bundled = bundledPictures()
+    expect(HUNT_FOUR_PICTURE_WORDS).toEqual(
+      [...HUNT_FOUR_TARGETS].filter((w) => bundled.has(w)).sort(),
+    )
+    expect(HUNT_FOUR_PICTURE_WORDS).toHaveLength(25)
+    for (const w of HUNT_FOUR_PICTURE_WORDS) {
+      expect(critterPictureKey(w)).toBe(w)
+      expect(critterHasPicture(w)).toBe(true)
+    }
+    expect(critterHasPicture('flap')).toBe(false)
   })
 
   it('C10 (Dave’s safeguard, Thomas 2026-10-22): with funny false, a non-word is quiet; every other run is unchanged', () => {
@@ -842,6 +887,53 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     expect(critterPraise('fan')).toBe("Yes! That's a fan.")
     for (const w of ['map', 'mom', 'egg', 'sex', 'car', 'tup'])
       expect(critterPraise(w)).toBeUndefined()
+  })
+
+  it('F9: critterPraise gives the 11 four-letter lesson words their lesson’s own correct line (crab and tent words); no other four-letter word has one', () => {
+    const lessonCorrect = (step: string) => {
+      const canon = JSON.parse(
+        readFileSync(
+          join(
+            process.cwd(),
+            'public',
+            'canon',
+            'word-song',
+            'level-1',
+            `${step}.json`,
+          ),
+          'utf8',
+        ),
+      ) as { plan: { utterances: { id: string; text: string }[] } }
+      return canon.plan.utterances
+        .filter((u) => /^word\.p\d+\.correct$/.test(u.id))
+        .map((u) => u.text)
+    }
+    const lines = [
+      ...lessonCorrect('crab-words'),
+      ...lessonCorrect('tent-words'),
+    ]
+    expect(HUNT_FOUR_LESSON_WORDS).toEqual(
+      'belt drum flag frog gift hand lamp nest plum pond tent'.split(' '),
+    )
+    for (const w of HUNT_FOUR_LESSON_WORDS) {
+      expect(HUNT_FOUR_TARGETS.has(w)).toBe(true)
+      expect(critterPraise(w)).toBe(`Yes! That's a ${w}.`)
+      expect(lines).toContain(critterPraise(w))
+    }
+    // The lessons' other words are not four-letter critter words.
+    expect(
+      lines
+        .map((l) => /^Yes! That's a (\w+)\.$/.exec(l)![1]!)
+        .filter((w) => HUNT_FOUR_TARGETS.has(w))
+        .sort(),
+    ).toEqual([...HUNT_FOUR_LESSON_WORDS])
+    for (const w of HUNT_FOUR_TARGETS)
+      if (!HUNT_FOUR_LESSON_WORDS.includes(w))
+        expect(critterPraise(w)).toBeUndefined()
+    expect(CRITTER_PRAISE_WORDS).toEqual(
+      [...CRITTER_PICTURE_WORDS, ...HUNT_FOUR_LESSON_WORDS].sort(),
+    )
+    expect(CRITTER_PRAISE_WORDS).toHaveLength(56)
   })
 
   it('C10 (Dave’s safeguard): non-words are funny from blending sounds on, quiet before it and for null', () => {

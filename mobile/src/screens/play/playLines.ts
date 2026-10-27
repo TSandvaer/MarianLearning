@@ -14,7 +14,7 @@ import {
   GUIDANCE_LINES,
 } from '@marian/core/emmasPath/guidanceLines'
 import {
-  CRITTER_PICTURE_WORDS,
+  CRITTER_PRAISE_WORDS,
   critterPraise,
   type PlayGameId,
   type RaftWeight,
@@ -53,8 +53,9 @@ export const PLAY_LINE_MANIFEST: Readonly<Record<PlayLineId, ManifestLine>> =
     ...GUIDANCE_LINES.filter(
       (l) => l.kind === 'play' || l.kind === 'play-word',
     ).map((l) => [l.id, { src: l.src, text: l.text }]),
-    // The picture words' praise: the lessons' canon clips, by their text.
-    ...CRITTER_PICTURE_WORDS.map((w) => {
+    // The picture words' praise and, for four-letter rounds, the 11 lesson
+    // words' (critters four-letter F9): the lessons' canon clips, by text.
+    ...CRITTER_PRAISE_WORDS.map((w) => {
       const text = critterPraise(w)!
       return [
         praiseId(w),
