@@ -38,7 +38,7 @@ appId: host.exp.Exponent
     id: critter-picture
 - assertVisible:
     id: critter-seat-2
-    text: Letter p, on the log
+    text: Letter t, on the log
 - assertVisible:
     id: critter-seat-0
 - takeScreenshot: ${SHOT}-three-seated
@@ -67,7 +67,7 @@ appId: host.exp.Exponent
     text: Letter a, on the log
 - assertVisible:
     id: critter-seat-2
-    text: Letter p, on the log
+    text: Letter t, on the log
 - assertVisible:
     id: hunt-slot-2
     text: Word to find
