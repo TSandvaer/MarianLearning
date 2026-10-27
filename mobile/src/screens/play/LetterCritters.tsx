@@ -715,7 +715,8 @@ export function LetterCritters({
    * § 4.1): the seated critters sing left to right, each 300 ms after the
    * one before ends, an empty seat between two of them a 600 ms rest. Emma
    * listens, then idles. No outcome, no clear, no write, and no run for the
-   * hint's count. A drag or a seat change cuts it.
+   * hint's count. Anything else on the tap player cuts it: a drag, a seat
+   * change, a critter or slot tap, the app going to the background.
    */
   const singPartial = () => {
     const current = seatsRef.current
@@ -744,7 +745,10 @@ export function LetterCritters({
     }
     next(0)
   }
-  /** The partial song, if one is singing, stops (a drag start). */
+  /**
+   * The partial song, if one is singing, stops and Emma idles: a new sound
+   * cuts the one in flight, and the song must not carry on after it.
+   */
   const cutPartial = () => {
     if (partialRef.current !== songRef.current) return
     songRef.current += 1
@@ -754,6 +758,7 @@ export function LetterCritters({
 
   /** A seat change: any song stops; the run sings 400 ms after the last. */
   const changed = (next: Seats) => {
+    cutPartial()
     setSeats(next)
     setLean(false)
     songRef.current += 1
@@ -1157,6 +1162,7 @@ export function LetterCritters({
   const slotTap = (word: string): number | null => {
     if (lockedRef.current) return null
     kit.cutLine()
+    cutPartial()
     const token = cutTap()
     bump(setBoxLit, word)
     return token
@@ -1323,6 +1329,7 @@ export function LetterCritters({
   const frameRef = useRef(frame)
   useEffect(() => {
     if (kit.cancelKey.endsWith('hidden')) {
+      cutPartial()
       songRef.current += 1
       // A slot's sound stops with the rest; a hint cut short ends Emma's point.
       cutTap()
@@ -1387,6 +1394,7 @@ export function LetterCritters({
   const onMeadowTap = (letter: string) => {
     if (lockedRef.current) return
     kit.cutLine()
+    cutPartial()
     cutTap()
     setMeadowHop((h) => ({ ...h, [letter]: (h[letter] ?? 0) + 1 }))
     singLetter(letter)
@@ -1397,6 +1405,7 @@ export function LetterCritters({
     kit.cutLine()
     const free = seatsRef.current.indexOf(null)
     if (free < 0) {
+      cutPartial()
       cutTap()
       singLetter(letter)
     } else changed(seatAt(seatsRef.current, free, letter))
@@ -1416,6 +1425,7 @@ export function LetterCritters({
     const letter = seatsRef.current[seat]
     if (letter === null || letter === undefined) return
     kit.cutLine()
+    cutPartial()
     cutTap()
     bounceSeat(seat)
     singLetter(letter)
