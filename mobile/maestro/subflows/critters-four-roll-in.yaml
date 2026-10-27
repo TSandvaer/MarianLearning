@@ -1,0 +1,152 @@
+# Letter critters' four-letter rounds, F20 (`design/native/critters-four-letter.md`
+# § 10.3), the part after t-a-g: the calling flow (14, on each form) has
+# opened the `critters-hunt` seed's round with only "3" open and dragged
+# t-a-g, the completing find. Here: the beat, the roll-in (the four-seat
+# log glides in and becomes the door, § 6.1), New letters; the door → a
+# fresh four-letter round; Back → the picker with two logs; Back → the
+# Play place; reopen → the picker; Back.
+#
+#   SHOT  the screenshots' prefix
+appId: host.exp.Exponent
+---
+- extendedWaitUntil:
+    visible:
+      id: critter-picture-tag
+    timeout: 15000
+# The beat: the lap lights each found slot in turn, then "You did it!".
+- extendedWaitUntil:
+    visible:
+      id: hunt-slot-1-lap
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: play-game-ribbon
+    timeout: 20000
+- takeScreenshot: ${SHOT}-beat-you-did-it
+# The roll-in, at the beat's end + 900: the slab with the four-seat log
+# glides in from the right (1200 ms), rests, then flies into the door
+# (§ 6.1). No New letters and no door while it runs.
+- extendedWaitUntil:
+    visible:
+      id: hunt-roll-in
+    timeout: 20000
+- assertNotVisible:
+    id: hunt-new-letters
+- takeScreenshot: ${SHOT}-roll-in
+# U0 + 2800: the door is in place and New letters is in, beside Back.
+- extendedWaitUntil:
+    visible:
+      id: hunt-new-letters
+    timeout: 20000
+- assertNotVisible:
+    id: hunt-roll-in
+- assertVisible:
+    id: hunt-open-four
+    text: Log, four letters
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ${SHOT}-door
+
+# The door: a fresh four-letter round (§ 6.2). Its id stays on screen
+# for the 200 ms fade, so tap-and-confirm's re-tap check would fire on
+# it; the lost tap is read from the door still being up after 15 s.
+- tapOn:
+    id: hunt-open-four
+- extendedWaitUntil:
+    notVisible:
+      id: hunt-open-four
+    timeout: 15000
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: hunt-open-four
+    commands:
+      - tapOn:
+          id: hunt-open-four
+          optional: true
+          label: 'MAESTRO-RETAP: still visible 15 s after the tap, tapping it again'
+# The "4" log (its label and its numeral, F11), 7 critters, a fresh board
+# (no slot filled, no New letters). The ids of the round's letters are
+# not known before the deal, so the 7 critters are counted by id: a 7th
+# `critter-<letter>` and no 8th.
+- extendedWaitUntil:
+    visible:
+      id: critter-log
+      text: Log, four letters
+    timeout: 15000
+- assertVisible:
+    id: critter-log-numeral
+- assertVisible:
+    text: '4'
+- assertNotVisible:
+    text: '3'
+- assertVisible:
+    id: critter-[a-z]
+    index: 6
+- assertNotVisible:
+    id: critter-[a-z]
+    index: 7
+- assertVisible:
+    id: hunt-slot-0
+    text: Word to find
+- assertNotVisible:
+    id: hunt-new-letters
+- assertNotVisible:
+    id: hunt-open-four
+# The four-letter open line, then the drag hint (the hand loops 6 s).
+- extendedWaitUntil:
+    notVisible:
+      id: play-game-ribbon
+    timeout: 25000
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ${SHOT}-four-round
+
+# Back: the picker, both logs (§ 5.1). Back stays on screen over the
+# picker, so tap-and-confirm.yaml's re-tap would press it again and leave
+# the picker for the Play place (2026-10-27): the -stays variant.
+- runFlow:
+    file: tap-and-confirm-stays.yaml
+    env:
+      TARGET: play-game-back
+      NEXT: hunt-picker
+- assertVisible:
+    id: hunt-pick-3
+    text: Log, three letters
+- assertVisible:
+    id: hunt-pick-4
+    text: Log, four letters
+- assertNotVisible:
+    id: letter-critters
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ${SHOT}-picker
+# Back from the picker: the Play place.
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: play-game-back
+      NEXT: play-place
+- assertNotVisible:
+    id: hunt-picker
+# Reopen: the picker, not a round.
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: play-tile-critters
+      NEXT: hunt-picker
+- assertVisible:
+    id: hunt-pick-3
+- assertVisible:
+    id: hunt-pick-4
+- assertNotVisible:
+    id: letter-critters
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ${SHOT}-picker-reopened
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: play-game-back
+      NEXT: play-place

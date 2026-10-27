@@ -1,0 +1,69 @@
+# Letter critters' four-letter rounds, F21 (`design/native/critters-four-letter.md`
+# § 10.3), on an iPad in portrait: the `critters-hunt-four` seed (a b c d
+# l m p, clap and lamp found; "3" and "4" open). The picker → "4" → the
+# round in progress; seat c, a, p: nothing sings for 5 s; a log tap sings
+# them and nothing else; c-a-m-p fills camp's slot (the third) and the
+# beat plays (3 of 4); damp stays findable; New letters deals a fresh
+# four-letter board. The shared steps are
+# `../subflows/critters-four-{round-open,partial,round-end}.yaml`; the
+# phone is 15-critters-four-round-phone-landscape.yaml.
+#
+# The points are from Maestro's hierarchy on this round on the iPad Pro
+# 11-inch (M5) simulator in portrait (834 x 1210, 2026-10-27): the
+# meadow is 4 + 3, rows at y 983 (x 261, 365, 469, 573) and 1087 (x 313,
+# 417, 521); the seats at y 853 (the log band's top + 56), x 228, 354,
+# 480 and 606 (the sockets' centres).
+#
+#   a b c d  /  l m p
+#
+# Screenshots go to Maestro's output (run.sh `--debug-output`, under
+# MAESTRO_OUT/15-critters-four-round/).
+appId: host.exp.Exponent
+name: Critters four-letter round (iPad portrait)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: critters-hunt-four
+# A flow that failed in landscape leaves the simulator there.
+- setOrientation: PORTRAIT
+- runFlow:
+    file: ../subflows/critters-four-round-open.yaml
+    env:
+      SHOT: four-round-tablet-portrait
+# c, a, p onto seats 0-2.
+- swipe:
+    start: 469, 983
+    end: 228, 853
+    duration: 800
+- swipe:
+    start: 261, 983
+    end: 354, 853
+    duration: 800
+- swipe:
+    start: 521, 1087
+    end: 480, 853
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-four-partial.yaml
+    env:
+      SHOT: four-round-tablet-portrait
+# c-a-m-p: m onto seat 2 (p hops home), then p onto seat 3.
+- swipe:
+    start: 417, 1087
+    end: 480, 853
+    duration: 800
+- waitForAnimationToEnd:
+    timeout: 1500
+- swipe:
+    start: 521, 1087
+    end: 606, 853
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-four-round-end.yaml
+    env:
+      SHOT: four-round-tablet-portrait

@@ -1,0 +1,41 @@
+# F20 (`design/native/critters-four-letter.md` § 10.3) as
+# 14-critters-four-door.yaml, on the iPad Pro 11-inch (M5) simulator in
+# portrait (834 x 1210, insets t32 b20). The points are from Maestro's
+# hierarchy on this round (2026-10-27): the meadow's rows at y 983 and
+# 1087, cells at x 313, 417 and 521; the seats at y 853 (the log band's
+# top + 56, as 12's), x 291, 417 and 543 (the sockets' centres).
+#
+#   a b g  /  h p t
+appId: host.exp.Exponent
+name: Critters four-letter door (iPad portrait)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: critters-hunt
+# A flow that failed in landscape leaves the simulator there.
+- setOrientation: PORTRAIT
+- runFlow:
+    file: ../subflows/critters-four-open.yaml
+    env:
+      SHOT: four-tablet-portrait
+# t-a-g, the completing find.
+- swipe:
+    start: 521, 1087
+    end: 291, 853
+    duration: 800
+- swipe:
+    start: 313, 983
+    end: 417, 853
+    duration: 800
+- swipe:
+    start: 521, 983
+    end: 543, 853
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-four-roll-in.yaml
+    env:
+      SHOT: four-tablet-portrait

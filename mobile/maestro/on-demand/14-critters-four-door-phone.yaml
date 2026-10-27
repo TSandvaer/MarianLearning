@@ -1,0 +1,40 @@
+# F20 (`design/native/critters-four-letter.md` § 10.3) as
+# 14-critters-four-door.yaml, on a phone in portrait. Run it on an iPhone
+# 17 simulator (402 x 874), not the README's iPad. The points are
+# 13-critters-word-hunt-phone.yaml's: the meadow's rows at y 667 and 731,
+# cells at x 137, 201 and 265; the seats at y 580, x 123, 201 and 279.
+#
+#   a b g  /  h p t
+appId: host.exp.Exponent
+name: Critters four-letter door (phone portrait)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: critters-hunt
+# A flow that failed in landscape leaves the simulator there.
+- setOrientation: PORTRAIT
+- runFlow:
+    file: ../subflows/critters-four-open.yaml
+    env:
+      SHOT: four-phone-portrait
+# t-a-g, the completing find.
+- swipe:
+    start: 265, 731
+    end: 123, 580
+    duration: 800
+- swipe:
+    start: 137, 667
+    end: 201, 580
+    duration: 800
+- swipe:
+    start: 265, 667
+    end: 279, 580
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-four-roll-in.yaml
+    env:
+      SHOT: four-phone-portrait
