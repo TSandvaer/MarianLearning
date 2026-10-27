@@ -16,6 +16,7 @@ import {
   setCloudSyncSuccessListener,
 } from '../progress/cloudSync'
 import { HUNT_STORAGE_KEY } from '../games/critterHunt'
+import { RAFT_ISLAND_STORAGE_KEY } from '../games/raftIsland'
 import { DEVICE_ID_STORAGE_KEY, readStoredDeviceId } from '../progress/deviceId'
 import { landsOf } from '../progress/lands'
 import { LAST_SYNC_STORAGE_KEY } from '../progress/lastSync'
@@ -101,7 +102,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('the 8 per-learner keys (§ 4.2, critters-word-hunt.md § 1)', () => {
+describe('the 9 per-learner keys (§ 4.2, critters-word-hunt.md § 1, raft-island-goal.md § 11.1)', () => {
   it('are the modules’ own keys', () => {
     expect([...LEARNER_KEYS]).toEqual([
       STORAGE_KEY,
@@ -112,6 +113,7 @@ describe('the 8 per-learner keys (§ 4.2, critters-word-hunt.md § 1)', () => {
       DEVICE_ID_STORAGE_KEY,
       LAST_SYNC_STORAGE_KEY,
       HUNT_STORAGE_KEY,
+      RAFT_ISLAND_STORAGE_KEY,
     ])
   })
 })

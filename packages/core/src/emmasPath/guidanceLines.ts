@@ -107,6 +107,19 @@ const NUMBER_WORDS = [
   'eight',
   'nine',
 ] as const
+/** Ten to nineteen, lower case: the 20 raft's totals (raft-island-goal § 12.1). */
+const TEEN_WORDS = [
+  'ten',
+  'eleven',
+  'twelve',
+  'thirteen',
+  'fourteen',
+  'fifteen',
+  'sixteen',
+  'seventeen',
+  'eighteen',
+  'nineteen',
+] as const
 const capitalize = (w: string) => `${w.charAt(0).toUpperCase()}${w.slice(1)}`
 const SCORE_WORDS: Record<number, string> = { 7: 'Seven', 8: 'Eight' }
 
@@ -304,6 +317,20 @@ function buildLines(): GuidanceLine[] {
   add(RAFT_SPLASH_ID, 'play', 'Too heavy!')
   add(RAFT_SILLY_ID, 'play', 'Hee hee! Silly animals!')
   add(RAFT_CLOSE_ID, 'play', 'What a party on the island!')
+  // The 20 raft (raft-island-goal § 12.1, Dave (6)): its open line, its
+  // totals 10-19 (one word each, so Lily gets "Ten,") and its departure.
+  // Its 1-9 are the 10 raft's. Not rendered yet (GUIDANCE_LINES_AWAITING_RENDER).
+  add(RAFT_OPEN_20_ID, 'play', 'The raft can carry twenty!')
+  TEEN_WORDS.forEach((n, i) =>
+    add(
+      raftTotalId(i + 10),
+      'play',
+      `${capitalize(n)}!`,
+      null,
+      `${capitalize(n)},`,
+    ),
+  )
+  add(RAFT_GO_20_ID, 'play', 'Twenty! Off we go!')
   // The critters' open line and their three non-word lines (Thomas
   // 2026-10-22): no "sing", and a non-word run asks whether it is a word.
   // The open line names the move, a drag up to the log (Thomas 2026-10-23,
@@ -432,6 +459,8 @@ const RAFT_GO_ID = 'guide.play.raft.go'
 const RAFT_SPLASH_ID = 'guide.play.raft.splash'
 const RAFT_SILLY_ID = 'guide.play.raft.silly'
 const RAFT_CLOSE_ID = 'guide.play.raft.close'
+const RAFT_OPEN_20_ID = 'guide.play.raft.open.20'
+const RAFT_GO_20_ID = 'guide.play.raft.go.20'
 const CRITTERS_OPEN_ID = 'guide.play.critters.open'
 const CRITTERS_OPEN_FOUR_ID = 'guide.play.critters.open.four'
 const crittersFunnyId = (n: 1 | 2 | 3) => `guide.play.critters.funny.${n}`
@@ -458,9 +487,14 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: none.
+ * Now: the 20 raft's 12 lines (raft-island-goal § 12.1), whose Lily render
+ * waits for Thomas's yes; nothing plays them until the native island build.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
+  'guide.play.raft.open.20',
+  ...TEEN_WORDS.map((_, i) => `guide.play.raft.total.${i + 10}`),
+  'guide.play.raft.go.20',
+]
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 

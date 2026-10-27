@@ -449,9 +449,10 @@ describe('the lines (§ 11, AC 7)', () => {
   // critters their third non-word line and 156 said words (Thomas 2026-10-22),
   // then 7 more said words (Dave 2026-10-25), then the four-letter rounds'
   // 82 targets, 9 said-later words and open line (Dave 2026-10-26, (B)),
-  // then the pictured boards' 15 four-letter words (Dave 2026-10-27, (C)).
-  it('counts: guidance 354 → 324 ids after the game lines left (597 with the peek prompt and the critter words), path lines 814 → 851, baked 254 → 259', () => {
-    expect(GUIDANCE_LINES).toHaveLength(597)
+  // then the pictured boards' 15 four-letter words (Dave 2026-10-27, (C)),
+  // then the 20 raft's 12 (raft-island-goal § 12.1).
+  it('counts: guidance 354 → 324 ids after the game lines left (609 with the peek prompt, the critter words and the 20 raft), path lines 814 → 851, baked 254 → 259', () => {
+    expect(GUIDANCE_LINES).toHaveLength(609)
     expect(PATH_LINES).toHaveLength(851)
     expect(BAKED_PATH_LINES).toHaveLength(259)
   })

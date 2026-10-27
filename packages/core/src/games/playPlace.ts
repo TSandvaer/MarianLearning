@@ -56,10 +56,39 @@ export function openPlayGames(progress: Progress | null): PlayGameId[] {
 export const RAFT_LOAD = 10
 /** Animals waiting on the shore. */
 export const RAFT_SHORE_SIZE = 6
-/** Crossings in a trip; the third is the natural stop. */
+/**
+ * Crossings in a trip; the third is the natural stop. Goes with the island
+ * goal's native build, with `tripOver` (raft-island-goal § 6, Dave 23 (C):
+ * no crossing cap); until then the shipped trip keeps it.
+ */
 export const RAFT_CROSSINGS = 3
 
 export type RaftWeight = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+
+/**
+ * A raft's load (raft-island-goal § 11.1): the 10 raft, and the 20 raft
+ * that a full 10 island opens (Dave (3)). Phase 2 adds 100.
+ */
+export type RaftTarget = 10 | 20
+
+/** The rafts, small to big. */
+export const RAFT_TARGETS: readonly RaftTarget[] = [10, 20]
+
+/** Seats on each raft's deck (§ 4.1): 3 × 2, and 4 × 2. */
+export const RAFT_SEATS: Readonly<Record<RaftTarget, number>> = {
+  10: 6,
+  20: 8,
+}
+
+/**
+ * What a shore is dealt for: the raft's target, and the kinds its island
+ * still lacks (`islandMissing` in `raftIsland.ts`). The defaults are today's
+ * 10 raft with nothing to bring.
+ */
+export interface RaftShoreOptions {
+  target?: RaftTarget
+  missing?: readonly number[]
+}
 
 /**
  * Each weight's animal, small to big, so size hints at weight: the shipped
@@ -82,19 +111,22 @@ const CANON_SHORE: readonly number[] = [7, 3, 6, 4, 8, 2]
 const MAX_DRAWS = 50
 
 /**
- * Every set of shore positions whose weights sum to exactly `RAFT_LOAD`:
+ * Every set of shore positions whose weights sum to exactly `target`:
  * positions ascending within a set, the sets in lexicographic order.
  */
-export function raftLoads(weights: readonly number[]): number[][] {
+export function raftLoads(
+  weights: readonly number[],
+  target: RaftTarget = RAFT_LOAD,
+): number[][] {
   const out: number[][] = []
   const walk = (from: number, picked: number[], sum: number) => {
-    if (sum === RAFT_LOAD && picked.length > 0) {
+    if (sum === target && picked.length > 0) {
       out.push([...picked])
       return
     }
     for (let i = from; i < weights.length; i++) {
       const w = weights[i]!
-      if (sum + w > RAFT_LOAD) continue
+      if (sum + w > target) continue
       picked.push(i)
       walk(i + 1, picked, sum + w)
       picked.pop()
@@ -104,24 +136,106 @@ export function raftLoads(weights: readonly number[]): number[][] {
   return out
 }
 
-/** True when `total` is 1-9 and no set of `waiting` makes `10 − total`. */
-export function raftStuck(waiting: readonly number[], total: number): boolean {
-  if (total < 1 || total >= RAFT_LOAD) return false
-  const gap = RAFT_LOAD - total
+/** Every sum up to `cap` that a set of `waiting` makes (0 among them). */
+function sumsUpTo(waiting: readonly number[], cap: number): Set<number> {
   let sums = new Set<number>([0])
   for (const w of waiting) {
     const next = new Set(sums)
-    for (const s of sums) if (s + w <= gap) next.add(s + w)
+    for (const s of sums) if (s + w <= cap) next.add(s + w)
     sums = next
   }
-  return !sums.has(gap)
+  return sums
 }
 
-/** At least 2 loads, at least one of them a pair (§ 2.1, D3). */
-function shoreOk(shore: readonly number[]): boolean {
-  const loads = raftLoads(shore)
-  return loads.length >= 2 && loads.some((l) => l.length === 2)
+/**
+ * True when `total` is 1 to `target − 1` and no set of `waiting` makes
+ * `target − total`.
+ */
+export function raftStuck(
+  waiting: readonly number[],
+  total: number,
+  target: RaftTarget = RAFT_LOAD,
+): boolean {
+  if (total < 1 || total >= target) return false
+  const gap = target - total
+  return !sumsUpTo(waiting, gap).has(gap)
 }
+
+/**
+ * The stuck newcomer's weight (Dave (3), widened; Q4): `gap − s`, in 1-9,
+ * for a sum `s` the waiting animals make, so the target is reachable
+ * again. `s` is 0 when the gap is 9 or less (on the 10 raft always, so
+ * that is today's `10 − total`); otherwise the smallest sum from
+ * `gap − 9`, so the newcomer is the biggest that closes the gap.
+ * Undefined when the raft is not stuck, or when no one animal can close
+ * the gap. That never happens within a crossing from a shore with a load
+ * to the target: the animals aboard and waiting then weigh at least the
+ * target, so adding the waiting weights one by one (each 9 or less) passes
+ * through `gap − 9` to `gap − 1`.
+ */
+export function raftNewcomer(
+  waiting: readonly number[],
+  total: number,
+  target: RaftTarget,
+): RaftWeight | undefined {
+  if (!raftStuck(waiting, total, target)) return undefined
+  const gap = target - total
+  if (gap <= 9) return gap as RaftWeight
+  const sums = sumsUpTo(waiting, gap)
+  let s: number | undefined
+  for (const x of sums) if (x >= gap - 9 && (s === undefined || x < s)) s = x
+  return s === undefined ? undefined : ((gap - s) as RaftWeight)
+}
+
+/**
+ * Some load to 20 is four animals that pair into ten and ten (Dave (3)):
+ * a learner on adding to ten can always make 20.
+ */
+function hasTenAndTen(shore: readonly number[]): boolean {
+  return raftLoads(shore, 20).some(
+    (l) =>
+      l.length === 4 &&
+      [1, 2, 3].some((j) => shore[l[0]!]! + shore[l[j]!]! === RAFT_LOAD),
+  )
+}
+
+/**
+ * The plain guarantee: at least 2 loads, at least one of them a pair (§
+ * 2.1, D3); on the 20 raft at least one of them ten and ten instead.
+ */
+function shoreOk(
+  shore: readonly number[],
+  target: RaftTarget = RAFT_LOAD,
+): boolean {
+  const loads = raftLoads(shore, target)
+  if (loads.length < 2) return false
+  return target === RAFT_LOAD
+    ? loads.some((l) => l.length === 2)
+    : hasTenAndTen(shore)
+}
+
+/**
+ * Dave (1)'s shore guarantee: while the island lacks a kind, some load
+ * holds one, so every crossing can bring a new kind.
+ */
+function bringsMissing(
+  shore: readonly number[],
+  target: RaftTarget,
+  missing: readonly number[],
+): boolean {
+  return (
+    missing.length === 0 ||
+    raftLoads(shore, target).some((l) =>
+      l.some((i) => missing.includes(shore[i]!)),
+    )
+  )
+}
+
+const guaranteed = (
+  shore: readonly number[],
+  target: RaftTarget,
+  missing: readonly number[],
+) => shoreOk(shore, target) && bringsMissing(shore, target, missing)
 
 const drawWeight = (rng: () => number) => 1 + Math.floor(rng() * 9)
 
@@ -136,42 +250,75 @@ function shuffled<T>(items: readonly T[], rng: () => number): T[] {
 }
 
 /**
- * A fresh shore: one bond to ten plus 4 more weights in 1-9, accepted when
- * it has at least 2 loads, then shuffled. After 50 rejected draws (never
- * expected), the three canon bonds, shuffled.
+ * The canon shore, for either target (it has 3 loads to 20). When none of
+ * the missing kinds is on it, the smallest takes 8 + 2's place with its
+ * partner to ten (Dave (1), (3)).
  */
-export function raftShore(rng: () => number): number[] {
+function fallbackShore(missing: readonly number[]): number[] {
+  if (missing.length === 0 || missing.some((m) => CANON_SHORE.includes(m)))
+    return [...CANON_SHORE]
+  const m = Math.min(...missing)
+  return [...CANON_SHORE.slice(0, 4), m, RAFT_LOAD - m]
+}
+
+/**
+ * A fresh shore: one bond to ten (two for the 20 raft, Dave (3)) and more
+ * weights in 1-9 up to 6, accepted when it has the plain guarantee and,
+ * while the island lacks a kind, a load holding one (Dave (1)); then
+ * shuffled. After 50 rejected draws (never expected), the canon shore with
+ * a missing kind swapped in, shuffled. With no options it deals today's
+ * shores, draw for draw.
+ */
+export function raftShore(
+  rng: () => number,
+  { target = RAFT_LOAD, missing = [] }: RaftShoreOptions = {},
+): number[] {
+  const bonds = target === RAFT_LOAD ? 1 : 2
   for (let draw = 0; draw < MAX_DRAWS; draw++) {
-    const a = drawWeight(rng)
-    const shore = [a, RAFT_LOAD - a]
+    const shore: number[] = []
+    for (let b = 0; b < bonds; b++) {
+      const a = drawWeight(rng)
+      shore.push(a, RAFT_LOAD - a)
+    }
     while (shore.length < RAFT_SHORE_SIZE) shore.push(drawWeight(rng))
-    if (shoreOk(shore)) return shuffled(shore, rng)
+    if (guaranteed(shore, target, missing)) return shuffled(shore, rng)
   }
-  return shuffled(CANON_SHORE, rng)
+  return shuffled(fallbackShore(missing), rng)
 }
 
 /**
  * The shore after a crossing: `waiting` in its order, then the newcomers
  * that bring it back to 6 (`result.slice(waiting.length)`), with the same
- * guarantee as `raftShore`. The newcomers are drawn for the empty places
- * only. Fallback: the complement of a waiting weight first, then any
- * weights; and last, the first passing set in order (never expected).
+ * guarantees as `raftShore`. The newcomers are drawn for the empty places
+ * only. Fallback: a missing kind and its partner to ten first (Dave (1)),
+ * then the complement of a waiting weight, then any weights; and last,
+ * every set in order: the first with every guarantee, else the first with
+ * the plain one, else the first with a load. Some waiting sets cannot have
+ * every guarantee (five pigs on the 20 raft: one place, no ten and ten).
+ * With no options it deals today's refills, draw for draw.
  */
 export function raftRefill(
   waiting: readonly number[],
   rng: () => number,
+  { target = RAFT_LOAD, missing = [] }: RaftShoreOptions = {},
 ): number[] {
   const empty = RAFT_SHORE_SIZE - waiting.length
   if (empty <= 0) return [...waiting]
-  if (waiting.length === 0) return raftShore(rng)
-  const tryWith = (first: number[]) => {
-    const shore = [...waiting, ...first]
+  if (waiting.length === 0) return raftShore(rng, { target, missing })
+  const tryWith = (first: readonly number[]) => {
+    const shore = [...waiting, ...first.slice(0, empty)]
     while (shore.length < RAFT_SHORE_SIZE) shore.push(drawWeight(rng))
-    return shoreOk(shore) ? shore : null
+    return guaranteed(shore, target, missing) ? shore : null
   }
   for (let draw = 0; draw < MAX_DRAWS; draw++) {
     const shore = tryWith([])
     if (shore) return shore
+  }
+  for (const m of missing) {
+    for (let draw = 0; draw < MAX_DRAWS; draw++) {
+      const shore = tryWith([m, RAFT_LOAD - m])
+      if (shore) return shore
+    }
   }
   for (const w of waiting) {
     for (let draw = 0; draw < MAX_DRAWS; draw++) {
@@ -180,12 +327,17 @@ export function raftRefill(
     }
   }
   const newcomers = new Array<number>(empty).fill(1)
+  let plain: number[] | null = null
+  let someLoad: number[] | null = null
   for (;;) {
     const shore = [...waiting, ...newcomers]
-    if (shoreOk(shore)) return shore
+    if (guaranteed(shore, target, missing)) return shore
+    if (plain === null && shoreOk(shore, target)) plain = shore
+    if (someLoad === null && raftLoads(shore, target).length > 0)
+      someLoad = shore
     let i = 0
     while (i < empty && newcomers[i] === 9) newcomers[i++] = 1
-    if (i === empty) return shore // nothing passes: never expected
+    if (i === empty) return plain ?? someLoad ?? shore
     newcomers[i]! += 1
   }
 }
