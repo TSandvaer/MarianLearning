@@ -13,10 +13,11 @@ appId: host.exp.Exponent
     visible:
       id: critter-picture-tag
     timeout: 15000
-# The beat: the lap lights each found slot in turn, then "You did it!".
+# The beat: the lap lights each found slot in turn (bag, hat, tag; bat's
+# slot, 1, stays dark), then "You did it!".
 - extendedWaitUntil:
     visible:
-      id: hunt-slot-1-lap
+      id: hunt-slot-2-lap
     timeout: 20000
 - extendedWaitUntil:
     visible:

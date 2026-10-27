@@ -6,7 +6,7 @@
 # and 328 (x 348, 404, 460); the seats at y 194 (the log band's top +
 # half a seat), x 302, 370, 438 and 506 (the sockets' centres).
 #
-#   a b c d  /  l m p
+#   a b c d  /  n s t
 appId: host.exp.Exponent
 name: Critters four-letter round (phone landscape)
 tags:
@@ -21,7 +21,7 @@ tags:
     file: ../subflows/critters-four-round-open.yaml
     env:
       SHOT: four-round-phone-landscape
-# c, a, p onto seats 0-2.
+# c, a, t onto seats 0-2.
 - swipe:
     start: 432, 272
     end: 302, 194
@@ -39,15 +39,9 @@ tags:
     file: ../subflows/critters-four-partial.yaml
     env:
       SHOT: four-round-phone-landscape
-# c-a-m-p: m onto seat 2 (p hops home), then p onto seat 3.
+# c-a-t-s: s onto seat 3.
 - swipe:
     start: 404, 328
-    end: 438, 194
-    duration: 800
-- waitForAnimationToEnd:
-    timeout: 1500
-- swipe:
-    start: 460, 328
     end: 506, 194
     duration: 800
     waitToSettleTimeoutMs: 300

@@ -5,7 +5,7 @@
 # 1087, cells at x 313, 417 and 521; the seats at y 853 (the log band's
 # top + 56, as 12's), x 291, 417 and 543 (the sockets' centres).
 #
-#   a b g  /  h p t
+#   a b f  /  g h t
 appId: host.exp.Exponent
 name: Critters four-letter door (iPad portrait)
 tags:
@@ -31,7 +31,7 @@ tags:
     end: 417, 853
     duration: 800
 - swipe:
-    start: 521, 983
+    start: 313, 1087
     end: 543, 853
     duration: 800
     waitToSettleTimeoutMs: 300

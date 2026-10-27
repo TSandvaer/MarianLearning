@@ -1,12 +1,13 @@
-# Letter critters' word hunt, part 3 of 3: after p-a-t, the last slot
-# fills with no second beat; New letters deals a fresh board; Back.
+# Letter critters' word hunt, part 3 of 3: after b-a-t, the last slot
+# (1) fills with no second beat; New letters deals a fresh board; Back.
 #
 #   SHOT  the screenshots' prefix
 appId: host.exp.Exponent
 ---
 - extendedWaitUntil:
     visible:
-      id: hunt-slot-5-tile-0
+      id: hunt-slot-1
+      text: Bat
     timeout: 20000
 - extendedWaitUntil:
     notVisible:

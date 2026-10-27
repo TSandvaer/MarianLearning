@@ -1,11 +1,11 @@
-# Letter critters' four-letter rounds, F21, part 3 of 3: the calling flow
-# has built c-a-m-p (m onto seat 2, sending p home, then p onto seat 3).
-# Four seated sing; camp is a target: Emma's word line, the joy beat, then
-# its tiles fill its own slot, the third (board index 2), and that is 3 of
-# 4, so the beat plays (the lap, "You did it!") and New letters enters,
-# with no roll-in ("4" is already open). Damp's slot stays empty
-# (findable). New letters: a fresh four-letter board. Back → the picker;
-# Back → the Play place.
+# Letter critters' four-letter rounds, F21 (F29), part 3 of 3: the calling
+# flow has built c-a-t-s (s onto seat 3). Four seated sing; cats is a
+# target: Emma's word line, the joy beat and its picture, then its tiles
+# fill its own slot, the third (board index 2), and that is 3 of 4, so
+# the beat plays (the lap, "You did it!") and New letters enters, with no
+# roll-in ("4" is already open). Sand's slot stays empty (findable). New
+# letters: a fresh four-letter board. Back → the picker; Back → the Play
+# place.
 #
 #   SHOT  the screenshots' prefix
 appId: host.exp.Exponent
@@ -13,16 +13,16 @@ appId: host.exp.Exponent
 - extendedWaitUntil:
     visible:
       id: critter-seat-3
-      text: Letter p, on the log
+      text: Letter s, on the log
     timeout: 5000
 - assertVisible:
     id: critter-seat-2
-    text: Letter m, on the log
-# The fill: camp's slot.
+    text: Letter t, on the log
+# The fill: cats' slot.
 - extendedWaitUntil:
     visible:
       id: hunt-slot-2
-      text: Camp
+      text: Cats
     timeout: 20000
 # The beat: the lap lights each found slot in turn, then "You did it!".
 - extendedWaitUntil:
@@ -42,16 +42,16 @@ appId: host.exp.Exponent
     id: hunt-roll-in
 - assertNotVisible:
     id: hunt-open-four
-# Damp stays findable; the found three keep their words.
+# Sand stays findable; the found three keep their words.
 - assertVisible:
     id: hunt-slot-3
     text: Word to find
 - assertVisible:
     id: hunt-slot-0
-    text: Clap
+    text: Ants
 - assertVisible:
     id: hunt-slot-1
-    text: Lamp
+    text: Bats
 - extendedWaitUntil:
     notVisible:
       id: critter-seat-0
@@ -97,7 +97,7 @@ appId: host.exp.Exponent
     id: hunt-slot-3
     text: Word to find
 - assertNotVisible:
-    text: Clap|Lamp|Camp
+    text: Ants|Bats|Cats
 - assertVisible:
     id: critter-[a-z]
     index: 6

@@ -1,7 +1,7 @@
 # Letter critters' word hunt, part 2 of 3: after t-a-g (the completing
-# find): its picture, the fill, the beat (the lap, "You did it!") and the
-# board after it, New letters beside Back. The calling flow then drags
-# p-a-t.
+# find, 3 of 4): its picture, the fill, the beat (the lap, "You did it!")
+# and the board after it, New letters beside Back. The calling flow then
+# drags b-a-t.
 #
 #   SHOT  the screenshots' prefix
 appId: host.exp.Exponent
@@ -14,12 +14,14 @@ appId: host.exp.Exponent
 # The fill: tag's tiles in its own slot (3), under its picture.
 - extendedWaitUntil:
     visible:
-      id: hunt-slot-3-tile-0
+      id: hunt-slot-3
+      text: Tag
     timeout: 20000
-# The beat: the lap lights each found slot in turn, then "You did it!".
+# The beat: the lap lights each found slot in turn (bag, hat, tag; bat's
+# slot, 1, stays dark), then "You did it!".
 - extendedWaitUntil:
     visible:
-      id: hunt-slot-1-lap
+      id: hunt-slot-2-lap
     timeout: 20000
 - takeScreenshot: ${SHOT}-beat-lap
 - extendedWaitUntil:
@@ -27,7 +29,7 @@ appId: host.exp.Exponent
       id: play-game-ribbon
     timeout: 20000
 - takeScreenshot: ${SHOT}-beat-you-did-it
-# The board after the beat: New letters beside Back; pat still to find.
+# The board after the beat: New letters beside Back; bat still to find.
 - extendedWaitUntil:
     visible:
       id: hunt-new-letters
