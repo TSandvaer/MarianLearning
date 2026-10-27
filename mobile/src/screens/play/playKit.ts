@@ -49,6 +49,8 @@ export interface GameKit {
   viewport: Viewport
   /** Back's disc (§ 1.7): the word hunt's New letters sits beside it. */
   back: Rect
+  /** Emma's caption ribbon (the four-letter door keeps clear of it). */
+  ribbon: { x: number; y: number; width: number }
   reducedMotion: boolean
   /**
    * Plays a line, cutting the one before it; resolves `true` when it ended
@@ -67,5 +69,11 @@ export interface GameKit {
   cancelKey: string
   /** The natural stop: back to the Play place, silent. */
   done: () => void
+  /**
+   * Back's own step inside a game (critters-four-letter.md § 5.1: a round
+   * goes back to the length picker): returns true when it handled Back,
+   * else Back returns to the Play place. `null` clears it.
+   */
+  setBack: (handler: (() => boolean) | null) => void
   rng: () => number
 }

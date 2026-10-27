@@ -55,6 +55,7 @@ import {
   seeded,
 } from '../../../test/playHarness'
 import { PRESS_MS } from '../hub/clay'
+import { PICK_AFTER_MS, ROLL_DONE_MS } from './HuntLengths'
 import { blendClipPath, blendSegments } from './critterModel'
 import {
   BOX_PULSE_MS,
@@ -554,7 +555,7 @@ async function toC0() {
 }
 
 describe('H17: completion', () => {
-  it('at the 5th of 6, after its shelf clears: the lap in board order, "You did it!", the cheer and burst, then New letters; the board ignores touches until then; Back works', async () => {
+  it('at the 5th of 6, after its shelf clears: the lap in board order, "You did it!", the cheer and burst, then (her first: the roll-in) New letters; the board ignores touches until then; Back works', async () => {
     const g = await toC0()
     // C0: the board locks, Emma celebrates.
     expect(g.poses.at(-1)).toBe('celebration')
@@ -591,6 +592,11 @@ describe('H17: completion', () => {
     expect(has('hunt-new-letters')).toBe(false)
     await advance(20)
     expect(g.poses.at(-1)).toBe('idle')
+    // Her first complete round opened "4": the roll-in plays before New
+    // letters (critters-four-letter.md § 6.1, F17).
+    expect(has('hunt-new-letters')).toBe(false)
+    expect(locked()).toBe(true)
+    await advance(ROLL_DONE_MS)
     expect(has('hunt-new-letters')).toBe(true)
     expect(locked()).toBe(false)
     // The beat played once; nothing in it but "You did it!".
@@ -599,9 +605,12 @@ describe('H17: completion', () => {
     ).toHaveLength(1)
   })
 
-  it('Back works during the beat', async () => {
+  it('Back works during the beat: "4" opened with the completing find, so to the picker, then the Play place', async () => {
     const g = await toC0()
     await advance(BEAT_LAP_AFTER_MS + 100)
+    await fireEvent.press(byId('play-game-back'))
+    expect(g.onExit).not.toHaveBeenCalled()
+    expect(has('hunt-picker')).toBe(true)
     await fireEvent.press(byId('play-game-back'))
     expect(g.onExit).toHaveBeenCalledTimes(1)
   })
@@ -689,7 +698,11 @@ describe('H20: leaving and coming back', () => {
     const first = await toC0()
     await advance(BEAT_LAP_AFTER_MS + 100)
     await first.unmount()
+    // "4" is open: the next visit opens on the picker (critters-four-letter.md § 5.1).
     await mount({ rng: seeded(7) })
+    expect(has('hunt-picker')).toBe(true)
+    await fireEvent.press(byId('hunt-pick-3'))
+    await advance(PICK_AFTER_MS + CRITTERS_OPEN_DELAY_MS + LINE_MS)
     expect(meadow()).not.toEqual(ROUND)
     expect(loadHuntRecord()!.found).toEqual([])
     expect(has('hunt-new-letters')).toBe(false)
