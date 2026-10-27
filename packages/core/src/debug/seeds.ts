@@ -743,13 +743,14 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
     ],
   },
 
-  // Letter critters word hunt (critters-word-hunt.md § 10.3, H26): a
-  // learner past cvc-words with short o current (Marian, 2026-10-25), and
-  // the round a b g h p t in progress with bag, hat, bat and tap found
-  // (4 of its 6 targets). Building t-a-g completes it (the beat); p-a-t
-  // then fills the last slot with no beat. Its extras: gap, tab, gag.
-  // Only "3" is open (critters-four-letter.md F20): t-a-g opens "4", and
-  // the roll-in plays after the beat.
+  // Letter critters word hunt (critters-word-hunt.md § 10.3, H26; since
+  // the pictured-only boards, § 16.4): a learner past cvc-words with short
+  // o current (Marian, 2026-10-25), and Dave's short-a fallback a b f g h t
+  // in progress with bag and hat found (2 of bag bat hat tag). Building
+  // t-a-g fills hunt-slot-3 and completes it (the beat, 3 of 4); bat stays
+  // findable. Its extras: fat, gag, tab. Only "3" is open
+  // (critters-four-letter.md F20): t-a-g opens "4", and the roll-in plays
+  // after the beat.
   'critters-hunt': {
     skillLevels: {
       'letter-names': 'mastered',
@@ -761,17 +762,17 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
     },
     skipGreet: true,
     hunt: {
-      letters: ['a', 'b', 'g', 'h', 'p', 't'],
-      found: ['bag', 'hat', 'bat', 'tap'],
+      letters: ['a', 'b', 'f', 'g', 'h', 't'],
+      found: ['bag', 'hat'],
     },
   },
 
-  // The four-letter rounds (critters-four-letter.md F21): the learner of
-  // `critters-hunt` with "3" and "4" open, and Dave's pinned short-a
-  // four-letter round a b c d l m p in progress with clap and lamp found
-  // (2 of camp clap damp lamp; b the decoy). The game opens on the length
-  // picker; on "4", c-a-m-p fills slot 3 and completes the round (3 of 4);
-  // damp stays findable.
+  // The four-letter rounds (critters-four-letter.md F21, § 15.5 F29): the
+  // learner of `critters-hunt` with "3" and "4" open, and Dave's short-a
+  // four-letter fallback a b c d n s t in progress with ants and bats found
+  // (2 of ants bats cats sand; band the extra). The game opens on the
+  // length picker; on "4", c-a-t-s fills hunt-slot-2 and completes the
+  // round (3 of 4); sand stays findable; b-a-n-d is said, with no chip.
   'critters-hunt-four': {
     skillLevels: {
       'letter-names': 'mastered',
@@ -783,18 +784,18 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
     },
     skipGreet: true,
     hunt: {
-      letters: ['a', 'b', 'c', 'd', 'l', 'm', 'p'],
-      found: ['clap', 'lamp'],
+      letters: ['a', 'b', 'c', 'd', 'n', 's', 't'],
+      found: ['ants', 'bats'],
       length: 4,
       open: [3, 4],
     },
   },
 
   // The word hunt's pictured board on a short-i round (critters-word-hunt.md
-  // § 15): short o and u mastered, short i current, and the round i b n p
-  // t w in progress with bib and pit found. Its board order is bib, bin,
-  // pin (pictures; pin is one of § 15.10's thin-line pictures), then bit,
-  // pit, tin, tip, win under the listen mark: N 8, a found listen slot.
+  // § 15, § 16.4): short o and u mastered, short i current, and the round
+  // i b g p s x in progress with bib found. Its board order is bib, pig
+  // (picture words), then sip, six (#714's six dots): N 4, every slot a
+  // picture. Its extras: big, gig, sis.
   'critters-hunt-i': {
     skillLevels: {
       'letter-names': 'mastered',
@@ -808,8 +809,8 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
     },
     skipGreet: true,
     hunt: {
-      letters: ['i', 'b', 'n', 'p', 't', 'w'],
-      found: ['bib', 'pit'],
+      letters: ['i', 'b', 'g', 'p', 's', 'x'],
+      found: ['bib'],
     },
   },
 }

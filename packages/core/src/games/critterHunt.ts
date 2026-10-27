@@ -3,17 +3,22 @@
  * (`design/native/critters-word-hunt.md` § 1; the rules are Dave's ruling
  * of 2026-10-25, `design/research/critters-word-hunt-2026-10-25.md`, cited
  * as "Dave (n)"), and four-letter rounds (`design/native/critters-four-letter.md`
- * § 1; Dave's ruling of 2026-10-26, (B), cited as "Dave 23 (B)").
+ * § 1; Dave's ruling of 2026-10-26, (B), cited as "Dave 23 (B)"). Since
+ * the pictured-only boards (Dave's ruling of 2026-10-27, (A),
+ * `design/research/critters-pictured-boards-2026-10-27.md`, "Dave 27";
+ * `critters-word-hunt.md` § 16, `critters-four-letter.md` § 15), every
+ * target has a picture.
  *
  * Once blending sounds is current or mastered (`critterFunnyOpen`, the same
  * gate), the free meadow gives way to rounds: 6 critters (one of her taught
- * short vowels, then 5 consonants), the 5-8 words they spell that she
- * knows (the targets), and the rarer said words (the extras). A round is
- * complete at all but one target, Thomas's 95 % rounded down.
+ * short vowels, then 5 consonants), the 4-8 words they spell that have a
+ * picture (the targets), and the other said words (the extras, at most 3).
+ * A round is complete at all but one target, Thomas's 95 % rounded down.
  *
  * Four-letter rounds open at her first complete three-letter round: 7
- * critters (the vowel, then 6 consonants), the 4-6 `HUNT_FOUR_TARGETS`
- * words they spell, no extras, at most one decoy consonant.
+ * critters (the vowel, then 6 consonants), the 4-6 pictured
+ * `HUNT_FOUR_TARGETS` words they spell, the rest as extras (at most 3),
+ * at most one decoy consonant.
  *
  * Its record, per learner, is the round in play of each length (Dave (7)):
  * its letters, targets, extras and the words found in find order, and the
@@ -43,10 +48,9 @@ export type HuntLength = 3 | 4
 export const HUNT_LENGTH = 3
 /** Critters in a round: 1 vowel + 5 consonants (Dave (1)). */
 export const HUNT_CONSONANTS = 5
-/** Targets per round, at least this many with a bundled picture, extras. */
-export const HUNT_MIN_TARGETS = 5
+/** Targets per round (N 4-8 since Dave 27 (A)), and extras. */
+export const HUNT_MIN_TARGETS = 4
 export const HUNT_MAX_TARGETS = 8
-export const HUNT_MIN_PICTURES = 3
 export const HUNT_MAX_EXTRAS = 3
 
 /**
@@ -54,7 +58,9 @@ export const HUNT_MAX_EXTRAS = 3
  * the critters spell, beyond the picture words and the said words with a
  * picture. Exactly as Dave (1) prints them, 68; and since the four-letter
  * phase gave them clips, _act add end ill its odd off_ (Dave 23 (B), "New
- * audio"; critters four-letter F7), 75.
+ * audio"; critters four-letter F7), 75. Since Dave 27 (A) they are targets
+ * only with a picture (_six ten red run tug_ and the like); the rest are
+ * extras, as any said word without one.
  */
 export const HUNT_FAMILIAR: ReadonlySet<string> = new Set(
   [
@@ -70,11 +76,12 @@ export const HUNT_FAMILIAR: ReadonlySet<string> = new Set(
 )
 
 /**
- * Dave's 18 rude four-letter words (Dave 23 (B)), as he prints them: no
+ * Dave's 18 rude four-letter words (Dave 23 (B)), as he prints them, and
+ * _clit_ (Dave 27 (A): the old short-i fallback spelled it): no
  * four-letter round deals letters that spell one.
  */
 export const HUNT_RUDE_FOUR: ReadonlySet<string> = new Set(
-  'cunt shit piss twat slut crap turd damn hell butt slag prat bums tits cums fags gits guns'.split(
+  'cunt shit piss twat slut crap turd damn hell butt slag prat bums tits cums fags gits guns clit'.split(
     ' ',
   ),
 )
@@ -83,10 +90,11 @@ export const HUNT_RUDE_FOUR: ReadonlySet<string> = new Set(
  * Four-letter words a 6-9 learner knows that have no clip (Dave's Q21
  * answer, 2026-10-26): no four-letter round deals letters that spell one,
  * since it would sing and sit on a board with no slot for it. Dave (8)'s
- * words that no round dealt by his other rules.
+ * words that no round dealt by his other rules, 25; _crab_ left it when
+ * #714 gave it a clip and Dave 27 (A) made it a target, 24.
  */
 export const HUNT_FOUR_UNDEALT: ReadonlySet<string> = new Set(
-  'crab trap grab slot lost slip snip spin twin grin swim crib list mist fist mint hint limp film snug stub mend send help held'.split(
+  'trap grab slot lost slip snip spin twin grin swim crib list mist fist mint hint limp film snug stub mend send help held'.split(
     ' ',
   ),
 )
@@ -131,13 +139,16 @@ export function huntProbeGuard(progress: Progress | null): boolean {
 export interface HuntRound {
   /** The vowel, then the 5 consonants (6 for four letters) a-z. */
   letters: string[]
-  /** The words to find, a-z: 5-8 of them (4-6 for four letters). */
+  /** The words to find, a-z, each with a picture: 4-8 of them (4-6 for four letters). */
   targets: string[]
-  /** The other said words they spell, a-z: 0-3, never required; none for four letters. */
+  /** The other said words they spell, a-z: 0-3, never required. */
   extras: string[]
 }
 
-/** Each length's deal rules: Dave (1) for three, Dave 23 (B) for four. */
+/**
+ * Each length's deal rules: Dave (1) for three, Dave 23 (B) for four, as
+ * Dave 27 (A) amends both.
+ */
 const RULES: Readonly<
   Record<
     HuntLength,
@@ -145,7 +156,6 @@ const RULES: Readonly<
       consonants: number
       minTargets: number
       maxTargets: number
-      minPictures: number
       /** Consonants in no target (a decoy's twin pops as usual). */
       maxDecoys: number
     }
@@ -155,14 +165,12 @@ const RULES: Readonly<
     consonants: HUNT_CONSONANTS,
     minTargets: HUNT_MIN_TARGETS,
     maxTargets: HUNT_MAX_TARGETS,
-    minPictures: HUNT_MIN_PICTURES,
-    maxDecoys: 0,
+    maxDecoys: 1,
   },
   4: {
     consonants: 6,
     minTargets: 4,
     maxTargets: 6,
-    minPictures: 2,
     maxDecoys: 1,
   },
 }
@@ -202,19 +210,17 @@ const spelled = (
   set: ReadonlySet<string>,
 ) => words.filter(([, ls]) => ls.every((l) => set.has(l))).map(([w]) => w)
 
-/** A target: a picture word, a said word with a picture, or familiar. */
-const isTarget = (w: string) => critterHasPicture(w) || HUNT_FAMILIAR.has(w)
-
 /**
  * The round `letters` deal (vowel first), or `null` when the rules reject
- * it. Three letters (Dave (1)): no quiet word spellable; 5-8 targets, at
- * least 3 with a bundled picture; at most 3 extras; every consonant in a
- * target; and, with `probeGuard`, no probe-reserve word spellable. Four
- * letters (Dave 23 (B), F1): no `HUNT_RUDE_FOUR` or `HUNT_FOUR_UNDEALT`
- * word spellable; the targets are the `HUNT_FOUR_TARGETS` words spelled,
- * 4-6, at least 2 with a bundled picture; no extras; at most one consonant
- * in no target. The probe guard is a three-letter rule (its words are
- * three letters).
+ * it. Three letters (Dave (1), Dave 27 (A); B1): no quiet word spellable;
+ * the targets are the words spelled with a bundled picture, 4-8; the
+ * extras the other said words spelled, at most 3; at most one consonant in
+ * no target; and, with `probeGuard`, no probe-reserve word spellable. Four
+ * letters (Dave 23 (B), Dave 27 (A); F23): no `HUNT_RUDE_FOUR` or
+ * `HUNT_FOUR_UNDEALT` word spellable; the targets are the
+ * `HUNT_FOUR_TARGETS` words spelled with a bundled picture, 4-6; the
+ * extras the rest, at most 3; at most one consonant in no target. The
+ * probe guard is a three-letter rule (its words are three letters).
  */
 export function huntRoundOf(
   letters: readonly string[],
@@ -224,28 +230,26 @@ export function huntRoundOf(
   }: { probeGuard?: boolean; length?: HuntLength } = {},
 ): HuntRound | null {
   const set = new Set(letters)
-  let targets: string[]
-  let extras: string[]
+  let words: string[]
   if (length === 4) {
     if (spelled(REJECTS_FOUR, set).length > 0) return null
-    targets = spelled(BUILDABLE_FOUR, set).sort()
-    extras = []
+    words = spelled(BUILDABLE_FOUR, set)
   } else {
-    const words = spelled(BUILDABLE, set)
-    if (words.some((w) => CRITTER_NOT_SAID.has(w))) return null
-    if (probeGuard && words.some((w) => PROBE_RESERVE_WORDS.includes(w))) {
+    const all = spelled(BUILDABLE, set)
+    if (all.some((w) => CRITTER_NOT_SAID.has(w))) return null
+    if (probeGuard && all.some((w) => PROBE_RESERVE_WORDS.includes(w))) {
       return null
     }
-    targets = words.filter(isTarget).sort()
-    extras = words
-      .filter((w) => !isTarget(w) && CRITTER_SAID_WORDS.includes(w))
-      .sort()
-    if (extras.length > HUNT_MAX_EXTRAS) return null
+    words = all.filter(
+      (w) => critterHasPicture(w) || CRITTER_SAID_WORDS.includes(w),
+    )
   }
+  const targets = words.filter(critterHasPicture).sort()
+  const extras = words.filter((w) => !critterHasPicture(w)).sort()
+  if (extras.length > HUNT_MAX_EXTRAS) return null
   const rules = RULES[length]
   if (targets.length < rules.minTargets || targets.length > rules.maxTargets)
     return null
-  if (targets.filter(critterHasPicture).length < rules.minPictures) return null
   const decoys = letters.filter(
     (l) => !VOWELS.has(l) && !targets.some((w) => w.includes(l)),
   )
@@ -275,10 +279,11 @@ const ROUNDS = new Map<string, readonly HuntRound[]>()
 
 /**
  * Every round `vowel` deals, by its consonants in lexicographic order.
- * Three letters: 439 in all (a 203, e 39, i 53, o 83, u 61), Dave (1)'s
- * count with the nine said later (F7); 184 before. Four letters
- * (`length: 4`): a 56, o 51, i 2, u 125, e 86 (Dave 23 (B) with Q21's
- * rule). Computed once per vowel, guard and length.
+ * Three letters: 473 in all (a 182, o 76, u 127, i 6, e 82), Dave 27
+ * (A)'s count with #714's eight pictures (B2); _fog_ and _dig_ add o 16
+ * and i 2 once their pictures are bundled. Four letters (`length: 4`):
+ * 196 (a 110, o 29, u 38, i 0, e 19; F25). Computed once per vowel, guard
+ * and length.
  */
 export function huntRounds(
   vowel: string,
@@ -301,30 +306,32 @@ export function huntRounds(
 }
 
 /**
- * Pinned fallback rounds, one per vowel (never expected: each vowel deals
- * at least 21 rounds). Each passes the probe guard. `critterHunt.test.ts`
- * checks every one.
+ * Dave's pinned fallback rounds, one per vowel (Dave 27 (A), the first
+ * round per vowel in his port; never expected: each vowel deals at least 6
+ * rounds). They deal bag bat hat tag, box fox mom mop pop, bug gum jug mug
+ * mum, bib fig pig wig and bed egg elf leg; the short-a one passes the
+ * probe guard. `critterHunt.test.ts` checks every one.
  */
 export const HUNT_FALLBACK: Readonly<Record<string, readonly string[]>> = {
-  a: ['a', 'b', 'g', 'h', 'p', 't'],
-  e: ['e', 'j', 'n', 'p', 't', 'v'],
-  i: ['i', 'b', 'f', 'g', 't', 'w'],
-  o: ['o', 'b', 'h', 'p', 't', 'x'],
-  u: ['u', 'b', 'g', 'j', 'n', 'r'],
+  a: ['a', 'b', 'f', 'g', 'h', 't'],
+  e: ['e', 'b', 'd', 'f', 'g', 'l'],
+  i: ['i', 'b', 'f', 'g', 'p', 'w'],
+  o: ['o', 'b', 'f', 'm', 'p', 'x'],
+  u: ['u', 'b', 'c', 'g', 'j', 'm'],
 }
 
 /**
- * Dave's pinned four-letter fallbacks, one per vowel (Dave 23 (B); never
- * expected: each vowel deals at least 2 rounds). They deal camp clap damp
- * lamp, crop drop pond prop, clip flip gift lift, bulb club gulp plug and
- * belt best sled test. `critterHunt.test.ts` checks every one.
+ * Dave's pinned four-letter fallbacks (Dave 27 (A); `critters-four-letter.md`
+ * § 15.2). They deal ants bats cats sand, cots mops pots stop tops, bulb
+ * jump plum pump and jets nest step tent. No i entry (Q36): short i deals
+ * no four-letter round, so the deal skips it, and a missing entry falls
+ * back to a's. `critterHunt.test.ts` checks every one.
  */
 export const HUNT_FOUR_FALLBACK: Readonly<Record<string, readonly string[]>> = {
-  a: ['a', 'b', 'c', 'd', 'l', 'm', 'p'],
-  e: ['e', 'b', 'c', 'd', 'l', 's', 't'],
-  i: ['i', 'c', 'f', 'g', 'l', 'p', 't'],
-  o: ['o', 'b', 'c', 'd', 'n', 'p', 'r'],
-  u: ['u', 'b', 'c', 'd', 'g', 'l', 'p'],
+  a: ['a', 'b', 'c', 'd', 'n', 's', 't'],
+  e: ['e', 'c', 'j', 'n', 'p', 's', 't'],
+  o: ['o', 'b', 'c', 'm', 'p', 's', 't'],
+  u: ['u', 'b', 'c', 'j', 'l', 'm', 'p'],
 }
 
 const sameLetters = (a: readonly string[], b: readonly string[] | undefined) =>
@@ -333,7 +340,9 @@ const sameLetters = (a: readonly string[], b: readonly string[] | undefined) =>
 /**
  * A fresh round (Dave (1)): one of her vowels, then one of that vowel's
  * rounds of `length` letters, each by `rng`; never the same letters as
- * `last`. With `probeGuard` (three letters only), only rounds that spell
+ * `last`. Only her vowels with such a round are picked (Dave 27 (A), B6:
+ * short i deals no four-letter round); the fallback deals only when none
+ * has one. With `probeGuard` (three letters only), only rounds that spell
  * no probe-reserve word. Picking uniformly among the rounds that pass is
  * draw-and-accept over the consonant sets, with the draws done once. No
  * vowels: _a_. The same `rng` gives the same round.
@@ -352,11 +361,16 @@ export function huntDeal(
   } = {},
 ): HuntRound {
   const own = vowels.length > 0 ? vowels : ['a']
+  const fresh = (v: string) =>
+    huntRounds(v, { probeGuard, length }).filter(
+      (r) => !sameLetters(r.letters, last),
+    )
+  const dealing = own.filter((v) => fresh(v).length > 0)
+  if (dealing.length > 0) {
+    const rounds = fresh(dealing[Math.floor(rng() * dealing.length)]!)
+    return rounds[Math.floor(rng() * rounds.length)]!
+  }
   const vowel = own[Math.floor(rng() * own.length)]!
-  const rounds = huntRounds(vowel, { probeGuard, length }).filter(
-    (r) => !sameLetters(r.letters, last),
-  )
-  if (rounds.length > 0) return rounds[Math.floor(rng() * rounds.length)]!
   const fallback = length === 4 ? HUNT_FOUR_FALLBACK : HUNT_FALLBACK
   return huntRoundOf(fallback[vowel] ?? fallback.a!, { length })!
 }
@@ -376,16 +390,20 @@ export function huntComplete(
   return foundTargets(round, found).length >= need
 }
 
-/** The board's three bands (§ 15.2): 0 easiest. */
+/**
+ * The board's three bands (§ 15.2): 0 easiest. Since Dave 27 (A) no dealt
+ * round has a third-band target; a round stored before it keeps its own
+ * (Q30).
+ */
 const boardBand = (word: string): number =>
   CRITTER_PICTURE_WORDS.includes(word) ? 0 : critterHasPicture(word) ? 1 : 2
 
 /**
  * The targets in board order (`critters-word-hunt.md` § 15.2, Dave 23
  * (A).1): picture words (each has a blend clip) a-z, then the other
- * targets with a picture a-z, then the targets with no picture a-z. A
- * four-letter round has no picture word, so it is its pictured targets
- * a-z, then the rest (critters four-letter F5). Slot
+ * targets with a picture a-z, then the targets with no picture a-z (only
+ * in a round stored before Dave 27 (A), Q30). A four-letter round has no
+ * picture word, so it is its targets a-z (critters four-letter F27). Slot
  * i holds word i from the deal. Derived, never stored: the record keeps
  * `found` in find order, so a round dealt before the board order reopens
  * with every find in its own slot (Q17).
@@ -455,7 +473,9 @@ function readAll(): Record<string, unknown> {
 
 /**
  * The playing learner's round of `length` letters, or `null` (none, or
- * unreadable: a fresh deal follows).
+ * unreadable: a fresh deal follows). A round stored under an older rule
+ * reopens as stored, its finds hers (Q30, Dave (3): never a lost find),
+ * until New letters deals a fresh one.
  */
 export function loadHuntRecord(
   length: HuntLength = HUNT_LENGTH,

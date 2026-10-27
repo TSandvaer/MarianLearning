@@ -737,9 +737,9 @@ describe('the letter critters’ said words (Thomas 2026-10-22)', () => {
       expect(critterWordLine(w)).toBeUndefined()
   })
 
-  it('F9 (critters four-letter spec): critterWordLine finds the 82 four-letter targets and the nine said later, caption "<W>.", input "<W>,"', () => {
+  it('F9 (critters four-letter spec): critterWordLine finds the 97 four-letter words (82, and the pictured boards’ 15) and the nine said later, caption "<W>.", input "<W>,"', () => {
     const clipped = [...HUNT_FOUR_TARGETS, ...CRITTER_SAID_LATER]
-    expect(clipped).toHaveLength(91)
+    expect(clipped).toHaveLength(106)
     for (const w of clipped)
       expect(critterWordLine(w)).toEqual({
         id: `guide.play.critters.word.${w}`,
@@ -749,11 +749,12 @@ describe('the letter critters’ said words (Thomas 2026-10-22)', () => {
         input: `${cap(w)},`,
         src: `/assets/audio/path/guide-play-critters-word-${w}.mp3`,
       })
-    // The render's bill (Dave 2026-10-26): 92 lines, 504 input characters.
+    // The render's bill (Dave 2026-10-26): 92 lines, 504 input characters;
+    // then the 15 (Dave 2026-10-27, (C)): 75 more.
     const open = guidanceLine('guide.play.critters.open.four')!
     expect(
       clipped.reduce((n, w) => n + critterWordLine(w)!.input!.length, 0) +
         open.text.length,
-    ).toBe(504)
+    ).toBe(504 + 75)
   })
 })
