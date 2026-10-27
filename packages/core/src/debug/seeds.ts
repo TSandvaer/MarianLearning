@@ -224,6 +224,8 @@ import {
   huntFind,
   huntRoundOf,
   saveHuntRecord,
+  setHuntOpenLengths,
+  type HuntLength,
 } from '../games/critterHunt'
 
 interface SeedRecipe {
@@ -263,10 +265,17 @@ interface SeedRecipe {
   readonly leitner?: readonly LeitnerItem<MathFact>[]
   /**
    * Optional Letter critters word hunt round in progress: its letters
-   * (vowel first) and the words already found, in find order. Written to
-   * the learner's hunt record (`games/critterHunt.ts`).
+   * (vowel first), the words already found, in find order, its length
+   * (default 3) and the lengths open (default `[3]`, so a learner who
+   * had "4" open gets her roll-in again). Written to the learner's hunt
+   * record (`games/critterHunt.ts`).
    */
-  readonly hunt?: { letters: readonly string[]; found: readonly string[] }
+  readonly hunt?: {
+    letters: readonly string[]
+    found: readonly string[]
+    length?: HuntLength
+    open?: readonly HuntLength[]
+  }
 }
 
 /**
@@ -739,6 +748,8 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
   // the round a b g h p t in progress with bag, hat, bat and tap found
   // (4 of its 6 targets). Building t-a-g completes it (the beat); p-a-t
   // then fills the last slot with no beat. Its extras: gap, tab, gag.
+  // Only "3" is open (critters-four-letter.md F20): t-a-g opens "4", and
+  // the roll-in plays after the beat.
   'critters-hunt': {
     skillLevels: {
       'letter-names': 'mastered',
@@ -752,6 +763,30 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
     hunt: {
       letters: ['a', 'b', 'g', 'h', 'p', 't'],
       found: ['bag', 'hat', 'bat', 'tap'],
+    },
+  },
+
+  // The four-letter rounds (critters-four-letter.md F21): the learner of
+  // `critters-hunt` with "3" and "4" open, and Dave's pinned short-a
+  // four-letter round a b c d l m p in progress with clap and lamp found
+  // (2 of camp clap damp lamp; b the decoy). The game opens on the length
+  // picker; on "4", c-a-m-p fills slot 3 and completes the round (3 of 4);
+  // damp stays findable.
+  'critters-hunt-four': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'sounding-out': 'mastered',
+      'cvc-words': 'mastered',
+      'cvc-words-short-o': 'practicing',
+    },
+    skipGreet: true,
+    hunt: {
+      letters: ['a', 'b', 'c', 'd', 'l', 'm', 'p'],
+      found: ['clap', 'lamp'],
+      length: 4,
+      open: [3, 4],
     },
   },
 
@@ -869,20 +904,23 @@ function applyLeitnerSeed(items: readonly LeitnerItem<MathFact>[]): void {
   })
 }
 
-/** Write a hunt round in progress as the learner's hunt record. */
+/**
+ * Write a hunt round in progress as the learner's hunt record of its
+ * length, and her open lengths.
+ */
 function applyHuntSeed({
   letters,
   found,
-}: {
-  letters: readonly string[]
-  found: readonly string[]
-}): void {
-  const round = huntRoundOf(letters)
+  length = 3,
+  open = [3],
+}: NonNullable<SeedRecipe['hunt']>): void {
+  const round = huntRoundOf(letters, { length })
   if (round === null) {
     console.warn(`[debugSeed] not a hunt round: ${letters.join('')}`)
     return
   }
-  saveHuntRecord(found.reduce(huntFind, freshHuntRecord(round)))
+  saveHuntRecord(found.reduce(huntFind, freshHuntRecord(round)), length)
+  setHuntOpenLengths(open)
 }
 
 /**

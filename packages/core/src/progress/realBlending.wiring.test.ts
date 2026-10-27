@@ -506,7 +506,7 @@ describe('debug seeds (AC 10)', () => {
   beforeEach(() => window.localStorage.clear())
   afterEach(() => window.localStorage.clear())
 
-  it("the 14 seeds with blending sounds mastered store sounding out mastered, and every seed's picker lands where it did", () => {
+  it("the 15 seeds with blending sounds mastered store sounding out mastered, and every seed's picker lands where it did", () => {
     let count = 0
     for (const name of DEBUG_SEED_NAMES) {
       window.localStorage.clear()
@@ -523,9 +523,9 @@ describe('debug seeds (AC 10)', () => {
         oldPick(loaded),
       )
     }
-    // 14: the 12 before, and Letter critters' word hunt seeds
-    // (critters-hunt, critters-hunt-i).
-    expect(count).toBe(14)
+    // 15: the 12 before, and Letter critters' word hunt seeds
+    // (critters-hunt, critters-hunt-four, critters-hunt-i).
+    expect(count).toBe(15)
   })
 })
 
