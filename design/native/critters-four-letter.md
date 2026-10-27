@@ -8,6 +8,8 @@
 
 **Amended 2026-10-27 (build 25):** the picker (§ 5) drops its two meadow slabs. The two logs themselves lie in the meadow and are the buttons (Thomas: "the overview need some polish, i dont like these big boxes"). It stays at two logs: Dave ruled the same day that there are no 5- or 6-letter rounds (his ruling of 2026-10-27 as the coordinator relayed it, not yet committed; (B), and (D) item 4: "Still two logs; no third length is coming"). Decision 4, § 5, § 7's picker wireframe, § 8, § 9, F16, F18, F19, Q28 and § 14 follow.
 
+**Amended 2026-10-27 (build 25): pictured-only boards.** Dave's ruling of 2026-10-27 is now committed verbatim (`design/research/critters-pictured-boards-2026-10-27.md`, quoted here as "Dave 27 (A)" to "(E)"). By (A) every four-letter target has a picture, a clip word with no picture becomes an extra (at most 3), the 14 voiceless plurals and _crab_ join the targets, and _clit_ joins the rude list. **§ 15 designs it:** the rule as Kevin's acceptance criteria, the chip ((D) item 2: it has no place on every form, so Dave's fallback, Emma's word and the joy beat with no chip), and the 36 pt check of the four-letter pictures ((D) item 3). The sections it changes are marked "(amended 2026-10-27, § 15)": the Goal, § 1, § 2.1, § 4.1, § 7, § 9 and § 10.
+
 **Standing rules:** any learner of about 6-9 (Marian is one); every spoken line and label is a row in a table, so the planned Danish version swaps rows; per learner through `@marian/core/learners`; audio-first; never a red X. **Spend is counted here and asked later**, each under its own popup (§ 9).
 
 **Scope:** spec only. No code, no renders, no paid calls, no tickets.
@@ -16,7 +18,7 @@
 
 ## Goal
 
-A learner who has finished a three-letter round sees a longer log with four sockets and a "4" glide in, and taps it. In a four-letter round she finds 4-6 words of four sounds, each shown by its picture or a listen mark over four boxes, on a log of four seats. From then on the game opens on two logs, "3" and "4", and she picks.
+A learner who has finished a three-letter round sees a longer log with four sockets and a "4" glide in, and taps it. In a four-letter round she finds 4-6 words of four sounds, each shown by its picture over four boxes (amended 2026-10-27, § 15: it was "its picture or a listen mark"), on a log of four seats. From then on the game opens on two logs, "3" and "4", and she picks.
 
 ## User state entering
 
@@ -60,6 +62,8 @@ She has the word hunt (blending sounds current or mastered, `critters-word-hunt.
 | `guide.play.critters.open.four`                                | a `GuidanceLine`       | "Drag four letters up to the log. Can you make these words?" (Dave 23 (B); the three-letter one is `guide.play.critters.open`, `guidanceLines.ts:314`, `:425`)                                                                                                |
 | `critterPraise(word)`, `HUNT_FOUR_LESSON_WORDS`                | 11 more words          | flag hand lamp tent nest belt gift frog pond drum plum: their lesson praise clip ("Yes! That's a flag.", `mobile/src/audio/canonAudioRegistry.ts:1395`). `CRITTER_PRAISE_WORDS` is the 45 and the 11; the app's play-line manifest has a praise line for each |
 
+**Amended 2026-10-27 (§ 15.2):** the four lists above grow or shrink (`HUNT_FOUR_TARGETS` 97, `HUNT_RUDE_FOUR` 19, `HUNT_FOUR_UNDEALT` 24, `HUNT_FOUR_PICTURE_WORDS` 41), and the round below changes: targets are only pictured words, extras (0-3) return, and the fallbacks and counts are Dave 27's. The text below is the rule as first built.
+
 **A round** (Dave 23 (B), "A round"):
 
 - **Letters:** 7: the vowel, then 6 consonants a-z, from the 17 consonant critters (b c d f g h j l m n p r s t v w x). Vowels: `huntVowels(progress)`, unchanged: only her taught vowels deal.
@@ -82,7 +86,7 @@ She has the word hunt (blending sounds current or mastered, `critters-word-hunt.
 
 ### 2.1 Parts
 
-As phase 1 (`critters-word-hunt.md` § 2.1) with four changes: **the log band** has 4 seats (§ 3); **the meadow** has 7 critters, 4 + 3; **the board** has N = 4-6 four-box slots; **there is no bonus chip** and no chip cell. The picture card is `p = min(block height, block width, 200 phone / 300 tablet)`, centred on the block, as phase 1.
+As phase 1 (`critters-word-hunt.md` § 2.1) with four changes: **the log band** has 4 seats (§ 3); **the meadow** has 7 critters, 4 + 3; **the board** has N = 4-6 four-box slots; **there is no bonus chip** and no chip cell (kept 2026-10-27, § 15.3: four-letter rounds now have extras, but no place for their chip fits every form). The picture card is `p = min(block height, block width, 200 phone / 300 tablet)`, centred on the block, as phase 1.
 
 | Form    | c / g   | Seat | Log band  | Meadow (4 + 3) | Block     |
 | ------- | ------- | ---- | --------- | -------------- | --------- |
@@ -179,10 +183,11 @@ Drag, drop, swap, hop home and a tap on a critter are `play-place.md` § 3.3, un
 | 1-3 seated, **she taps the log** | They sing left to right, each its own sound with its bounce, the next 300 ms after the one before ends (`play-place.md:514`). **An empty seat between two seated critters adds a 600 ms rest** (Decision 8): the gap across one empty middle seat is 900 ms (300 + 600), and each further empty middle seat adds 600 (Dave, Q20); empty seats at either end are skipped. Emma `listening`, then `idle`. **Nothing else:** no outcome, no clear, no write, and it is not a run for the hint's count. A drag or a seat change cuts the song.                                                                        |
 | 4 seated                         | 400 ms after the last seat change, with no drag in progress, they sing, left to right, as above. The board waits from the first sound (`play-place.md:522`). Then the outcome:                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | a target (`'word'`)              | 300 ms after the last sound, Emma says the word ("Flag.", caption in her ribbon, `attentive-pointing`), as a said word (`play-place.md:517`). At her line's end, **the joy beat:** `cheering`, the cheer, the four bounce together, and the burst from the log's middle (Decision 10; `k` = seat / 112). A pictured target pops its picture at that moment (the said word's card, held 2400 ms, then the float-away). One of the 11 lesson words, on its first build in the visit: its praise clip at her line's end + 1200, still `cheering` (Dave 23 (B); `play-place.md:509`'s timing). Then the fill (§ 4.2). |
+| an extra (§ 15.3)                | Amended 2026-10-27: a `'word'` run that is not a target. As a target up to and including the joy beat: Emma says the word with its caption, then the joy beat. No picture (an extra has none), no praise, **no fill and no chip**. The outcome is over at her line's end + 1200, then the shelf clears. Recorded in `found`, as phase 1's extras are                                                                                                                                                                                                                                                              |
 | anything else (`'quiet'`)        | 300 ms after the last sound, the four bounce together once (0.15 c, 250 ms) and sit. No word, boing, tumble, line, picture or sparkle; Emma `idle` (`play-place.md:518`). Real words, plurals and rare words all take this (Dave 23 (B), "Quiet words").                                                                                                                                                                                                                                                                                                                                                          |
 | then                             | **The shelf clears** after every run of four, as after every run of three (`play-place.md:522-531`): the outcome over, 400 ms hold, 400 ms drop.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
-**Never in a four-letter round:** the boing, the tumble or a non-word line; extras; the bonus chip.
+**Never in a four-letter round:** the boing, the tumble or a non-word line; extras (amended 2026-10-27, § 15.3: extras now deal, 0-3 a round); the bonus chip.
 
 **A three-letter word on the four-seat log** (_fog_ for _frog_) leaves a seat empty, so it never sings unless she taps the log, and then it is never judged (Dave 23 (B)).
 
@@ -365,7 +370,7 @@ After the beat, only P has a free strip for a full-size second log: the 3-log's 
 
 ## 7. Wireframes (positions from § 2.4, § 5.2 and § 6; the art is not to scale, the annotations are)
 
-Sample rounds are real rounds by Dave 23 (B)'s rules (my port, § 11). Board order: pictured a-z, then the rest a-z.
+Sample rounds are real rounds by Dave 23 (B)'s rules (my port, § 11). Board order: pictured a-z, then the rest a-z. (Amended 2026-10-27, § 15: the positions hold, but the listen slots no longer deal. Of these sample rounds only o d n p r s t still deals, as _drop pond pots stop tops_ with the extras _prop spot trot_; the others do not.)
 
 ```
 PHONE PORTRAIT 375×667 (S4, four boxes), a partial run
@@ -578,7 +583,7 @@ They go in `PLAY_LABELS` (`mobile/src/screens/play/playLines.ts:105-117`) beside
 | ant  | one big red ant, side view, six legs, three body parts                                                                            | _bug_, _bee_                                                                    |
 | elf  | a small friendly elf with pointed ears and a green pointed hat                                                                    | _king_, _hat_                                                                   |
 
-With the 11 lesson pictures, 25 of the 82 targets are pictured (Dave). **Optional, not now** (Dave): 5 phase-1 pictures (hog pup fin tin vet), about $0.39, only if device play shows listen slots stall.
+With the 11 lesson pictures, 25 of the 82 targets are pictured (Dave). **Optional, not now** (Dave): 5 phase-1 pictures (hog pup fin tin vet), about $0.39, only if device play shows listen slots stall. (Amended 2026-10-27: Dave withdrew these five, "By my own rule they read as pig, dog, shark or fish, can and doctor", Dave 27 (A). The 23 pictures of Dave 27 (C) are in Devon's PR #714, open at e012ff88; § 15.)
 
 ---
 
@@ -586,11 +591,11 @@ With the 11 lesson pictures, 25 of the 82 targets are pictured (Dave). **Optiona
 
 ### 10.1 Core (vitest, `packages/core`; Kevin; Dave 23 (D) item 12)
 
-1. **F1.** For every vowel, every round `huntRounds(v, { length: 4 })` returns has 7 letters (the vowel, then 6 distinct consonants of the 17, a-z); its targets are exactly the `HUNT_FOUR_TARGETS` words those letters spell (the vowel once, a consonant at most twice), 4-6 of them, at least 2 with a bundled picture; at most 1 consonant is in no target; no `HUNT_RUDE_FOUR` word is spellable; no `HUNT_FOUR_UNDEALT` word is spellable (the 25 words with no clip, Q21); `extras` is empty. `huntDeal` never returns `last`'s letters, and the same seed gives the same round.
-2. **F2.** `HUNT_FOUR_TARGETS` equals Dave's 82 (a 18, o 15, i 7, u 19, e 23); `HUNT_RUDE_FOUR` his printed 18; `HUNT_FOUR_UNDEALT` his 25; _hump_ is on none.
-3. **F3.** With the 16 pictures bundled, each of Dave's 5 pinned fallbacks is a round by F1 with the targets § 1 lists. The rounds per vowel are a 56, o 51, i 2, u 125, e 86, with § 1's N splits (Dave's counts; Q21).
+1. **F1.** (Superseded 2026-10-27 by F23, § 15.5.) For every vowel, every round `huntRounds(v, { length: 4 })` returns has 7 letters (the vowel, then 6 distinct consonants of the 17, a-z); its targets are exactly the `HUNT_FOUR_TARGETS` words those letters spell (the vowel once, a consonant at most twice), 4-6 of them, at least 2 with a bundled picture; at most 1 consonant is in no target; no `HUNT_RUDE_FOUR` word is spellable; no `HUNT_FOUR_UNDEALT` word is spellable (the 25 words with no clip, Q21); `extras` is empty. `huntDeal` never returns `last`'s letters, and the same seed gives the same round.
+2. **F2.** (Superseded 2026-10-27 by F24.) `HUNT_FOUR_TARGETS` equals Dave's 82 (a 18, o 15, i 7, u 19, e 23); `HUNT_RUDE_FOUR` his printed 18; `HUNT_FOUR_UNDEALT` his 25; _hump_ is on none.
+3. **F3.** (Superseded 2026-10-27 by F25.) With the 16 pictures bundled, each of Dave's 5 pinned fallbacks is a round by F1 with the targets § 1 lists. The rounds per vowel are a 56, o 51, i 2, u 125, e 86, with § 1's N splits (Dave's counts; Q21).
 4. **F4.** `huntComplete` is false at N − 2 and true at N − 1 for N 4, 5 and 6, and stays true at N.
-5. **F5.** `huntBoardOrder` in a four-letter round is the pictured targets a-z, then the rest a-z: o d n p r s t gives drop pond stop prop spot trot; a c l m n p s gives clap lamp camp plan slap snap.
+5. **F5.** (Amended 2026-10-27 by F27: its two sample rounds no longer deal.) `huntBoardOrder` in a four-letter round is the pictured targets a-z, then the rest a-z: o d n p r s t gives drop pond stop prop spot trot; a c l m n p s gives clap lamp camp plan slap snap.
 6. **F6.** `huntOpenLengths()` is `[3]` until a learner's first three-letter round completes, then `[3, 4]`, written with the completing find, kept across restarts, never reverting. Learner B's stay `[3]`. A four-letter `HuntRecord` (7 letters) round-trips under the `"4"` key and leaves `"3"` untouched.
 7. **F7.** _act add end ill its odd off_ are on `HUNT_FAMILIAR`; _ant_ and _elf_ are said words with a picture once bundled; none of the 9 is on `CRITTER_NOT_SAID`. Phase 1's H2/H3 counts are re-pinned to what the code then gives.
 8. **F8.** A run of four: `'word'` for a `HUNT_FOUR_TARGETS` word, `'quiet'` for anything else; never `'picture'` or `'funny'`.
@@ -611,8 +616,8 @@ With the 11 lesson pictures, 25 of the 82 targets are pictured (Dave). **Optiona
 
 ### 10.3 Device and E2E (Jessica first; phone P and L, iPad portrait and landscape; Emma muted for local runs)
 
-20. **F20.** Maestro on the `critters-hunt` seed (a b g h p t, with bag, hat, bat and tap found, `critters-word-hunt.md:564`), learner with `[3]`: build t-a-g. The beat plays, the log glides in and becomes the door, New letters appears. Tap the door: a four-letter round with the "4" log, 7 critters and four-box slots, everything inside the play area on all four forms (screenshots). Back: the picker with two logs. Back: the Play place. Reopen: the picker.
-21. **F21.** Maestro on a proposed `critters-hunt-four` seed (a b c d l m p, with clap and lamp found): seat c, a, p: nothing sings for 5 s; tap the log: "c ... a ... p", nothing else. Build c-a-m-p: it fills slot 3, and the beat plays (3 of 4). _damp_ stays findable. New letters: a fresh four-letter board.
+20. **F20.** (Amended 2026-10-27 by F29: the seed is a b f g h t with bag and hat found, `critters-word-hunt.md` § 16.4; t-a-g still completes it.) Maestro on the `critters-hunt` seed (a b g h p t, with bag, hat, bat and tap found, `critters-word-hunt.md:564`), learner with `[3]`: build t-a-g. The beat plays, the log glides in and becomes the door, New letters appears. Tap the door: a four-letter round with the "4" log, 7 critters and four-box slots, everything inside the play area on all four forms (screenshots). Back: the picker with two logs. Back: the Play place. Reopen: the picker.
+21. **F21.** (Superseded 2026-10-27 by F29.) Maestro on a proposed `critters-hunt-four` seed (a b c d l m p, with clap and lamp found): seat c, a, p: nothing sings for 5 s; tap the log: "c ... a ... p", nothing else. Build c-a-m-p: it fills slot 3, and the beat plays (3 of 4). _damp_ stays findable. New letters: a fresh four-letter board.
 22. **F22.** Thomas's eye on a phone and an iPad (§ 11): the four-box board, the picker, the roll-in and the door. His ear on the 92 lines is the render's own ear test.
 
 ---
@@ -669,3 +674,143 @@ With the 11 lesson pictures, 25 of the 82 targets are pictured (Dave). **Optiona
 | Failure feedback        | No boing, tumble or line in four-letter rounds; a partial run is never judged                                                                                                                                                                                            |
 | Grind                   | 4-6 words, all but one, the hint                                                                                                                                                                                                                                         |
 | Rude words              | No round's letters spell one of Dave's 18                                                                                                                                                                                                                                |
+
+---
+
+## 15. Pictured-only boards (build 25, Dave 27, 2026-10-27)
+
+**Rules:** Dave 27 (A) for four letters (`design/research/critters-pictured-boards-2026-10-27.md`). This section gives the rule as Kevin's acceptance criteria (§ 15.2), designs Dave 27 (D) item 2, a place for the chip (§ 15.3), and does item 3, the 36 pt check, for the four-letter pictures (§ 15.4). The three-letter half, the N-4 board and the seeds are `critters-word-hunt.md` § 16. **Unchanged:** the board, its ladder and § 2.4's rects (N stays 4-6), the log, the meadow, the fill, the hint, the beat, the picker (Dave 27 (D) item 4: "Still two logs"). **0 new audio and 0 new pictures in this PR, $0.** Line numbers in § 15 are at `origin/main` abcfc090, and on PR #714's branch at e012ff88 where marked.
+
+### 15.1 Decisions (this section's own calls, with reasons)
+
+1. **No chip in four-letter rounds, on every form** (Dave 27 (D) item 2's fallback). § 15.3 finds no place that fits all 16 viewports, and none at all on 7 of them. A chip on some forms only would appear and vanish when the device turns (a rotation keeps the chip, `critters-word-hunt.md` H25), and a learner's phone and iPad would differ. Dave: "the chip is a record; the reward is the joy beat".
+2. **An extra is still recorded** (`huntFind` unchanged; phase 1's Q1). Nothing draws it, but the record stays one shape for both lengths, and a later design that finds room has the data.
+3. **No layout change.** N is still 4-6 and § 2.4 still holds; only what a slot can hold changed.
+
+### 15.2 The four-letter rule (Dave 27 (A), for Kevin)
+
+- **Targets:** exactly the spellable `HUNT_FOUR_TARGETS` words with a bundled picture (`critterHasPicture`). **N 4-6.** Complete at N − 1, as now.
+- **Extras:** exactly the other spellable `HUNT_FOUR_TARGETS` words: each has a clip, and none has a picture. **At most 3** (a round with 4 is not dealt). § 15.3 says what one does.
+- **At most 1 decoy consonant** (unchanged).
+- **Rejects:** `HUNT_RUDE_FOUR` plus _clit_ (19: the shipped short-i fallback i c f g l p t spells it, Dave 27 (A)), and `HUNT_FOUR_UNDEALT` minus _crab_ (24). No probe guard (unchanged).
+- **The lists:**
+  - #714's `HUNT_FOUR_LATER` (the 14 plurals and _crab_, `playPlace.ts:500` on its branch) moves onto `HUNT_FOUR_TARGETS`: 82 + 15 = 97.
+  - _step_, the 14 plurals **and _crab_** move onto `HUNT_FOUR_PICTURE_WORDS`: 25 + 16 = 41. #714 holds step and the plurals on `CRITTER_PICTURES_WIRED_LATER` (`:577` there), which empties. Crab's picture is bundled already (`mobile/assets/pictures/crab.webp`, `registry.ts:57`), but `critterHasPicture('crab')` is false today (checked). Dave's "For Kevin" list puts crab on the targets only; his counts need it pictured. Without it short a deals 104 rounds, not 110 (the port; Q33).
+- **The deal** picks only among her vowels with at least one four-letter round other than `last`'s letters. Short i has none (Dave: "Short i stays thin: ... 0 four-letter"), so a learner with i among her vowels gets her other vowels' four-letter rounds. She always has a (four letters open after a three-letter round, and a opens the hunt), and a deals 110.
+- **Fallbacks** (Dave's proposal, "Kevin pins them"): a b c d n s t, o b c m p s t, u b c j l m p, e c j n p s t, and **no i entry**. They deal _ants bats cats sand_ / band; _cots mops pots stop tops_ / cost spot; _bulb jump plum pump_ / bump club lump; _jets nest step tent_ / sent test (the port). `huntDeal` already falls back to a's when a vowel has no entry (`fallback[vowel] ?? fallback.a`, `critterHunt.ts:361`).
+- **Counts** (Dave's; the port reproduces them exactly): a 110, o 29, u 38, i 0, e 19, with N splits a {4: 81, 5: 26, 6: 3}, o {4: 15, 5: 14}, u {4: 36, 5: 2}, e {4: 18, 5: 1}. (E) adds no four-letter round.
+- **Extras per round** (the port): a {0: 53, 1: 41, 2: 9, 3: 7}, o {1: 8, 2: 11, 3: 10}, u {2: 24, 3: 14}, e {2: 16, 3: 3}. 143 of the 196 rounds have at least one, and every o, u and e round does.
+- **Pictured targets ever dealt** (Dave): a ants bats caps cats clap crab hand hats lamp maps mats rats sand taps; o cots drop mops pond pots stop tops; u bulb drum jump plug plum pump slug; e jets nest step tent vest. Never dealt: flag frog gift belt ramp sled clip drip (Dave 27 (A)).
+
+### 15.3 The chip (Dave 27 (D) item 2)
+
+**The chip of a four-letter round** would hold at most 3 extras of four small tiles: `4 bx + 3 gb + 2 pad` wide and `3 bx + 2 pad + 2 pad` tall for 3 extras. That is 76 × 60 at S4 and S5 (bx 16), 140 × 116 at S1, 124 × 104 at S2 and 101 × 84 at S3 (`SLOT_STEPS`, `playGeometry.ts:399-405`).
+
+**Measured** on 2026-10-27 by a scratch script (not committed; `tmp/pictured-boards/chip4.ts` in the main checkout) over the shipped four-letter `huntScene` at 4ccd7570 (byte-identical at abcfc090; the method check of `critters-word-hunt.md` § 16.2 covers it), for N 4, 5 and 6. A place passes when the chip is inside `A` and clear of every slot, the log band, the numeral, every seat's drop zone and every critter with its burrow (phase 1's fit rule for the chip, `critters-word-hunt.md` § 2.2). Four places were tried:
+
+- **(a) beside the meadow,** `g` right of it, bottom-aligned: phase 1's portrait place (`chipRect`, `playGeometry.ts:470-490`);
+- **(b) beside the meadow's short row** (the 3 below the 4), bottom-aligned;
+- **(c) landscape, the board's next cell** in rows of 2, as phase 1's landscape chip (it adds a row at N 4 and N 6);
+- **(d) landscape, under the board** in `A`.
+
+| Viewport (step)               | Passes for N 4, 5 and 6              | Why nothing else does (N 6 unless marked)                                                                                                                                                                 |
+| ----------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 375 × 667 (S4)                | **none**                             | (a) 36.5 pt outside `A`; (b) 4.5 pt outside `A` (71.5 free beside the short row, as beside phase 1's meadow, `critters-word-hunt.md` § 2.3, for a 76 chip); 5 pt free above the board and below the block |
+| 390 × 844 (S4)                | (b), 1.8 pt below critter 4's burrow | (a) 29 pt outside `A`                                                                                                                                                                                     |
+| 667 × 375 (S5)                | **none**                             | (a) and (b) hit slot 5; (c) needs 4 rows, 278 > `A`'s 216.4; (d) 9.4 pt free for 60                                                                                                                       |
+| 844 × 390 (S4)                | **none**                             | (a) hits slot 5; (b) hits critter 4 by 5.9; (c) 286 > 214.2; (d) 1.2 free                                                                                                                                 |
+| 820 × 1180, 834 × 1194 (S1)   | (a), 16 from critter 4               | (b) hits critter 4 by 15.5                                                                                                                                                                                |
+| 744 × 1133, 810 × 1080 (S2)   | (a), 16 from critter 4               | (b) hits critter 4 by 3.5                                                                                                                                                                                 |
+| 768 × 1024 (S3)               | (a) and (b), 16 or more              |                                                                                                                                                                                                           |
+| 1180 × 820, b20 and t24 (S1)  | **none**                             | (a) and (b) hit slots 3 and 5; (c) 592 > 537 / 513; (d) 97 / 73 free for 116                                                                                                                              |
+| 1194 × 834 (S1)               | **none**                             | (a) and (b) hit slots 3 and 5; (c) 592 > 527; (d) 87 free for 116                                                                                                                                         |
+| 1133 × 744 (S2)               | **none**                             | (a) hits slot 5; (b) hits slot 5 and critter 4; (c) 496 > 437; (d) 69 free for 104                                                                                                                        |
+| 1080 × 810, t24 and none (S3) | (b), 14.4 from slot 3 or 5           | (a) hits slot 3 (N 4) or 5 (N 6)                                                                                                                                                                          |
+| 1024 × 768 (S4)               | (b), 16 from critter 7               | (a) hits slot 5 by 8                                                                                                                                                                                      |
+
+**Result:** no single place fits every form, and on 7 of the 16 viewports nothing fits (one phone in portrait, both phones in landscape, four iPads in landscape). Dave's own numbers predicted it: "39.5 pt a side" beside the four-critter row, "10 pt spare", and "the board's next cell only at N 5" (Dave 27 (D) item 2). A smaller chip does not change it: phone landscape at N 6 has 9.4 pt free in its board's column and 14.2 above and below its block (`A` 216.4, block 188), so no chip of a readable tile fits there at all.
+
+**So Dave's fallback, on every form (Decision 1).** An extra in a four-letter round:
+
+| t                     | What happens                                                                                                                                                                                                          |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| last sound + 300      | Emma says the word ("Spot.", caption in her ribbon, `attentive-pointing`), as a target (§ 4.1)                                                                                                                        |
+| her line's end        | **The joy beat:** `cheering`, the cheer, the four bounce together, the burst from the log's middle (Decision 10). No picture (an extra has none) and no praise (the 11 lesson words are all pictured, so all targets) |
+| her line's end + 1200 | The outcome is over (§ 4.2's unpictured timing). **No fill:** no tile flies, no slot changes, no chip appears. The shelf clears (400 ms hold, 400 ms drop)                                                            |
+
+- **A repeat extra** plays the same again (the joy beat, no praise; there is no slot to wiggle).
+- **The record:** `huntFind` adds it to `found` (Decision 2). It never counts toward completion.
+- **The hint:** an extra is a run "without a new target" (§ 4.3), as in phase 1.
+- **Reduce Motion and VoiceOver:** as a target's outcome (§ 8); nothing is added.
+- **Nothing on screen says how many extras exist** (`critters-word-hunt.md` § 4.5, Dave (1)), and now nothing shows which she found.
+
+### 15.4 The phone picture check, four letters (Dave 27 (D) item 3: "It matters most for the plurals: does 'three' read?")
+
+**What:** the 15 four-letter pictures on PR #714's branch (`mobile/assets/pictures/<word>.webp` at e012ff88: the 14 plurals and _step_), and _crab_ (bundled, newly dealt). **How:** `critters-word-hunt.md` § 16.5's method, in four-box slots: S4 100 × 67 and S5 92 × 65, both T 36, the picture drawn to the whole box. The singular of each plural (shipped) was drawn beside it at the same T. Not committed: `tmp/pictured-boards/contact-3x.png` in the main checkout.
+
+| Word | Content at T 36 (w × h, pt) | Three?           | The thing at 36 pt                                     | Its singular (h, pt) |
+| ---- | --------------------------- | ---------------- | ------------------------------------------------------ | -------------------- |
+| ants | 35.3 × 13.9                 | yes              | red ants, clear                                        | 26.6                 |
+| bats | 35.7 × 11.5                 | yes, wings touch | purple bats                                            | 24.8                 |
+| caps | 34.6 × 10.7                 | yes, overlapping | **weak:** three pink humps                             | 23.2                 |
+| cats | 32.7 × 21.4                 | yes              | three sitting cats, clear                              | 33.8                 |
+| cots | 34.1 × 10.8                 | yes              | small beds                                             | 20.8                 |
+| hats | 35 × 9.3                    | yes              | **weak:** the smallest objects on the sheet            | 24                   |
+| jets | 34.3 × 28                   | yes              | planes, clear (2 over 1)                               | 20.6                 |
+| maps | 34.5 × 14                   | yes              | folded papers before maps                              | 25                   |
+| mats | 34.4 × 10.2                 | yes              | **weak:** three striped strips                         | 19.8                 |
+| mops | 25.6 × 30.7                 | yes              | mops, clear (upright)                                  | 33.5                 |
+| pots | 34.6 × 9.8                  | yes              | grey pots, small but the shape holds                   | 26.9                 |
+| rats | 34.4 × 10.8                 | yes              | mice or rats (as the singular)                         | 24.8                 |
+| taps | 33.3 × 18.4                 | yes              | taps with drips; not a sink                            | 30.8                 |
+| tops | 33.5 × 16.6                 | yes              | spinning tops, clear                                   | 30.5                 |
+| step | 36 × 19.1                   | (one)            | **weak:** a stone slab on grass, "block" before "step" | n/a                  |
+| crab | (bundled)                   | (one)            | a crab, clear                                          | n/a                  |
+
+- **"Three" reads in all 14.** The objects shrink. Nine plurals put three objects in one row across the box, so each is about 11.5 pt wide and 9-14 pt tall: 40-55 % of the singular's height at the same T (_hats_ 9.3 against 24). _jets_ (2 over 1) and the upright _mops_, _tops_, _taps_ and _cats_ read best.
+- **Weakest:** _hats_, _caps_, _mats_ and _step_. Their limit is the drawing at 36 pt, and a phone has no more room (§ 2.2; `critters-word-hunt.md` § 15.10). A tap gives the word.
+- **The lever is art, not layout:** re-rendering the one-row plurals as 2 over 1, as _jets_ is drawn, would let each object take about half the box a side instead of a third. It needs its own popup and spend; not proposed now (Q35). F30 is the device check.
+- **S5** (667 × 375 only) draws the same 36 pt picture over smaller boxes; nothing changes. **Tablets** draw 72 / 56 / 44, except the 1024 × 768 iPad in landscape, which takes S4 (§ 2.4) and so these 36 pt pictures.
+
+### 15.5 Acceptance criteria (F23-F30; they supersede or amend F1-F3, F5, F20 and F21 as marked there)
+
+**Core (vitest, `packages/core`; Kevin):**
+
+23. **F23** (supersedes F1). For every vowel, every round `huntRounds(v, { length: 4 })` returns has 7 letters (the vowel, then 6 distinct consonants of the 17, a-z); its targets are exactly the spellable `HUNT_FOUR_TARGETS` words with `critterHasPicture`, 4-6 of them; its extras are exactly the other spellable `HUNT_FOUR_TARGETS` words, at most 3; at most 1 consonant is in no target; no `HUNT_RUDE_FOUR` or `HUNT_FOUR_UNDEALT` word is spellable. `huntDeal` never returns `last`'s letters; the same seed gives the same round.
+24. **F24** (supersedes F2). `HUNT_FOUR_TARGETS` is Dave 23's 82 and the 15 of `HUNT_FOUR_LATER` (97); `HUNT_RUDE_FOUR` is his 18 and _clit_ (19); `HUNT_FOUR_UNDEALT` is his 25 without _crab_ (24); `HUNT_FOUR_PICTURE_WORDS` is the 25, _step_, the 14 plurals and _crab_ (41), each checked against the registry; `HUNT_FOUR_LATER` and `CRITTER_PICTURES_WIRED_LATER` are empty or gone. _hump_ is on none.
+25. **F25** (supersedes F3). The rounds per vowel are a 110, o 29, u 38, i 0, e 19, with § 15.2's N splits. `HUNT_FOUR_FALLBACK` is § 15.2's four (or Kevin's pins), each a round by F23 with the targets and extras listed there, and has no i entry.
+26. **F26.** For a learner whose vowels include i (and so a), every four-letter `huntDeal` over 1,000 seeds returns a round of another vowel; three-letter deals still include short-i rounds.
+27. **F27** (amends F5). Every word of `huntBoardOrder` in a four-letter round has a picture, so the order is the targets a-z: a b c d n s t gives ants bats cats sand; o b c m p s t gives cots mops pots stop tops.
+
+**Native (jest, `mobile`; Devon):**
+
+28. **F28** (amends F12, F13). With fake timers and audio, in a four-letter round an extra (in a b c d n s t, _band_) plays Emma's word line with its caption and the joy beat, no picture and no praise; no tile renders in any slot, `hunt-bonus` never renders (F13 holds), and the shelf's 400 ms hold starts at her line's end + 1200, then its 400 ms drop. A repeat extra does the same. After it, `found` holds it and `huntComplete` is unchanged; the hint's run count counts it as a run without a new target.
+
+**Device and E2E (Jessica first; phone P and L, iPad portrait and landscape; Emma muted for local runs):**
+
+29. **F29** (amends F20, supersedes F21). F20 runs on the new `critters-hunt` seed (a b f g h t, bag and hat found; `critters-word-hunt.md` § 16.4): build t-a-g, and the rest of F20 holds. On the new `critters-hunt-four` seed (a b c d n s t, ants and bats found): seat c, a, t: nothing sings for 5 s; tap the log: "c ... a ... t", nothing else. Build b-a-n-d: "Band.", the joy beat, nothing fills, no chip. Build c-a-t-s: it fills `hunt-slot-2`, and the beat plays (3 of 4); _sand_ stays findable. New letters: a fresh four-letter board, every slot a picture, no listen mark (screenshots on all four forms).
+30. **F30.** Thomas's eye on a phone (Predict-Before-Soak, § 15.6): the 15 pictures of § 15.4 at 36 pt, and an extra's outcome with no chip.
+
+### 15.6 Prediction and bounded convergence
+
+- **Prediction (falsifiable, written before anyone sees it on a device):**
+  - On a phone Thomas sees "three" in every plural. He names _ants cats jets mops pots taps tops_ at a glance and asks about at least two of _hats caps mats cots rats_. _step_ needs its tap.
+  - In a short-o four-letter round (every one has an extra) Marian builds at least one extra (_spot_, _cost_) and does not look for where it went.
+- **Bounded convergence.** **Tested:** the chip's four candidate places on 16 viewports through the shipped four-letter `huntScene` (method check: § 2.4's rows reproduce exactly); the four-letter rule through the port of `critters-word-hunt.md` § 16.7, which reproduces Dave 27's four-letter counts, N splits and four fallbacks exactly, and the crab finding; the 16 pictures on a 3× browser sheet and their drawn size from the files. **Not tested:** anything on a device; whether an extra with no record reads as "that counted" to a child; whether three objects read to a child at 36 pt; a re-render's cost or look; Kevin's code against the port.
+
+### 15.7 Open questions (§ 15)
+
+33. **Q33 (Dave, Kevin). _crab_ must be on `HUNT_FOUR_PICTURE_WORDS` too.** Your "For Kevin" list puts it on the targets only; your counts treat it as pictured (short a: 110 with it, 104 without, the port). F24 adds it; say if you meant otherwise.
+34. **Q34 (Dave). No chip in any four-letter round** (Decision 1), not a chip on the forms where one fits. The chip-less extra is what she meets in 143 of 196 four-letter rounds, every short-o one among them. Your untested "didn't count" item applies most here.
+35. **Q35 (Dave, Thomas). The one-row plurals draw each object at 9-14 pt tall** (§ 15.4). "Three" reads; the thing is weakest in _hats_, _caps_ and _mats_. If F30 fails them, the lever is a 2-over-1 re-render under its own popup; not proposed now.
+36. **Q36 (Kevin). `HUNT_FOUR_FALLBACK` has no i entry** (Dave: "i none"). With F26's skip, a learner reaches a fallback only if all her vowels deal 0 four-letter rounds, which a (110) never does; `fallback.a` covers a missing entry (`critterHunt.ts:361`).
+
+### 15.8 Child-safety and dark-pattern check (the change only)
+
+| Risk                    | Here                                                                                                                                                                                                                   |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Failure feedback        | Unchanged: an extra is said and gets the joy beat, never judged; any other run of four sings and sits (`'quiet'`, § 4.1). What changes: a word with no picture used to fill a listen slot and now leaves no mark (Q34) |
+| A record of extras      | None drawn (Decision 1); none lost (stored, Decision 2); nothing says how many exist                                                                                                                                   |
+| Rude words              | No round spells one of the 19 (Dave's 18 and _clit_)                                                                                                                                                                   |
+| Grind, variable reward  | Unchanged: 4-6 words, all but one; the joy beat is the same every time                                                                                                                                                 |
+| Untaught content judged | Unchanged: her taught vowels only, and short i deals no four-letter round                                                                                                                                              |
