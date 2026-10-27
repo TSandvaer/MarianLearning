@@ -7,12 +7,17 @@
 import type { Viewport } from '../../layout/layout'
 import { mathLayout } from '../../layout/mathLayout'
 import {
+  arrivalScene,
+  backRect,
   chipRect,
   critterScene,
   crittersFitBothWays,
+  doorRect,
   huntScene,
   huntSceneFits,
+  logSockets,
   overlaps,
+  pickerScene,
   playArea,
   raftScene,
   TABLET_FIT_INSETS,
@@ -525,5 +530,459 @@ describe('H7: the word hunt scene (critters-word-hunt.md § 2.4)', () => {
     expect(l.chipCell).not.toBeNull()
     expect(l.chipCell!.y).toBeGreaterThan(l.slots[5]!.card.y)
     expect(sceneOf(vp(375, 667), 6).s.chipCell).toBeNull()
+  })
+})
+
+/** critters-four-letter.md § 2.4: (x, y, w, h) rects for N 6. */
+const FOUR_TABLE: readonly (readonly [
+  string,
+  Viewport,
+  string,
+  Record<'slot' | 'board' | 'logBand' | 'meadow', readonly number[]> & {
+    picture: readonly [number, number, number]
+  },
+])[] = [
+  [
+    '375 × 667',
+    vp(375, 667),
+    'S4',
+    {
+      slot: [100, 67],
+      board: [31.5, 264, 312, 140],
+      logBand: [19.5, 416, 336, 86],
+      meadow: [63.5, 510, 248, 120],
+      picture: [87.5, 423, 200],
+    },
+  ],
+  [
+    '667 × 375',
+    vp(667, 375),
+    'S5',
+    {
+      slot: [92, 65],
+      board: [461, 151.1, 190, 207],
+      logBand: [160, 160.6, 296, 76],
+      meadow: [200, 244.6, 216, 104],
+      picture: [214, 160.6, 188],
+    },
+  ],
+  [
+    '390 × 844 (t47 b34)',
+    vp(390, 844, { top: 47, bottom: 34 }),
+    'S4',
+    {
+      slot: [100, 67],
+      board: [39, 369.5, 312, 140],
+      logBand: [27, 521.5, 336, 86],
+      meadow: [71, 615.5, 248, 120],
+      picture: [95, 528.5, 200],
+    },
+  ],
+  [
+    '844 × 390 (l/r47 b21)',
+    vp(844, 390, { left: 47, right: 47, bottom: 21 }),
+    'S4',
+    {
+      slot: [100, 67],
+      board: [561, 144.6, 206, 213],
+      logBand: [241, 157.1, 296, 76],
+      meadow: [281, 241.1, 216, 104],
+      picture: [295, 157.1, 188],
+    },
+  ],
+  [
+    '820 × 1180 (t24 b20)',
+    vp(820, 1180, { top: 24, bottom: 20 }),
+    'S1',
+    {
+      slot: [188, 136],
+      board: [112, 462.4, 596, 288],
+      logBand: [150, 774.4, 520, 126],
+      meadow: [210, 916.4, 400, 192],
+      picture: [260, 791.4, 300],
+    },
+  ],
+  [
+    '1180 × 820 (b20)',
+    vp(1180, 820, { bottom: 20 }),
+    'S1',
+    {
+      slot: [188, 136],
+      board: [772, 279.5, 392, 440],
+      logBand: [245.2, 332.5, 520, 126],
+      meadow: [305.2, 474.5, 400, 192],
+      picture: [355.2, 349.5, 300],
+    },
+  ],
+  [
+    '1180 × 820 (t24 b20)',
+    vp(1180, 820, { top: 24, bottom: 20 }),
+    'S1',
+    {
+      slot: [188, 136],
+      board: [772, 291.5, 392, 440],
+      logBand: [245.2, 344.5, 520, 126],
+      meadow: [305.2, 486.5, 400, 192],
+      picture: [355.2, 361.5, 300],
+    },
+  ],
+  [
+    '834 × 1194 (t24 b20)',
+    vp(834, 1194, { top: 24, bottom: 20 }),
+    'S1',
+    {
+      slot: [188, 136],
+      board: [119, 471.2, 596, 288],
+      logBand: [157, 783.2, 520, 126],
+      meadow: [217, 925.2, 400, 192],
+      picture: [267, 800.2, 300],
+    },
+  ],
+  [
+    '1194 × 834 (t24 b20)',
+    vp(1194, 834, { top: 24, bottom: 20 }),
+    'S1',
+    {
+      slot: [188, 136],
+      board: [786, 298.5, 392, 440],
+      logBand: [248.8, 351.5, 520, 126],
+      meadow: [308.8, 493.5, 400, 192],
+      picture: [358.8, 368.5, 300],
+    },
+  ],
+  [
+    '744 × 1133 (t24 b20)',
+    vp(744, 1133, { top: 24, bottom: 20 }),
+    'S2',
+    {
+      slot: [156, 112],
+      board: [122, 456.8, 500, 240],
+      logBand: [112, 720.8, 520, 126],
+      meadow: [172, 862.8, 400, 192],
+      picture: [222, 737.8, 300],
+    },
+  ],
+  [
+    '1133 × 744 (t24 b20)',
+    vp(1133, 744, { top: 24, bottom: 20 }),
+    'S2',
+    {
+      slot: [156, 112],
+      board: [779.2, 289.5, 328, 368],
+      logBand: [235.2, 306.5, 520, 126],
+      meadow: [295.2, 448.5, 400, 192],
+      picture: [345.2, 323.5, 300],
+    },
+  ],
+  [
+    '810 × 1080 (t24 b20)',
+    vp(810, 1080, { top: 24, bottom: 20 }),
+    'S2',
+    {
+      slot: [156, 112],
+      board: [155, 423.4, 500, 240],
+      logBand: [145, 687.4, 520, 126],
+      meadow: [205, 829.4, 400, 192],
+      picture: [255, 704.4, 300],
+    },
+  ],
+  [
+    '1080 × 810 (t24 b20)',
+    vp(1080, 810, { top: 24, bottom: 20 }),
+    'S3',
+    {
+      slot: [133, 90],
+      board: [782, 355.5, 282, 302],
+      logBand: [242.6, 339.5, 520, 126],
+      meadow: [302.6, 481.5, 400, 192],
+      picture: [352.6, 356.5, 300],
+    },
+  ],
+  [
+    '768 × 1024 (t24 b20)',
+    vp(768, 1024, { top: 24, bottom: 20 }),
+    'S3',
+    {
+      slot: [133, 90],
+      board: [168.5, 410.1, 431, 196],
+      logBand: [124, 630.1, 520, 126],
+      meadow: [184, 772.1, 400, 192],
+      picture: [234, 647.1, 300],
+    },
+  ],
+  [
+    '1024 × 768 (t24 b20)',
+    vp(1024, 768, { top: 24, bottom: 20 }),
+    'S4',
+    {
+      slot: [100, 67],
+      board: [783.8, 369, 216, 233],
+      logBand: [239.8, 318.5, 520, 126],
+      meadow: [299.8, 460.5, 400, 192],
+      picture: [349.8, 335.5, 300],
+    },
+  ],
+]
+
+describe('F10: the four-letter scene (critters-four-letter.md § 2.4)', () => {
+  const sceneOf = (v: Viewport, n: number) => {
+    const layout = mathLayout(v)
+    const A = playArea(layout)
+    return { A, s: huntScene(A, layout.tablet, layout.landscape, n, 4) }
+  }
+  const expectRect = (
+    r: { x: number; y: number; width: number; height: number },
+    [x, y, w, h]: readonly number[],
+  ) => {
+    expect(r.x).toBeCloseTo(x!, 1)
+    expect(r.y).toBeCloseTo(y!, 1)
+    expect(r.width).toBeCloseTo(w!, 1)
+    expect(r.height).toBeCloseTo(h!, 1)
+  }
+
+  it.each(FOUR_TABLE)(
+    '%s: § 2.4’s step, slot and rects for N 6',
+    (_, v, step, want) => {
+      const { s } = sceneOf(v, 6)
+      expect(s.step.name).toBe(step)
+      expect(s.slots[0]!.card.width).toBeCloseTo(want.slot[0]!, 1)
+      expect(s.slots[0]!.card.height).toBeCloseTo(want.slot[1]!, 1)
+      expectRect(s.board, want.board)
+      expectRect(s.logBand, want.logBand)
+      expectRect(s.meadow, want.meadow)
+      const [px, py, p] = want.picture
+      expectRect(s.picture, [px, py, p, p])
+    },
+  )
+
+  it.each(FOUR_TABLE)('%s: the fit rule holds for N 4, 5 and 6', (_, v) => {
+    for (const n of [4, 5, 6]) {
+      const { A, s } = sceneOf(v, n)
+      expect(s.slots).toHaveLength(n)
+      expect(s.slots.every((x) => x.boxes.length === 4)).toBe(true)
+      expect(s.chipCell).toBeNull()
+      expect(huntSceneFits(s, A)).toBe(true)
+    }
+  })
+
+  it('4 seats; 7 critters, 4 + 3 in round order, each row centred (§ 2.5)', () => {
+    const { s } = sceneOf(vp(375, 667), 6)
+    expect(s.seats.map((r) => r.x)).toEqual([35.5, 113.5, 191.5, 269.5])
+    expect(s.seats.every((r) => r.y === 416 && r.width === 70)).toBe(true)
+    expect(s.cells.map((r) => [r.x, r.y])).toEqual([
+      [63.5, 510],
+      [127.5, 510],
+      [191.5, 510],
+      [255.5, 510],
+      [95.5, 574],
+      [159.5, 574],
+      [223.5, 574],
+    ])
+    expectRect(s.log, [19.5, 478, 336, 24])
+    expectRect(s.numeral, [19.5, 474, 32, 32])
+  })
+
+  it('rows: portrait ceil(N/2) over floor(N/2); landscape 2 a row, the last centred; no chip cell', () => {
+    const rowsOf = (s: ReturnType<typeof huntScene>) =>
+      [...new Set(s.slots.map((x) => x.card.y))].map(
+        (y) => s.slots.filter((x) => x.card.y === y).length,
+      )
+    expect(rowsOf(sceneOf(vp(375, 667), 4).s)).toEqual([2, 2])
+    expect(rowsOf(sceneOf(vp(375, 667), 5).s)).toEqual([3, 2])
+    expect(rowsOf(sceneOf(vp(667, 375), 5).s)).toEqual([2, 2, 1])
+    expect(rowsOf(sceneOf(vp(667, 375), 6).s)).toEqual([2, 2, 2])
+    const l5 = sceneOf(vp(667, 375), 5).s
+    expect(l5.slots[4]!.card.x).toBeCloseTo(510, 1)
+  })
+
+  it('the three-letter scene is unchanged by the length (no S5, 3 seats)', () => {
+    const layout = mathLayout(vp(667, 375))
+    const s = huntScene(playArea(layout), false, true, 6)
+    expect(s.step.name).toBe('S4')
+    expect(s.seats).toHaveLength(3)
+    expect(s.slots[0]!.boxes).toHaveLength(3)
+  })
+})
+
+describe('F16: the length picker (critters-four-letter.md § 5.2)', () => {
+  const PICKER = [
+    [
+      'P',
+      vp(375, 667),
+      [
+        [16, 259, 343, 180],
+        [16, 455, 343, 180],
+      ],
+      [
+        [19.5, 306, 258, 86],
+        [19.5, 502, 336, 86],
+      ],
+      [368, 564],
+      [364, 560],
+      32,
+      28,
+    ],
+    [
+      'L',
+      vp(667, 375),
+      [
+        [160, 146.4, 491, 100.2],
+        [160, 262.6, 491, 100.2],
+      ],
+      [
+        [257.5, 158.5, 228, 76],
+        [257.5, 274.7, 296, 76],
+      ],
+      [210.5, 326.7],
+      [206.5, 322.7],
+      32,
+      24,
+    ],
+    [
+      'W',
+      vp(820, 1180, { top: 24, bottom: 20 }),
+      [
+        [16, 442.8, 788, 334.6],
+        [16, 793.4, 788, 334.6],
+      ],
+      [
+        [150, 547.1, 394, 126],
+        [150, 897.7, 520, 126],
+      ],
+      [649.1, 999.7],
+      [641.1, 991.7],
+      40,
+      44,
+    ],
+    [
+      'TL',
+      vp(1180, 820, { bottom: 20 }),
+      [
+        [245.2, 231, 918.8, 260.5],
+        [245.2, 507.5, 918.8, 260.5],
+      ],
+      [
+        [444.6, 298.3, 394, 126],
+        [444.6, 574.8, 520, 126],
+      ],
+      [400.3, 676.8],
+      [392.3, 668.8],
+      40,
+      44,
+    ],
+  ] as const
+  it.each(PICKER)(
+    '%s: the slabs, logs, bars and discs at § 5.2’s rects',
+    (_, v, slabs, bands, barYs, discYs, D, radius) => {
+      const layout = mathLayout(v)
+      const p = pickerScene(playArea(layout), layout.tablet, layout.landscape)
+      expect(p.slabs.map((s) => s.length)).toEqual([3, 4])
+      expect(p.radius).toBe(radius)
+      p.slabs.forEach((s, i) => {
+        // § 5.2 prints to 0.1 pt (298.25 as 298.3).
+        const near = (
+          r: { x: number; y: number; width: number; height: number },
+          want: readonly number[],
+        ) =>
+          [r.x, r.y, r.width, r.height].forEach((v, k) =>
+            expect(Math.abs(v - want[k]!)).toBeLessThanOrEqual(0.0501),
+          )
+        near(s.slab, slabs[i]!)
+        near(s.log.band, bands[i]!)
+        expect(Math.abs(s.log.bar.y - barYs[i]!)).toBeLessThanOrEqual(0.0501)
+        expect(s.log.bar.height).toBe(24)
+        expect(Math.abs(s.log.disc.y - discYs[i]!)).toBeLessThanOrEqual(0.0501)
+        expect(s.log.disc.width).toBe(D)
+        expect(Math.abs(s.log.disc.x - bands[0]![0]!)).toBeLessThanOrEqual(
+          0.0501,
+        )
+        expect(s.log.seats).toHaveLength(s.length)
+      })
+    },
+  )
+})
+
+describe('F17: the arrival slab and the door (critters-four-letter.md § 6.1, § 6.2)', () => {
+  const ARRIVAL = [
+    [
+      'P',
+      vp(375, 667),
+      [16, 423, 343, 48],
+      [19.5, 435, 336, 24],
+      [19.5, 431, 32],
+      383,
+      [160, 8, 56],
+    ],
+    [
+      'L',
+      vp(667, 375),
+      [249.5, 230.6, 312, 48],
+      [257.5, 242.6, 296, 24],
+      [257.5, 238.6, 32],
+      675,
+      [160, 8, 44],
+    ],
+    [
+      'W',
+      vp(820, 1180, { top: 24, bottom: 20 }),
+      [134, 749.4, 552, 72],
+      [150, 773.4, 520, 24],
+      [150, 765.4, 40],
+      828,
+      [213.3, 34.7, 74.7],
+    ],
+    [
+      'TL',
+      vp(1180, 820, { bottom: 20 }),
+      [428.6, 463.5, 552, 72],
+      [444.6, 487.5, 520, 24],
+      [444.6, 479.5, 40],
+      1188,
+      [213.3, 10.7, 74.7],
+    ],
+  ] as const
+  it.each(ARRIVAL)(
+    '%s: the slab at rest, its log bar and disc, its start, and the door',
+    (_, v, slab, bar, disc, startX, door) => {
+      const layout = mathLayout(v)
+      const a = arrivalScene(
+        playArea(layout),
+        layout.tablet,
+        layout.landscape,
+        v.width,
+      )
+      const near = (
+        r: { x: number; y: number; width: number; height: number },
+        want: readonly number[],
+      ) => {
+        expect(r.x).toBeCloseTo(want[0]!, 1)
+        expect(r.y).toBeCloseTo(want[1]!, 1)
+        expect(r.width).toBeCloseTo(want[2]!, 1)
+        expect(r.height).toBeCloseTo(want[3] ?? want[2]!, 1)
+      }
+      near(a.slab, slab)
+      expect(a.slab.height / 2).toBeCloseTo(slab[3] / 2, 1)
+      near(a.log.bar, bar)
+      near(a.log.disc, disc)
+      expect(a.startX).toBe(startX)
+      const d = doorRect(backRect(layout), layout.ribbon, layout.tablet)
+      near(d, door)
+      // Clear of the ribbon: above it, or beside it.
+      const { ribbon } = layout
+      expect(
+        d.y + d.height <= ribbon.y ||
+          d.x + d.width <= ribbon.x ||
+          d.x >= ribbon.x + ribbon.width,
+      ).toBe(true)
+    },
+  )
+
+  it('four sockets, one under each seat, 0.64 of the seat wide (T8)', () => {
+    const layout = mathLayout(vp(375, 667))
+    const s = huntScene(playArea(layout), false, false, 6, 4)
+    const sockets = logSockets(s.seats, s.log)
+    expect(sockets).toHaveLength(4)
+    sockets.forEach((r) => expect(r.width).toBeCloseTo(44.8, 5))
+    expect(sockets[0]!.x).toBeCloseTo(35.5 + 0.18 * 70, 5)
   })
 })
