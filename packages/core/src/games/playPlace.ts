@@ -491,12 +491,37 @@ export const CRITTER_SAID_LATER: readonly string[] = [
 ]
 
 /**
+ * The 15 four-letter words the pictured-only boards give a clip (Dave
+ * 2026-10-27, (A) and (C), "New Lily lines"): the 14 voiceless plurals of
+ * pack words and _crab_. Content only so far: they are not
+ * `HUNT_FOUR_TARGETS` (crab stays on `HUNT_FOUR_UNDEALT`), so a run that
+ * spells one sits, until the pictured-board core moves them onto it.
+ */
+export const HUNT_FOUR_LATER: readonly string[] = [
+  'ants',
+  'bats',
+  'caps',
+  'cats',
+  'cots',
+  'crab',
+  'hats',
+  'jets',
+  'maps',
+  'mats',
+  'mops',
+  'pots',
+  'rats',
+  'taps',
+  'tops',
+]
+
+/**
  * Every word with a whole-word Lily clip, sorted: the said words (the nine
- * said later among them) and the four-letter targets
- * (`critterWordLine(word)`).
+ * said later among them), the four-letter targets and the 15 four-letter
+ * words for later (`critterWordLine(word)`).
  */
 export const CRITTER_CLIP_WORDS: readonly string[] = [
-  ...new Set([...CRITTER_SAID_WORDS, ...HUNT_FOUR_TARGETS]),
+  ...new Set([...CRITTER_SAID_WORDS, ...HUNT_FOUR_TARGETS, ...HUNT_FOUR_LATER]),
 ].sort()
 
 /** A word whose pack picture is another word's (Dave 2026-10-25, § 6). */
@@ -538,6 +563,41 @@ export const HUNT_FOUR_PICTURE_WORDS: readonly string[] = [
   'stop',
   'tent',
   'vest',
+]
+
+/**
+ * The pack pictures bundled ahead of the rule that deals them, sorted: the
+ * pictured-only boards' 23 (Dave 2026-10-27, (A) and (C); Thomas's picks
+ * 2026-10-27), the 8 three-letter said words and step and the 14 voiceless
+ * plurals. Until core's pictured-board rule moves them onto
+ * `CRITTER_SAID_PICTURE_WORDS` and `HUNT_FOUR_PICTURE_WORDS` (and empties
+ * this list), no round treats them as pictured, and the tests that check
+ * those two lists against the app's registry leave them out.
+ */
+export const CRITTER_PICTURES_WIRED_LATER: readonly string[] = [
+  'ants',
+  'bats',
+  'caps',
+  'cats',
+  'cots',
+  'dot',
+  'hats',
+  'jets',
+  'maps',
+  'mats',
+  'mops',
+  'peg',
+  'pots',
+  'rats',
+  'red',
+  'rod',
+  'run',
+  'six',
+  'step',
+  'taps',
+  'ten',
+  'tops',
+  'tug',
 ]
 
 /**

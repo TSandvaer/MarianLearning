@@ -97,7 +97,8 @@
       "rat",
       "ring",
       "sun",
-      "elf"
+      "elf",
+      "hats"
     ]
   },
   {
@@ -132,7 +133,8 @@
       "pan",
       "seal",
       "tap",
-      "tree"
+      "tree",
+      "caps"
     ]
   },
   {
@@ -147,7 +149,7 @@
       "a flat cartoon mouse icon",
       "a scary or dirty sewer rat"
     ],
-    "distinctFrom": ["bat", "cat", "bus", "cup", "hat", "mat"]
+    "distinctFrom": ["bat", "cat", "bus", "cup", "hat", "mat", "rats"]
   },
   {
     "word": "map",
@@ -161,7 +163,7 @@
       "letters, numbers or place names",
       "an X mark"
     ],
-    "distinctFrom": ["cap", "dog", "mat", "sheep", "sun"]
+    "distinctFrom": ["cap", "dog", "mat", "sheep", "sun", "maps"]
   },
   {
     "word": "mat",
@@ -188,7 +190,8 @@
       "map",
       "nut",
       "pen",
-      "rat"
+      "rat",
+      "mats"
     ]
   },
   {
@@ -238,7 +241,8 @@
       "star",
       "sun",
       "tub",
-      "tube"
+      "tube",
+      "cats"
     ]
   },
   {
@@ -266,7 +270,8 @@
       "mat",
       "mom",
       "sun",
-      "tag"
+      "tag",
+      "bats"
     ]
   },
   {
@@ -293,7 +298,17 @@
       "a shower head",
       "a running stream of water"
     ],
-    "distinctFrom": ["cap", "cup", "dog", "nest", "pan", "tent", "drip", "drop"]
+    "distinctFrom": [
+      "cap",
+      "cup",
+      "dog",
+      "nest",
+      "pan",
+      "tent",
+      "drip",
+      "drop",
+      "taps"
+    ]
   },
   {
     "word": "tag",
@@ -598,7 +613,8 @@
       "shark",
       "sheep",
       "sun",
-      "swing"
+      "swing",
+      "pots"
     ]
   },
   {
@@ -643,7 +659,8 @@
       "seal",
       "spoon",
       "sun",
-      "top"
+      "top",
+      "mops"
     ]
   },
   {
@@ -657,7 +674,7 @@
       "a hospital bed or bunk bed",
       "someone sleeping on it"
     ],
-    "distinctFrom": ["box", "coat", "fox", "goat", "hot", "pot"]
+    "distinctFrom": ["box", "coat", "fox", "goat", "hot", "pot", "cots"]
   },
   {
     "word": "dog",
@@ -764,7 +781,8 @@
       "rope",
       "sun",
       "tub",
-      "wing"
+      "wing",
+      "step"
     ]
   },
   {
@@ -778,7 +796,17 @@
       "a party hat",
       "a hand"
     ],
-    "distinctFrom": ["boot", "dog", "mom", "mop", "pop", "tooth", "tub", "tube"]
+    "distinctFrom": [
+      "boot",
+      "dog",
+      "mom",
+      "mop",
+      "pop",
+      "tooth",
+      "tub",
+      "tube",
+      "tops"
+    ]
   },
   {
     "word": "log",
@@ -811,7 +839,8 @@
       "pop",
       "rock",
       "mud",
-      "ramp"
+      "ramp",
+      "rod"
     ]
   },
   {
@@ -1301,7 +1330,8 @@
       "pine",
       "sip",
       "wig",
-      "clip"
+      "clip",
+      "peg"
     ]
   },
   {
@@ -1685,7 +1715,8 @@
       "spoon",
       "stool",
       "sun",
-      "web"
+      "web",
+      "jets"
     ]
   },
   {
@@ -1750,7 +1781,8 @@
       "rug",
       "sack",
       "sock",
-      "mud"
+      "mud",
+      "step"
     ]
   },
   {
@@ -2921,7 +2953,7 @@
       "a hair band or a comb",
       "hair or a head"
     ],
-    "distinctFrom": ["pin"]
+    "distinctFrom": ["pin", "peg"]
   },
   {
     "word": "drip",
@@ -2973,7 +3005,7 @@
       "a grown-up, like the man or the dad",
       "a skipping rope or a trampoline"
     ],
-    "distinctFrom": ["dad", "frog", "man"]
+    "distinctFrom": ["dad", "frog", "man", "run"]
   },
   {
     "word": "pump",
@@ -3039,7 +3071,7 @@
       "a spider with eight legs",
       "many ants or an anthill"
     ],
-    "distinctFrom": ["bee", "bug"]
+    "distinctFrom": ["bee", "bug", "ants"]
   },
   {
     "word": "elf",
@@ -3053,5 +3085,320 @@
       "wings, like a fairy"
     ],
     "distinctFrom": ["hat", "king"]
+  },
+  {
+    "word": "six",
+    "tier": "short-i",
+    "batch": 21,
+    "subject": "Six round dots in two rows of three, all one soft-blue colour, flat and evenly spaced.",
+    "avoid": ["a die or dice", "a numeral or any digit", "fingers or a hand"],
+    "distinctFrom": ["ten", "dot"]
+  },
+  {
+    "word": "ten",
+    "tier": "short-e",
+    "batch": 21,
+    "subject": "Ten round dots in two rows of five, in six's style: all one soft-blue colour, flat and evenly spaced.",
+    "avoid": ["a die or dice", "a numeral or any digit", "fingers or a hand"],
+    "distinctFrom": ["six", "dot"]
+  },
+  {
+    "word": "red",
+    "tier": "short-e",
+    "batch": 21,
+    "subject": "A plain red paint splash.",
+    "avoid": ["a heart", "an apple", "a ball", "a shape that reads as a blob"],
+    "distinctFrom": ["dot"]
+  },
+  {
+    "word": "peg",
+    "tier": "short-e",
+    "batch": 21,
+    "subject": "One wooden clothes peg (a clothespin) in side view, with its metal spring visible.",
+    "avoid": [
+      "a pin, like the pin",
+      "a hair clip or a paper clip, like the clip"
+    ],
+    "distinctFrom": ["pin", "clip"]
+  },
+  {
+    "word": "rod",
+    "tier": "short-o",
+    "batch": 21,
+    "subject": "A fishing rod with its reel and line.",
+    "avoid": ["a fish", "a person", "a plain stick"],
+    "distinctFrom": ["log"]
+  },
+  {
+    "word": "run",
+    "tier": "short-u",
+    "batch": 21,
+    "subject": "One child running in side view, mid-stride, with one foot down on the ground.",
+    "avoid": [
+      "a child in the air with both feet off the ground, like the jump",
+      "hopping"
+    ],
+    "distinctFrom": ["jump"]
+  },
+  {
+    "word": "dot",
+    "tier": "short-o",
+    "batch": 21,
+    "subject": "One big flat round dot in one soft-blue colour.",
+    "avoid": [
+      "red, like the red",
+      "yellow, like the sun",
+      "shading or a shine, like a ball"
+    ],
+    "distinctFrom": ["six", "ten", "red"]
+  },
+  {
+    "word": "tug",
+    "tier": "short-u",
+    "batch": 21,
+    "subject": "Two children leaning back on a rope, a tug of war.",
+    "avoid": [],
+    "distinctFrom": []
+  },
+  {
+    "word": "step",
+    "tier": "crab-words",
+    "batch": 21,
+    "subject": "One wide stone step seen from the side, sitting on green grass with a little path leading up to it, so it reads as a step you walk up: a clear flat top tread and a straight vertical front riser, smooth light-grey cut stone with square edges.",
+    "avoid": [
+      "a staircase with two or more steps, like stairs",
+      "a box or a crate, like the box",
+      "a rock, a boulder, or a rounded or rough natural stone",
+      "a brick wall"
+    ],
+    "distinctFrom": ["box", "rock"]
+  },
+  {
+    "word": "ants",
+    "tier": "tent-words",
+    "batch": 21,
+    "subject": "Exactly three identical big red ants, spaced apart in a row, each in side view with six thin legs, two antennae and three round body parts.",
+    "avoid": [
+      "two, four or more ants",
+      "ants in a pile or a set, touching or overlapping",
+      "ants of different sizes or colours",
+      "a bug or a beetle, like the bug",
+      "a bee with wings or stripes, like the bee",
+      "a spider with eight legs",
+      "many ants or an anthill"
+    ],
+    "distinctFrom": ["ant"]
+  },
+  {
+    "word": "bats",
+    "tier": "tent-words",
+    "batch": 21,
+    "subject": "Exactly three identical friendly soft-purple bats, spaced apart in a row, each facing the viewer with both wings spread wide open, a small round furry body, big kind eyes and no fangs.",
+    "avoid": [
+      "two, four or more bats",
+      "bats in a pile or a set, touching or overlapping",
+      "bats of different sizes or colours",
+      "a baseball bat",
+      "fangs or a Halloween or vampire look",
+      "a bird",
+      "a mouse or rat with no wings"
+    ],
+    "distinctFrom": ["bat"]
+  },
+  {
+    "word": "caps",
+    "tier": "tent-words",
+    "batch": 21,
+    "subject": "Exactly three identical rose-pink baseball caps, spaced apart in a row, each in three-quarter view with a rounded crown, faint stitched panel lines and a peak that sticks out at the front only.",
+    "avoid": [
+      "two, four or more caps",
+      "caps in a pile or a set, touching or overlapping",
+      "caps of different sizes or colours",
+      "a wide brim all the way round, like a sun hat",
+      "a logo or letters",
+      "a head wearing it",
+      "a beanie"
+    ],
+    "distinctFrom": ["cap"]
+  },
+  {
+    "word": "cats",
+    "tier": "tent-words",
+    "batch": 21,
+    "subject": "Exactly three identical grey tabby cats, spaced apart in a row, each sitting upright in three-quarter view, with pointed triangle ears, whiskers, a narrow muzzle, a small pink nose and its tail curled round its paws.",
+    "avoid": [
+      "two, four or more cats",
+      "cats in a pile or a set, touching or overlapping",
+      "cats of different sizes or colours",
+      "floppy ears or a broad muzzle, like a dog",
+      "long bunny ears",
+      "a long thin bare tail, like a rat",
+      "a snout or curly tail, like a pig"
+    ],
+    "distinctFrom": ["cat"]
+  },
+  {
+    "word": "hats",
+    "tier": "tent-words",
+    "batch": 21,
+    "subject": "Exactly three identical wide-brimmed straw sun hats, spaced apart in a row, each in three-quarter view, pale straw-cream with a soft rose ribbon tied round the round crown, the whole circular brim visible.",
+    "avoid": [
+      "two, four or more hats",
+      "hats in a pile or a set, touching or overlapping",
+      "hats of different sizes or colours",
+      "a peak at the front only, like a baseball cap",
+      "a top hat, beanie or cowboy hat",
+      "a head wearing it"
+    ],
+    "distinctFrom": ["hat"]
+  },
+  {
+    "word": "maps",
+    "tier": "tent-words",
+    "batch": 21,
+    "subject": "Exactly three identical paper maps, spaced apart in a row, each lying open and slightly tilted, cream paper with two curled corners and fold lines, showing simple soft-green land shapes on a soft-blue sea and a dotted path ending at a small red pin.",
+    "avoid": [
+      "two, four or more maps",
+      "maps in a pile or a set, touching or overlapping",
+      "maps of different sizes or colours",
+      "a plain striped rectangle, like a mat or rug",
+      "a small card on a string, like a tag",
+      "a globe or a ball",
+      "letters, numbers or place names",
+      "an X mark"
+    ],
+    "distinctFrom": ["map"]
+  },
+  {
+    "word": "mats",
+    "tier": "tent-words",
+    "batch": 21,
+    "subject": "Exactly three identical small rectangular woven mats, spaced apart in a row, each lying flat in three-quarter view, with soft rose-pink and cream stripes and plain, straight edges.",
+    "avoid": [
+      "two, four or more mats",
+      "mats in a pile or a set, touching or overlapping",
+      "mats of different sizes or colours",
+      "a stack of towels or folded towels",
+      "fringe or tassels on the ends, like a rug",
+      "land shapes or fold lines, like a map",
+      "a rolled yoga mat",
+      "letters such as WELCOME"
+    ],
+    "distinctFrom": ["mat"]
+  },
+  {
+    "word": "rats",
+    "tier": "tent-words",
+    "batch": 21,
+    "subject": "Exactly three identical small, friendly grey-brown rats, spaced apart in a row, each standing on all fours in side view, with a pointed snout, round pink ears, small dark eyes and a long, thin pink tail curving behind it.",
+    "avoid": [
+      "two, four or more rats",
+      "rats in a pile or a set, touching or overlapping",
+      "rats of different sizes or colours",
+      "a cat's pointed ears and whiskers",
+      "wings, like a bat",
+      "a pink round body, like a pig",
+      "a flat cartoon mouse icon",
+      "a scary or dirty sewer rat"
+    ],
+    "distinctFrom": ["rat"]
+  },
+  {
+    "word": "taps",
+    "tier": "tent-words",
+    "batch": 21,
+    "subject": "Exactly three identical silver kitchen taps, spaced apart in a row and not joined, each seen from the side, with a round handle on top and a curved spout pointing down, and one blue drop of water falling from each spout.",
+    "avoid": [
+      "two, four or more taps",
+      "taps in a pile or a set, touching or overlapping",
+      "taps of different sizes or colours",
+      "a sink, a counter, a wall or pipes joining them",
+      "a sink or basin",
+      "a hand",
+      "a shower head",
+      "a running stream of water"
+    ],
+    "distinctFrom": ["tap"]
+  },
+  {
+    "word": "cots",
+    "tier": "tent-words",
+    "batch": 21,
+    "subject": "Exactly three identical small, low, narrow cots, spaced apart in a row, each in three-quarter view: a light wooden frame on four short legs, a thin cream mattress and one small white pillow at one end, with no headboard.",
+    "avoid": [
+      "two, four or more cots",
+      "cots in a pile or a set, touching or overlapping",
+      "cots of different sizes or colours",
+      "a nursery or a room",
+      "a big bed with a headboard or a blanket",
+      "a baby's cot with bars",
+      "a hospital bed or bunk bed",
+      "someone sleeping on it"
+    ],
+    "distinctFrom": ["cot"]
+  },
+  {
+    "word": "mops",
+    "tier": "tent-words",
+    "batch": 21,
+    "subject": "Exactly three identical cleaning mops standing upright, spaced apart in a row, each with a long, thin warm-brown wooden handle and a head of soft cream-pink yarn strands hanging down at the bottom.",
+    "avoid": [
+      "two, four or more mops",
+      "mops in a pile or a set, touching or overlapping",
+      "mops of different sizes or colours",
+      "a stiff broom",
+      "a bucket or water",
+      "a paintbrush or a pen",
+      "a wig of hair"
+    ],
+    "distinctFrom": ["mop"]
+  },
+  {
+    "word": "pots",
+    "tier": "tent-words",
+    "batch": 21,
+    "subject": "Exactly three identical empty soft-grey cooking pots, spaced apart in a row, each in three-quarter view from slightly above, deep and round with no lid, and two short handles on opposite sides.",
+    "avoid": [
+      "two, four or more pots",
+      "pots in a pile or a set, touching or overlapping",
+      "pots of different sizes or colours",
+      "one long handle or a shallow body, like a frying pan",
+      "steam or food",
+      "a lid on top",
+      "a bowl"
+    ],
+    "distinctFrom": ["pot"]
+  },
+  {
+    "word": "tops",
+    "tier": "tent-words",
+    "batch": 21,
+    "subject": "Exactly three identical wooden spinning tops, spaced apart in a row, each standing still on its point in three-quarter view, an upside-down cone with soft coral and cream stripes and a small round knob on top.",
+    "avoid": [
+      "two, four or more tops",
+      "tops in a pile or a set, touching or overlapping",
+      "tops of different sizes or colours",
+      "motion lines or blur",
+      "an ice-cream cone",
+      "a party hat",
+      "a hand"
+    ],
+    "distinctFrom": ["top"]
+  },
+  {
+    "word": "jets",
+    "tier": "tent-words",
+    "batch": 21,
+    "subject": "Exactly three identical soft-blue passenger jets in flight, spaced apart, each in three-quarter front-side view, with two wide wings, a tail fin, a cockpit window and a row of small round windows.",
+    "avoid": [
+      "two, four or more jets",
+      "jets in a pile or a set, touching or overlapping",
+      "jets of different sizes or colours",
+      "clouds, sky or a runway",
+      "a fighter jet or rockets",
+      "a face on the nose",
+      "a white plane that fades into the background"
+    ],
+    "distinctFrom": ["jet"]
   }
 ]

@@ -77,18 +77,20 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'map-peek-ask': 1,
       // The letter critters' said words (Thomas 2026-10-22; Dave
       // 2026-10-25: 7 more; Dave 2026-10-26: the nine said later and the
-      // 82 four-letter targets).
-      'play-word': 254,
+      // 82 four-letter targets; Dave 2026-10-27: the 15 for the pictured
+      // boards).
+      'play-word': 269,
     })
-    expect(GUIDANCE_LINES).toHaveLength(582)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(582)
+    expect(GUIDANCE_LINES).toHaveLength(597)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(597)
     // Bee, car, snail and moon words' leads are duck words' text (content
-    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories', and twelve
-    // critter words' captions are story words' ("And.", "Got.", "Hid.",
-    // "Ran.", "Sat."; since Dave 2026-10-26 "Drum.", "Frog.", "Lamp.",
-    // "Nest.", "Plum.", "Pond.", "Tent."): 582 ids, 565 texts, 582 files.
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(565)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(582)
+    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories', and
+    // thirteen critter words' captions are story words' ("And.", "Got.",
+    // "Hid.", "Ran.", "Sat."; since Dave 2026-10-26 "Drum.", "Frog.",
+    // "Lamp.", "Nest.", "Plum.", "Pond.", "Tent."; since Dave 2026-10-27
+    // "Crab."): 597 ids, 579 texts, 597 files.
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(579)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(597)
   })
 
   it('AC8: both replay sets, one line per STAGE_SPOKEN_NAMES step, with the exact texts (map-tap-to-play § 6, T1 approved 2026-10-17)', () => {
@@ -413,7 +415,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(582)
+    ).toHaveLength(597)
   })
 
   it('repeats no Emma’s Path line', () => {
@@ -709,14 +711,15 @@ describe('the letter critters’ said words (Thomas 2026-10-22)', () => {
     )
     // 163 inputs of four characters each, two of them five (Dave
     // 2026-10-25's seven: 28 characters); then the nine said later (36)
-    // and the 82 four-letter targets (410, Dave 2026-10-26).
-    expect(words.reduce((n, l) => n + l.input!.length, 0)).toBe(1100)
+    // and the 82 four-letter targets (410, Dave 2026-10-26); then the 15
+    // for the pictured boards (75, Dave 2026-10-27).
+    expect(words.reduce((n, l) => n + l.input!.length, 0)).toBe(1175)
     expect(
       words.filter((l) => /^(Sat|Wed),$/.test(l.input!)).map((l) => l.id),
     ).toEqual([])
   })
 
-  it('the 254 are rendered in Lily (none awaits its render)', () => {
+  it('the 269 are rendered in Lily (none awaits its render)', () => {
     expect(
       words.filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id)),
     ).toEqual([])

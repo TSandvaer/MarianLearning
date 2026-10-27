@@ -13,6 +13,7 @@ import { setKeyValueStore } from '@marian/core'
 import { progressAtStep } from '@marian/core/debug/stepProgress'
 import {
   CRITTER_CAP,
+  CRITTER_PICTURES_WIRED_LATER,
   CRITTER_SAID_PICTURE_WORDS,
   CRITTER_SAID_WORDS,
   CRITTER_SOUND_SOURCE,
@@ -786,10 +787,12 @@ describe('Thomas 2026-10-23 (Marian’s play test)', () => {
 })
 
 describe('Thomas 2026-10-23 (build 20): "No picture for rat and there is no m"', () => {
-  it('the said words with a bundled pack picture are exactly CRITTER_SAID_PICTURE_WORDS (mum shows mom’s, Dave’s word hunt ruling § 6)', () => {
+  it('the said words with a bundled pack picture are exactly CRITTER_SAID_PICTURE_WORDS, bar CRITTER_PICTURES_WIRED_LATER (mum shows mom’s, Dave’s word hunt ruling § 6)', () => {
     expect(
       CRITTER_SAID_WORDS.filter(
-        (w) => pictureAsset(critterPictureKey(w)) !== undefined,
+        (w) =>
+          pictureAsset(critterPictureKey(w)) !== undefined &&
+          !CRITTER_PICTURES_WIRED_LATER.includes(w),
       ),
     ).toEqual(CRITTER_SAID_PICTURE_WORDS)
     expect(pictureAsset(critterPictureKey('mum'))).toBe(pictureAsset('mom'))
