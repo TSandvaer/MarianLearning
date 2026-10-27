@@ -202,7 +202,10 @@ export function ListenMark({ box, testID }: { box: Rect; testID: string }) {
 /**
  * The picture box's face (§ 15.3): the word's pack picture `contain`,
  * drawn to the whole box and clipped to its radius, or the listen mark
- * for a word with no picture (or none bundled: never a blank box).
+ * for a word with no picture (or none bundled: never a blank box). Since
+ * the pictured-only boards (§ 16, B9) every dealt target has a picture,
+ * so the mark shows only for a missing asset, or in a round stored before
+ * them (Q30).
  */
 function SlotFace({
   index,

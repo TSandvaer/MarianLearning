@@ -47,8 +47,9 @@
  * six critters, her vowel (no twin, its burrow ringed while it is out)
  * and five consonants; a "3" on the log's end; and a board of slots, one
  * per word to find, in board order (§ 15.2: the easiest first), each with
- * its word's picture or the listen mark from the deal; a tap on one plays
- * its word. A new word plays its outcome as above, then its picture
+ * its word's picture from the deal (every target has one since the
+ * pictured-only boards, § 16; the listen mark only for a missing asset or
+ * a round stored before them); a tap on one plays its word. A new word plays its outcome as above, then its picture
  * shrinks onto its own slot's picture and its letters fly up as tiles; an
  * extra joins the bonus chip; a repeat wiggles its slot. After five runs
  * without a new word, or 45 s without a drag, the first empty slot glows:
@@ -62,11 +63,12 @@
  * round: on that round, after the beat, a four-seat log rolls in and
  * becomes a door beside New letters (§ 6). A four-letter round has seven
  * critters (4 + 3), four seats with a "4" on the log, four-box slots and
- * no extras: four seated sing 400 ms after the last seat change, a target
- * as a said word (its picture and, for the 11 lesson words, its praise),
- * anything else sings and sits; 1-3 seated sing only when she taps the
- * log, an empty seat between two critters a rest, and nothing judges them
- * (§ 4.1). `CrittersGame.tsx` holds the picker and the visit.
+ * no bonus chip (§ 15.3): four seated sing 400 ms after the last seat
+ * change, a target as a said word (its picture and, for the 11 lesson
+ * words, its praise), an extra as a said word with the joy beat and
+ * nothing filled, anything else sings and sits; 1-3 seated sing only
+ * when she taps the log, an empty seat between two critters a rest, and
+ * nothing judges them (§ 4.1). `CrittersGame.tsx` holds the picker and the visit.
  *
  * Reduce Motion (§ 3.7): no bounce, hop, spring, tumble or burst; the
  * singing letter lights (and at the joy beat the three light together),
@@ -1610,7 +1612,8 @@ export function LetterCritters({
               />
             )
           })}
-          {bonus.length > 0 && (
+          {/* critters-four-letter.md § 15.3: no chip in a four-letter round. */}
+          {!four && bonus.length > 0 && (
             <BonusChip
               rect={chipRect(hs, bonus.length)}
               tiles={bonus.map((_, i) => chipTiles(hs, bonus.length, i))}
