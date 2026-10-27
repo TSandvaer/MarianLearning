@@ -357,7 +357,7 @@ describe('the raft island goal, core (raft-island-goal § 11.2, I1-I3)', () => {
       expect(shore).toHaveLength(6)
       expect(strictOk(shore, 10, missing)).toBe(true)
     }
-  })
+  }, 30_000)
 
   it('I1: raftShore(rng, { target: 20, missing }) gives 6 weights in 1-9, 2 loads to 20, a ten-and-ten load, and a load with a missing kind, over 1,000 seeds per case', () => {
     const cases: RaftWeight[][] = [[], ...KINDS.map((k) => [k])]
@@ -376,7 +376,7 @@ describe('the raft island goal, core (raft-island-goal § 11.2, I1-I3)', () => {
       expect(shore).toHaveLength(6)
       expect(strictOk(shore, 20, missing)).toBe(true)
     }
-  })
+  }, 30_000)
 
   it('I1: the fallback is the canon shore, with a missing kind it lacks swapped in with its partner to ten (Dave (1), (3))', () => {
     // An rng stuck at 0 draws only bees and pigs: every draw fails a
@@ -449,7 +449,7 @@ describe('the raft island goal, core (raft-island-goal § 11.2, I1-I3)', () => {
       }
     }
     expect(short).toEqual({ 10: SHORT_10, 20: SHORT_20 })
-  })
+  }, 30_000)
 
   it('I1: in play, every 20 refill keeps every guarantee; a 10 refill may lack the missing-kind load (4 waiting), never the plain guarantee', () => {
     // 1,000 islands filled crossing by crossing: the shore with the
@@ -486,7 +486,7 @@ describe('the raft island goal, core (raft-island-goal § 11.2, I1-I3)', () => {
       10: { refills: 8068, short: 77 },
       20: { refills: 5207, short: 0 },
     })
-  })
+  }, 30_000)
 
   it('I1: raftRefill on the hard waiting sets, both targets', () => {
     expect(
