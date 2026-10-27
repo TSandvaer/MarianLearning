@@ -13,6 +13,7 @@ import {
   CRITTER_NEVER_SAY,
   CRITTER_NOT_SAID,
   CRITTER_PICTURE_WORDS,
+  CRITTER_PICTURES_WIRED_LATER,
   CRITTER_REAL_WORDS,
   CRITTER_SAID_LATER,
   CRITTER_SAID_PICTURE_WORDS,
@@ -758,7 +759,11 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     ])
     expect(CRITTER_SAID_WORDS).toContain('rag')
     expect(CRITTER_SAID_PICTURE_WORDS).toEqual(
-      CRITTER_SAID_WORDS.filter((w) => bundled.has(critterPictureKey(w))),
+      CRITTER_SAID_WORDS.filter(
+        (w) =>
+          bundled.has(critterPictureKey(w)) &&
+          !CRITTER_PICTURES_WIRED_LATER.includes(w),
+      ),
     )
     expect(critterPictureKey('mum')).toBe('mom')
     expect(critterPictureKey('mom')).toBe('mom')
@@ -863,7 +868,11 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
   it('F2/F1: HUNT_FOUR_PICTURE_WORDS is exactly the four-letter targets with a bundled pack picture: 25 (the 11 lesson pictures and 14 of #709)', () => {
     const bundled = bundledPictures()
     expect(HUNT_FOUR_PICTURE_WORDS).toEqual(
-      [...HUNT_FOUR_TARGETS].filter((w) => bundled.has(w)).sort(),
+      [...HUNT_FOUR_TARGETS]
+        .filter(
+          (w) => bundled.has(w) && !CRITTER_PICTURES_WIRED_LATER.includes(w),
+        )
+        .sort(),
     )
     expect(HUNT_FOUR_PICTURE_WORDS).toHaveLength(25)
     for (const w of HUNT_FOUR_PICTURE_WORDS) {
@@ -871,6 +880,50 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
       expect(critterHasPicture(w)).toBe(true)
     }
     expect(critterHasPicture('flap')).toBe(false)
+  })
+
+  it('CRITTER_PICTURES_WIRED_LATER (Dave 2026-10-27, (A) and (C); Thomas’s picks 2026-10-27): the 23 pictured-board pictures, each bundled, none pictured in a round yet', () => {
+    const bundled = bundledPictures()
+    expect(CRITTER_PICTURES_WIRED_LATER).toEqual([
+      'ants',
+      'bats',
+      'caps',
+      'cats',
+      'cots',
+      'dot',
+      'hats',
+      'jets',
+      'maps',
+      'mats',
+      'mops',
+      'peg',
+      'pots',
+      'rats',
+      'red',
+      'rod',
+      'run',
+      'six',
+      'step',
+      'taps',
+      'ten',
+      'tops',
+      'tug',
+    ])
+    for (const w of CRITTER_PICTURES_WIRED_LATER) {
+      expect(bundled.has(w)).toBe(true)
+      expect(critterPictureKey(w)).toBe(w)
+      expect(critterHasPicture(w)).toBe(false)
+    }
+    // The 8 three-letter ones are said words; step is a four-letter
+    // target; the 14 plurals are on no list yet.
+    expect(
+      CRITTER_PICTURES_WIRED_LATER.filter((w) =>
+        CRITTER_SAID_WORDS.includes(w),
+      ),
+    ).toEqual(['dot', 'peg', 'red', 'rod', 'run', 'six', 'ten', 'tug'])
+    expect(
+      CRITTER_PICTURES_WIRED_LATER.filter((w) => HUNT_FOUR_TARGETS.has(w)),
+    ).toEqual(['step'])
   })
 
   it('C10 (Dave’s safeguard, Thomas 2026-10-22): with funny false, a non-word is quiet; every other run is unchanged', () => {

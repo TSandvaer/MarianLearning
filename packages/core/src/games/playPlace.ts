@@ -566,6 +566,41 @@ export const HUNT_FOUR_PICTURE_WORDS: readonly string[] = [
 ]
 
 /**
+ * The pack pictures bundled ahead of the rule that deals them, sorted: the
+ * pictured-only boards' 23 (Dave 2026-10-27, (A) and (C); Thomas's picks
+ * 2026-10-27), the 8 three-letter said words and step and the 14 voiceless
+ * plurals. Until core's pictured-board rule moves them onto
+ * `CRITTER_SAID_PICTURE_WORDS` and `HUNT_FOUR_PICTURE_WORDS` (and empties
+ * this list), no round treats them as pictured, and the tests that check
+ * those two lists against the app's registry leave them out.
+ */
+export const CRITTER_PICTURES_WIRED_LATER: readonly string[] = [
+  'ants',
+  'bats',
+  'caps',
+  'cats',
+  'cots',
+  'dot',
+  'hats',
+  'jets',
+  'maps',
+  'mats',
+  'mops',
+  'peg',
+  'pots',
+  'rats',
+  'red',
+  'rod',
+  'run',
+  'six',
+  'step',
+  'taps',
+  'ten',
+  'tops',
+  'tug',
+]
+
+/**
  * A picture word, a said word with a bundled pack picture, or a pictured
  * four-letter target.
  */
