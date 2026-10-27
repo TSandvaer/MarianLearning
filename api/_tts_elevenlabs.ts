@@ -107,6 +107,13 @@ export const BLEND_GRAPHEME_IPA: Readonly<Record<string, string>> = {
   x: 'ks',
   y: 'j',
   z: 'zː',
+  // The digraph critters' sound-source blends (Dave 2026-10-27, digraph
+  // critters (A)): sh, ch and th as LETTER_SOUND_IPA's shhh, chuh and
+  // ththth; ng is new. None was ear-tested in a Lily blend before.
+  sh: 'ʃː',
+  ch: 'tʃ',
+  th: 'θː',
+  ng: 'ŋ',
 }
 
 /** Whole words whose CVC onset `g` is soft (/dʒ/), not the default hard

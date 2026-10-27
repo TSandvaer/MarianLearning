@@ -6,6 +6,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { synthesizeUtterance, ttsProvider, type TtsRequest } from './_tts.js'
 import {
+  BLEND_GRAPHEME_IPA,
   ELEVENLABS_MODEL_ID,
   ELEVENLABS_OUTPUT_FORMAT,
   ELEVENLABS_VOICE_ID,
@@ -95,6 +96,28 @@ describe('renderElevenLabsText', () => {
     expect(renderElevenLabsText('n - e - t ... net', 'cvc-words-short-e')).toBe(
       '/n/ - /ɛ/ - /t/ ... net',
     )
+  })
+
+  it('renders the digraph critters’ blends with one IPA sound per digraph (Dave 2026-10-27)', () => {
+    expect(renderElevenLabsBlend('sh - i - p ... ship')).toBe(
+      '/ʃː/ - /ɪ/ - /p/ ... ship',
+    )
+    expect(renderElevenLabsBlend('ch - i - p ... chip')).toBe(
+      '/tʃ/ - /ɪ/ - /p/ ... chip',
+    )
+    expect(renderElevenLabsBlend('th - i - n ... thin')).toBe(
+      '/θː/ - /ɪ/ - /n/ ... thin',
+    )
+    expect(renderElevenLabsBlend('r - i - ng ... ring')).toBe(
+      '/ɹ/ - /ɪ/ - /ŋ/ ... ring',
+    )
+    // As the shipped letter sounds: shhh, chuh, ththth.
+    for (const [g, m] of [
+      ['sh', 'shhh'],
+      ['ch', 'chuh'],
+      ['th', 'ththth'],
+    ])
+      expect(BLEND_GRAPHEME_IPA[g]).toBe(LETTER_SOUND_IPA[m])
   })
 
   it('falls back to plain text for a blend with an unmapped grapheme', () => {

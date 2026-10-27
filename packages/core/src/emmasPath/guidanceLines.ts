@@ -18,7 +18,7 @@
  * already uses, both loadable by the node-typed render scripts).
  */
 import type { MapStop } from '../map/mapModel'
-import { CRITTER_CLIP_WORDS } from '../games/playPlace'
+import { CRITTER_CLIP_WORDS, CRITTER_DIGRAPH_BLENDS } from '../games/playPlace'
 import type { Land } from '../progress/lands'
 import type { SkillNode } from '../progress/types'
 import {
@@ -69,6 +69,7 @@ export type GuidanceLineKind =
   | 'map-peek-ask-locked'
   | 'map-peek-ask'
   | 'play-word'
+  | 'play-blend'
 
 export interface GuidanceLine {
   /** Dotted id, e.g. `guide.hub.suggest.math`. */
@@ -375,6 +376,12 @@ function buildLines(): GuidanceLine[] {
       null,
       CRITTER_WORD_INPUTS[word] ?? `${capitalize(word)},`,
     )
+  // The digraph critters' sound sources (Dave 2026-10-27, digraph critters
+  // (A)): blend clips no one hears whole. A critter sings the digraph's
+  // window, cut by the clip's marks. The caption is the blend text; the
+  // render sends it as IPA (`renderElevenLabsBlend`).
+  for (const text of Object.values(CRITTER_DIGRAPH_BLENDS))
+    add(critterBlendId(text.split('...').pop()!.trim()), 'play-blend', text)
   return lines
 }
 
@@ -467,6 +474,7 @@ const crittersFunnyId = (n: 1 | 2 | 3) => `guide.play.critters.funny.${n}`
 const PEEK_ASK_LOCKED_ID = 'guide.map.peek-ask.locked'
 const PEEK_ASK_ID = 'guide.map.peek-ask'
 const critterWordId = (word: string) => `guide.play.critters.word.${word}`
+const critterBlendId = (word: string) => `guide.play.critters.blend.${word}`
 /**
  * Critter words whose "Word," input Lily reads as a day: "Sat," came back
  * as "Saturday" and "Wed," as "Wednesday" (ear test #661, 2026-10-22). A

@@ -8,11 +8,14 @@
  * after their Lily render; fewer than 6 new entries would mean a retake.
  * The cvc-words graduation check's probe lines (`cvc-words-probe.json`)
  * add 4 (nap, rat, map, tap): 50, and its reserve's five new words 5
- * (ham, cab, rag, ram, pad): 55.
+ * (ham, cab, rag, ram, pad): 55. The digraph critters' 4 sound-source
+ * blends (Dave 2026-10-27) are guidance lines, not canon: 59.
  */
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { CRITTER_DIGRAPH_BLENDS } from '@marian/core/games/playPlace'
+import { GUIDANCE_LINES } from '@marian/core/emmasPath/guidanceLines'
 import { REPO_ROOT } from '../../test/webSource'
 import { BLEND_MARKS } from './blendMarks.generated'
 import {
@@ -63,8 +66,19 @@ function canonBlends(): Map<string, { bytes: number; sha256: string }> {
 describe('the generated marks', () => {
   const canon = canonBlends()
 
-  it('cover the 55 canon blend clips: same length, same content', () => {
+  it('cover the 55 canon blend clips and the 4 digraph sound sources: same length, same content', () => {
     expect(canon.size).toBe(55)
+    const digraph = GUIDANCE_LINES.filter((l) => l.kind === 'play-blend')
+    expect(digraph.map((l) => l.text)).toEqual(
+      Object.values(CRITTER_DIGRAPH_BLENDS),
+    )
+    for (const { text, src } of digraph) {
+      const mp3 = readFileSync(resolve(REPO_ROOT, 'public', src.slice(1)))
+      canon.set(text, {
+        bytes: mp3.length,
+        sha256: createHash('sha256').update(mp3).digest('hex').slice(0, 16),
+      })
+    }
     expect(Object.keys(BLEND_MARKS).sort()).toEqual([...canon.keys()].sort())
     for (const [text, clip] of canon) {
       const { bytes, sha256 } = BLEND_MARKS[text]!

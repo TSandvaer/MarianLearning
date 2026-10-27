@@ -26,6 +26,8 @@ import {
   critterRun,
   critterSet,
   CRITTER_PRAISE_WORDS,
+  CRITTER_DIGRAPH_BLENDS,
+  HUNT_DIGRAPH_LATER,
   HUNT_FOUR_LESSON_WORDS,
   HUNT_FOUR_PICTURE_WORDS,
   HUNT_FOUR_TARGETS,
@@ -1235,9 +1237,13 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
       expect(critterRun(w)).toBe('word')
     }
     expect(CRITTER_CLIP_WORDS).toEqual(
-      [...CRITTER_SAID_WORDS, ...HUNT_FOUR_TARGETS].sort(),
+      [
+        ...CRITTER_SAID_WORDS,
+        ...HUNT_FOUR_TARGETS,
+        ...HUNT_DIGRAPH_LATER,
+      ].sort(),
     )
-    expect(CRITTER_CLIP_WORDS).toHaveLength(269)
+    expect(CRITTER_CLIP_WORDS).toHaveLength(282)
   })
 
   it('F24 (pictured-only boards, Dave 2026-10-27, (A) and (C)): the 14 voiceless plurals and crab are four-letter targets with a clip word, said after a run of four; the holding lists are gone', () => {
@@ -1253,6 +1259,36 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     expect(HUNT_FOUR_TARGETS.size).toBe(97)
     expect('HUNT_FOUR_LATER' in PlayPlace).toBe(false)
     expect('CRITTER_PICTURES_WIRED_LATER' in PlayPlace).toBe(false)
+  })
+
+  it('digraph critters content (Dave 2026-10-27, (A), (C), (D)): the 13 clip words, none dealt or said yet, and the 4 sound-source blends', () => {
+    expect(HUNT_DIGRAPH_LATER).toEqual(
+      'chest chip fish moth ring shed shin ship shop shot sing wing wish'.split(
+        ' ',
+      ),
+    )
+    for (const w of HUNT_DIGRAPH_LATER) {
+      expect(CRITTER_SAID_WORDS).not.toContain(w)
+      expect(HUNT_FOUR_TARGETS.has(w)).toBe(false)
+      expect(critterRun(w)).not.toBe('word')
+    }
+    // One blend per digraph: three sounds and the word, the digraph one
+    // sound (sh, ch, th first; ng third).
+    expect(CRITTER_DIGRAPH_BLENDS).toEqual({
+      sh: 'sh - i - p ... ship',
+      ch: 'ch - i - p ... chip',
+      th: 'th - i - n ... thin',
+      ng: 'r - i - ng ... ring',
+    })
+    for (const [g, text] of Object.entries(CRITTER_DIGRAPH_BLENDS)) {
+      const [sounds, word] = text.split(' ... ')
+      expect(sounds!.split(' - ')).toHaveLength(3)
+      expect(sounds!.split(' - ')).toContain(g)
+      expect(sounds!.split(' - ').join('')).toBe(word)
+    }
+    // Not a sound source yet: the digraph core adds them.
+    for (const g of Object.keys(CRITTER_DIGRAPH_BLENDS))
+      expect(CRITTER_SOUND_SOURCE[g]).toBeUndefined()
   })
 
   it('F8 (critters four-letter § 1): a run of four is word for a HUNT_FOUR_TARGETS word and quiet for every other, never picture or funny', () => {

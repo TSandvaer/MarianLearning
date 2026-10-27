@@ -348,6 +348,30 @@ const marks = new Map()
     }
   }
   rmSync(tmp, { force: true })
+  // The digraph critters' sound-source blends (Dave 2026-10-27, digraph
+  // critters (A)), rendered as guidance lines: the text is the file's word
+  // with one sound per digraph (`guide-play-critters-blend-ship.mp3` is
+  // "sh - i - p ... ship"), as core's `CRITTER_DIGRAPH_BLENDS`. Their
+  // boundaries are silences of >= 250 ms, not 300: Lily left 297 and 271 ms
+  // between thin's sounds, and the words' own stop gaps are under 170 ms.
+  // A letter's 80 ms tap tail still ends in silence.
+  const pathDir = join(webAssets, 'audio', 'path')
+  for (const name of sorted(
+    pathDir,
+    /^guide-play-critters-blend-[a-z]+\.mp3$/,
+  )) {
+    const word = name.slice('guide-play-critters-blend-'.length, -'.mp3'.length)
+    const text = `${word.match(/sh|ch|th|ng|[a-z]/g).join(' - ')} ... ${word}`
+    if (marks.has(text))
+      throw new Error(`blend "${text}" has two different clips`)
+    const mp3 = readFileSync(join(pathDir, name))
+    const segments = clipSegments(join(pathDir, name), 0.25, 4)
+    if (segments === null) {
+      console.warn(`blend "${text}" (${name}): not 4 segments, skipped`)
+      continue
+    }
+    marks.set(text, { bytes: mp3.length, sha256: clipHash(mp3), segments })
+  }
 }
 
 /** A clip's content hash: the first 16 hex digits of its SHA-256. */
@@ -428,11 +452,12 @@ function clipSegments(path, minSilence, count) {
  * re-run \`npm run export-assets\` after a canon re-bake.
  *
  * Every baked Word Song blend clip (\`word.p*.blend\` in
- * \`public/canon/word-song/**\`), keyed by its text: the MP3's byte length
- * (the app's check), its content hash (the first 16 hex digits of its
- * SHA-256: \`blendMarks.test.ts\` fails when a re-bake changes a clip) and
- * its four sound segments \`[onMs, offMs]\` (3 graphemes, then the
- * whole word), from ffmpeg \`silencedetect\` at -35 dB
+ * \`public/canon/word-song/**\`) and the digraph critters' sound-source
+ * blends (\`guide-play-critters-blend-*.mp3\`), keyed by its text: the
+ * MP3's byte length (the app's check), its content hash (the first 16 hex
+ * digits of its SHA-256: \`blendMarks.test.ts\` fails when a re-bake changes
+ * a clip) and its four sound segments \`[onMs, offMs]\` (3 graphemes, then
+ * the whole word), from ffmpeg \`silencedetect\` at -35 dB
  * (design/native/word-song-native.md § 5). Read through \`./blendMarks.ts\`.
  */
 export const BLEND_MARKS: Readonly<
