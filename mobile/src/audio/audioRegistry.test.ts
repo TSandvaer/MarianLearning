@@ -147,8 +147,8 @@ describe('bundled blend clips (play-place spec § 3.4, N15)', () => {
 })
 
 describe('bundled critter word clips (Thomas 2026-10-22)', () => {
-  it('bundles a whole-word clip for each of the 254 clip words (the 163 said, the nine said later, the 82 four-letter targets), byte-identical to the web original', () => {
-    expect(CRITTER_CLIP_WORDS).toHaveLength(254)
+  it('bundles a whole-word clip for each of the 269 clip words (the 163 said, the nine said later, the 82 four-letter targets, the 15 for the pictured boards), byte-identical to the web original', () => {
+    expect(CRITTER_CLIP_WORDS).toHaveLength(269)
     const wrong = CRITTER_CLIP_WORDS.filter((w) => {
       const src = critterWordLine(w)?.src
       if (src === undefined || !registryPaths.includes(src)) return true

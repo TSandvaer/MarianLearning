@@ -336,9 +336,10 @@ function buildLines(): GuidanceLine[] {
   add(PEEK_ASK_ID, 'map-peek-ask', 'Want to try it?')
   // The letter critters' real words, said whole after the sounds (Thomas
   // 2026-10-22; play-place spec § 3.3): one clip per `CRITTER_CLIP_WORDS`
-  // word (the said words, and since Dave 2026-10-26 the nine said later
-  // and the 82 four-letter targets), its caption "Map." and its input
-  // "Map," (the one-word rule, as the story words since wave 4).
+  // word (the said words, since Dave 2026-10-26 the nine said later and
+  // the 82 four-letter targets, and since Dave 2026-10-27 the pictured
+  // boards' 14 plurals and crab), its caption "Map." and its input "Map,"
+  // (the one-word rule, as the story words since wave 4).
   for (const word of CRITTER_CLIP_WORDS)
     add(
       critterWordId(word),

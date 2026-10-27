@@ -26,6 +26,7 @@ import {
   critterRun,
   critterSet,
   CRITTER_PRAISE_WORDS,
+  HUNT_FOUR_LATER,
   HUNT_FOUR_LESSON_WORDS,
   HUNT_FOUR_PICTURE_WORDS,
   HUNT_FOUR_TARGETS,
@@ -816,9 +817,22 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
       expect(critterRun(w)).toBe('word')
     }
     expect(CRITTER_CLIP_WORDS).toEqual(
-      [...CRITTER_SAID_WORDS, ...HUNT_FOUR_TARGETS].sort(),
+      [...CRITTER_SAID_WORDS, ...HUNT_FOUR_TARGETS, ...HUNT_FOUR_LATER].sort(),
     )
-    expect(CRITTER_CLIP_WORDS).toHaveLength(254)
+    expect(CRITTER_CLIP_WORDS).toHaveLength(269)
+  })
+
+  it('pictured-only boards content (Dave 2026-10-27, (A) and (C)): HUNT_FOUR_LATER is the 14 voiceless plurals and crab, each with a clip word and none dealt or said yet', () => {
+    expect(HUNT_FOUR_LATER).toEqual(
+      'ants bats caps cats cots crab hats jets maps mats mops pots rats taps tops'.split(
+        ' ',
+      ),
+    )
+    for (const w of HUNT_FOUR_LATER) {
+      expect(CRITTER_CLIP_WORDS).toContain(w)
+      expect(HUNT_FOUR_TARGETS.has(w)).toBe(false)
+      expect(critterRun(w)).toBe('quiet')
+    }
   })
 
   it('F8 (critters four-letter § 1): a run of four is word for a HUNT_FOUR_TARGETS word and quiet for every other, never picture or funny', () => {
