@@ -36,12 +36,15 @@ import {
   activate,
   advance,
   byId,
+  dragRelease,
+  dragStart,
   fakeSounds,
   has,
   LINE_MS,
   mountGame,
   PHONE_P,
   seeded,
+  tap,
 } from '../../../test/playHarness'
 import { blendClipPath, blendSegments } from './critterModel'
 import { FILL_LAND_FOUR_MS, FILL_LAND_MS } from './HuntBoard'
@@ -305,15 +308,86 @@ describe('F12: runs of four', () => {
     expect(g.calls.slice(from)).toEqual([letterCall('c'), letterCall('p')])
   })
 
-  it('a drag start or a seat change cuts the song', async () => {
+  it('a drag start or a seat change cuts the song; Emma idles', async () => {
     const g = await mountFour()
     await seat('c', 'a')
     await advance(1000)
-    const from = g.calls.length
+    let from = g.calls.length
     await fireEvent.press(byId('critter-log'))
-    await activate(byId('critter-seat-1'))
+    await dragStart(byId('critter-m'), { x: 5, y: 5 })
+    expect(g.poses.at(-1)).toBe('idle')
     await advance(3000)
     expect(g.calls.slice(from)).toEqual([letterCall('c')])
+    await dragRelease(byId('critter-m'), { x: 5, y: 5 })
+    await advance(1000)
+
+    from = g.calls.length
+    await fireEvent.press(byId('critter-log'))
+    await activate(byId('critter-seat-1'))
+    expect(g.poses.at(-1)).toBe('idle')
+    await advance(3000)
+    expect(g.calls.slice(from)).toEqual([letterCall('c')])
+    expect(g.poses.at(-1)).toBe('idle')
+  })
+
+  it('a critter tap mid-song cuts it: her own sound plays out, nothing follows; Emma idles', async () => {
+    const g = await mountFour()
+    await seat('c', 'a', 'p')
+    await advance(1000)
+    // In the meadow: before the fix the song carried on, c m a p.
+    let from = g.calls.length
+    await fireEvent.press(byId('critter-log'))
+    await advance(50)
+    await tap(byId('critter-m'))
+    const atTap = g.poses.at(-1)
+    await advance(5000)
+    expect(g.calls.slice(from)).toEqual([letterCall('c'), letterCall('m')])
+    expect(atTap).toBe('idle')
+    expect(g.poses.at(-1)).toBe('idle')
+
+    // On a seat.
+    from = g.calls.length
+    await fireEvent.press(byId('critter-log'))
+    await advance(50)
+    await tap(byId('critter-seat-2'))
+    await advance(5000)
+    expect(g.calls.slice(from)).toEqual([letterCall('c'), letterCall('p')])
+    expect(g.poses.at(-1)).toBe('idle')
+
+    // VoiceOver's Hear on a meadow critter.
+    from = g.calls.length
+    await fireEvent.press(byId('critter-log'))
+    await advance(50)
+    await activate(byId('critter-d'), 'hear')
+    await advance(5000)
+    expect(g.calls.slice(from)).toEqual([letterCall('c'), letterCall('d')])
+    expect(g.poses.at(-1)).toBe('idle')
+  })
+
+  it('a slot tap or the app going to the background cuts it too; Emma idles', async () => {
+    const g = await mountFour()
+    await seat('c', 'a', 'p')
+    await advance(1000)
+    let from = g.calls.length
+    await fireEvent.press(byId('critter-log'))
+    await advance(50)
+    await fireEvent.press(byId('hunt-slot-3'))
+    await advance(5000)
+    expect(g.calls.slice(from)).toEqual([
+      letterCall('c'),
+      { uri: saidClipOf('damp'), from: 0, to: null },
+    ])
+    expect(g.poses.at(-1)).toBe('idle')
+
+    from = g.calls.length
+    await fireEvent.press(byId('critter-log'))
+    await advance(50)
+    await act(async () => g.visibility.set(true))
+    expect(g.poses.at(-1)).toBe('idle')
+    await act(async () => g.visibility.set(false))
+    await advance(5000)
+    expect(g.calls.slice(from)).toEqual([letterCall('c')])
+    expect(g.poses.at(-1)).toBe('idle')
   })
 
   it('four seated sing 400 ms after the last seat change', async () => {
