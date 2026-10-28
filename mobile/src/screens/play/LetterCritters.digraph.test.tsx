@@ -1125,4 +1125,32 @@ describe('D28 (Dave’s Q38 ruling): "Two letters, one sound!" once per learner'
     await advance(40)
     expect(g.poses.at(-1)).toBe('idle')
   })
+
+  it('the line ends with ch e s on the four-seat log: its run starts no song, and Emma idles', async () => {
+    learner({ step: 'digraphs-ch', four: { letters: CH_FOUR }, open: [3, 4] })
+    const LONG = 1500
+    const g = await mount({ lineMs: LONG })
+    await pickFour()
+    await advance(LONG)
+    const seats = sceneOf(PHONE_P, 4, 4).seats
+    for (const [unit, at] of [
+      ['e', 1],
+      ['s', 2],
+    ] as const) {
+      await dragStart(byId(`critter-${unit}`), centre(seats[at]!))
+      await dragRelease(byId(`critter-${unit}`), centre(seats[at]!))
+    }
+    await advance(2000)
+    await dragStart(byId('critter-ch'), centre(seats[0]!))
+    expect(g.lines.at(-1)).toBe(DIGRAPH_LINE)
+    await dragRelease(byId('critter-ch'), centre(seats[0]!))
+    expect(seated()).toEqual([0, 1, 2])
+    // The run falls due during the line; at its end, 1-3 seated only lean.
+    const calls = g.calls.length
+    await advance(LONG - 20)
+    expect(g.poses.at(-1)).toBe('attentive-pointing')
+    await advance(40)
+    expect(g.poses.at(-1)).toBe('idle')
+    expect(g.calls).toHaveLength(calls)
+  })
 })

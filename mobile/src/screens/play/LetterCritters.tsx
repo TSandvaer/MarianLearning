@@ -851,11 +851,12 @@ export function LetterCritters({
         if (ok) {
           singDueRef.current = false
           sing()
-          return
+        } else {
+          scheduleSing()
         }
-        scheduleSing()
       }
-      // What cut the line keeps the pose it set: a song, the hint pointing.
+      // A song, or the hint pointing, keeps its pose; a run that starts no
+      // song (1-3 seated on four seats only lean) leaves her idle.
       if (pointingRef.current || posed.count() !== pose) return
       kit.setPose('idle')
     })
