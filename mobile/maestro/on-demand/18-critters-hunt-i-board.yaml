@@ -1,0 +1,102 @@
+# Letter critters' word hunt on a short-i round (`design/native/critters-word-hunt.md`
+# § 16.4; § 16.6, B10's board): the `critters-hunt-i` seed (i b g p s x,
+# bib found; N 4: bib pig sip six, extras big gig sis). The board in
+# portrait (2 + 2) and in landscape (3 + 1), every slot with its picture
+# and no listen mark (the screenshots; six is #714's six dots). A tap on
+# six's empty slot plays its word, nothing else. No swipes: the flow runs
+# as it is on an iPad and on an iPhone 17, one form pair each.
+#
+# Screenshots go to Maestro's output (run.sh `--debug-output`, under
+# MAESTRO_OUT/18-critters-hunt-i-board/).
+appId: host.exp.Exponent
+name: Critters word hunt short-i board (portrait and landscape)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: critters-hunt-i
+- setOrientation: PORTRAIT
+- runFlow: ../subflows/open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub-play
+    timeout: 120000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: hub-play
+      NEXT: play-place
+- extendedWaitUntil:
+    visible:
+      id: play-tile-critters
+    timeout: 15000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: play-tile-critters
+      NEXT: letter-critters
+# Only "3" is open: the round, no picker. In board order the slots hold
+# bib (found), pig, sip, six.
+- extendedWaitUntil:
+    visible:
+      id: critter-log-numeral
+    timeout: 15000
+- assertVisible:
+    id: hunt-slot-0
+    text: Bib
+- assertVisible:
+    id: hunt-slot-1
+    text: Word to find
+- assertVisible:
+    id: hunt-slot-2
+    text: Word to find
+- assertVisible:
+    id: hunt-slot-3
+    text: Word to find
+- assertNotVisible:
+    id: hunt-slot-4
+- assertNotVisible:
+    id: hunt-bonus
+- extendedWaitUntil:
+    notVisible:
+      id: play-game-ribbon
+    timeout: 25000
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: hunt-i-portrait-board
+# Six's empty slot: its word, sound only.
+- tapOn:
+    id: hunt-slot-3
+    waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    visible:
+      id: play-game-ribbon
+    timeout: 3000
+    optional: true
+- assertNotVisible:
+    id: play-game-ribbon
+- assertVisible:
+    id: hunt-slot-3
+    text: Word to find
+- setOrientation: LANDSCAPE_LEFT
+- extendedWaitUntil:
+    visible:
+      id: hunt-slot-0
+      text: Bib
+    timeout: 10000
+- assertVisible:
+    id: hunt-slot-3
+    text: Word to find
+- assertNotVisible:
+    id: hunt-slot-4
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: hunt-i-landscape-board
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: play-game-back
+      NEXT: play-place
+- setOrientation: PORTRAIT

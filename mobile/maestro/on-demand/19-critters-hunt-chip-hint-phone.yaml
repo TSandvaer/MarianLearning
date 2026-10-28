@@ -1,0 +1,162 @@
+# B10 and B11 (`design/native/critters-word-hunt.md` § 16.6) as
+# 19-critters-hunt-chip-hint.yaml, on a phone in portrait, where the chip
+# sits beside the meadow (§ 2.3). Run it on an iPhone 17 simulator (402 x
+# 874, insets t62 b34): the points are 13-critters-word-hunt-phone.yaml's,
+# the meadow's rows at y 667 and 731, cells at x 137, 201 and 265; the
+# seats at y 580, x 123, 201 and 279.
+#
+#   a b f  /  g h t
+#
+# Screenshots go to Maestro's output (run.sh `--debug-output`, under
+# MAESTRO_OUT/19-critters-hunt-chip-hint-phone/).
+appId: host.exp.Exponent
+name: Critters word hunt chip and hint (phone portrait)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: critters-hunt
+# A flow that failed in landscape leaves the simulator there.
+- setOrientation: PORTRAIT
+- runFlow:
+    file: ../subflows/critters-hunt-open.yaml
+    env:
+      SHOT: chip-hint-phone-portrait
+- runFlow: ../subflows/critters-hunt-slot-tap.yaml
+# Run 1, f-a-t: an extra, the chip appears.
+- swipe:
+    start: 265, 667
+    end: 123, 580
+    duration: 800
+- swipe:
+    start: 137, 667
+    end: 201, 580
+    duration: 800
+- swipe:
+    start: 265, 731
+    end: 279, 580
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-hunt-extra.yaml
+    env:
+      SHOT: chip-hint-phone-portrait
+# Run 2, t-a-b: an extra, the chip's second.
+- swipe:
+    start: 265, 731
+    end: 123, 580
+    duration: 800
+- swipe:
+    start: 137, 667
+    end: 201, 580
+    duration: 800
+- swipe:
+    start: 201, 667
+    end: 279, 580
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-hunt-run.yaml
+    env:
+      L0: t
+      L1: a
+      L2: b
+- assertVisible:
+    id: hunt-bonus
+    text: Bonus words, fat, tab
+- assertNotVisible:
+    id: hunt-slot-1-glow
+# Run 3, h-a-g: a never-say word, it sings and sits.
+- swipe:
+    start: 201, 731
+    end: 123, 580
+    duration: 800
+- swipe:
+    start: 137, 667
+    end: 201, 580
+    duration: 800
+- swipe:
+    start: 137, 731
+    end: 279, 580
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-hunt-run.yaml
+    env:
+      L0: h
+      L1: a
+      L2: g
+- assertVisible:
+    id: hunt-bonus
+    text: Bonus words, fat, tab
+- assertNotVisible:
+    id: hunt-slot-1-glow
+# Run 4, f-a-t again: a repeat extra, the chip unchanged.
+- swipe:
+    start: 265, 667
+    end: 123, 580
+    duration: 800
+- swipe:
+    start: 137, 667
+    end: 201, 580
+    duration: 800
+- swipe:
+    start: 265, 731
+    end: 279, 580
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-hunt-run.yaml
+    env:
+      L0: f
+      L1: a
+      L2: t
+- assertVisible:
+    id: hunt-bonus
+    text: Bonus words, fat, tab
+- assertNotVisible:
+    id: hunt-slot-1-glow
+# Run 5, h-a-b: a non-word. The fifth run with no new target: the glow.
+- swipe:
+    start: 201, 731
+    end: 123, 580
+    duration: 800
+- swipe:
+    start: 137, 667
+    end: 201, 580
+    duration: 800
+- swipe:
+    start: 201, 667
+    end: 279, 580
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-hunt-run.yaml
+    env:
+      L0: h
+      L1: a
+      L2: b
+- runFlow:
+    file: ../subflows/critters-hunt-hint.yaml
+    env:
+      SHOT: chip-hint-phone-portrait
+# b-a-t, the glowing slot's word: 3 of 4.
+- swipe:
+    start: 201, 667
+    end: 123, 580
+    duration: 800
+- swipe:
+    start: 137, 667
+    end: 201, 580
+    duration: 800
+- swipe:
+    start: 265, 731
+    end: 279, 580
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-hunt-hint-end.yaml
+    env:
+      SHOT: chip-hint-phone-portrait

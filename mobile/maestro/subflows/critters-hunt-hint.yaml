@@ -1,0 +1,49 @@
+# Letter critters' word hunt (critters-word-hunt.md § 4.6, § 15.7; § 16.6,
+# B11): the calling flow has made 5 runs of three with no new target on
+# the `critters-hunt` seed (fat, tab, hag, fat, hab: extras, a never-say
+# word, a repeat extra and a non-word). The first empty slot, bat's (1),
+# glows, silently: its ring, its label "Hint", no line. A tap plays its
+# whole blend clip with Emma `attentive-pointing` (muted: her pose is what
+# shows; the clip itself is H15's, jest), then she is `idle`. The calling
+# flow then builds b-a-t.
+#
+#   SHOT  the screenshots' prefix
+appId: host.exp.Exponent
+---
+# The glow comes as the fifth run's shelf lands; the wait's budget counts
+# from that run's last drag (Maestro 2.11.0), so it is the run's own.
+- extendedWaitUntil:
+    visible:
+      id: hunt-slot-1-glow
+    timeout: 25000
+- assertVisible:
+    id: hunt-slot-1
+    text: Hint
+# One glow: tag's slot (3) is empty too, and does not glow.
+- assertNotVisible:
+    id: hunt-slot-3-glow
+- assertVisible:
+    id: hunt-slot-3
+    text: Word to find
+- assertNotVisible:
+    id: play-game-ribbon
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ${SHOT}-hint-glow
+- tapOn:
+    id: hunt-slot-1
+    waitToSettleTimeoutMs: 200
+- extendedWaitUntil:
+    visible:
+      id: emma-attentive-pointing
+    timeout: 3000
+- assertNotVisible:
+    id: play-game-ribbon
+- takeScreenshot: ${SHOT}-hint-tap
+- extendedWaitUntil:
+    visible:
+      id: emma-idle
+    timeout: 10000
+# The glow stands until a new target is found.
+- assertVisible:
+    id: hunt-slot-1-glow
