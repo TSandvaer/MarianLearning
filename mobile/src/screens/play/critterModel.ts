@@ -3,6 +3,7 @@
  * the log's seats (3, or 4 in a four-letter round), and what they sing.
  * Pure; the visit only.
  */
+import { CRITTER_DIGRAPH_BLENDS } from '@marian/core/games/playPlace'
 import { BLEND_MARKS } from '../../audio/blendMarks.generated'
 import type { Segment } from '../../audio/blendMarks'
 
@@ -80,9 +81,15 @@ export function swapSeats(seats: Seats, a: number, b: number): Seats {
   return next
 }
 
-/** The blend clip's text for a CVC word: "f - a - n ... fan". */
+/**
+ * The blend clip's text for a CVC word: "f - a - n ... fan"; for a digraph
+ * critter's sound source (ship, chip, thin, ring), its own blend: "sh - i
+ * - p ... ship" (`CRITTER_DIGRAPH_BLENDS`, critters digraph D9).
+ */
 export const blendText = (word: string) =>
-  `${word[0]} - ${word[1]} - ${word[2]} ... ${word}`
+  Object.values(CRITTER_DIGRAPH_BLENDS).find((t) =>
+    t.endsWith(` ... ${word}`),
+  ) ?? `${word[0]} - ${word[1]} - ${word[2]} ... ${word}`
 
 /** The bundled clip's web path (play-place § 3.4, K1). */
 export const blendClipPath = (word: string) => `/native/blend/${word}.mp3`

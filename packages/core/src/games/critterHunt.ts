@@ -20,6 +20,14 @@
  * `HUNT_FOUR_TARGETS` words they spell, the rest as extras (at most 3),
  * at most one decoy consonant.
  *
+ * Digraph rounds (`design/native/critters-digraph.md` § 11.1, D1-D13;
+ * Dave's digraph ruling of 2026-10-27, (A)-(C),
+ * `design/research/critters-digraph-2026-10-28.md`, "Dave D"): once a
+ * digraph's Word Song step is current or mastered (`huntDigraphs`), a
+ * round may hold one digraph critter ("sh"), one entry of its letters,
+ * which fills one seat and one box. Everything counts critters, never
+ * characters: spelling, the decoy, the run (sh-i-p is three critters).
+ *
  * Its record, per learner, is the round in play of each length (Dave (7)):
  * its letters, targets, extras and the words found in find order, and the
  * lengths she has open. Toy state
@@ -38,7 +46,12 @@ import {
   CRITTER_SAID_WORDS,
   critterHasPicture,
   currentOrMastered,
+  HUNT_DIGRAPH_LATER,
+  HUNT_DIGRAPH_QUIET,
+  HUNT_DIGRAPHS,
   HUNT_FOUR_TARGETS,
+  type HuntDigraph,
+  type HuntUnit,
 } from './playPlace'
 
 /** A round's word length: three letters, or four (critters four-letter § 1). */
@@ -100,6 +113,17 @@ export const HUNT_FOUR_UNDEALT: ReadonlySet<string> = new Set(
 )
 
 /**
+ * The four-critter digraph words that reject a four-letter round (Dave
+ * D (C)): his rude words (shits shags bitch) and the 22 a 6-9 learner
+ * knows that have no clip. 25. Any other four-critter digraph run sits.
+ */
+export const HUNT_DIGRAPH_FOUR_REJECTS: ReadonlySet<string> = new Set(
+  'shits shags bitch bench shelf brush ships chips swing crash flash smash trash fresh crush lunch punch bunch munch pinch chimp sting bring stung swung'.split(
+    ' ',
+  ),
+)
+
+/**
  * Each short vowel and the step that teaches it (Dave (1)): _a_ from
  * blending sounds, then _o_, _u_, _i_, _e_ from their CVC steps.
  */
@@ -123,6 +147,28 @@ export function huntVowels(progress: Progress | null): string[] {
 }
 
 /**
+ * Each digraph critter and the step that teaches it (Dave D (B),
+ * "Opening"): sh, ch and th from their own steps, ng from duck words.
+ */
+const DIGRAPH_STEPS: readonly (readonly [HuntDigraph, WordSongNode])[] = [
+  ['sh', 'digraphs-sh'],
+  ['ch', 'digraphs-ch'],
+  ['th', 'digraphs-th-voiceless'],
+  ['ng', 'duck-words'],
+]
+
+/**
+ * Her open digraph critters, in teaching order (D7): each once its step
+ * is current or mastered. `[]` for `null` and before digraphs-sh.
+ */
+export function huntDigraphs(progress: Progress | null): HuntDigraph[] {
+  if (progress === null) return []
+  return DIGRAPH_STEPS.filter(([, step]) =>
+    currentOrMastered(progress, step),
+  ).map(([g]) => g)
+}
+
+/**
  * The probe guard (Dave (1)): while cvc-words is her current step and not
  * mastered, no round spells a probe-reserve word, so the hunt does not use
  * up the check's fresh words.
@@ -137,8 +183,13 @@ export function huntProbeGuard(progress: Progress | null): boolean {
 
 /** A dealt round: the meadow's letters and the words they spell. */
 export interface HuntRound {
-  /** The vowel, then the 5 consonants (6 for four letters) a-z. */
-  letters: string[]
+  /**
+   * Its critters: the vowel, then the 5 consonants (6 for four letters)
+   * a-z. A digraph round has the vowel, the digraph, then 4 (5) single
+   * consonants a-z (Q41: Dave D (C)'s fallbacks print it so, and the
+   * meadow draws it so).
+   */
+  letters: HuntUnit[]
   /** The words to find, a-z, each with a picture: 4-8 of them (4-6 for four letters). */
   targets: string[]
   /** The other said words they spell, a-z: 0-3, never required. */
@@ -179,36 +230,81 @@ const VOWELS = new Set(['a', 'e', 'i', 'o', 'u'])
 /** The 17 consonants among the 22 critter letters. */
 const CONSONANTS = [...'bcdfghjlmnprstvwx']
 
+const isDigraph = (u: string): u is HuntDigraph =>
+  (HUNT_DIGRAPHS as readonly string[]).includes(u)
+
 /**
- * The words of `words` a round could ever build, each with its letters: a
- * vowel at most once (it has no twin) and a consonant at most twice (its
- * twin, so dad, mom, pump and test work). A word on it is spellable when
- * every letter is in the round.
+ * `word`'s critters among `letters`, in order (D2): a digraph critter
+ * where the round has its two letters as one, else one critter a letter.
+ * ship on i sh b c n p is sh i p. `null` when the round's critters do not
+ * make it. By the pair rule (D5) a word a round spells has one split.
+ */
+export function huntUnits(
+  word: string,
+  letters: readonly HuntUnit[],
+): HuntUnit[] | null {
+  const from = (at: number): HuntUnit[] | null => {
+    if (at === word.length) return []
+    const pair = word.slice(at, at + 2)
+    for (const unit of pair.length === 2 ? [pair, word[at]!] : [pair]) {
+      if (!letters.includes(unit)) continue
+      const rest = from(at + unit.length)
+      if (rest !== null) return [unit, ...rest]
+    }
+    return null
+  }
+  return from(0)
+}
+
+/** A digraph-list word's critters, its digraph as one (wish: w i sh). */
+const digraphCritters = (word: string): HuntUnit[] =>
+  huntUnits(word, [...HUNT_DIGRAPHS, ...word])!
+
+/** Each word a round could build, with its distinct critters. */
+type Buildable = readonly (readonly [string, readonly HuntUnit[]])[]
+
+/**
+ * The words of `words` a round could ever build, each with its critters
+ * (`critters`, one a letter by default): a vowel at most once (it has no
+ * twin) and a consonant critter at most twice (its twin, so dad, mom,
+ * pump and test work). A word on it is spellable when every critter is in
+ * the round (D4).
  */
 const buildable = (
   words: Iterable<string>,
-): readonly (readonly [string, readonly string[]])[] =>
+  critters: (word: string) => readonly HuntUnit[] = (w) => [...w],
+): Buildable =>
   [...words]
-    .filter((w) =>
-      [...w].every(
-        (ch) =>
-          [...w].filter((x) => x === ch).length <= (VOWELS.has(ch) ? 1 : 2),
+    .map((w) => [w, critters(w)] as const)
+    .filter(([, cs]) =>
+      cs.every(
+        (c) => cs.filter((x) => x === c).length <= (VOWELS.has(c) ? 1 : 2),
       ),
     )
-    .map((w) => [w, [...new Set(w)]] as const)
+    .map(([w, cs]) => [w, [...new Set(cs)]] as const)
 
 /** The real three-letter words a round could ever build. */
 const BUILDABLE = buildable(
   [...CRITTER_REAL_WORDS].filter((w) => w.length === HUNT_LENGTH),
 )
-/** The four-letter targets, and the words that reject a four-letter round. */
-const BUILDABLE_FOUR = buildable(HUNT_FOUR_TARGETS)
-const REJECTS_FOUR = buildable([...HUNT_RUDE_FOUR, ...HUNT_FOUR_UNDEALT])
+/** The digraph words of `n` critters (Dave D (C)). */
+const digraphWords = (n: number) =>
+  HUNT_DIGRAPH_LATER.filter((w) => digraphCritters(w).length === n)
+/** The three-critter digraph words said, and those that reject a round. */
+const BUILDABLE_DIGRAPH = buildable(digraphWords(3), digraphCritters)
+const REJECTS_DIGRAPH = buildable(HUNT_DIGRAPH_QUIET, digraphCritters)
+/** The four-letter targets and chest, and the words that reject a four-letter round. */
+const BUILDABLE_FOUR = [
+  ...buildable(HUNT_FOUR_TARGETS),
+  ...buildable(digraphWords(4), digraphCritters),
+]
+const REJECTS_FOUR = [
+  ...buildable([...HUNT_RUDE_FOUR, ...HUNT_FOUR_UNDEALT]),
+  ...buildable(HUNT_DIGRAPH_FOUR_REJECTS, digraphCritters),
+]
 
-const spelled = (
-  words: readonly (readonly [string, readonly string[]])[],
-  set: ReadonlySet<string>,
-) => words.filter(([, ls]) => ls.every((l) => set.has(l))).map(([w]) => w)
+const spelled = (words: Buildable, set: ReadonlySet<string>): Buildable =>
+  words.filter(([, cs]) => cs.every((c) => set.has(c)))
 
 /**
  * The round `letters` deal (vowel first), or `null` when the rules reject
@@ -221,6 +317,15 @@ const spelled = (
  * `HUNT_FOUR_TARGETS` words spelled with a bundled picture, 4-6; the
  * extras the rest, at most 3; at most one consonant in no target. The
  * probe guard is a three-letter rule (its words are three letters).
+ *
+ * A digraph round (D1-D10, Dave D (B)) is spelled and judged by critters
+ * (`buildable`): exactly one digraph critter, never with both its letters
+ * as singles (the pair rule); no `HUNT_DIGRAPH_QUIET` word spellable
+ * (three seats) or `HUNT_DIGRAPH_FOUR_REJECTS` word (four); its
+ * `HUNT_DIGRAPH_LATER` words of that many critters join the plain ones,
+ * pictured as targets and the rest as extras; a consonant critter is a
+ * decoy when no target's critters hold it (s beside sh, though ship holds
+ * the letter); and at least one target uses the digraph.
  */
 export function huntRoundOf(
   letters: readonly string[],
@@ -230,30 +335,42 @@ export function huntRoundOf(
   }: { probeGuard?: boolean; length?: HuntLength } = {},
 ): HuntRound | null {
   const set = new Set(letters)
-  let words: string[]
+  const digraphs = letters.filter(isDigraph)
+  if (digraphs.length > 1) return null
+  const digraph = digraphs[0]
+  if (digraph !== undefined && [...digraph].every((ch) => set.has(ch)))
+    return null
+  let said: Buildable
   if (length === 4) {
     if (spelled(REJECTS_FOUR, set).length > 0) return null
-    words = spelled(BUILDABLE_FOUR, set)
+    said = spelled(BUILDABLE_FOUR, set)
   } else {
     const all = spelled(BUILDABLE, set)
-    if (all.some((w) => CRITTER_NOT_SAID.has(w))) return null
-    if (probeGuard && all.some((w) => PROBE_RESERVE_WORDS.includes(w))) {
+    if (all.some(([w]) => CRITTER_NOT_SAID.has(w))) return null
+    if (spelled(REJECTS_DIGRAPH, set).length > 0) return null
+    if (probeGuard && all.some(([w]) => PROBE_RESERVE_WORDS.includes(w))) {
       return null
     }
-    words = all.filter(
-      (w) => critterHasPicture(w) || CRITTER_SAID_WORDS.includes(w),
-    )
+    said = [
+      ...all.filter(
+        ([w]) => critterHasPicture(w) || CRITTER_SAID_WORDS.includes(w),
+      ),
+      ...spelled(BUILDABLE_DIGRAPH, set),
+    ]
   }
+  const critters = new Map(said)
+  const words = [...critters.keys()]
   const targets = words.filter(critterHasPicture).sort()
   const extras = words.filter((w) => !critterHasPicture(w)).sort()
   if (extras.length > HUNT_MAX_EXTRAS) return null
   const rules = RULES[length]
   if (targets.length < rules.minTargets || targets.length > rules.maxTargets)
     return null
-  const decoys = letters.filter(
-    (l) => !VOWELS.has(l) && !targets.some((w) => w.includes(l)),
-  )
+  const used = (c: HuntUnit) =>
+    targets.some((w) => critters.get(w)!.includes(c))
+  const decoys = letters.filter((l) => !VOWELS.has(l) && !used(l))
   if (decoys.length > rules.maxDecoys) return null
+  if (digraph !== undefined && !used(digraph)) return null
   return { letters: [...letters], targets, extras }
 }
 
@@ -282,23 +399,29 @@ const ROUNDS = new Map<string, readonly HuntRound[]>()
  * Three letters: 491 in all (a 182, o 92, u 127, i 8, e 82), Dave 27
  * (A)'s count with #714's eight pictures (B2) and _fog_ and _dig_ (Dave 27
  * (E), pictures in #719: o +16, i +2). Four letters (`length: 4`):
- * 196 (a 110, o 29, u 38, i 0, e 19; F25). Computed once per vowel, guard
- * and length.
+ * 196 (a 110, o 29, u 38, i 0, e 19; F25). With `digraph`, the rounds
+ * that hold that digraph critter and single consonants a-z (D11, Dave
+ * D (C)): three seats 122 (sh o 28, i 23, e 15; ch i 10; th o 22; ng i
+ * 24), four seats 22 (ch e); every other pair 0. Computed once per vowel,
+ * guard, length and digraph.
  */
 export function huntRounds(
   vowel: string,
   {
     probeGuard = false,
     length = HUNT_LENGTH,
-  }: { probeGuard?: boolean; length?: HuntLength } = {},
+    digraph,
+  }: { probeGuard?: boolean; length?: HuntLength; digraph?: HuntDigraph } = {},
 ): readonly HuntRound[] {
   const guard = probeGuard && length === 3
-  const key = `${vowel}|${guard}|${length}`
+  const key = `${vowel}|${guard}|${length}|${digraph ?? ''}`
   const known = ROUNDS.get(key)
   if (known !== undefined) return known
   const out: HuntRound[] = []
-  for (const cs of choose(CONSONANTS, RULES[length].consonants)) {
-    const round = huntRoundOf([vowel, ...cs], { probeGuard: guard, length })
+  const lead = digraph === undefined ? [vowel] : [vowel, digraph]
+  const singles = RULES[length].consonants + 1 - lead.length
+  for (const cs of choose(CONSONANTS, singles)) {
+    const round = huntRoundOf([...lead, ...cs], { probeGuard: guard, length })
     if (round !== null) out.push(round)
   }
   ROUNDS.set(key, out)
@@ -334,6 +457,35 @@ export const HUNT_FOUR_FALLBACK: Readonly<Record<string, readonly string[]>> = {
   u: ['u', 'b', 'c', 'j', 'l', 'm', 'p'],
 }
 
+/**
+ * Dave's pinned digraph fallbacks (Dave D (C), "Kevin pins them"): the
+ * first round of each pair that deals, by digraph and vowel. They deal box
+ * fox pop shop, bib bin pin ship, bed egg leg shed, bib chip fig pig, cot
+ * dot mom moth and bib fig wig wing (three seats), and chest jets nest
+ * tent (four). The deal never needs them: a pair is picked only with a
+ * round to deal, and each that deals has at least 10.
+ * `critterHuntDigraph.test.ts` checks every one.
+ */
+export const HUNT_DIGRAPH_FALLBACK: Readonly<
+  Partial<Record<HuntDigraph, Readonly<Record<string, readonly HuntUnit[]>>>>
+> = {
+  sh: {
+    o: ['o', 'sh', 'b', 'f', 'p', 'x'],
+    i: ['i', 'sh', 'b', 'c', 'n', 'p'],
+    e: ['e', 'sh', 'b', 'd', 'g', 'l'],
+  },
+  ch: { i: ['i', 'ch', 'b', 'f', 'g', 'p'] },
+  th: { o: ['o', 'th', 'c', 'd', 'm', 't'] },
+  ng: { i: ['i', 'ng', 'b', 'f', 'g', 'w'] },
+}
+
+/** The four-seat digraph fallback (Dave D (C)): ch-e, the only pair. */
+export const HUNT_DIGRAPH_FOUR_FALLBACK: Readonly<
+  Partial<Record<HuntDigraph, Readonly<Record<string, readonly HuntUnit[]>>>>
+> = {
+  ch: { e: ['e', 'ch', 'c', 'j', 'n', 's', 't'] },
+}
+
 const sameLetters = (a: readonly string[], b: readonly string[] | undefined) =>
   b !== undefined && a.length === b.length && a.every((l, i) => l === b[i])
 
@@ -346,6 +498,13 @@ const sameLetters = (a: readonly string[], b: readonly string[] | undefined) =>
  * no probe-reserve word. Picking uniformly among the rounds that pass is
  * draw-and-accept over the consonant sets, with the draws done once. No
  * vowels: _a_. The same `rng` gives the same round.
+ *
+ * With her open `digraphs` (`huntDigraphs`; D8, Dave D (B), "The deal"):
+ * first one of plain and each open digraph with such a round for one of
+ * her vowels, uniformly; then her vowel and the round as above, among that
+ * pick's. With only plain to pick (no digraph open, or none dealing at
+ * this length) nothing is drawn for it, so the deal is draw for draw the
+ * one without digraphs.
  */
 export function huntDeal(
   vowels: readonly string[],
@@ -354,20 +513,27 @@ export function huntDeal(
     last,
     probeGuard = false,
     length = HUNT_LENGTH,
+    digraphs = [],
   }: {
     last?: readonly string[]
     probeGuard?: boolean
     length?: HuntLength
+    digraphs?: readonly HuntDigraph[]
   } = {},
 ): HuntRound {
   const own = vowels.length > 0 ? vowels : ['a']
-  const fresh = (v: string) =>
-    huntRounds(v, { probeGuard, length }).filter(
+  const fresh = (v: string, digraph?: HuntDigraph) =>
+    huntRounds(v, { probeGuard, length, digraph }).filter(
       (r) => !sameLetters(r.letters, last),
     )
-  const dealing = own.filter((v) => fresh(v).length > 0)
-  if (dealing.length > 0) {
-    const rounds = fresh(dealing[Math.floor(rng() * dealing.length)]!)
+  const picks = [undefined, ...digraphs].filter((g) =>
+    own.some((v) => fresh(v, g).length > 0),
+  )
+  if (picks.length > 0) {
+    const pick =
+      picks.length === 1 ? picks[0] : picks[Math.floor(rng() * picks.length)]
+    const dealing = own.filter((v) => fresh(v, pick).length > 0)
+    const rounds = fresh(dealing[Math.floor(rng() * dealing.length)]!, pick)
     return rounds[Math.floor(rng() * rounds.length)]!
   }
   const vowel = own[Math.floor(rng() * own.length)]!

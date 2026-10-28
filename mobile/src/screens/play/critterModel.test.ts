@@ -65,6 +65,18 @@ describe('every critter sound has a bundled clip and marks (§ 3.4)', () => {
       expect(audioForWebPath(blendClipPath(word))).toBeDefined()
     }
   })
+
+  it('a digraph critter’s source is its own blend, not a CVC split (D9)', () => {
+    expect(blendText('ship')).toBe('sh - i - p ... ship')
+    expect(blendText('chip')).toBe('ch - i - p ... chip')
+    expect(blendText('thin')).toBe('th - i - n ... thin')
+    expect(blendText('ring')).toBe('r - i - ng ... ring')
+    for (const g of ['sh', 'ch', 'th', 'ng']) {
+      const { word, index } = CRITTER_SOUND_SOURCE[g]!
+      expect(blendSegments(word)).toHaveLength(4)
+      expect(blendText(word).split(' ... ')[0]!.split(' - ')[index]).toBe(g)
+    }
+  })
 })
 
 describe('four seats (critters-four-letter.md § 4.1)', () => {
