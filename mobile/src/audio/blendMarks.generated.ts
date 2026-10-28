@@ -3,11 +3,12 @@
  * re-run `npm run export-assets` after a canon re-bake.
  *
  * Every baked Word Song blend clip (`word.p*.blend` in
- * `public/canon/word-song/**`), keyed by its text: the MP3's byte length
- * (the app's check), its content hash (the first 16 hex digits of its
- * SHA-256: `blendMarks.test.ts` fails when a re-bake changes a clip) and
- * its four sound segments `[onMs, offMs]` (3 graphemes, then the
- * whole word), from ffmpeg `silencedetect` at -35 dB
+ * `public/canon/word-song/**`) and the digraph critters' sound-source
+ * blends (`guide-play-critters-blend-*.mp3`), keyed by its text: the
+ * MP3's byte length (the app's check), its content hash (the first 16 hex
+ * digits of its SHA-256: `blendMarks.test.ts` fails when a re-bake changes
+ * a clip) and its four sound segments `[onMs, offMs]` (3 graphemes, then
+ * the whole word), from ffmpeg `silencedetect` at -35 dB
  * (design/native/word-song-native.md § 5). Read through `./blendMarks.ts`.
  */
 export const BLEND_MARKS: Readonly<
@@ -158,6 +159,16 @@ export const BLEND_MARKS: Readonly<
       [792, 981],
       [1632, 1737],
       [2376, 2749],
+    ],
+  },
+  'ch - i - p ... chip': {
+    bytes: 22359,
+    sha256: 'dc2dd30dc8ec8f53',
+    segments: [
+      [74, 313],
+      [713, 925],
+      [1410, 1539],
+      [2152, 2552],
     ],
   },
   'd - a - d ... dad': {
@@ -480,6 +491,16 @@ export const BLEND_MARKS: Readonly<
       [2592, 3158],
     ],
   },
+  'r - i - ng ... ring': {
+    bytes: 26748,
+    sha256: '771787848cf42fee',
+    segments: [
+      [104, 405],
+      [840, 1055],
+      [1469, 1966],
+      [2489, 3051],
+    ],
+  },
   'r - u - g ... rug': {
     bytes: 26121,
     sha256: 'c9c1f347a6e2888f',
@@ -510,6 +531,16 @@ export const BLEND_MARKS: Readonly<
       [2337, 2960],
     ],
   },
+  'sh - i - p ... ship': {
+    bytes: 26748,
+    sha256: '54295ae5f5cfa2dc',
+    segments: [
+      [98, 455],
+      [905, 1139],
+      [1754, 1828],
+      [2436, 2920],
+    ],
+  },
   't - a - g ... tag': {
     bytes: 25494,
     sha256: 'e6198f43c4f3bbef',
@@ -538,6 +569,16 @@ export const BLEND_MARKS: Readonly<
       [656, 923],
       [1280, 1536],
       [2166, 2609],
+    ],
+  },
+  'th - i - n ... thin': {
+    bytes: 24240,
+    sha256: '8e1ccd3fa0269c74',
+    segments: [
+      [89, 302],
+      [599, 803],
+      [1074, 1490],
+      [2049, 2616],
     ],
   },
   'v - a - n ... van': {

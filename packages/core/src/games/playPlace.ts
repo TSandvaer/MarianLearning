@@ -560,7 +560,7 @@ export const CRITTER_NOT_SAID: ReadonlySet<string> = new Set([
  * The words Emma says after the critters sing them, sorted: every real word
  * that is not a picture word, not on `CRITTER_NEVER_SAY` and not on
  * `CRITTER_NOT_SAID`. Each has a whole-word Lily clip
- * (`critterWordLine(word)` in `emmasPath/guidanceLines.ts`); the 31 on
+ * (`critterWordLine(word)` in `emmasPath/guidanceLines.ts`); the 33 on
  * `CRITTER_SAID_PICTURE_WORDS` also have a pack picture.
  */
 export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
@@ -583,16 +583,20 @@ export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
  * _mug_, _sad_, _mud_ and _hug_ (batch 19, Thomas's picks 2026-10-25);
  * and _ant_ and _elf_ (critters four-letter F7, pictures in #709); and
  * the pictured-only boards' eight (Dave 2026-10-27, (A); pictures in
- * #714): _dot peg red rod run six ten tug_. Pinned here, since core never
- * reads the app's registry; `playPlace.test.ts` checks them against it.
+ * #714): _dot peg red rod run six ten tug_; and the digraph critters'
+ * _fog_ and _dig_ (Dave's digraph-critter ruling of 2026-10-27, (E);
+ * pictures in #719). Pinned here, since core never reads the app's
+ * registry; `playPlace.test.ts` checks them against it.
  */
 export const CRITTER_SAID_PICTURE_WORDS: readonly string[] = [
   'ant',
   'bun',
   'cab',
+  'dig',
   'dot',
   'egg',
   'elf',
+  'fog',
   'gum',
   'ham',
   'hug',
@@ -663,11 +667,55 @@ export const CRITTER_SAID_LATER: readonly string[] = [
 ]
 
 /**
+ * The 13 digraph-critter words that get a clip (Dave 2026-10-27, digraph
+ * critters (C) and (D), "New Lily lines"): the three-seat targets ship
+ * fish shed shop chip moth ring wing sing, the four-seat target chest and
+ * the extras shin shot wish. Content only so far: none is dealt or said
+ * (a run that spells one is not `'word'`) until the digraph core wires
+ * them.
+ */
+export const HUNT_DIGRAPH_LATER: readonly string[] = [
+  'chest',
+  'chip',
+  'fish',
+  'moth',
+  'ring',
+  'shed',
+  'shin',
+  'ship',
+  'shop',
+  'shot',
+  'sing',
+  'wing',
+  'wish',
+]
+
+/**
+ * The digraph critters' sound sources (Dave 2026-10-27, digraph critters
+ * (A), "Its sound"): one Lily blend clip per digraph, in the 4-segment
+ * blend format, its marks exported with every blend's (`BLEND_MARKS`). No
+ * lesson plays them; a critter sings the digraph's own window: sh, ch and
+ * th the first sound, ng the third (no English word starts with ng). Not
+ * in `CRITTER_SOUND_SOURCE` yet: the digraph core adds them.
+ */
+export const CRITTER_DIGRAPH_BLENDS: Readonly<Record<string, string>> = {
+  sh: 'sh - i - p ... ship',
+  ch: 'ch - i - p ... chip',
+  th: 'th - i - n ... thin',
+  ng: 'r - i - ng ... ring',
+}
+
+/**
  * Every word with a whole-word Lily clip, sorted: the said words (the nine
- * said later among them) and the four-letter words (`critterWordLine(word)`).
+ * said later among them), the four-letter targets and the 13 digraph words
+ * for later (`critterWordLine(word)`).
  */
 export const CRITTER_CLIP_WORDS: readonly string[] = [
-  ...new Set([...CRITTER_SAID_WORDS, ...HUNT_FOUR_TARGETS]),
+  ...new Set([
+    ...CRITTER_SAID_WORDS,
+    ...HUNT_FOUR_TARGETS,
+    ...HUNT_DIGRAPH_LATER,
+  ]),
 ].sort()
 
 /** A word whose pack picture is another word's (Dave 2026-10-25, § 6). */

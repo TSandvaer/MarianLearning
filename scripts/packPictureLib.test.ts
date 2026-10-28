@@ -9,6 +9,7 @@ import { APIConnectionError, APIConnectionTimeoutError, APIError } from 'openai'
 import { describe, expect, it, vi } from 'vitest'
 
 import { AVATAR_IDS } from '@marian/core/learners'
+import { FORBIDDEN_PAIRS } from '@marian/core/wordSong/wordPack'
 
 import {
   anchorRelPaths,
@@ -698,6 +699,25 @@ const scene = (over: Partial<SceneManifestEntry> = {}): SceneManifestEntry => ({
   avoid: [],
   refs: ['fox', 'rug'],
   ...over,
+})
+
+describe('the word pack manifest', () => {
+  const pack = parseManifest(
+    readRepoJson('design/word-song/picture-manifest.json'),
+  )
+
+  it("lists every FORBIDDEN_PAIRS pair in both rows' distinctFrom", () => {
+    const byWord = new Map(pack.map((e) => [e.word, e]))
+    const missing: string[] = []
+    for (const [a, b] of FORBIDDEN_PAIRS) {
+      const ea = byWord.get(a)
+      const eb = byWord.get(b)
+      if (!ea || !eb) continue
+      if (!ea.distinctFrom.includes(b)) missing.push(`${a} -> ${b}`)
+      if (!eb.distinctFrom.includes(a)) missing.push(`${b} -> ${a}`)
+    }
+    expect(missing).toEqual([])
+  })
 })
 
 describe('the scene manifest', () => {
