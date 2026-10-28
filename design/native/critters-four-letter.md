@@ -12,6 +12,8 @@
 
 **Amended 2026-10-28: a title on each picker log.** Thomas approved the polished picker (#713) and asked, as the coordinator relayed him: "there is room for a title like "Three letter words" and "Four letter words" (or better title if you have one)." Dave ruled the same day (his ruling of 2026-10-28 as the coordinator relayed it, not committed; quoted here as "Dave 28"): one printed, silent, static title per log, "Three letters" and "Four letters", plain text on the meadow just above the log, inside the log's button, on the picker only, and 0 new Lily lines. **§ 5.4 designs it.** Decision 11, § 5.2's paint, § 7's picker wireframe, § 8, § 9, F16, F18, F19, § 11.2, § 12, Q37 and § 14 follow. It amends Dave 23 (B)'s "No text" (`design/research/critters-four-letter-2026-10-26.md:85`) for the picker's two titles only (Dave 28 (4)).
 
+**Phase 3, 2026-10-28: digraph critters.** Dave's digraph ruling (committed verbatim as `design/research/critters-digraph-2026-10-28.md`) adds four-seat rounds with a ch critter (_chest_, [ch][e][s][t]) once digraphs-ch opens. They are designed in `design/native/critters-digraph.md`, which also checks the digraph tile in this spec's smallest box (S5, b 20). The picker, its titles and this spec's layout are unchanged; its open questions continue from Q37 there (Q38-Q45).
+
 **Standing rules:** any learner of about 6-9 (Marian is one); every spoken line and label is a row in a table, so the planned Danish version swaps rows; per learner through `@marian/core/learners`; audio-first; never a red X. **Spend is counted here and asked later**, each under its own popup (§ 9).
 
 **Scope:** spec only. No code, no renders, no paid calls, no tickets.

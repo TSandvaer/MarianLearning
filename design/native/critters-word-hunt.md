@@ -16,6 +16,8 @@
 
 **Amended 2026-10-27 (build 25): pictured-only boards.** Thomas approved boards whose every slot shows a picture, with their content (15 Lily clips and 23 pictures, Devon's PR #714). Dave ruled (committed verbatim as `design/research/critters-pictured-boards-2026-10-27.md`, quoted here as "Dave 27 (A)" to "Dave 27 (E)"): targets are only words with a bundled picture, a familiar word with no picture becomes an extra, N is 4-8, and one decoy consonant is allowed. **§ 16 designs it** for three-letter rounds (his (D) items 1 and 3) and gives the core rule as acceptance criteria. Four-letter rounds are `critters-four-letter.md` § 15. The sections it changes are edited in place and marked "(amended 2026-10-27, § 16)": the Goal, § 1, § 2.1-§ 2.3, § 10, § 14, § 15.2-§ 15.4, § 15.8 and § 15.11.
 
+**Phase 3, 2026-10-28: digraph critters.** Dave's digraph ruling (committed verbatim as `design/research/critters-digraph-2026-10-28.md`) adds one critter that wears two letters and a bar (sh, ch, th or ng) to three-seat rounds once its Word Song step opens, with words like _ship_ on the three-seat log. It is designed in `design/native/critters-digraph.md`; this spec's layout, steps and timings hold for it unchanged, and its runs, tiles and hint count critters, not characters.
+
 ## Goal
 
 A learner past blending sounds opens Letter critters and sees six critters, a log with a "3" on its end, and a row of three-box slots, each showing the picture of a word to find (amended 2026-10-27, § 16: every dealt slot has a picture; it was "or a listen mark she can tap to hear it"). Each word she builds lands in its own slot. When all but one are found, Emma celebrates the round, and a "new letters" button lets her start another when she wants to.
