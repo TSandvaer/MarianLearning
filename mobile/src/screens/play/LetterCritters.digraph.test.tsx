@@ -1082,4 +1082,47 @@ describe('D28 (Dave’s Q38 ruling): "Two letters, one sound!" once per learner'
     expect(g.lines.at(-1)).toBe('guide.play.critters.word.ship')
     expect(g.calls.slice(calls)).toEqual(['sh', 'i', 'p'].map(unitCall))
   })
+
+  it('a log tap during the line, its run waiting: the pair sings once, sh i, Emma listening then idle', async () => {
+    const LONG = 1500
+    const g = await mount({ lineMs: LONG })
+    await advance(LONG)
+    const seats = sceneOf(PHONE_P, 4).seats
+    await dragStart(byId('critter-i'), centre(seats[1]!))
+    await dragRelease(byId('critter-i'), centre(seats[1]!))
+    await advance(4000)
+    await dragStart(byId('critter-sh'), centre(seats[0]!))
+    expect(g.lines.at(-1)).toBe(DIGRAPH_LINE)
+    await dragRelease(byId('critter-sh'), centre(seats[0]!))
+    expect(seated()).toEqual([0, 1])
+    // The pair falls due 400 ms after the seat change and waits for the line.
+    await advance(600)
+    const calls = g.calls.length
+    const poses = g.poses.length
+    await fireEvent.press(byId('critter-log'))
+    await advance(4000)
+    expect(g.calls.slice(calls)).toEqual(['sh', 'i'].map(unitCall))
+    expect(g.poses.slice(poses)).toEqual(['listening', 'idle'])
+  })
+
+  it('a hint tap during the line: Emma points until the hint ends', async () => {
+    const LONG = 1500
+    const g = await mount({ lineMs: LONG })
+    await build(['b', 'i', 'b'])
+    await advance(HUNT_HINT_IDLE_MS + 1000)
+    expect(has('hunt-slot-1-glow')).toBe(true)
+    await tap(byId('critter-sh'))
+    await advance(ownMs('sh') + SOUND_GAP_MS + 10)
+    expect(g.lines.at(-1)).toBe(DIGRAPH_LINE)
+    const from = g.calls.length
+    await fireEvent.press(byId('hunt-slot-1'))
+    // The hint plays bin's whole blend clip; she points to its end.
+    await advance(wholeMs(clipOf('bin')) - 20)
+    expect(g.calls.slice(from)).toEqual([
+      { uri: clipOf('bin'), from: 0, to: null },
+    ])
+    expect(g.poses.at(-1)).toBe('attentive-pointing')
+    await advance(40)
+    expect(g.poses.at(-1)).toBe('idle')
+  })
 })

@@ -347,6 +347,16 @@ export function LetterCritters({
       },
     }
   })
+  // Each pose Emma takes: a line's end idles her only if none came since.
+  const [posed] = useState(() => {
+    let count = 0
+    return {
+      count: () => count,
+      add: () => {
+        count += 1
+      },
+    }
+  })
   const kit: GameKit = {
     ...frameKit,
     later: (fn, ms) =>
@@ -365,6 +375,7 @@ export function LetterCritters({
         })
       }),
     setPose: (pose) => {
+      posed.add()
       if (scope.alive()) frameKit.setPose(pose)
     },
   }
@@ -544,6 +555,8 @@ export function LetterCritters({
   const [pairSaidAtMount] = useState(huntDigraphLineSaid)
   const pairSaidRef = useRef(pairSaidAtMount)
   const pairPlayingRef = useRef(false)
+  /** The song token of the run that fell due during the line and waits. */
+  const pairWaitRef = useRef(-1)
 
   const setSeats = (next: Seats) => {
     seatsRef.current = next
@@ -799,7 +812,10 @@ export function LetterCritters({
       if (songRef.current !== token) return
       if (draggingRef.current) return
       // The digraph critters' line plays: the run waits for its end (D28).
-      if (pairPlayingRef.current) return
+      if (pairPlayingRef.current) {
+        pairWaitRef.current = token
+        return
+      }
       singDueRef.current = false
       sing()
     }, SING_AFTER_MS)
@@ -819,9 +835,19 @@ export function LetterCritters({
     markHuntDigraphLineSaid()
     pairPlayingRef.current = true
     kit.setPose('attentive-pointing')
+    const pose = posed.count()
     void kit.speak('guide.play.critters.digraph').then((ok) => {
       pairPlayingRef.current = false
-      if (singDueRef.current && !lockedRef.current && !draggingRef.current) {
+      // Only the run that waited, and only if nothing has moved the token on
+      // since (a log tap, a song, a seat change): a run not yet due keeps
+      // its own 400 ms.
+      const waited = pairWaitRef.current === songRef.current
+      if (
+        waited &&
+        singDueRef.current &&
+        !lockedRef.current &&
+        !draggingRef.current
+      ) {
         if (ok) {
           singDueRef.current = false
           sing()
@@ -829,6 +855,8 @@ export function LetterCritters({
         }
         scheduleSing()
       }
+      // What cut the line keeps the pose it set: a song, the hint pointing.
+      if (pointingRef.current || posed.count() !== pose) return
       kit.setPose('idle')
     })
   }
