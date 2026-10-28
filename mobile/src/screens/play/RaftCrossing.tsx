@@ -578,7 +578,80 @@ export function RaftCrossing({
       <Backdrop scene={scene} area={kit.area} tablet={tablet} />
       <TripIsland scene={scene} tablet={tablet} />
 
-      {/* The nine homes (§ 1): not touch targets (Decision 10). */}
+      <Deck
+        scene={scene}
+        rect={deckRect}
+        total={model.total}
+        splashing={splash !== null && model.phase === 'wobbling'}
+        gliding={gliding}
+        reducedMotion={reducedMotion}
+        frameKey={kit.cancelKey}
+        tablet={tablet}
+      >
+        {model.seats.map((id, seat) => {
+          if (id === null) return null
+          const animal = model.animals[id]!
+          return (
+            <Fly
+              key={`aboard-${id}`}
+              rect={scene.seats[seat]!}
+              from={takeFrom(`aboard-${id}`)}
+              reducedMotion={reducedMotion}
+            >
+              <DragPiece
+                testID={`raft-aboard-${id}`}
+                rect={{
+                  x: 0,
+                  y: 0,
+                  width: scene.seats[seat]!.width,
+                  height: scene.seats[seat]!.height,
+                }}
+                accessibilityLabel={animalLabel(
+                  RAFT_ANIMALS[animal.weight],
+                  animal.weight,
+                )}
+                disabled={!shoreOpen}
+                reducedMotion={reducedMotion}
+                cancelKey={kit.cancelKey}
+                onTap={() => onTakeOff(id)}
+                onDrop={(p) => (contains(boardZone, p) ? false : onTakeOff(id))}
+              >
+                <SceneMotion
+                  scene={playing}
+                  reducedMotion={reducedMotion}
+                  order={seat}
+                  heaviest={animal.weight === heaviestAboard}
+                >
+                  <AnimalArt
+                    weight={animal.weight}
+                    size={scene.seats[seat]!.width}
+                    tag
+                    tablet={tablet}
+                  />
+                </SceneMotion>
+              </DragPiece>
+            </Fly>
+          )
+        })}
+        {splash !== null && (
+          <SplashingAnimal
+            key={splash.key}
+            testID="raft-splashing"
+            weight={splash.weight}
+            seat={scene.seats[splash.seat]!}
+            home={(() => {
+              const spot = scene.spots[model.animals[splash.id]!.home]!
+              return { ...spot, x: spot.x - deckRect.x, y: spot.y - deckRect.y }
+            })()}
+            reducedMotion={reducedMotion}
+            tablet={tablet}
+          />
+        )}
+      </Deck>
+
+      {/* The nine homes (§ 1): not touch targets (Decision 10). Above the
+          raft: at the landing its flag pokes up into the island and would
+          cover a tag (home 6's on a tablet in portrait). */}
       <View pointerEvents="none" style={styles.fill}>
         {homeRects.map((r, i) => {
           const w = (i + 1) as RaftWeight
@@ -658,77 +731,6 @@ export function RaftCrossing({
         {lap > 0 && reducedMotion && <View testID="raft-brighten" />}
         {dance > 0 && <View testID="raft-dance" />}
       </View>
-
-      <Deck
-        scene={scene}
-        rect={deckRect}
-        total={model.total}
-        splashing={splash !== null && model.phase === 'wobbling'}
-        gliding={gliding}
-        reducedMotion={reducedMotion}
-        frameKey={kit.cancelKey}
-        tablet={tablet}
-      >
-        {model.seats.map((id, seat) => {
-          if (id === null) return null
-          const animal = model.animals[id]!
-          return (
-            <Fly
-              key={`aboard-${id}`}
-              rect={scene.seats[seat]!}
-              from={takeFrom(`aboard-${id}`)}
-              reducedMotion={reducedMotion}
-            >
-              <DragPiece
-                testID={`raft-aboard-${id}`}
-                rect={{
-                  x: 0,
-                  y: 0,
-                  width: scene.seats[seat]!.width,
-                  height: scene.seats[seat]!.height,
-                }}
-                accessibilityLabel={animalLabel(
-                  RAFT_ANIMALS[animal.weight],
-                  animal.weight,
-                )}
-                disabled={!shoreOpen}
-                reducedMotion={reducedMotion}
-                cancelKey={kit.cancelKey}
-                onTap={() => onTakeOff(id)}
-                onDrop={(p) => (contains(boardZone, p) ? false : onTakeOff(id))}
-              >
-                <SceneMotion
-                  scene={playing}
-                  reducedMotion={reducedMotion}
-                  order={seat}
-                  heaviest={animal.weight === heaviestAboard}
-                >
-                  <AnimalArt
-                    weight={animal.weight}
-                    size={scene.seats[seat]!.width}
-                    tag
-                    tablet={tablet}
-                  />
-                </SceneMotion>
-              </DragPiece>
-            </Fly>
-          )
-        })}
-        {splash !== null && (
-          <SplashingAnimal
-            key={splash.key}
-            testID="raft-splashing"
-            weight={splash.weight}
-            seat={scene.seats[splash.seat]!}
-            home={(() => {
-              const spot = scene.spots[model.animals[splash.id]!.home]!
-              return { ...spot, x: spot.x - deckRect.x, y: spot.y - deckRect.y }
-            })()}
-            reducedMotion={reducedMotion}
-            tablet={tablet}
-          />
-        )}
-      </Deck>
 
       {model.spots.map((id, spot) => {
         if (id === null) return null

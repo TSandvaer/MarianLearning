@@ -22,6 +22,8 @@ import {
 import { audioForWebPath } from '../../audio/bundledAudio'
 import { createManifestLinePlayer } from '../../audio/manifestLines'
 import type { AudioEngine } from '../../audio/engine'
+import { mathLayout } from '../../layout/mathLayout'
+import { islandHomes, overlaps, playArea, raftScene } from './playGeometry'
 import { PLAY_LINE_MANIFEST } from './playLines'
 import {
   AFTER_HOMES_MS,
@@ -500,6 +502,39 @@ describe('I14: Reduce Motion', () => {
     expect(g.sfx.sparkle.play.mock.calls.length).toBe(sparkles + 1)
     await advance(REVEAL_UNLOCK_GAP_MS)
     expect(byId('raft-pond-20').props.accessibilityState?.disabled).toBe(false)
+  })
+})
+
+describe('I11, I16: the homes stay readable at the landing', () => {
+  it('the landed flag reaches home 6’s tag on a tablet in portrait, so the homes draw above the raft', async () => {
+    const W = {
+      width: 820,
+      height: 1180,
+      insets: { top: 24, bottom: 20, left: 0, right: 0 },
+    }
+    const l = mathLayout(W)
+    const sc = raftScene(playArea(l), l.tablet, l.landscape)
+    const flag = {
+      ...sc.flag,
+      x: sc.landing.x + 7,
+      y: sc.landing.y + sc.flag.y,
+    }
+    const six = islandHomes(sc)[5]!
+    const d = 0.58 * six.width
+    const tag = {
+      x: six.x + six.width - d,
+      y: six.y + six.height - d,
+      width: d,
+      height: d,
+    }
+    expect(overlaps(flag, tag)).toBe(true)
+    seed()
+    await mountGame('raft', { viewport: W, shore: [7, 3, 6, 4, 8, 2] })
+    // Tree order is drawing order: the raft, then the homes over it.
+    const order = screen
+      .queryAllByTestId(/^(raft|raft-home-6)$/)
+      .map((n) => String(n.props.testID))
+    expect(order).toEqual(['raft', 'raft-home-6'])
   })
 })
 
