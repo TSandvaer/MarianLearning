@@ -10,6 +10,8 @@
 
 **Amended 2026-10-27 (build 25): pictured-only boards.** Dave's ruling of 2026-10-27 is now committed verbatim (`design/research/critters-pictured-boards-2026-10-27.md`, quoted here as "Dave 27 (A)" to "(E)"). By (A) every four-letter target has a picture, a clip word with no picture becomes an extra (at most 3), the 14 voiceless plurals and _crab_ join the targets, and _clit_ joins the rude list. **§ 15 designs it:** the rule as Kevin's acceptance criteria, the chip ((D) item 2: it has no place on every form, so Dave's fallback, Emma's word and the joy beat with no chip), and the 36 pt check of the four-letter pictures ((D) item 3). The sections it changes are marked "(amended 2026-10-27, § 15)": the Goal, § 1, § 2.1, § 4.1, § 7, § 9 and § 10.
 
+**Amended 2026-10-28: a title on each picker log.** Thomas approved the polished picker (#713) and asked, as the coordinator relayed him: "there is room for a title like "Three letter words" and "Four letter words" (or better title if you have one)." Dave ruled the same day (his ruling of 2026-10-28 as the coordinator relayed it, not committed; quoted here as "Dave 28"): one printed, silent, static title per log, "Three letters" and "Four letters", plain text on the meadow just above the log, inside the log's button, on the picker only, and 0 new Lily lines. **§ 5.4 designs it.** Decision 11, § 5.2's paint, § 7's picker wireframe, § 8, § 9, F16, F18, F19, § 11.2, § 12, Q37 and § 14 follow. It amends Dave 23 (B)'s "No text" (`design/research/critters-four-letter-2026-10-26.md:85`) for the picker's two titles only (Dave 28 (4)).
+
 **Standing rules:** any learner of about 6-9 (Marian is one); every spoken line and label is a row in a table, so the planned Danish version swaps rows; per learner through `@marian/core/learners`; audio-first; never a red X. **Spend is counted here and asked later**, each under its own popup (§ 9).
 
 **Scope:** spec only. No code, no renders, no paid calls, no tickets.
@@ -36,6 +38,7 @@ She has the word hunt (blending sounds current or mastered, `critters-word-hunt.
 8. **An empty seat between two seated critters is a rest when the log is tapped.** "f_og" sings /f/, a 600 ms rest, /o/, /g/. The gap marks the missing sound without a word, which is the cluster's second consonant that young spellers leave out (Dave 23 (B), Bruck & Treiman 1990). Nothing judges it. Q20.
 9. **The hint's four sounds light no critter** (§ 15 Decision 6, `critters-word-hunt.md:583`): lighting them would point at the letters.
 10. **The joy beat's burst starts at the log's middle,** between seats 2 and 3, because a four-seat log has no middle seat (`play-place.md:508` bursts from the middle seat).
+11. **Each picker log has a printed title that lies still on the meadow** (2026-10-28, § 5.4): "Three letters" and "Four letters", the words Emma says when that round opens. It is part of the log's button, says nothing, never changes, and does not hop or sink with the log, as its ground shadow does not. Words that jump are harder to read, and the wave is there to show the logs. Decision 5 stands: the titles are the same whatever the rounds hold.
 
 ---
 
@@ -256,7 +259,7 @@ Phase 1's beat (`critters-word-hunt.md` § 5.1, as § 15.6 amends it): at N − 
 - **x0** `= A.x + (A.width − W(4)) / 2`: the pair is centred on the "4" log, and both discs are at `x0`.
 - **The button** (the `Pressable`) is the log's row: `(x0 − 8, row top) (W(n) + 16) × r`. The rows abut. A tap right of the "3" log's end, or anywhere else off a log, is the meadow (§ 5.3).
 - **Ground shadow** (paint, under the bar, never touchable): `(x0 + 6, bar.y + H + ledge − s / 2) (W(n) − 12) × s`, face `radial-gradient(ellipse at 50% 50%, rgba(60,40,10,0.3) 0%, rgba(60,40,10,0.15) 38%, rgba(60,40,10,0) 70%)`. That is T9's band-shadow brown (`HuntLengths.tsx:77`), darker for a contact shadow, in the `… at …` gradient form `HuntLengths.tsx` already draws (`:63`, `:70`).
-- **Paint:** T8's wood face, ledge and sockets, and T11's disc, as `HuntLengths.tsx:52-72` has them. **No slab, band, critters, slots, text or count** (Dave 23 (B)). The same picker whatever the rounds hold (Decision 5).
+- **Paint:** T8's wood face, ledge and sockets, and T11's disc, as `HuntLengths.tsx:52-72` has them. **No slab, band, critters, slots or count, and no text but the numerals and § 5.4's two titles** (Dave 23 (B), amended by Dave 28). The same picker whatever the rounds hold (Decision 5).
 
 Rects are (x, y) w × h; a disc is (x, y) and its side.
 
@@ -312,6 +315,54 @@ Socket 1 is at `x0 + 36` on phones (42.1 × 17.9 P, 38.4 × 17.9 L) and `x0 + 52
 - **Entering from the Play place:** the place fades out, the picker fades in (200 / 200 ms), silent (`play-place.md:154`).
 - **Back from a round:** the round fades out, the picker fades in (200 / 200 ms), silent. Back during a completion beat stores the round complete, as phase 1's Q7.
 - **Rotation** lays it out again (no wave); **background** as `play-place.md:212`.
+
+### 5.4 The titles (2026-10-28; Thomas, Dave 28)
+
+**Wording (Dave 28 (2)):** "Three letters" over the "3" log and "Four letters" over the "4" log. They are the words Emma says when that round opens ("Drag three letters up to the log. …", `packages/core/src/emmasPath/guidanceLines.ts:314`; "Drag four letters up to the log. …", `:325`), and the words of the logs' VoiceOver labels (`mobile/src/screens/play/playLines.ts:116`, `:119`). So the print mirrors her speech and needs no new line. Not "Four letter words", as Thomas suggested: it reads as "four-letter word", the idiom for a rude word, and the adults who read the screen will see the joke (Dave 28 (2)). They are rows in `PLAY_LABELS`, so the Danish version swaps them.
+
+**Mock:** `tmp/picker-polish/index.html` in the main checkout (not committed), section "New, 2026-10-28": `*-titled.png` on phone P, phone L, iPad P and Thomas's iPad (1080 × 810), `*-titled-annotated.png` with the text boxes, and `html/*-titled-live.html` (the wave and the press under the still titles).
+
+**Line numbers** in § 5.4 are at `origin/main` 2e9ca30f, and in `HuntLengths.tsx` at PR #717's head 02c3a84c where marked.
+
+**The type:**
+
+| Part        | Value                                                                                                                                                                                                                                                                   |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Face        | Fredoka 700 (`fonts.bold`, `mobile/src/theme.ts:18`), `#6b3f1f`: the games' type and the numeral's ink (`play-games-restyle.md:31`, `:59`). No plaque, sign, box, outline, halo or shadow (Thomas, build 25, § 5.2; Dave 28 (1))                                        |
+| Size `f`    | `0.45 D`: 18 on phones, 25.2 on tablets. The numeral (0.62 `D`) stays the larger mark, because the numeral and the sockets carry the meaning for a child who does not read yet (Dave 28 (1))                                                                            |
+| Line height | `1.21 f` (21.78, 30.49): Fredoka 700's own ascent plus descent (974 + 236 per 1000 in `Fredoka_700Bold.ttf`, the file the app loads, `mobile/src/fonts.ts:7`). With no extra leading, the baseline is `0.974 f` below the box top whatever the engine does with leading |
+| Scaling     | `allowFontScaling={false}`, as the disc's numeral (`HuntLengths.tsx:149`). A larger system text size would push the title out of its row and onto the log above; the label carries the same words (§ 8.2)                                                               |
+| Lines       | One, `numberOfLines={1}`, never wrapped or truncated (the fit below)                                                                                                                                                                                                    |
+
+**Placement:** the text box's left edge is the disc's left edge (`x0`), and its bottom is 2 pt above the disc's top: box `(x0, disc.y − 2 − 1.21 f)`, `1.21 f` tall, as wide as its text. In the row that is `row top + 0.22` on phones (the row has 24 pt above the disc, § 5.2) and `row top + 1.11` on tablets (33.6 pt). The letters have no descenders. Their ink, measured, runs from `0.73 f` above the baseline to `0.02 f` below it: phones from `row top + 4.61` to `+ 18.11`, ending 5.89 pt above the disc; tablets from `+ 7.26` to `+ 26.16`, ending 7.44 pt above it. **It fits the phone row as it is, so the pitch stays 88** (Dave 28: grow the pitch rather than move the title out of the button). 18 is about the largest size that fits there with the 2 pt gap (22 / 1.21 = 18.2).
+
+**Measured** 2026-10-28 by a scratch script (not committed) on § 5.2's rects (its table, and `tmp/picker-polish/html/geometry.json` for all 16 viewports). Text widths and ink are from Chromium's canvas with the app's Fredoka file (the mock's copy is byte-identical, `shasum` 077ce632): "Three letters" is 5.898 `f` wide, "Four letters" 5.304 `f`. **Contrast** is `#6b3f1f` against the lightest and darkest backdrop pixel under each title's ink, sampled from the mock's renders without titles, which draw the shipped garden (§ 5.2). TL has no mock, so it is a render of the garden alone at its size. **Method check:** in the titled renders the drawn ink matches the predicted ink on all four mock forms within 1.5 pt (the dark-pixel threshold drops the anti-aliased edge).
+
+| Form (insets)                   | `f`  | "Three letters": box; contrast             | "Four letters": box; contrast              |
+| ------------------------------- | ---- | ------------------------------------------ | ------------------------------------------ |
+| P 375 × 667                     | 18   | (24, 359.2) 106.2 × 21.8; 6.17-6.29 : 1    | (24, 447.2) 95.5 × 21.8; 6.16-6.27 : 1     |
+| L 667 × 375                     | 18   | (252.9, 166.8) 106.2 × 21.8; 6.45-6.60 : 1 | (252.9, 254.8) 95.5 × 21.8; 6.19-6.30 : 1  |
+| W 820 × 1180 (t24 b20)          | 25.2 | (141.9, 663.3) 148.6 × 30.5; 6.09-6.22 : 1 | (141.9, 786.5) 133.7 × 30.5; 6.15-6.25 : 1 |
+| TL 1180 × 820 (b20)             | 25.2 | (436.5, 377.4) 148.6 × 30.5; 6.32-6.54 : 1 | (436.5, 500.6) 133.7 × 30.5; 6.07-6.19 : 1 |
+| Thomas's iPad 1080 × 810 (none) | 25.2 | (385.2, 382.4) 148.6 × 30.5; 6.38-6.52 : 1 | (385.2, 505.6) 133.7 × 30.5; 6.10-6.21 : 1 |
+
+- **The fit, all 16 viewports:** each box lies inside its log's button: its top is below the row's top, and its right end stops short of the log's own end. The tightest is the "3" log on phone L: the title ends at 359.1, the bar at 490.1. The contrast is at least 6.07 : 1 on every form, above WCAG AA's 4.5 : 1 for text of any size.
+- **Each title reads as its own log's:** the "4" title's ink is 5.89 pt above its own disc and 29.6 pt below the "3" log's ledge on phone P (ledge 389 + 28 + 5 = 422, ink from 451.6). On Thomas's iPad it is 7.44 pt and 44.9 pt (ledge 424.9 + 36 + 6 = 466.9, ink from 511.8).
+- **Danish rows** (for the planned version, not designed here): "Tre bogstaver" and "Fire bogstaver" are 6.28 `f` and 6.60 `f` wide (113.0 and 118.8 on phones), so they fit. Their _g_ descends 0.22 `f`, which is inside the line box and leaves 2.3 pt above the disc on phones. That is the Danish version's own check.
+
+**Behaviour (Dave 28 (1), (3), (4)):**
+
+- **Inside the button:** the title is a child of its log's `Pressable` (`hunt-pick-<n>`), within its `hit` row. It is `pointerEvents="none"` and not an element, so a tap on the words is a tap on that log: the plink, the press and the round. There is no second target in the row.
+- **It never moves.** It lies on the meadow like the ground shadow: it does not hop with the wave, does not sink with the press, and with Reduce Motion does not dim with the pressed log (§ 8.1). It fades in and out with the picker (200 / 200 ms).
+- **Silent:** nothing plays on arrival or on a tap but the plink (F16). **Static:** the same two strings whatever the rounds hold, before and after the roll-in, with no "new" and no mark (Decision 5, Q27).
+- **The picker only:** no title on a round's log, the board, the door or the roll-in (Dave 28 (4)). In a round, F11 stands. This is not a precedent for the Play place's tiles, which have "No text" (`play-place.md:121`): Emma says these words and never names a game.
+
+**For the build (names):**
+
+- `PLAY_LABELS` (`playLines.ts:107-124`): `huntTitle: 'Three letters'`, `huntTitleFour: 'Four letters'`, beside `huntLog` and `huntLogFour` (the table already holds "the labels nobody speaks").
+- `playGeometry.ts`: `PickerLog` gains `title: Rect` (the text box above), and `PickerScene` gains `titleSize: number` (`f`); the line height is `1.21 × titleSize`. Nothing else in `pickerScene` changes.
+- `HuntLengths.tsx` (PR #717 at 02c3a84c): in `PickerLogButton`, a `Text` (`testID="hunt-pick-<n>-title"`, `accessible={false}`, `pointerEvents="none"`, `allowFontScaling={false}`, `numberOfLines={1}`) at `relTo(hit, title)`. It is a sibling of the shadow (`:299-309`) and outside `BareLog`'s `motion` style (`:310-317`), so the sink, the hop and the Reduce Motion dim do not reach it.
+- **0 new Lily lines, 0 characters, $0** (Dave 28 (3)).
 
 ---
 
@@ -477,19 +528,22 @@ PICKER, PHONE PORTRAIT 375×667                  PICKER, PHONE LANDSCAPE 667×37
 +-------------------------------+               +------------------------------------------------+
 |(<)                            |               |(<)          ribbon: empty                      |
 | .-----.  [ribbon: empty]      |               |                                                |
-|( Emma  ) idle, silent         |               | .-----.                                        |
+|( Emma  ) idle, silent         |               | .-----.        Three letters                   |
 | '-----'                       |               |( Emma  )       (3)=o====o====o==               |
 |                               |  A from y 259 |( idle  )         ~~~~~~~~~~~~~~~               |
-|                               |               |                (4)=o====o====o====o==          |
-| (3)=o=====o=====o===          |  row 3        | '-----'          ~~~~~~~~~~~~~~~~~~~~          |
-|   ~~~~~~~~~~~~~~~~~           |  (16, 359)    +------------------------------------------------+
-| (4)=o=====o=====o=====o===    |  269.3 × 88    row 3 (244.9, 166.6) 253.2 × 88, row 4
-|   ~~~~~~~~~~~~~~~~~~~~~~~     |  row 4           (244.9, 254.6) 321.2 × 88; discs at x 252.9;
-|                               |  (16, 447)       bars 28 tall at y 196.6 and 284.6
-|            (meadow)           |  343 × 88
-|                               |                TABLETS: W and TL as § 5.2's table (bars 36,
-+-------------------------------+                  discs 56, rows 123.2)
+| Three letters                 |  row 3        |                Four letters                    |
+| (3)=o=====o=====o===          |  (16, 359)    |                (4)=o====o====o====o==          |
+|   ~~~~~~~~~~~~~~~~~           |  269.3 × 88   | '-----'          ~~~~~~~~~~~~~~~~~~~~          |
+| Four letters                  |  row 4        +------------------------------------------------+
+| (4)=o=====o=====o=====o===    |  (16, 447)     row 3 (244.9, 166.6) 253.2 × 88, row 4
+|   ~~~~~~~~~~~~~~~~~~~~~~~     |  343 × 88        (244.9, 254.6) 321.2 × 88; discs at x 252.9;
+|                               |                  bars 28 tall at y 196.6 and 284.6; title boxes
+|            (meadow)           |                  at (252.9, 166.8) and (252.9, 254.8), 18 pt
+|                               |                TABLETS: W and TL as § 5.2's and § 5.4's tables
++-------------------------------+                  (bars 36, discs 56, rows 123.2, titles 25.2 pt)
  discs (24, 383) and (24, 471), 40; bars 28 tall at y 389 and 477; ~~ the ground shadow.
+ Title boxes (24, 359.2) and (24, 447.2), Fredoka 700 18 pt #6b3f1f, each in its log's row;
+ they lie still when the logs hop or sink (§ 5.4).
  A log's row is its button; a tap on no log is the meadow and sends the wave (§ 5.3)
 ```
 
@@ -526,6 +580,7 @@ Lines, sounds and their times are unchanged; dragging still follows the finger.
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Picker press                        | A 150 ms dim (opacity 1 → 0.85 → 1) of the pressed log instead of the sink (the raft picker's, `raft-island-goal.md:385`)                                                                                       |
 | The picker's wave                   | None: no hop on arrival or on a meadow tap (§ 5.3); the meadow tap does nothing                                                                                                                                 |
+| The picker's titles                 | Unchanged, as they never move (§ 5.4): the press dims the log, not its title                                                                                                                                    |
 | Picker in and out, round in and out | Unchanged (already fades)                                                                                                                                                                                       |
 | The roll-in                         | No glide, dip or flight, and no slab. At U0 + 1200 the door fades in at its rect (300 ms) with the sparkle; Emma `celebration`, then `idle` at U0 + 2300; New letters (200 ms fade) and the unlock at U0 + 2800 |
 | The door's press                    | Kept, as New letters' (the clay disc's press has no Reduce Motion branch, `mapChrome.tsx:90-95`)                                                                                                                |
@@ -537,23 +592,24 @@ Lines, sounds and their times are unchanged; dragging still follows the finger.
 
 They go in `PLAY_LABELS` (`mobile/src/screens/play/playLines.ts:105-117`) beside `huntLog` ("Log, three letters", `:112`), so a language version swaps rows.
 
-| Element                               | Label                                       | Role, activate                                               |
-| ------------------------------------- | ------------------------------------------- | ------------------------------------------------------------ |
-| The picker's "3" log (its row)        | "Log, three letters"                        | button; opens the three-letter round                         |
-| The picker's "4" log (its row)        | "Log, four letters"                         | button; opens the four-letter round                          |
-| A log's bar, sockets, disc and shadow | none (`accessible={false}`, inside its row) |                                                              |
-| The meadow under the logs             | none (`accessible={false}`)                 |                                                              |
-| The door                              | "Log, four letters" (`huntLogFour`, new)    | button; opens a fresh four-letter round                      |
-| The log in a four-letter round        | "Log, four letters"                         | button; sings the seated critters, a partial run too (§ 4.1) |
-| Slots, the glowing slot               | as § 15.9: "Word to find", the word, "Hint" | button                                                       |
+| Element                                      | Label                                       | Role, activate                                               |
+| -------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------ |
+| The picker's "3" log (its row)               | "Log, three letters"                        | button; opens the three-letter round                         |
+| The picker's "4" log (its row)               | "Log, four letters"                         | button; opens the four-letter round                          |
+| A log's bar, sockets, disc, title and shadow | none (`accessible={false}`, inside its row) |                                                              |
+| The meadow under the logs                    | none (`accessible={false}`)                 |                                                              |
+| The door                                     | "Log, four letters" (`huntLogFour`, new)    | button; opens a fresh four-letter round                      |
+| The log in a four-letter round               | "Log, four letters"                         | button; sings the seated critters, a partial run too (§ 4.1) |
+| Slots, the glowing slot                      | as § 15.9: "Word to find", the word, "Hint" | button                                                       |
 
+- **The labels stay as they are with the titles** (2026-10-28, § 5.4). Each already holds its log's visible title ("Log, four letters" holds "Four letters"), so VoiceOver says the words she sees, and the name contains the visible text (WCAG 2.5.3, Label in Name). They are not merged into "Four letters, log": the same label serves the door and the round's log, which have no title.
 - Picker focus order: "3", then "4". The roll-in announces nothing (as the beat, `critters-word-hunt.md:410`); the door becomes an element when it lands. No label states a count.
 
 ---
 
 ## 9. Assets, audio and spend (counts only; each spend is asked under its own popup later)
 
-**Drawn in the app, $0:** the four-box slots, the four-seat log with its sockets and "4" disc, the picker's logs and their ground shadows, the arrival slab, the door. **Reused:** the poses `idle`, `listening`, `attentive-pointing`, `cheering`, `celebration` (`emmaPose.ts:24-32`); plink, sparkle and cheer (`playKit.ts:31-33`); "You did it!" and the burst; the 11 lesson pictures and their praise clips.
+**Drawn in the app, $0:** the four-box slots, the four-seat log with its sockets and "4" disc, the picker's logs, their ground shadows and their two titles (text, in the Fredoka 700 the app already bundles), the arrival slab, the door. The titles add 0 Lily lines (§ 5.4). **Reused:** the poses `idle`, `listening`, `attentive-pointing`, `cheering`, `celebration` (`emmaPose.ts:24-32`); plink, sparkle and cheer (`playKit.ts:31-33`); "You did it!" and the burst; the 11 lesson pictures and their praise clips.
 
 **New audio: 92 Lily lines, 504 input characters,** in one render, under its own spend popup, judged at the voice-QA ear test (Dave 23 (D), "Spend"). Caption "<W>.", input "<W>,":
 
@@ -609,10 +665,10 @@ With the 11 lesson pictures, 25 of the 82 targets are pictured (Dave). **Optiona
 13. **F13.** In a four-letter round, `hunt-bonus` never renders, and no boing, tumble or non-word line plays, over any sequence of runs.
 14. **F14.** An empty slot's tap plays its `critterWordLine` clip, sound only. The hint glows after 5 runs of four with no new target (or 45 s); its tap plays the four critters' windows in order, each 300 ms after the last ends, then the word clip 300 ms after the fourth; no critter's lit state changes; no ghost.
 15. **F15.** At N − 1 the phase-1 beat plays in board order, with no roll-in and no door; New letters deals a fresh four-letter round.
-16. **F16.** The picker: absent with `[3]`; with `[3, 4]` the game opens on it. `pickerScene` equals § 5.2's tables: each `hunt-pick-<n>` is at its log's button rect, with the bar and disc as listed, on P, L, W and TL; on all 16 viewports both buttons are inside `A` and at least 44 pt tall. Rendered: no slab, no `hunt-pick-<n>-face`, no text but the discs' numerals, n sockets on log n. A log tap opens that length's round (in progress, else fresh); a tap on `hunt-pick-meadow` opens nothing. Its open line plays on the first entry of that length in the visit and not on the second. Back from a round goes to the picker, and from the picker to the Play place. The picker plays nothing but the plink, on a log tap only. With fake timers: the wave starts 500 ms after the picker mounts (each log's hop 120 ms after the one above), and again on a meadow press-in, but not twice within 1200 ms; nothing moves after it with no touch for 30 s; a log's press-in cuts it.
+16. **F16.** (Amended 2026-10-28: the titles, § 5.4.) The picker: absent with `[3]`; with `[3, 4]` the game opens on it. `pickerScene` equals § 5.2's tables: each `hunt-pick-<n>` is at its log's button rect, with the bar and disc as listed, on P, L, W and TL; on all 16 viewports both buttons are inside `A` and at least 44 pt tall. Rendered: no slab, no `hunt-pick-<n>-face`, no text but the discs' numerals and the two titles, n sockets on log n. **The titles:** `hunt-pick-3-title` reads exactly "Three letters" and `hunt-pick-4-title` "Four letters" (`PLAY_LABELS.huntTitle`, `huntTitleFour`). Each is inside its `hunt-pick-<n>` at § 5.4's box, Fredoka 700, `#6b3f1f`, size 0.45 `D` (18 / 25.2), line height 1.21 × that, one line, `allowFontScaling={false}`; on all 16 viewports its box is inside its button. A press on a title opens that log's round. Neither title changes after the roll-in or with any round's state, and neither moves: its translate stays 0 through the wave and a press. A log tap opens that length's round (in progress, else fresh); a tap on `hunt-pick-meadow` opens nothing. Its open line plays on the first entry of that length in the visit and not on the second. Back from a round goes to the picker, and from the picker to the Play place. The picker plays nothing but the plink, on a log tap only. With fake timers: the wave starts 500 ms after the picker mounts (each log's hop 120 ms after the one above), and again on a meadow press-in, but not twice within 1200 ms; nothing moves after it with no touch for 30 s; a log's press-in cuts it.
 17. **F17.** The roll-in, with fake timers: on a learner's first complete three-letter round, § 6.1's steps play once at their times, the door lands at § 6.2's rect and New letters enters after it. A door tap opens a fresh four-letter round. On the next completion, and on any later screen, there is no roll-in and no `hunt-open-four`. Back mid-roll-in goes to the picker, and the roll-in never replays.
-18. **F18.** Reduce Motion (mocked): § 8.1's rows; no glide, flight, dip, bounce, burst or picker wave starts; lines and sounds keep their times.
-19. **F19.** VoiceOver: § 8.2's labels and roles; each picker log's row is one element, in order "3" then "4"; its bar, sockets, disc and shadow, and the meadow, are not elements.
+18. **F18.** Reduce Motion (mocked): § 8.1's rows; no glide, flight, dip, bounce, burst or picker wave starts; a picker press dims the log and leaves its title's opacity at 1; lines and sounds keep their times.
+19. **F19.** (Amended 2026-10-28.) VoiceOver: § 8.2's labels and roles; each picker log's row is one element, in order "3" then "4", and its label is unchanged ("Log, three letters", "Log, four letters"); its bar, sockets, disc, title and shadow, and the meadow, are not elements.
 
 ### 10.3 Device and E2E (Jessica first; phone P and L, iPad portrait and landscape; Emma muted for local runs)
 
@@ -638,11 +694,16 @@ With the 11 lesson pictures, 25 of the 82 targets are pictured (Dave). **Optiona
 - **Prediction (written before Thomas sees it on a device):** on his iPad (1080 × 810) Thomas reads the two logs as the choice with nothing explained, and does not ask for a box or band back. If he finds fault, it is with the empty meadow around the pair ("too empty", "too low"), not with the logs. The lever is § 5.2's pitch (2.2 `D`, 123.2 on tablets); the pair is centred in `A`, which sits right of Emma's column. The one-socket step from "3" to "4" reads as "longer word, longer log" to him before anyone says so.
 - **Bounded convergence.** **Tested:** the geometry on § 2.4's 15 viewports and his iPad, through the shipped `mathLayout`, `playArea`, `backRect` and `logSockets` (the method check reproduces the old slabs exactly, and his screenshot's slab edges at insets 0); the look, as HTML drawn to those rects with the shipped backdrop gradient, the real Emma and Fredoka (`tmp/picker-polish/`). **Not tested:** anything on a device; React Native's rendering of the ground shadow's `ellipse` gradient (the shipped pieces use `circle`); the wave's feel on a device, and whether a child taps the meadow at all; the roll-in's arrival slab (§ 6), which keeps its small green clay pill and was not redesigned here.
 
+### 11.2 The titles (2026-10-28)
+
+- **Prediction (written before Thomas sees it on a device):** on his iPad Thomas reads "Three letters" and "Four letters" as the logs' names and does not ask for "words" back. If he finds fault, it is the size on the iPad (25.2 pt beside the 34.7 pt numeral), not the place or the colour. The lever is § 5.4's `0.45 D`: at the tablets' pitch the line fits up to about 26 pt with the 2 pt gap (31.6 / 1.21), and beyond that the pitch grows. He does not notice that the titles stay still while the logs hop unless he looks for it.
+- **Bounded convergence.** **Tested:** the boxes on all 16 viewports from § 5.2's geometry; the text widths and ink with the app's own Fredoka file, in Chromium; the contrast on the mock's renders of the shipped garden on five forms; the predicted ink against the drawn ink (within 1.5 pt). **Not tested:** anything on a device; React Native's text layout on iOS, that is, whether a line box of `1.21 f` puts the baseline where Chromium does (the natural line height should make them agree, unverified); whether a child reads the words or taps them; a learner with a larger system text size (scaling is off, § 5.4); the Danish rows beyond their width; the 1366 × 1024 class and split view (as § 5.2).
+
 ## 12. Amendments for the build PR
 
 - `critters-word-hunt.md`: § 5.1's "(phase 2)" row (`:236`) → this spec § 6; § 6.3's log row → per length; H9 (`:470`) "renders '3'" → the round's length; H11 (`:474`) → its length. § 9 already points here (this PR).
 - `play-place.md`: `:155` and `:539` (Back from the game goes to the Play place) → to the critters' picker with two lengths open; § 3.8's labels.
-- `playLines.ts` `PLAY_LABELS`: `huntLogFour` "Log, four letters".
+- `playLines.ts` `PLAY_LABELS`: `huntLogFour` "Log, four letters"; `huntTitle` "Three letters" and `huntTitleFour` "Four letters" (§ 5.4, 2026-10-28).
 - `guidanceLines.ts`: the four-letter open line and the 91 word lines.
 
 ---
@@ -660,20 +721,24 @@ With the 11 lesson pictures, 25 of the 82 targets are pictured (Dave). **Optiona
 27. **Q27 (Dave, FYI). The picker shows no round state** (Decision 5): a round left half done looks the same as none.
 28. **Q28 (Dave, FYI). The picker's wave** (§ 5.3, 2026-10-27): the logs hop in turn, top to bottom, once as the picker appears and again when a tap lands on no log. It is silent, the same for every log, never on a timer, and off with Reduce Motion. It answers a touch, so it stays inside the Play place's rail "every motion answers a touch or a line" (`play-place.md:178`). The coordinator's brief asked for "a gentle idle cue"; I did not make it repeat while she waits, because that would be a second motion with no touch behind it (the raft's bob is the only one). If you would rather it never ran on arrival, drop that one; the meadow tap alone still teaches where the buttons are.
 
+Added 2026-10-28:
+
+37. **Q37 (coordinator, for Thomas). The titles' words** (§ 5.4): "Three letters" and "Four letters", not "Three letter words" and "Four letter words". They are the words Emma says as each round opens, and "four-letter word" is the idiom for a rude word (Dave 28 (2)). Dave finds Thomas's wording acceptable for the child if he prefers it; it would cost the idiom and a print that no line says. It is two `PLAY_LABELS` rows either way. I recommend Dave's.
+
 ---
 
 ## 14. Child-safety and dark-pattern check (the four-letter rounds only)
 
-| Risk                    | Here                                                                                                                                                                                                                                                                     |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A prize, a currency     | None. The unlock is a harder game, not a prize (Dave (3)); no star, badge, "new" mark or count anywhere                                                                                                                                                                  |
-| Lures                   | The door is still, silent and child-tapped, shows once, and never returns; the picker shows no unfinished round (Decision 5) and never speaks; its wave answers a touch, moves every log alike and never repeats on its own (Q28); nothing outside the game mentions "4" |
-| Forced difficulty       | None: she can always go back to 3, with no re-lock (Dave 23 (B))                                                                                                                                                                                                         |
-| Variable reward         | None: the roll-in plays once per learner; the beat is the same every time                                                                                                                                                                                                |
-| Untaught content judged | Clusters are relaxed (Dave (4)): a four-letter run is never judged a miss; a non-target sings and sits; only her taught vowels deal                                                                                                                                      |
-| Failure feedback        | No boing, tumble or line in four-letter rounds; a partial run is never judged                                                                                                                                                                                            |
-| Grind                   | 4-6 words, all but one, the hint                                                                                                                                                                                                                                         |
-| Rude words              | No round's letters spell one of Dave's 18                                                                                                                                                                                                                                |
+| Risk                    | Here                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A prize, a currency     | None. The unlock is a harder game, not a prize (Dave (3)); no star, badge, "new" mark or count anywhere                                                                                                                                                                                                                                 |
+| Lures                   | The door is still, silent and child-tapped, shows once, and never returns; the picker shows no unfinished round (Decision 5) and never speaks; its wave answers a touch, moves every log alike and never repeats on its own (Q28); its two titles are static and silent and say no count (§ 5.4); nothing outside the game mentions "4" |
+| Forced difficulty       | None: she can always go back to 3, with no re-lock (Dave 23 (B))                                                                                                                                                                                                                                                                        |
+| Variable reward         | None: the roll-in plays once per learner; the beat is the same every time                                                                                                                                                                                                                                                               |
+| Untaught content judged | Clusters are relaxed (Dave (4)): a four-letter run is never judged a miss; a non-target sings and sits; only her taught vowels deal                                                                                                                                                                                                     |
+| Failure feedback        | No boing, tumble or line in four-letter rounds; a partial run is never judged                                                                                                                                                                                                                                                           |
+| Grind                   | 4-6 words, all but one, the hint                                                                                                                                                                                                                                                                                                        |
+| Rude words              | No round's letters spell one of Dave's 18                                                                                                                                                                                                                                                                                               |
 
 ---
 
