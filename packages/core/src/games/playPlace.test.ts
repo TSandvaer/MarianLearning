@@ -34,7 +34,6 @@ import {
   openPlayGames,
   PLAY_GAMES,
   RAFT_ANIMALS,
-  RAFT_CROSSINGS,
   RAFT_LOAD,
   RAFT_SEATS,
   RAFT_SHORE_SIZE,
@@ -179,7 +178,7 @@ describe('the raft (§ 2.1)', () => {
     raftLoads(ws).filter((l) => l.length === 2)
 
   it('has the constants and the nine animals, small to big', () => {
-    expect([RAFT_LOAD, RAFT_SHORE_SIZE, RAFT_CROSSINGS]).toEqual([10, 6, 3])
+    expect([RAFT_LOAD, RAFT_SHORE_SIZE]).toEqual([10, 6])
     expect(RAFT_ANIMALS).toEqual({
       1: 'bee',
       2: 'frog',

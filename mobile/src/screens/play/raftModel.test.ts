@@ -1,16 +1,22 @@
 /**
- * Raft crossing's model (play-place § 2.3; ACs N7, N7a, N8 at the model
- * level; the screen's timing is RaftCrossing.test.tsx's).
+ * Raft crossing's model (play-place § 2.3, raft-island-goal §§ 1-6; ACs
+ * N7, N7a, I8, I12 at the model level; the screen's timing is
+ * RaftCrossing.test.tsx's and RaftIsland.test.tsx's).
  */
+import * as playPlace from '@marian/core/games/playPlace'
 import { RAFT_ANIMALS } from '@marian/core/games/playPlace'
+import * as model from './raftModel'
 import {
   arrive,
   board,
+  homeOne,
+  homePlan,
   initialRaft,
+  islandIsFull,
+  missingOf,
   refill,
   splashEnd,
   takeOff,
-  tripOver,
   waitingWeights,
   wobbleEnd,
   type RaftState,
@@ -46,7 +52,7 @@ function splash(s: RaftState, id: number) {
 
 describe('board and take off (N7)', () => {
   it('boards to the next free seat; the total follows; take-off goes home', () => {
-    let s = initialRaft(seeded(1), [7, 3, 6, 4, 8, 2])
+    let s = initialRaft(seeded(1), { shore: [7, 3, 6, 4, 8, 2] })
     ;[s] = board(s, idOf(s, 6))
     expect(s.total).toBe(6)
     expect(s.seats[0]).toBe(2)
@@ -60,7 +66,7 @@ describe('board and take off (N7)', () => {
   })
 
   it('past ten: a splash; the total keeps the old load; drops are refused while it wobbles', () => {
-    let s = initialRaft(seeded(1), [7, 3, 6, 4, 8, 2])
+    let s = initialRaft(seeded(1), { shore: [7, 3, 6, 4, 8, 2] })
     ;[s] = board(s, idOf(s, 7))
     const [w, r] = board(s, idOf(s, 6))
     expect(r).toBe('splash')
@@ -74,7 +80,7 @@ describe('board and take off (N7)', () => {
   })
 
   it('exactly ten departs', () => {
-    let s = initialRaft(seeded(1), [7, 3, 6, 4, 8, 2])
+    let s = initialRaft(seeded(1), { shore: [7, 3, 6, 4, 8, 2] })
     ;[s] = board(s, idOf(s, 7))
     const [d, r] = board(s, idOf(s, 3))
     expect(r).toBe('depart')
@@ -86,7 +92,7 @@ describe('board and take off (N7)', () => {
 describe('stuck: a newcomer walks on (N7a, D4)', () => {
   /** A 6 aboard, waiting 2, 5, 7, 9, 9: no set makes 4. */
   function stuck() {
-    let s = initialRaft(seeded(1), [6, 2, 5, 7, 9, 9])
+    let s = initialRaft(seeded(1), { shore: [6, 2, 5, 7, 9, 9] })
     ;[s] = board(s, idOf(s, 6))
     return s
   }
@@ -117,7 +123,7 @@ describe('stuck: a newcomer walks on (N7a, D4)', () => {
   })
 
   it('a splash on a raft that is not stuck never brings one', () => {
-    let s = initialRaft(seeded(1), [6, 2, 5, 7, 9, 4])
+    let s = initialRaft(seeded(1), { shore: [6, 2, 5, 7, 9, 4] })
     ;[s] = board(s, idOf(s, 6))
     ;[s] = splash(s, idOf(s, 5))
     const [, r] = splash(s, idOf(s, 7))
@@ -140,30 +146,136 @@ describe('stuck: a newcomer walks on (N7a, D4)', () => {
   })
 })
 
-describe('crossings (N8)', () => {
-  it('arrive lands the animals, never the same scene twice in a row; three crossings end the trip', () => {
+describe('crossings (I8: no cap)', () => {
+  /** Load a pair to ten, land, walk everyone home. */
+  function cross(s: RaftState, rng: () => number) {
+    const pair = raftLoadPair(s)
+    ;[s] = board(s, pair[0])
+    ;[s] = board(s, pair[1])
+    expect(s.phase).toBe('away')
+    let scene
+    ;[s, scene] = arrive(s, rng)
+    // At arrival the animals stay seated.
+    expect(s.seats.filter((x) => x !== null)).toHaveLength(2)
+    const plan = homePlan(s)
+    for (const hop of plan) s = homeOne(s, hop.id)
+    return { s, scene, plan }
+  }
+
+  it('twelve crossings in a row all come back to a full shore; scenes never repeat back to back', () => {
     const rng = seeded(7)
-    let s = initialRaft(rng, [7, 3, 6, 4, 8, 2])
+    let s = initialRaft(rng, { shore: [7, 3, 6, 4, 8, 2] })
     let last = null
-    for (let k = 1; k <= 3; k++) {
-      const pair = raftLoadPair(s)
-      ;[s] = board(s, pair[0])
-      ;[s] = board(s, pair[1])
-      expect(s.phase).toBe('away')
-      let scene
-      ;[s, scene] = arrive(s, rng)
-      expect(scene).not.toBe(last)
-      last = scene
-      expect(s.island).toHaveLength(2 * k)
-      expect(s.crossings).toBe(k)
-      if (k < 3) {
-        expect(tripOver(s)).toBe(false)
-        ;[s] = refill(s, rng, METRIC)
-        expect(s.spots.filter((x) => x !== null)).toHaveLength(6)
-        expect(s.phase).toBe('loading')
-      }
+    for (let k = 1; k <= 12; k++) {
+      const r = cross(s, rng)
+      expect(r.scene).not.toBe(last)
+      last = r.scene
+      s = r.s
+      expect(s.seats.every((x) => x === null)).toBe(true)
+      expect(s.total).toBe(0)
+      ;[s] = refill(s, rng, METRIC)
+      expect(s.spots.filter((x) => x !== null)).toHaveLength(6)
+      expect(s.phase).toBe('loading')
     }
-    expect(tripOver(s)).toBe(true)
+  })
+
+  it('no crossing cap is left in the model or the core (I8)', () => {
+    expect('tripOver' in model).toBe(false)
+    expect('RAFT_CROSSINGS' in playPlace).toBe(false)
+  })
+})
+
+describe('the walk home (I8, § 2)', () => {
+  it('lightest first; a new kind fills, a kind already home and a second of a kind merge', () => {
+    let s = initialRaft(seeded(1), {
+      shore: [5, 5, 3, 7, 2, 8],
+      homes: [3],
+    })
+    ;[s] = board(s, idOf(s, 7))
+    ;[s] = board(s, idOf(s, 3))
+    expect(homePlan(s).map((h) => [h.weight, h.fill])).toEqual([
+      [3, false],
+      [7, true],
+    ])
+    s = initialRaft(seeded(1), { shore: [5, 5, 3, 7, 2, 8] })
+    ;[s] = board(s, idOf(s, 5, 1))
+    ;[s] = board(s, idOf(s, 5))
+    expect(homePlan(s).map((h) => [h.weight, h.fill, h.seat])).toEqual([
+      [5, true, 0],
+      [5, false, 1],
+    ])
+  })
+
+  it('homeOne takes the animal off its seat and puts its kind home, once', () => {
+    let s = initialRaft(seeded(1), { shore: [7, 3, 6, 4, 8, 2], homes: [3] })
+    ;[s] = board(s, idOf(s, 7))
+    ;[s] = board(s, idOf(s, 3))
+    for (const hop of homePlan(s)) s = homeOne(s, hop.id)
+    expect(s.homes).toEqual([3, 7])
+    expect(waitingWeights(s)).toEqual([6, 4, 8, 2])
+    expect(Object.keys(s.animals)).toHaveLength(4)
+  })
+
+  it('the ninth kind fills the island', () => {
+    let s = initialRaft(seeded(1), {
+      shore: [9, 1, 6, 4, 8, 2],
+      homes: [1, 2, 3, 4, 5, 6, 7, 8],
+    })
+    expect(islandIsFull(s)).toBe(false)
+    ;[s] = board(s, idOf(s, 9))
+    ;[s] = board(s, idOf(s, 1))
+    for (const hop of homePlan(s)) s = homeOne(s, hop.id)
+    expect(islandIsFull(s)).toBe(true)
+  })
+
+  it('a fresh shore and a refill carry a missing kind (Dave (1))', () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const rng = seeded(seed)
+      const homes = [1, 2, 3, 4, 5, 6, 7, 8] as const
+      const s = initialRaft(rng, { homes })
+      expect(missingOf(s.homes)).toEqual([9])
+      expect(waitingWeights(s)).toContain(9)
+    }
+  })
+})
+
+describe('the 20 raft (I12, I13)', () => {
+  it('has 8 seats; ten aboard boards on; past twenty splashes; exactly twenty departs', () => {
+    let s = initialRaft(seeded(1), {
+      target: 20,
+      shore: [7, 3, 6, 4, 8, 2],
+    })
+    expect(s.seats).toHaveLength(8)
+    ;[s] = board(s, idOf(s, 7))
+    ;[s] = board(s, idOf(s, 3))
+    expect(s.total).toBe(10)
+    expect(s.phase).toBe('loading')
+    ;[s] = board(s, idOf(s, 6))
+    expect(s.total).toBe(16)
+    expect(board(s, idOf(s, 8))[1]).toBe('splash')
+    const [d, r] = board(s, idOf(s, 4))
+    expect(r).toBe('depart')
+    expect(d.total).toBe(20)
+  })
+
+  it('a stuck 20 raft gets raftNewcomer’s weight after two splashes; boarding can reach 20', () => {
+    // 9 + 9 aboard (18), waiting 5, 6, 7, 8: no sum makes 2.
+    let s = initialRaft(seeded(1), {
+      target: 20,
+      shore: [9, 9, 5, 6, 7, 8],
+    })
+    ;[s] = board(s, idOf(s, 9))
+    ;[s] = board(s, idOf(s, 9))
+    expect(s.total).toBe(18)
+    let r
+    ;[s, r] = splash(s, idOf(s, 5))
+    expect(r.newcomer).toBeNull()
+    ;[s, r] = splash(s, idOf(s, 6))
+    expect(r.newcomer).not.toBeNull()
+    const w = s.animals[r.newcomer!]!.weight
+    expect(w).toBe(playPlace.raftNewcomer([5, 6, 7, 8], 18, 20))
+    expect(w).toBe(2)
+    expect(board(s, r.newcomer!)[1]).toBe('depart')
   })
 })
 
