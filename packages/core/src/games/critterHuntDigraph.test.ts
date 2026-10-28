@@ -5,12 +5,20 @@
  * `design/research/critters-digraph-2026-10-28.md`, cited as "Dave D (A)"
  * to "Dave D (C)". Every rule is checked twice: against Dave's printed
  * lists, counts and fallbacks, and against a long-way oracle over every
- * letter set a pair could deal.
+ * letter set a pair could deal. D28-core is the flag of Dave's Q38 ruling:
+ * "Two letters, one sound!" is said once per learner.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { progressAtStep } from '../debug/stepProgress'
+import {
+  activateLearner,
+  activeLearner,
+  addLearner,
+  ensureLearnerList,
+  resetLearnersForTests,
+} from '../learners'
 import { setKeyValueStore, type KeyValueStore } from '../platform/keyValueStore'
 import type { SkillNode } from '../progress/types'
 import {
@@ -24,14 +32,18 @@ import {
   huntBoardOrder,
   huntComplete,
   huntDeal,
+  huntDigraphLineSaid,
   huntDigraphs,
   huntFind,
+  huntOpenLengths,
   huntRoundOf,
   huntRounds,
   huntUnits,
   huntVowels,
   loadHuntRecord,
+  markHuntDigraphLineSaid,
   saveHuntRecord,
+  setHuntOpenLengths,
   type HuntLength,
   type HuntRound,
 } from './critterHunt'
@@ -262,6 +274,7 @@ beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
 afterEach(() => {
+  resetLearnersForTests()
   setKeyValueStore(null)
   vi.restoreAllMocks()
 })
@@ -932,5 +945,71 @@ describe('D13: pictures, praise and board order', () => {
         ])
         expect(board.slice(0, pics.length)).toEqual(pics)
       }
+  })
+})
+
+describe('D28-core (Dave’s Q38 ruling): "Two letters, one sound!" once per learner', () => {
+  it('unsaid until marked, then said for good: kept across a round’s save, New letters and the open lengths; learner B’s is her own', () => {
+    const store = new MapStore()
+    setKeyValueStore(store)
+    ensureLearnerList()
+    const a = activeLearner()!
+    const b = addLearner({
+      name: 'Sam',
+      avatarId: 'owl',
+      start: { math: 1, wordSong: 1 },
+    })
+    activateLearner(a.id)
+    expect(huntDigraphLineSaid()).toBe(false)
+    const rec = freshHuntRecord(huntRoundOf(words('i sh b c n p'))!)
+    saveHuntRecord(rec)
+    expect(huntDigraphLineSaid()).toBe(false)
+    markHuntDigraphLineSaid()
+    expect(huntDigraphLineSaid()).toBe(true)
+    // The round and the open lengths are untouched by the mark.
+    expect(loadHuntRecord()).toEqual(rec)
+    expect(huntOpenLengths()).toEqual([3])
+    // A completing find with unlock, New letters, the seed's open lengths:
+    // the flag stays.
+    let done = rec
+    for (const w of rec.targets) done = huntFind(done, w)
+    saveHuntRecord(done, 3, { unlock: true })
+    expect(huntOpenLengths()).toEqual([3, 4])
+    saveHuntRecord(freshHuntRecord(huntRoundOf(words('o th c d m t'))!))
+    setHuntOpenLengths([3])
+    expect(huntDigraphLineSaid()).toBe(true)
+    markHuntDigraphLineSaid()
+    expect(huntDigraphLineSaid()).toBe(true)
+
+    activateLearner(b.id)
+    expect(huntDigraphLineSaid()).toBe(false)
+    activateLearner(a.id)
+    expect(huntDigraphLineSaid()).toBe(true)
+  })
+
+  it('stored beside the rounds as `digraphLine`; a value without it reads as unsaid', () => {
+    const store = new MapStore()
+    setKeyValueStore(store)
+    saveHuntRecord(freshHuntRecord(huntRoundOf(words('i sh b c n p'))!))
+    expect(huntDigraphLineSaid()).toBe(false)
+    markHuntDigraphLineSaid()
+    const all = JSON.parse(store.getItem(HUNT_STORAGE_KEY)!) as Record<
+      string,
+      unknown
+    >
+    expect(all.digraphLine).toBe(true)
+    expect(Object.keys(all).sort()).toEqual(['3', 'digraphLine'])
+  })
+
+  it('unreadable reads as unsaid; marking then replaces it; no store is a no-op', () => {
+    const store = new MapStore()
+    setKeyValueStore(store)
+    store.setItem(HUNT_STORAGE_KEY, '{not json')
+    expect(huntDigraphLineSaid()).toBe(false)
+    markHuntDigraphLineSaid()
+    expect(huntDigraphLineSaid()).toBe(true)
+    setKeyValueStore(null)
+    expect(huntDigraphLineSaid()).toBe(false)
+    expect(() => markHuntDigraphLineSaid()).not.toThrow()
   })
 })

@@ -602,14 +602,17 @@ export interface HuntRecord extends HuntRound {
 
 /**
  * One of the learner's own keys (`learners/keys.ts` `LEARNER_KEYS`). Its
- * value is by length, `{ "3": HuntRecord, "4": HuntRecord, "open": [3, 4] }`:
- * each length's round in play, and `open` once "4" has opened (Q24; F6).
- * Older values have no `open`: they read as `[3]`.
+ * value is by length, `{ "3": HuntRecord, "4": HuntRecord, "open": [3, 4],
+ * "digraphLine": true }`: each length's round in play, `open` once "4" has
+ * opened (Q24; F6), and `digraphLine` once Emma has said "Two letters, one
+ * sound!" (D28). Older values have neither: they read as `[3]` and unsaid.
  */
 export const HUNT_STORAGE_KEY = 'marian-tutor.critter-hunt.v1'
 
 /** The field of the stored value that holds the open lengths. */
 const OPEN_FIELD = 'open'
+/** The field that marks the digraph critters' line said (D28). */
+const DIGRAPH_LINE_FIELD = 'digraphLine'
 
 const isWords = (v: unknown): v is string[] =>
   Array.isArray(v) && v.every((w) => typeof w === 'string')
@@ -732,6 +735,40 @@ export function setHuntOpenLengths(open: readonly HuntLength[]): void {
     )
   } catch (err) {
     console.warn('[Critters] could not save the open lengths:', err)
+  }
+}
+
+/**
+ * Whether Emma has said "Two letters, one sound!" to the playing learner
+ * (Dave's Q38 ruling, D28): one flag for all four digraph critters, said
+ * the first time she taps or lifts one. Never reverts. Unreadable reads
+ * as unsaid.
+ */
+export function huntDigraphLineSaid(): boolean {
+  try {
+    return readAll()[DIGRAPH_LINE_FIELD] === true
+  } catch {
+    return false
+  }
+}
+
+/** Marks the line said, beside her rounds (D28). A failure is logged. */
+export function markHuntDigraphLineSaid(): void {
+  const store = getKeyValueStore()
+  if (store === null) return
+  try {
+    let all: Record<string, unknown> = {}
+    try {
+      all = readAll()
+    } catch {
+      // An unreadable record is replaced.
+    }
+    store.setItem(
+      HUNT_STORAGE_KEY,
+      JSON.stringify({ ...all, [DIGRAPH_LINE_FIELD]: true }),
+    )
+  } catch (err) {
+    console.warn('[Critters] could not save the digraph line:', err)
   }
 }
 
