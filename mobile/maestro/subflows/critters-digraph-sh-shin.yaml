@@ -19,12 +19,8 @@ appId: host.exp.Exponent
 - assertVisible:
     id: critter-seat-1
     text: Letter i, on the log
-- extendedWaitUntil:
-    visible:
-      id: play-game-ribbon
-      text: Shin.
-    timeout: 10000
-# The three still seated while Emma says it: the seated sh at 1.25 c.
+# The three seated: the seated sh at 1.25 c. "Shin." lasts about a second,
+# so it is read from Metro's log (`play:guide.play.critters.word.shin`).
 - takeScreenshot: ${SHOT}-shin-seated
 - extendedWaitUntil:
     visible:

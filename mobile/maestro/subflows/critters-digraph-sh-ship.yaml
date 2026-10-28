@@ -7,25 +7,14 @@
 # follows the beat (critters-four-letter.md § 6) and New letters comes
 # with the door. Back → the picker; Back → the Play place.
 #
+# The seated labels are part 3's. "Ship." lasts about a second and under
+# load can end before a swipe's settle does (2026-10-28), so it and the
+# praise are read from Metro's log (`play:guide.play.critters.word.ship`,
+# `...praise.ship`); the picture, up through the praise, is waited for.
+#
 #   SHOT  the screenshots' prefix
 appId: host.exp.Exponent
 ---
-- extendedWaitUntil:
-    visible:
-      id: critter-seat-2
-      text: Letter p, on the log
-    timeout: 5000
-- assertVisible:
-    id: critter-seat-0
-    text: Letters s h, one sound, on the log
-- assertVisible:
-    id: critter-seat-1
-    text: Letter i, on the log
-- extendedWaitUntil:
-    visible:
-      id: play-game-ribbon
-      text: Ship.
-    timeout: 10000
 - extendedWaitUntil:
     visible:
       id: critter-picture-ship
