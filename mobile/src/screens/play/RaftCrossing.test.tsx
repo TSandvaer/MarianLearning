@@ -10,7 +10,6 @@ import {
   byId,
   dragTo,
   has,
-  LINE_MS,
   mountGame,
   PHONE_L,
   PHONE_P,
@@ -18,9 +17,12 @@ import {
 } from '../../../test/playHarness'
 import { centre, playArea, raftScene } from './playGeometry'
 import {
+  AFTER_HOMES_MS,
   AFTER_SCENE_MS,
-  CLOSE_GAP_MS,
   GLIDE_MS,
+  HOME_BEAT_MS,
+  HOP_HOME_MS,
+  HOP_HOME_STAGGER_MS,
   RAFT_OPEN_DELAY_MS,
   RETURN_MS,
   ROW_AT_MS,
@@ -38,7 +40,7 @@ const sceneP = () => {
 const deck = () => centre(sceneP().dock)
 const flag = () => String(byId('raft-flag').props.children)
 const shoreCount = () => screen.queryAllByTestId(/^raft-animal-\d+$/).length
-const islandCount = () => screen.queryAllByTestId(/^raft-island-\d+$/).length
+const homeCount = () => screen.queryAllByTestId(/^raft-home-\d-animal$/).length
 
 beforeEach(() => jest.useFakeTimers())
 afterEach(() => jest.useRealTimers())
@@ -62,7 +64,7 @@ describe('N7: board, take off, too heavy', () => {
     expect(has('raft-animal-0')).toBe(false)
     expect(flag()).toBe('7')
     expect(g.lines).toEqual(['guide.play.raft.total.7'])
-    expect(byId('raft').props.accessibilityLabel).toBe('Raft, seven')
+    expect(byId('raft').props.accessibilityLabel).toBe('Raft for ten, seven')
     // A drop boards too, and its total cuts the one before.
     const cuts = (g.player.cancelActive as jest.Mock).mock.calls.length
     await dragTo(byId('raft-animal-5'), deck())
@@ -197,13 +199,14 @@ describe('N8: crossings', () => {
     return NUMBER.indexOf(label.split(', ')[1]!)
   }
 
-  it('ten departs, lands, plays a scene, returns to a full shore; the third ends the trip', async () => {
+  it('ten departs, lands, plays a scene on the deck, walks home and returns to a full shore; the third does not end the trip (I8)', async () => {
     const shore = [7, 3, 6, 4, 8, 2]
     const g = await mountGame('raft', { shore })
     let lastScene: string | null = null
     for (let k = 1; k <= 3; k++) {
+      const sparkles = g.sfx.sparkle.play.mock.calls.length
       await loadTen(shore)
-      expect(g.sfx.sparkle.play).toHaveBeenCalledTimes(k)
+      expect(g.sfx.sparkle.play.mock.calls.length).toBe(sparkles + 1)
       expect(g.poses.at(-1)).toBe('waving')
       expect(g.lines.at(-1)).toBe('guide.play.raft.go')
       expect(flag()).toBe('10')
@@ -215,7 +218,8 @@ describe('N8: crossings', () => {
       await advance(ROW_AT_MS)
       expect(has('raft-rowing')).toBe(true)
       await advance(GLIDE_MS)
-      expect(islandCount()).toBe(2 * k)
+      // At the landing the two stay seated.
+      expect(screen.queryAllByTestId(/^raft-aboard-\d+$/)).toHaveLength(2)
       await advance(SCENE_AT_MS)
       expect(g.lines.at(-1)).toBe('guide.play.raft.silly')
       expect(g.poses.at(-1)).toBe('cheering')
@@ -223,23 +227,27 @@ describe('N8: crossings', () => {
         .testID as string
       expect(scene).not.toBe(lastScene)
       lastScene = scene
-      await advance(SCENE_MS + AFTER_SCENE_MS)
-      if (k < 3) {
-        await advance(RETURN_MS)
-        expect(shoreCount()).toBe(6)
-        expect(g.poses.at(-1)).toBe('idle')
-      }
+      await advance(
+        SCENE_MS +
+          AFTER_SCENE_MS +
+          HOP_HOME_STAGGER_MS +
+          HOP_HOME_MS +
+          HOME_BEAT_MS +
+          AFTER_HOMES_MS +
+          RETURN_MS,
+      )
+      expect(screen.queryAllByTestId(/^raft-aboard-\d+$/)).toHaveLength(0)
+      expect(shoreCount()).toBe(6)
+      expect(g.poses.at(-1)).toBe('idle')
     }
-    expect(g.lines.at(-1)).toBe('guide.play.raft.close')
+    expect(g.lines).not.toContain('guide.play.raft.close')
+    await advance(10_000)
     expect(g.onExit).not.toHaveBeenCalled()
-    await advance(LINE_MS + CLOSE_GAP_MS)
-    expect(g.onExit).toHaveBeenCalledTimes(1)
-    expect(g.lines.filter((l) => l === 'guide.play.raft.close')).toHaveLength(1)
   })
 })
 
 describe('N13: a new layout keeps the trip', () => {
-  it('rotation mid-load keeps who is aboard; rotation mid-crossing keeps the crossing and island', async () => {
+  it('rotation mid-load keeps who is aboard; rotation mid-crossing keeps the crossing and the island (I11)', async () => {
     const g = await mountGame('raft', { shore: [7, 3, 6, 4, 8, 2] })
     await tap(byId('raft-animal-2'))
     await g.relayout(PHONE_L)
@@ -248,8 +256,15 @@ describe('N13: a new layout keeps the trip', () => {
     await tap(byId('raft-animal-3'))
     await advance(ROW_AT_MS + GLIDE_MS / 2)
     await g.relayout(PHONE_P)
-    await advance(GLIDE_MS / 2)
-    expect(islandCount()).toBe(2)
+    await advance(
+      GLIDE_MS / 2 +
+        SCENE_AT_MS +
+        SCENE_MS +
+        AFTER_SCENE_MS +
+        HOP_HOME_STAGGER_MS +
+        HOP_HOME_MS,
+    )
+    expect(homeCount()).toBe(2)
     expect(shoreCount()).toBe(4)
   })
 })
@@ -260,7 +275,7 @@ describe('N17: VoiceOver', () => {
     expect(byId('raft').props.accessibilityRole).toBeUndefined()
     await activate(byId('raft-animal-4'))
     expect(has('raft-aboard-4')).toBe(true)
-    expect(byId('raft').props.accessibilityLabel).toBe('Raft, eight')
+    expect(byId('raft').props.accessibilityLabel).toBe('Raft for ten, eight')
     expect(byId('raft-aboard-4').props.accessibilityLabel).toBe('Goat, eight')
     await activate(byId('raft-aboard-4'))
     expect(has('raft-animal-4')).toBe(true)

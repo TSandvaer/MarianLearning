@@ -1,0 +1,73 @@
+# F29 (`design/native/critters-four-letter.md` § 15.5) as
+# 17-critters-four-band.yaml, on a phone in landscape, the tightest form.
+# Run it on an iPhone 17 simulator (874 x 402, insets t0 b20 l62 r62):
+# the points are 15-critters-four-round-phone-landscape.yaml's, the
+# meadow is 4 + 3, rows at y 272 (x 320, 376, 432, 488) and 328 (x 348,
+# 404, 460); the seats at y 194, x 302, 370, 438 and 506.
+#
+#   a b c d  /  n s t
+appId: host.exp.Exponent
+name: Critters four-letter band (phone landscape)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: critters-hunt-four
+- setOrientation: LANDSCAPE_LEFT
+- runFlow:
+    file: ../subflows/critters-four-round-open.yaml
+    env:
+      SHOT: four-band-phone-landscape
+# b-a-n-d onto seats 0-3: the extra.
+- swipe:
+    start: 376, 272
+    end: 302, 194
+    duration: 800
+- swipe:
+    start: 320, 272
+    end: 370, 194
+    duration: 800
+- swipe:
+    start: 348, 328
+    end: 438, 194
+    duration: 800
+- swipe:
+    start: 488, 272
+    end: 506, 194
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-four-band.yaml
+    env:
+      SHOT: four-band-phone-landscape
+# c, a, t onto seats 0-2.
+- swipe:
+    start: 432, 272
+    end: 302, 194
+    duration: 800
+- swipe:
+    start: 320, 272
+    end: 370, 194
+    duration: 800
+- swipe:
+    start: 460, 328
+    end: 438, 194
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-four-partial.yaml
+    env:
+      SHOT: four-band-phone-landscape
+# c-a-t-s: s onto seat 3.
+- swipe:
+    start: 404, 328
+    end: 506, 194
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-four-round-end.yaml
+    env:
+      SHOT: four-band-phone-landscape
+- setOrientation: PORTRAIT

@@ -1,0 +1,29 @@
+# The raft island goal on one device, portrait then landscape
+# (`design/native/raft-island-goal.md` I16, I17; `subflows/raft-island-run.yaml`).
+# Run it on an iPhone simulator, then on an iPad simulator (the flow taps
+# by label and id, so it needs no per-form points). Screenshots go to
+# MAESTRO_OUT/16-raft-island/.
+appId: host.exp.Exponent
+name: Raft island
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: raft-island-eight
+- setOrientation: PORTRAIT
+- runFlow:
+    file: ../subflows/raft-island-run.yaml
+    env:
+      SHOT: raft-portrait
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: raft-island-eight
+- setOrientation: LANDSCAPE_LEFT
+- runFlow:
+    file: ../subflows/raft-island-run.yaml
+    env:
+      SHOT: raft-landscape
+- setOrientation: PORTRAIT

@@ -363,7 +363,8 @@
       "rug",
       "sun",
       "tag",
-      "tub"
+      "tub",
+      "chip"
     ]
   },
   {
@@ -739,7 +740,8 @@
       "tent",
       "top",
       "tree",
-      "tub"
+      "tub",
+      "dig"
     ]
   },
   {
@@ -782,7 +784,8 @@
       "sun",
       "tub",
       "wing",
-      "step"
+      "step",
+      "chest"
     ]
   },
   {
@@ -1306,7 +1309,8 @@
       "nut",
       "rug",
       "sun",
-      "tub"
+      "tub",
+      "shed"
     ]
   },
   {
@@ -2073,7 +2077,7 @@
       "a candle or a torch",
       "a ceiling light"
     ],
-    "distinctFrom": ["bus", "dog", "hand", "lock", "bulb"]
+    "distinctFrom": ["bus", "dog", "hand", "lock", "bulb", "moth", "fog"]
   },
   {
     "word": "hand",
@@ -2119,7 +2123,8 @@
       "nest",
       "net",
       "tap",
-      "tree"
+      "tree",
+      "shop"
     ]
   },
   {
@@ -2447,7 +2452,7 @@
       "animals or a farmer",
       "a silo"
     ],
-    "distinctFrom": ["tent", "roof", "bag", "fox", "harp", "hat", "pen"]
+    "distinctFrom": ["tent", "roof", "bag", "fox", "harp", "hat", "pen", "shed"]
   },
   {
     "word": "star",
@@ -2491,7 +2496,8 @@
       "scarf",
       "sheep",
       "ship",
-      "star"
+      "star",
+      "fish"
     ]
   },
   {
@@ -2886,7 +2892,7 @@
       "a brown heap of mud or dirt",
       "a bucket"
     ],
-    "distinctFrom": ["flag", "mud", "sun"]
+    "distinctFrom": ["flag", "mud", "sun", "dig"]
   },
   {
     "word": "ramp",
@@ -3005,7 +3011,7 @@
       "a grown-up, like the man or the dad",
       "a skipping rope or a trampoline"
     ],
-    "distinctFrom": ["dad", "frog", "man", "run"]
+    "distinctFrom": ["dad", "frog", "man", "run", "sing"]
   },
   {
     "word": "pump",
@@ -3400,5 +3406,112 @@
       "a white plane that fades into the background"
     ],
     "distinctFrom": ["jet"]
+  },
+  {
+    "word": "fish",
+    "tier": "digraphs-sh",
+    "batch": 22,
+    "subject": "One fish in side view, one plain colour, eye, fins and tail clear.",
+    "avoid": [
+      "a bowl (bowl)",
+      "a shark (the pack's shark.webp)",
+      "water scenery"
+    ],
+    "distinctFrom": ["shark"]
+  },
+  {
+    "word": "shed",
+    "tier": "digraphs-sh",
+    "batch": 22,
+    "subject": "A small garden shed of dark-brown vertical planks, one sloping roof, a plank door, a small window, a garden spade leaning by it.",
+    "avoid": [
+      "cream walls and a pointed roof (hut.webp, a pack word)",
+      "a chimney (house)",
+      "red (barn.webp)"
+    ],
+    "distinctFrom": ["shop", "hut", "barn"]
+  },
+  {
+    "word": "shop",
+    "tier": "digraphs-sh",
+    "batch": 22,
+    "subject": "A small shop front with a striped flat awning and a big window of loaves or fruit.",
+    "avoid": [
+      "any letters or a sign with words",
+      "a chimney (house)",
+      "a pointed striped roof (tent)"
+    ],
+    "distinctFrom": ["shed", "tent"]
+  },
+  {
+    "word": "chip",
+    "tier": "digraphs-ch",
+    "batch": 22,
+    "subject": "One golden potato crisp, round and slightly wavy.",
+    "avoid": ["a pile or a packet (bag, a pack word)", "a cookie", "a coin"],
+    "distinctFrom": ["chest", "bag"]
+  },
+  {
+    "word": "moth",
+    "tier": "digraphs-th-voiceless",
+    "batch": 22,
+    "subject": "One moth from above, wings flat, soft brown-grey, fuzzy body, feathery antennae.",
+    "avoid": [
+      "bright butterfly colours or club-tipped antennae (butterfly)",
+      "a lamp (lamp, a pack word)",
+      "flowers"
+    ],
+    "distinctFrom": ["lamp"]
+  },
+  {
+    "word": "sing",
+    "tier": "duck-words",
+    "batch": 22,
+    "subject": "A child singing, three-quarter view, mouth open, two music notes floating out.",
+    "avoid": [
+      "a microphone",
+      "an instrument",
+      "a bird",
+      "a child in mid-air (jump.webp)",
+      "a child running (run)"
+    ],
+    "distinctFrom": ["jump"]
+  },
+  {
+    "word": "chest",
+    "tier": "digraphs-ch",
+    "batch": 22,
+    "subject": "A wooden treasure chest, domed lid open, metal bands, a few gold coins.",
+    "avoid": [
+      "cardboard or a flat lid (box.webp)",
+      "a chest of drawers",
+      "a body"
+    ],
+    "distinctFrom": ["chip", "box"]
+  },
+  {
+    "word": "fog",
+    "tier": "short-o",
+    "batch": 22,
+    "subject": "One bare tree and a fence fading into soft grey mist, no sun.",
+    "avoid": [
+      "white clouds in a blue sky (cloud)",
+      "smoke from a chimney or fire (smoke)",
+      "rain",
+      "a lamp post (lamp)"
+    ],
+    "distinctFrom": ["lamp"]
+  },
+  {
+    "word": "dig",
+    "tier": "short-i",
+    "batch": 22,
+    "subject": "A child kneeling, digging a hole in dark-brown soil with a small metal garden trowel, a heap of earth beside it.",
+    "avoid": [
+      "golden sand or a red toy spade (sand.webp is exactly that)",
+      "a dog digging (dog)",
+      "a bucket"
+    ],
+    "distinctFrom": ["sand", "dog"]
   }
 ]

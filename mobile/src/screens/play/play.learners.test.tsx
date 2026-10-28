@@ -3,8 +3,8 @@
  * learner-scoped store: learner A on adding to ten and letter sounds sees
  * the Play disc and both games; learner B on numbers and letter names sees
  * the Play disc and the critters only (Thomas 2026-10-22); a visit as A
- * (the place and a raft trip's first crossing) writes no key of either
- * learner.
+ * (the place and a raft trip's first crossing) writes only A's island key,
+ * once per new kind (raft-island-goal I7).
  */
 import { setKeyValueStore } from '@marian/core'
 import { progressAtStep } from '@marian/core/debug/stepProgress'
@@ -16,6 +16,7 @@ import {
   resetLearnersForTests,
   type LearnerEntry,
 } from '@marian/core/learners'
+import { RAFT_ISLAND_STORAGE_KEY } from '@marian/core/games/raftIsland'
 import { STORAGE_KEY } from '@marian/core/progress'
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
 import { advance, byId, mountGame, tap } from '../../../test/playHarness'
@@ -138,7 +139,7 @@ it('N16 (Thomas 2026-10-22): B’s Play place has the critters only', async () =
   expect(tiles()).toEqual(['play-tile-critters'])
 })
 
-it('N16: a visit as A writes no key of either learner', async () => {
+it('N16, I7: a visit as A writes only A’s island key, once per new kind', async () => {
   activateLearner(a.id)
   const before = store.writes.length
   await render(
@@ -158,5 +159,13 @@ it('N16: a visit as A writes no key of either learner', async () => {
   await tap(byId('raft-animal-0'))
   await tap(byId('raft-animal-1'))
   await advance(10_000)
-  expect(store.writes.slice(before)).toEqual([])
+  // The dog (7) and the hen (3) fill their homes: one write each.
+  expect(store.writes.slice(before)).toEqual([
+    RAFT_ISLAND_STORAGE_KEY,
+    RAFT_ISLAND_STORAGE_KEY,
+  ])
+  expect(JSON.parse(store.data.get(RAFT_ISLAND_STORAGE_KEY)!)).toEqual({
+    10: [3, 7],
+    20: [],
+  })
 })

@@ -9,7 +9,9 @@ import {
   CRITTER_NOT_SAID,
   CRITTER_PICTURE_WORDS,
   CRITTER_SAID_LATER,
+  CRITTER_DIGRAPH_BLENDS,
   CRITTER_SAID_WORDS,
+  HUNT_DIGRAPH_LATER,
   HUNT_FOUR_TARGETS,
 } from '../games/playPlace'
 import { STAGE_SPOKEN_NAMES } from '../sessionEnd/friendlyNodeName'
@@ -79,19 +81,21 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       // The letter critters' said words (Thomas 2026-10-22; Dave
       // 2026-10-25: 7 more; Dave 2026-10-26: the nine said later and the
       // 82 four-letter targets; Dave 2026-10-27: the 15 for the pictured
-      // boards).
-      'play-word': 269,
+      // boards and the 13 digraph words).
+      'play-word': 282,
+      // The digraph critters' four sound-source blends (Dave 2026-10-27).
+      'play-blend': 4,
     })
-    expect(GUIDANCE_LINES).toHaveLength(609)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(609)
+    expect(GUIDANCE_LINES).toHaveLength(626)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(626)
     // Bee, car, snail and moon words' leads are duck words' text (content
-    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories', and
-    // thirteen critter words' captions are story words' ("And.", "Got.",
-    // "Hid.", "Ran.", "Sat."; since Dave 2026-10-26 "Drum.", "Frog.",
-    // "Lamp.", "Nest.", "Plum.", "Pond.", "Tent."; since Dave 2026-10-27
-    // "Crab."): 609 ids, 591 texts, 609 files.
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(591)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(609)
+    // wave 4 § 11, wave 5 § 9.1), goat stories' sheep stories', and sixteen
+    // critter words' captions are story words' ("And.", "Got.", "Hid.",
+    // "Ran.", "Sat."; since Dave 2026-10-26 "Drum.", "Frog.", "Lamp.",
+    // "Nest.", "Plum.", "Pond.", "Tent."; since Dave 2026-10-27 "Crab.",
+    // "Ring.", "Shed.", "Ship."): 626 ids, 605 texts, 626 files.
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(605)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(626)
   })
 
   it('AC8: both replay sets, one line per STAGE_SPOKEN_NAMES step, with the exact texts (map-tap-to-play § 6, T1 approved 2026-10-17)', () => {
@@ -416,7 +420,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(609)
+    ).toHaveLength(626)
   })
 
   it('repeats no Emma’s Path line', () => {
@@ -488,6 +492,7 @@ describe('the flower bed moved into adding to ten (flower-bed-into-add-to-10 § 
           !realBlending.has(l.id) &&
           l.kind !== 'play' &&
           l.kind !== 'play-word' &&
+          l.kind !== 'play-blend' &&
           !l.kind.startsWith('map-peek-ask'),
       ).map(({ id, kind, world, text, input, src }) => [
         id,
@@ -543,7 +548,7 @@ const TEEN = [
   'nineteen',
 ] as const
 
-/** The 20 raft's 12 lines (raft-island-goal § 12.1), awaiting their render. */
+/** The 20 raft's 12 lines (raft-island-goal § 12.1). */
 const RAFT_20_IDS = [
   'guide.play.raft.open.20',
   ...TEEN.map((_, i) => `guide.play.raft.total.${i + 10}`),
@@ -653,21 +658,23 @@ describe('the Play place lines (play-place spec § 4)', () => {
     expect(raft20.reduce((n, l) => n + (l.input ?? l.text).length, 0)).toBe(124)
   })
 
-  it('C7: the 20 shipped play lines are rendered in Lily; the 20 raft’s 12 await theirs (I6)', () => {
+  it('C7: the 32 play lines are rendered in Lily, the 20 raft’s 12 too (none awaits its render)', () => {
     expect(
-      play
-        .filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id))
-        .map((l) => l.id),
-    ).toEqual(RAFT_20_IDS)
-    expect([...GUIDANCE_LINES_AWAITING_RENDER]).toEqual(RAFT_20_IDS)
+      play.filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id)),
+    ).toEqual([])
+    expect([...GUIDANCE_LINES_AWAITING_RENDER]).toEqual([])
   })
 
   it('C8: no Emma line (kind play) says again, next, more, round, win, fast or "not a word"; the read-back words (kind play-word) are out of scope', () => {
     const banned = /\b(again|next|more|round|win|fast)\b|not a word/i
     // C8's scope (Thomas 2026-10-22): every guide.play.* line but the
-    // 'play-word' ones, which only say back the run she built (§ 3.3).
+    // 'play-word' ones, which only say back the run she built (§ 3.3), and
+    // the 'play-blend' sound sources, which say sounds and a word.
     const scoped = GUIDANCE_LINES.filter(
-      (l) => l.id.startsWith('guide.play.') && l.kind !== 'play-word',
+      (l) =>
+        l.id.startsWith('guide.play.') &&
+        l.kind !== 'play-word' &&
+        l.kind !== 'play-blend',
     )
     expect(scoped).toEqual(play)
     expect(scoped).toHaveLength(32)
@@ -685,8 +692,9 @@ describe('the Play place lines (play-place spec § 4)', () => {
     expect(
       GUIDANCE_LINES.filter(
         (l) =>
-          (l.kind === 'play' || l.kind === 'play-word') !==
-          l.id.startsWith('guide.play.'),
+          (l.kind === 'play' ||
+            l.kind === 'play-word' ||
+            l.kind === 'play-blend') !== l.id.startsWith('guide.play.'),
       ),
     ).toEqual([])
   })
@@ -735,8 +743,8 @@ describe('the letter critters’ said words (Thomas 2026-10-22)', () => {
   const words = GUIDANCE_LINES.filter((l) => l.kind === 'play-word')
   const cap = (w: string) => `${w.charAt(0).toUpperCase()}${w.slice(1)}`
 
-  it('one line per CRITTER_CLIP_WORDS word, in its order, last in the catalogue', () => {
-    expect(GUIDANCE_LINES.slice(340)).toEqual(words)
+  it('one line per CRITTER_CLIP_WORDS word, in its order, then only the 4 sound-source blends', () => {
+    expect(GUIDANCE_LINES.slice(340, -4)).toEqual(words)
     expect(words).toEqual(
       CRITTER_CLIP_WORDS.map((w) => ({
         id: `guide.play.critters.word.${w}`,
@@ -753,14 +761,15 @@ describe('the letter critters’ said words (Thomas 2026-10-22)', () => {
     // 163 inputs of four characters each, two of them five (Dave
     // 2026-10-25's seven: 28 characters); then the nine said later (36)
     // and the 82 four-letter targets (410, Dave 2026-10-26); then the 15
-    // for the pictured boards (75, Dave 2026-10-27).
-    expect(words.reduce((n, l) => n + l.input!.length, 0)).toBe(1175)
+    // for the pictured boards (75, Dave 2026-10-27) and the 13 digraph
+    // words (66, Dave 2026-10-27).
+    expect(words.reduce((n, l) => n + l.input!.length, 0)).toBe(1241)
     expect(
       words.filter((l) => /^(Sat|Wed),$/.test(l.input!)).map((l) => l.id),
     ).toEqual([])
   })
 
-  it('the 269 are rendered in Lily (none awaits its render)', () => {
+  it('the 282 are rendered in Lily (none awaits its render)', () => {
     expect(
       words.filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id)),
     ).toEqual([])
@@ -797,5 +806,46 @@ describe('the letter critters’ said words (Thomas 2026-10-22)', () => {
       clipped.reduce((n, w) => n + critterWordLine(w)!.input!.length, 0) +
         open.text.length,
     ).toBe(504 + 75)
+  })
+})
+
+describe('the digraph critters’ content (Dave 2026-10-27, digraph critters (A), (D))', () => {
+  const cap = (w: string) => `${w.charAt(0).toUpperCase()}${w.slice(1)}`
+
+  it('the 13 digraph words have a clip line, caption "<W>.", input "<W>,": 66 input characters', () => {
+    for (const w of HUNT_DIGRAPH_LATER)
+      expect(critterWordLine(w)).toEqual({
+        id: `guide.play.critters.word.${w}`,
+        kind: 'play-word',
+        world: null,
+        text: `${cap(w)}.`,
+        input: `${cap(w)},`,
+        src: `/assets/audio/path/guide-play-critters-word-${w}.mp3`,
+      })
+    expect(
+      HUNT_DIGRAPH_LATER.reduce(
+        (n, w) => n + critterWordLine(w)!.input!.length,
+        0,
+      ),
+    ).toBe(66)
+  })
+
+  it('the 4 sound-source blends close the catalogue: caption = blend text, no input, the path src, rendered in Lily', () => {
+    const blends = GUIDANCE_LINES.filter((l) => l.kind === 'play-blend')
+    expect(GUIDANCE_LINES.slice(-4)).toEqual(blends)
+    expect(blends).toEqual(
+      ['ship', 'chip', 'thin', 'ring'].map((w, i) => ({
+        id: `guide.play.critters.blend.${w}`,
+        kind: 'play-blend',
+        world: null,
+        text: Object.values(CRITTER_DIGRAPH_BLENDS)[i],
+        src: `/assets/audio/path/guide-play-critters-blend-${w}.mp3`,
+      })),
+    )
+    // 76 caption characters (Dave (D)); the render sends them as IPA, 99.
+    expect(blends.reduce((n, l) => n + l.text.length, 0)).toBe(76)
+    expect(
+      blends.filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id)),
+    ).toEqual([])
   })
 })

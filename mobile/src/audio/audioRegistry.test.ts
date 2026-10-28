@@ -10,7 +10,10 @@ import {
   GUIDANCE_LINES_AWAITING_RENDER,
   critterWordLine,
 } from '@marian/core/emmasPath/guidanceLines'
-import { CRITTER_CLIP_WORDS } from '@marian/core/games/playPlace'
+import {
+  CRITTER_CLIP_WORDS,
+  CRITTER_DIGRAPH_BLENDS,
+} from '@marian/core/games/playPlace'
 import { HUB_LINES } from '@marian/core/hub/hubLines'
 import { WEB_AUDIO_MODULES } from './audioRegistry'
 import { BLEND_MARKS } from './blendMarks.generated'
@@ -122,8 +125,9 @@ describe('bundled blend clips (play-place spec § 3.4, N15)', () => {
   it('bundles every BLEND_MARKS clip as /native/blend/<word>.mp3, with its measured bytes and hash', () => {
     const texts = Object.keys(BLEND_MARKS)
     // 46, plus the graduation check's nap, rat, map and tap, plus the
-    // probe reserve's ham, cab, rag, ram and pad.
-    expect(texts).toHaveLength(55)
+    // probe reserve's ham, cab, rag, ram and pad, plus the digraph
+    // critters' ship, chip, thin and ring (Dave 2026-10-27).
+    expect(texts).toHaveLength(59)
     const wrong = texts.filter((text) => {
       const webPath = `${BLEND_PREFIX}${word(text)}.mp3`
       if (!registryPaths.includes(webPath)) return true
@@ -147,8 +151,8 @@ describe('bundled blend clips (play-place spec § 3.4, N15)', () => {
 })
 
 describe('bundled critter word clips (Thomas 2026-10-22)', () => {
-  it('bundles a whole-word clip for each of the 269 clip words (the 163 said, the nine said later, the 82 four-letter targets, the 15 for the pictured boards), byte-identical to the web original', () => {
-    expect(CRITTER_CLIP_WORDS).toHaveLength(269)
+  it('bundles a whole-word clip for each of the 282 clip words (the 163 said, the nine said later, the 82 four-letter targets, the 15 for the pictured boards, the 13 digraph words), byte-identical to the web original', () => {
+    expect(CRITTER_CLIP_WORDS).toHaveLength(282)
     const wrong = CRITTER_CLIP_WORDS.filter((w) => {
       const src = critterWordLine(w)?.src
       if (src === undefined || !registryPaths.includes(src)) return true
@@ -241,7 +245,13 @@ describe('bundled canon clips (no-Claude plan phase 1, design/native/no-claude-s
     const files = readdirSync(canonDir).map((f) => join(canonDir, f))
     expect(files.filter((f) => !targets.has(f))).toEqual([])
     const blendDir = join(mobileRoot, 'assets', 'audio', 'blend')
-    for (const text of Object.keys(BLEND_MARKS)) {
+    // The digraph critters' sound sources are no canon line (Dave
+    // 2026-10-27): only their blend clip bundles them.
+    const texts = Object.keys(BLEND_MARKS)
+    expect(texts.filter((t) => !canon.has(t)).sort()).toEqual(
+      Object.values(CRITTER_DIGRAPH_BLENDS).sort(),
+    )
+    for (const text of texts.filter((t) => canon.has(t))) {
       expect(entries.get(text)?.file).toBe(
         join(blendDir, `${text.split('...').pop()!.trim()}.mp3`),
       )

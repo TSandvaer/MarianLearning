@@ -1,0 +1,43 @@
+# Letter critters' word hunt (critters-word-hunt.md § 4.5; § 16.6, B10):
+# the calling flow has built f-a-t, an extra of the `critters-hunt` seed's
+# round (fat gag tab). Emma says it (her ribbon), and at the fill's moment
+# the bonus chip appears with it; no slot fills. Then the shelf clears.
+#
+#   SHOT  the screenshots' prefix
+appId: host.exp.Exponent
+---
+- extendedWaitUntil:
+    visible:
+      id: critter-seat-2
+      text: Letter t, on the log
+    timeout: 5000
+- assertVisible:
+    id: critter-seat-0
+    text: Letter f, on the log
+- extendedWaitUntil:
+    visible:
+      id: play-game-ribbon
+    timeout: 10000
+- takeScreenshot: ${SHOT}-fat-said
+- extendedWaitUntil:
+    visible:
+      id: hunt-bonus
+      text: Bonus words, fat
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: critter-seat-0
+    timeout: 20000
+- assertVisible:
+    id: hunt-bonus
+    text: Bonus words, fat
+# No slot took it: bat and tag are still to find.
+- assertVisible:
+    id: hunt-slot-1
+    text: Word to find
+- assertVisible:
+    id: hunt-slot-3
+    text: Word to find
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ${SHOT}-chip-fat

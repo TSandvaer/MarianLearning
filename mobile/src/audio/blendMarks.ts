@@ -9,7 +9,8 @@
  * - The caption: each grapheme token appears at its mark, a separator
  *   (`-`, `...`) with the token after it.
  * - Tap sounds: a letter plays its segment from 30 ms before to 80 ms
- *   after (every segment is followed by ≥ 300 ms of silence); the picture
+ *   after (every segment is followed by ≥ 300 ms of silence, ≥ 250 ms on
+ *   the digraph critters' sound sources); the picture
  *   plays the whole word to the clip's end.
  *
  * At runtime a mark is used only on a clip with the same text and byte

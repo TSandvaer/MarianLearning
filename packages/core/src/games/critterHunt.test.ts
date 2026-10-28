@@ -265,22 +265,25 @@ describe('B1 (amends H2): huntDeal', () => {
   })
 })
 
-/** Dave 27 (A), "Three-letter targets that are ever dealt". */
+/**
+ * Dave 27 (A), "Three-letter targets that are ever dealt", with fog and dig
+ * pictured (Dave 27 (E); #719): o adds fog, and i adds dig and lid (computed).
+ */
 const DAVES_THREE_DEALT: Record<string, string> = {
   a: 'ant bag bat cab can cap cat dad fan ham hat jam man map mat nap pad pan sad tag tap van',
-  o: 'box cot dog dot fox hot log mom mop pop pot rod top',
+  o: 'box cot dog dot fog fox hot log mom mop pop pot rod top',
   u: 'bug bun bus cup gum jug mud mug mum nut rug run sun tub tug',
-  i: 'bib fig pig sip six wig',
+  i: 'bib dig fig lid pig sip six wig',
   e: 'bed egg elf hen jet leg net peg pen red ten web',
 }
 
-describe('B2: the three-letter counts (Dave 27 (A); fog and dig not bundled yet)', () => {
-  it('the rounds per vowel: a 182, o 76, u 127, i 6, e 82, with Dave’s N splits', () => {
+describe('B2: the three-letter counts (Dave 27 (A), with fog and dig by (E))', () => {
+  it('the rounds per vowel: a 182, o 92, u 127, i 8, e 82, with Dave’s N splits', () => {
     expect(
       Object.fromEntries(
         [...'aouie'].map((v) => [v, huntRounds(v).length] as const),
       ),
-    ).toEqual({ a: 182, o: 76, u: 127, i: 6, e: 82 })
+    ).toEqual({ a: 182, o: 92, u: 127, i: 8, e: 82 })
     expect(splitsOf(huntRounds('a'))).toEqual({
       4: 96,
       5: 49,
@@ -288,7 +291,7 @@ describe('B2: the three-letter counts (Dave 27 (A); fog and dig not bundled yet)
       7: 9,
       8: 1,
     })
-    expect(splitsOf(huntRounds('o'))).toEqual({ 4: 47, 5: 8, 6: 20, 7: 1 })
+    expect(splitsOf(huntRounds('o'))).toEqual({ 4: 58, 5: 12, 6: 21, 7: 1 })
     expect(splitsOf(huntRounds('u'))).toEqual({
       4: 53,
       5: 60,
@@ -296,25 +299,18 @@ describe('B2: the three-letter counts (Dave 27 (A); fog and dig not bundled yet)
       7: 2,
       8: 1,
     })
-    expect(splitsOf(huntRounds('i'))).toEqual({ 4: 6 })
+    expect(splitsOf(huntRounds('i'))).toEqual({ 4: 8 })
     expect(splitsOf(huntRounds('e'))).toEqual({ 4: 70, 5: 10, 6: 2 })
   })
 
-  it('the targets ever dealt are Dave’s, per vowel; 442 of the 473 rounds have an extra', () => {
+  it('the targets ever dealt are Dave’s, per vowel; 460 of the 491 rounds have an extra', () => {
     for (const v of 'aouie') {
       const dealt = new Set(huntRounds(v).flatMap((r) => r.targets))
       expect([...dealt].sort()).toEqual(DAVES_THREE_DEALT[v]!.split(' '))
     }
     const all = [...'aouie'].flatMap((v) => huntRounds(v))
-    expect(all).toHaveLength(473)
-    expect(all.filter((r) => r.extras.length > 0)).toHaveLength(442)
-  })
-
-  it('fog and dig are said words with no picture yet: they ship with the digraph content (Dave 27 (E))', () => {
-    for (const w of ['fog', 'dig']) {
-      expect(CRITTER_SAID_WORDS).toContain(w)
-      expect(critterHasPicture(w)).toBe(false)
-    }
+    expect(all).toHaveLength(491)
+    expect(all.filter((r) => r.extras.length > 0)).toHaveLength(460)
   })
 })
 

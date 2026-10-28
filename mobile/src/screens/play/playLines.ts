@@ -17,6 +17,7 @@ import {
   CRITTER_PRAISE_WORDS,
   critterPraise,
   type PlayGameId,
+  type RaftTarget,
   type RaftWeight,
 } from '@marian/core/games/playPlace'
 import { canonClipFor } from '../../audio/bundledAudio'
@@ -26,13 +27,19 @@ import {
   type ManifestLinePlayer,
 } from '../../audio/manifestLines'
 
+/** The 20 raft's totals past nine (raft-island-goal § 12.1). */
+type RaftTeen = 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19
+
 export type PlayLineId =
   | 'guide.play.open'
   | 'guide.play.raft.open'
-  | `guide.play.raft.total.${RaftWeight}`
+  | 'guide.play.raft.open.20'
+  | `guide.play.raft.total.${RaftWeight | RaftTeen}`
   | 'guide.play.raft.go'
+  | 'guide.play.raft.go.20'
   | 'guide.play.raft.splash'
   | 'guide.play.raft.silly'
+  | 'guide.play.raft.party'
   | 'guide.play.raft.close'
   | 'guide.play.critters.open'
   | 'guide.play.critters.open.four'
@@ -43,7 +50,10 @@ export type PlayLineId =
   | `guide.play.critters.praise.${string}`
   | 'guide.play.critters.done'
 
-/** "You did it!", Word Song's session-end opener (no new audio). */
+/**
+ * "You did it!", Word Song's session-end opener (no new audio): the word
+ * hunt's completion and the raft island's party (raft-island-goal § 3.1).
+ */
 export const CRITTERS_DONE_TEXT = 'You did it!'
 
 const praiseId = (word: string) =>
@@ -73,6 +83,15 @@ export const PLAY_LINE_MANIFEST: Readonly<Record<PlayLineId, ManifestLine>> =
         clip: canonClipFor(CRITTERS_DONE_TEXT)?.module,
       },
     ],
+    // The raft island's party (raft-island-goal § 3.1): the same clip.
+    [
+      'guide.play.raft.party',
+      {
+        src: null,
+        text: CRITTERS_DONE_TEXT,
+        clip: canonClipFor(CRITTERS_DONE_TEXT)?.module,
+      },
+    ],
   ]) as Record<PlayLineId, ManifestLine>
 
 export type PlayLinePlayer = ManifestLinePlayer<PlayLineId>
@@ -81,9 +100,17 @@ export function createPlayLinePlayer(): PlayLinePlayer {
   return createManifestLinePlayer<PlayLineId>('play', PLAY_LINE_MANIFEST)
 }
 
-/** The raft's running total, "<N>!" (t 1-9). */
+/** The raft's running total, "<N>!" (t 1-9; on the 20 raft 1-19). */
 export const raftTotalLine = (t: number) =>
   `guide.play.raft.total.${t}` as PlayLineId
+
+/** The raft's open line (§ 4.1; the 20 raft's, raft-island-goal § 4.5). */
+export const raftOpenLine = (target: RaftTarget): PlayLineId =>
+  target === 10 ? 'guide.play.raft.open' : 'guide.play.raft.open.20'
+
+/** Exactly the target: "Ten! Off we go!", "Twenty! Off we go!". */
+export const raftGoLine = (target: RaftTarget): PlayLineId =>
+  target === 10 ? 'guide.play.raft.go' : 'guide.play.raft.go.20'
 
 /** The three non-word lines, in turn, every time (§ 3.3, Thomas 2026-10-22). */
 export const crittersFunnyLine = (n: 1 | 2 | 3) =>
@@ -109,6 +136,10 @@ export const PLAY_LABELS = {
   home: 'Home',
   back: 'Back',
   raft: 'Raft',
+  // The raft island (raft-island-goal § 10): rows a language version swaps.
+  raftFor: 'Raft for',
+  homeFilled: 'home',
+  homeEmpty: 'empty home',
   log: 'Log',
   // The word hunt (critters-word-hunt.md § 6.3, § 15.9). One label for
   // every empty slot, whatever its word: a label that held the word would
@@ -133,7 +164,7 @@ export const PLAY_TILE_LABELS: Readonly<Record<PlayGameId, string>> = {
   critters: 'Letter critters',
 }
 
-/** The number words the labels use ("Dog, seven"; "Raft, seven"). */
+/** The number words the labels use ("Dog, seven"; "Raft for twenty, seven"). */
 const NUMBER_WORDS = [
   'zero',
   'one',
@@ -146,6 +177,16 @@ const NUMBER_WORDS = [
   'eight',
   'nine',
   'ten',
+  'eleven',
+  'twelve',
+  'thirteen',
+  'fourteen',
+  'fifteen',
+  'sixteen',
+  'seventeen',
+  'eighteen',
+  'nineteen',
+  'twenty',
 ] as const
 
 const capitalised = (word: string) => word[0]!.toUpperCase() + word.slice(1)
@@ -154,9 +195,25 @@ const capitalised = (word: string) => word[0]!.toUpperCase() + word.slice(1)
 export const animalLabel = (animal: string, weight: number) =>
   `${capitalised(animal)}, ${NUMBER_WORDS[weight]}`
 
-/** The raft: "Raft, <total>". */
-export const raftLabel = (total: number) =>
-  `${PLAY_LABELS.raft}, ${NUMBER_WORDS[total]}`
+/** A raft: "Raft for <target>" ("Raft for twenty"): a pond in the picker. */
+export const raftForLabel = (target: RaftTarget) =>
+  `${PLAY_LABELS.raftFor} ${NUMBER_WORDS[target]}`
+
+/**
+ * The raft in a trip (raft-island-goal § 10): "Raft for <target>,
+ * <total>" ("Raft for twenty, seven"); at 0 "Raft for twenty".
+ */
+export const raftLabel = (target: RaftTarget, total: number) =>
+  total === 0
+    ? raftForLabel(target)
+    : `${raftForLabel(target)}, ${NUMBER_WORDS[total]}`
+
+/**
+ * An island home (§ 10): "<Animal>, <number>, home" ("Pig, nine, home"),
+ * or "<Animal>, <number>, empty home".
+ */
+export const homeLabel = (animal: string, weight: number, filled: boolean) =>
+  `${animalLabel(animal, weight)}, ${filled ? PLAY_LABELS.homeFilled : PLAY_LABELS.homeEmpty}`
 
 /** A filled slot: the word, capitalised ("Fan"). */
 export const slotLabel = (word: string) => capitalised(word)

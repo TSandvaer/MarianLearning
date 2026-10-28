@@ -14,7 +14,10 @@
  * - `assets/audio/sfx/*.mp3`     `public/assets/sfx-*.mp3`
  * - `assets/audio/blend/<word>.mp3` every Word Song blend clip
  *                                (`word.p*.blend` in `public/canon/word-song/**`),
- *                                decoded from the canon; registered as
+ *                                decoded from the canon, and the digraph
+ *                                critters' 4 sound-source blends
+ *                                (`guide-play-critters-blend-<word>.mp3`,
+ *                                copied); registered as
  *                                `/native/blend/<word>.mp3` (play-place spec
  *                                § 3.4: the letter critters play them with no
  *                                network call)
@@ -132,6 +135,19 @@ const blendPaths = new Map()
       clips.set(word, { text: u.text, mp3 })
     }
   }
+  // The digraph critters' sound sources (Dave 2026-10-27, digraph critters
+  // (A)): blend clips no lesson has, so each renders as a guidance line
+  // (`guide-play-critters-blend-<word>.mp3`), bundled here as a blend clip
+  // like the canon's. No canon line has their text (not in `blendPaths`).
+  const pathDir = join(webAssets, 'audio', 'path')
+  for (const file of readdirSync(pathDir).sort()) {
+    const word = file.match(/^guide-play-critters-blend-([a-z]+)\.mp3$/)?.[1]
+    if (word === undefined) continue
+    if (clips.has(word)) {
+      throw new Error(`blend word "${word}" has two different clips`)
+    }
+    clips.set(word, { text: null, mp3: readFileSync(join(pathDir, file)) })
+  }
   const dest = join(out, 'blend')
   rmSync(dest, { recursive: true, force: true })
   mkdirSync(dest, { recursive: true })
@@ -139,7 +155,9 @@ const blendPaths = new Map()
     const file = `${word}.mp3`
     writeFileSync(join(dest, file), clips.get(word).mp3)
     entries.push([`/native/blend/${file}`, `../../assets/audio/blend/${file}`])
-    blendPaths.set(clips.get(word).text, `../../assets/audio/blend/${file}`)
+    if (clips.get(word).text !== null) {
+      blendPaths.set(clips.get(word).text, `../../assets/audio/blend/${file}`)
+    }
   }
   console.log(`blend: ${clips.size} files`)
 }

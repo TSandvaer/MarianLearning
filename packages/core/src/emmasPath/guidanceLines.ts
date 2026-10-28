@@ -18,7 +18,7 @@
  * already uses, both loadable by the node-typed render scripts).
  */
 import type { MapStop } from '../map/mapModel'
-import { CRITTER_CLIP_WORDS } from '../games/playPlace'
+import { CRITTER_CLIP_WORDS, CRITTER_DIGRAPH_BLENDS } from '../games/playPlace'
 import type { Land } from '../progress/lands'
 import type { SkillNode } from '../progress/types'
 import {
@@ -69,6 +69,7 @@ export type GuidanceLineKind =
   | 'map-peek-ask-locked'
   | 'map-peek-ask'
   | 'play-word'
+  | 'play-blend'
 
 export interface GuidanceLine {
   /** Dotted id, e.g. `guide.hub.suggest.math`. */
@@ -319,7 +320,7 @@ function buildLines(): GuidanceLine[] {
   add(RAFT_CLOSE_ID, 'play', 'What a party on the island!')
   // The 20 raft (raft-island-goal § 12.1, Dave (6)): its open line, its
   // totals 10-19 (one word each, so Lily gets "Ten,") and its departure.
-  // Its 1-9 are the 10 raft's. Not rendered yet (GUIDANCE_LINES_AWAITING_RENDER).
+  // Its 1-9 are the 10 raft's.
   add(RAFT_OPEN_20_ID, 'play', 'The raft can carry twenty!')
   TEEN_WORDS.forEach((n, i) =>
     add(
@@ -375,6 +376,12 @@ function buildLines(): GuidanceLine[] {
       null,
       CRITTER_WORD_INPUTS[word] ?? `${capitalize(word)},`,
     )
+  // The digraph critters' sound sources (Dave 2026-10-27, digraph critters
+  // (A)): blend clips no one hears whole. A critter sings the digraph's
+  // window, cut by the clip's marks. The caption is the blend text; the
+  // render sends it as IPA (`renderElevenLabsBlend`).
+  for (const text of Object.values(CRITTER_DIGRAPH_BLENDS))
+    add(critterBlendId(text.split('...').pop()!.trim()), 'play-blend', text)
   return lines
 }
 
@@ -467,6 +474,7 @@ const crittersFunnyId = (n: 1 | 2 | 3) => `guide.play.critters.funny.${n}`
 const PEEK_ASK_LOCKED_ID = 'guide.map.peek-ask.locked'
 const PEEK_ASK_ID = 'guide.map.peek-ask'
 const critterWordId = (word: string) => `guide.play.critters.word.${word}`
+const critterBlendId = (word: string) => `guide.play.critters.blend.${word}`
 /**
  * Critter words whose "Word," input Lily reads as a day: "Sat," came back
  * as "Saturday" and "Wed," as "Wednesday" (ear test #661, 2026-10-22). A
@@ -487,14 +495,9 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: the 20 raft's 12 lines (raft-island-goal § 12.1), whose Lily render
- * waits for Thomas's yes; nothing plays them until the native island build.
+ * Now: none.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
-  'guide.play.raft.open.20',
-  ...TEEN_WORDS.map((_, i) => `guide.play.raft.total.${i + 10}`),
-  'guide.play.raft.go.20',
-]
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 
