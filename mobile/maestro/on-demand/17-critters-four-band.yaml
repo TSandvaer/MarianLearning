@@ -1,0 +1,84 @@
+# Letter critters' four-letter rounds, F29 (`design/native/critters-four-letter.md`
+# § 15.5), on an iPad in portrait: the `critters-hunt-four` seed (a b c d
+# n s t, ants and bats found; band the extra). The picker → "4" → b-a-n-d:
+# "Band.", the joy beat, nothing fills, no chip (§ 15.3) → then F29's
+# rest as 15-critters-four-round.yaml: c, a, t seated, nothing for 5 s; a
+# log tap, nothing else; c-a-t-s fills cats' slot (2) and the beat plays
+# (3 of 4); sand stays findable; New letters: a fresh four-letter board.
+# The shared steps are `../subflows/critters-four-{round-open,band,partial,
+# round-end}.yaml`; the phone is 17-critters-four-band-phone-landscape.yaml.
+#
+# The points are 15-critters-four-round.yaml's (iPad Pro 11-inch (M5),
+# portrait, 834 x 1210): the meadow is 4 + 3, rows at y 983 (x 261, 365,
+# 469, 573) and 1087 (x 313, 417, 521); the seats at y 853, x 228, 354,
+# 480 and 606.
+#
+#   a b c d  /  n s t
+#
+# Screenshots go to Maestro's output (run.sh `--debug-output`, under
+# MAESTRO_OUT/17-critters-four-band/).
+appId: host.exp.Exponent
+name: Critters four-letter band (iPad portrait)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: critters-hunt-four
+# A flow that failed in landscape leaves the simulator there.
+- setOrientation: PORTRAIT
+- runFlow:
+    file: ../subflows/critters-four-round-open.yaml
+    env:
+      SHOT: four-band-tablet-portrait
+# b-a-n-d onto seats 0-3: the extra.
+- swipe:
+    start: 365, 983
+    end: 228, 853
+    duration: 800
+- swipe:
+    start: 261, 983
+    end: 354, 853
+    duration: 800
+- swipe:
+    start: 313, 1087
+    end: 480, 853
+    duration: 800
+- swipe:
+    start: 573, 983
+    end: 606, 853
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-four-band.yaml
+    env:
+      SHOT: four-band-tablet-portrait
+# c, a, t onto seats 0-2.
+- swipe:
+    start: 469, 983
+    end: 228, 853
+    duration: 800
+- swipe:
+    start: 261, 983
+    end: 354, 853
+    duration: 800
+- swipe:
+    start: 521, 1087
+    end: 480, 853
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-four-partial.yaml
+    env:
+      SHOT: four-band-tablet-portrait
+# c-a-t-s: s onto seat 3.
+- swipe:
+    start: 417, 1087
+    end: 606, 853
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-four-round-end.yaml
+    env:
+      SHOT: four-band-tablet-portrait

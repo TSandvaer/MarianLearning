@@ -1,0 +1,27 @@
+# Letter critters' word hunt (critters-word-hunt.md § 15.5; § 16.6, B10):
+# a tap on tag's empty slot (3) plays "tag", sound only: no caption, no
+# picture, no fill. The runs are muted and the tap-clip player writes no
+# Metro row, so the clip itself is B9/H15's (jest); here, nothing else
+# happens and the slot stays empty.
+appId: host.exp.Exponent
+---
+- tapOn:
+    id: hunt-slot-3
+    waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    visible:
+      id: play-game-ribbon
+    timeout: 3000
+    optional: true
+- assertNotVisible:
+    id: play-game-ribbon
+- assertNotVisible:
+    id: critter-picture
+- assertNotVisible:
+    id: hunt-bonus
+- assertVisible:
+    id: hunt-slot-3
+    text: Word to find
+- assertVisible:
+    id: hunt-slot-0
+    text: Bag

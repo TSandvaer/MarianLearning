@@ -1,5 +1,6 @@
 # Letter critters' word hunt, part 3 of 3: after b-a-t, the last slot
-# (1) fills with no second beat; New letters deals a fresh board; Back.
+# (1) fills with no second beat; New letters deals a fresh board; Back →
+# the picker; Back → the Play place.
 #
 #   SHOT  the screenshots' prefix
 appId: host.exp.Exponent
@@ -38,6 +39,14 @@ appId: host.exp.Exponent
 - waitForAnimationToEnd:
     timeout: 1500
 - takeScreenshot: ${SHOT}-new-letters
+# t-a-g opened "4" (the seed has only "3" open), so Back goes to the
+# picker first (critters-four-letter.md § 5.1); Back stays on screen over
+# it: the -stays variant. Then Back → the Play place.
+- runFlow:
+    file: tap-and-confirm-stays.yaml
+    env:
+      TARGET: play-game-back
+      NEXT: hunt-picker
 - runFlow:
     file: tap-and-confirm.yaml
     env:

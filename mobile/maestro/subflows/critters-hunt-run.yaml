@@ -1,0 +1,34 @@
+# Letter critters' word hunt: one run of three that fills no slot (an
+# extra, a never-say word or a non-word) has been dragged onto the log by
+# the calling flow. Every run of three ends with the shelf cleared
+# (`LetterCritters.tsx`), so the next run can start.
+#
+# The seat checks are optional: on this Mac a swipe command takes about
+# 8 s under load (Maestro's settle after the 800 ms gesture), and a
+# never-say run (sounds only, then the shelf) can clear before the check
+# runs (h-a-g, 2026-10-28). A lost drag still fails the calling flow: the
+# hint's glow comes only after the fifth run (critters-hunt-hint.yaml).
+#
+#   L0, L1, L2  the seated letters, left to right
+appId: host.exp.Exponent
+---
+- extendedWaitUntil:
+    visible:
+      id: critter-seat-2
+      text: Letter ${L2}, on the log
+    timeout: 3000
+    optional: true
+- assertVisible:
+    id: critter-seat-0
+    text: Letter ${L0}, on the log
+    optional: true
+- assertVisible:
+    id: critter-seat-1
+    text: Letter ${L1}, on the log
+    optional: true
+- extendedWaitUntil:
+    notVisible:
+      id: critter-seat-0
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 1500

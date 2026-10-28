@@ -1,0 +1,66 @@
+# Letter critters' word hunt (§ 16.6, B11), after the hint: the calling
+# flow has built b-a-t, the glowing slot's word. The glow goes as its fill
+# starts, bat's tiles fill its own slot (1), and that is 3 of 4 (bag, bat,
+# hat), so the beat plays (the lap, "You did it!"); tag's slot (3) stays
+# empty, findable. The seed has only "3" open, so the roll-in follows the
+# beat (critters-four-letter.md § 6) and New letters comes with the door.
+# Back → the picker; Back → the Play place.
+#
+#   SHOT  the screenshots' prefix
+appId: host.exp.Exponent
+---
+- extendedWaitUntil:
+    visible:
+      id: critter-seat-2
+      text: Letter t, on the log
+    timeout: 5000
+- assertVisible:
+    id: critter-seat-0
+    text: Letter b, on the log
+- extendedWaitUntil:
+    visible:
+      id: hunt-slot-1
+      text: Bat
+    timeout: 20000
+- assertNotVisible:
+    id: hunt-slot-1-glow
+- extendedWaitUntil:
+    visible:
+      id: hunt-slot-[0-2]-lap
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: play-game-ribbon
+    timeout: 20000
+- takeScreenshot: ${SHOT}-bat-beat
+- extendedWaitUntil:
+    visible:
+      id: hunt-new-letters
+    timeout: 30000
+- assertVisible:
+    id: hunt-slot-3
+    text: Word to find
+- assertVisible:
+    id: hunt-slot-0
+    text: Bag
+- assertVisible:
+    id: hunt-slot-2
+    text: Hat
+- assertNotVisible:
+    id: hunt-slot-[0-3]-glow
+- assertVisible:
+    id: hunt-bonus
+    text: Bonus words, fat, tab
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ${SHOT}-board-after-bat
+- runFlow:
+    file: tap-and-confirm-stays.yaml
+    env:
+      TARGET: play-game-back
+      NEXT: hunt-picker
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: play-game-back
+      NEXT: play-place

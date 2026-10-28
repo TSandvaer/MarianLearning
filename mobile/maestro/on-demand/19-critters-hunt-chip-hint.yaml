@@ -1,0 +1,173 @@
+# Letter critters' word hunt, the chip and the hint on the pictured-only
+# board (`design/native/critters-word-hunt.md` § 16.6, B10 and B11), on an
+# iPad in landscape: the `critters-hunt` seed (a b f g h t, bag and hat
+# found; N 4: bag bat hat tag, extras fat gag tab). A tap on tag's empty
+# slot plays its word, nothing else (B10). f-a-t: Emma says it and the
+# chip appears (B10). Four more runs with no new target (t-a-b, h-a-g a
+# never-say word, f-a-t again, h-a-b a non-word): bat's slot glows,
+# silently; a tap plays its hint with Emma pointing; b-a-t ends the glow,
+# fills its slot and the beat plays (3 of 4); tag stays findable (B11).
+# The shared steps are `../subflows/critters-hunt-{open,slot-tap,extra,
+# run,hint,hint-end}.yaml`; the phone is 19-critters-hunt-chip-hint-phone.yaml.
+#
+# The points are 12-critters-word-hunt.yaml's (the same round on the
+# iPad Pro 11-inch (M5) simulator in landscape): the meadow's rows at y
+# 542 and 646, cells at x 373, 477 and 581; the seats at y 411, x 351,
+# 477 and 603.
+#
+#   a b f  /  g h t
+#
+# Screenshots go to Maestro's output (run.sh `--debug-output`, under
+# MAESTRO_OUT/19-critters-hunt-chip-hint/).
+appId: host.exp.Exponent
+name: Critters word hunt chip and hint (iPad landscape)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: critters-hunt
+- setOrientation: LANDSCAPE_LEFT
+- runFlow:
+    file: ../subflows/critters-hunt-open.yaml
+    env:
+      SHOT: chip-hint-tablet-landscape
+- runFlow: ../subflows/critters-hunt-slot-tap.yaml
+# Run 1, f-a-t: an extra, the chip appears.
+- swipe:
+    start: 581, 542
+    end: 351, 411
+    duration: 800
+- swipe:
+    start: 373, 542
+    end: 477, 411
+    duration: 800
+- swipe:
+    start: 581, 646
+    end: 603, 411
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-hunt-extra.yaml
+    env:
+      SHOT: chip-hint-tablet-landscape
+# Run 2, t-a-b: an extra, the chip's second.
+- swipe:
+    start: 581, 646
+    end: 351, 411
+    duration: 800
+- swipe:
+    start: 373, 542
+    end: 477, 411
+    duration: 800
+- swipe:
+    start: 477, 542
+    end: 603, 411
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-hunt-run.yaml
+    env:
+      L0: t
+      L1: a
+      L2: b
+- assertVisible:
+    id: hunt-bonus
+    text: Bonus words, fat, tab
+- assertNotVisible:
+    id: hunt-slot-1-glow
+# Run 3, h-a-g: a never-say word, it sings and sits.
+- swipe:
+    start: 477, 646
+    end: 351, 411
+    duration: 800
+- swipe:
+    start: 373, 542
+    end: 477, 411
+    duration: 800
+- swipe:
+    start: 373, 646
+    end: 603, 411
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-hunt-run.yaml
+    env:
+      L0: h
+      L1: a
+      L2: g
+- assertVisible:
+    id: hunt-bonus
+    text: Bonus words, fat, tab
+- assertNotVisible:
+    id: hunt-slot-1-glow
+# Run 4, f-a-t again: a repeat extra, the chip unchanged.
+- swipe:
+    start: 581, 542
+    end: 351, 411
+    duration: 800
+- swipe:
+    start: 373, 542
+    end: 477, 411
+    duration: 800
+- swipe:
+    start: 581, 646
+    end: 603, 411
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-hunt-run.yaml
+    env:
+      L0: f
+      L1: a
+      L2: t
+- assertVisible:
+    id: hunt-bonus
+    text: Bonus words, fat, tab
+- assertNotVisible:
+    id: hunt-slot-1-glow
+# Run 5, h-a-b: a non-word (boing, tumble, a line). The fifth run with no
+# new target: the glow.
+- swipe:
+    start: 477, 646
+    end: 351, 411
+    duration: 800
+- swipe:
+    start: 373, 542
+    end: 477, 411
+    duration: 800
+- swipe:
+    start: 477, 542
+    end: 603, 411
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-hunt-run.yaml
+    env:
+      L0: h
+      L1: a
+      L2: b
+- runFlow:
+    file: ../subflows/critters-hunt-hint.yaml
+    env:
+      SHOT: chip-hint-tablet-landscape
+# b-a-t, the glowing slot's word: 3 of 4.
+- swipe:
+    start: 477, 542
+    end: 351, 411
+    duration: 800
+- swipe:
+    start: 373, 542
+    end: 477, 411
+    duration: 800
+- swipe:
+    start: 581, 646
+    end: 603, 411
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-hunt-hint-end.yaml
+    env:
+      SHOT: chip-hint-tablet-landscape
+- setOrientation: PORTRAIT
