@@ -319,7 +319,7 @@ function buildLines(): GuidanceLine[] {
   add(RAFT_CLOSE_ID, 'play', 'What a party on the island!')
   // The 20 raft (raft-island-goal § 12.1, Dave (6)): its open line, its
   // totals 10-19 (one word each, so Lily gets "Ten,") and its departure.
-  // Its 1-9 are the 10 raft's. Not rendered yet (GUIDANCE_LINES_AWAITING_RENDER).
+  // Its 1-9 are the 10 raft's.
   add(RAFT_OPEN_20_ID, 'play', 'The raft can carry twenty!')
   TEEN_WORDS.forEach((n, i) =>
     add(
@@ -487,14 +487,9 @@ export const GUIDANCE_LINES: readonly GuidanceLine[] = buildLines()
  * bundled-MP3 tests expect exactly these to be missing. The render commit
  * sets this list to `[]` (the tests fail while a listed clip exists).
  *
- * Now: the 20 raft's 12 lines (raft-island-goal § 12.1), whose Lily render
- * waits for Thomas's yes; nothing plays them until the native island build.
+ * Now: none.
  */
-export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = [
-  'guide.play.raft.open.20',
-  ...TEEN_WORDS.map((_, i) => `guide.play.raft.total.${i + 10}`),
-  'guide.play.raft.go.20',
-]
+export const GUIDANCE_LINES_AWAITING_RENDER: readonly string[] = []
 
 const BY_ID = new Map(GUIDANCE_LINES.map((l) => [l.id, l]))
 
