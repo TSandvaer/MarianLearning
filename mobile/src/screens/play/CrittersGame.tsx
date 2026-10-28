@@ -36,6 +36,10 @@ const PICKER_LABELS = {
   3: PLAY_LABELS.huntLog,
   4: PLAY_LABELS.huntLogFour,
 } as const
+const PICKER_TITLES = {
+  3: PLAY_LABELS.huntTitle,
+  4: PLAY_LABELS.huntTitleFour,
+} as const
 
 type CrittersView =
   | { kind: 'picker'; key: number }
@@ -124,6 +128,7 @@ export function CrittersGame({ kit, sounds, words, hunt }: CrittersGameProps) {
           tablet={kit.tablet}
           reducedMotion={kit.reducedMotion}
           labels={PICKER_LABELS}
+          titles={PICKER_TITLES}
           onPick={onPick}
         />
       ) : (

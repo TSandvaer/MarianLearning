@@ -73,7 +73,9 @@ import {
   SING_AFTER_MS,
   SOUND_GAP_MS,
 } from './LetterCritters'
+import { fonts } from '../../theme'
 import { backRect, doorRect, pickerScene, playArea } from './playGeometry'
+import { PLAY_LABELS } from './playLines'
 
 const FOUR = ['a', 'c', 'd', 'l', 'm', 'p', 's']
 const FOUR_BOARD = ['caps', 'clap', 'lamp', 'maps']
@@ -205,6 +207,18 @@ const tilesOf = (i: number) =>
     })
     .join('')
 const flat = (el: ReturnType<typeof byId>) => StyleSheet.flatten(el.props.style)
+/**
+ * § 5.4: no translate or opacity on a picker title, or on any view between
+ * it and its row, so the wave, the press and the dim never reach it.
+ */
+const titleStill = (n: 3 | 4) => {
+  const row = byId(`hunt-pick-${n}`)
+  for (let el = byId(`hunt-pick-${n}-title`); el !== row; el = el.parent!) {
+    const st = flat(el) ?? {}
+    if (st.transform !== undefined || st.opacity !== undefined) return false
+  }
+  return true
+}
 
 async function seat(...letters: string[]) {
   for (const l of letters) await activate(byId(`critter-${l}`))
@@ -716,7 +730,7 @@ describe('F16: the length picker', () => {
     expect(g.lines).toEqual([])
   })
 
-  it('no slab: two logs, n sockets on log n, no text but the discs’ numerals', async () => {
+  it('no slab: two logs, n sockets on log n, no text but the discs’ numerals and the two titles', async () => {
     learner({ four: ['clap'] })
     await mount()
     for (const n of [3, 4]) {
@@ -731,7 +745,113 @@ describe('F16: the length picker', () => {
     const texts = within(byId('hunt-picker'))
       .queryAllByText(/./)
       .map((t) => t.props.children as string)
-    expect(texts).toEqual(['3', '4'])
+    expect(texts).toEqual(['Three letters', '3', 'Four letters', '4'])
+  })
+
+  describe('the titles (§ 5.4)', () => {
+    const TITLE = { 3: 'Three letters', 4: 'Four letters' } as const
+    const titleOf = (n: 3 | 4) => byId(`hunt-pick-${n}-title`)
+    const still = (n: 3 | 4) => titleStill(n)
+
+    it.each([
+      ['phone P', PHONE_P, 18],
+      [
+        "Thomas's iPad 1080 × 810",
+        { ...PHONE_P, width: 1080, height: 810 },
+        25.2,
+      ],
+    ] as const)(
+      '%s: "Three letters" and "Four letters" inside their rows at § 5.4’s box, Fredoka 700 #6b3f1f, 0.45 D, line 1.21 f, one line, unscaled',
+      async (_, viewport, f) => {
+        learner({ four: ['clap'] })
+        await mount({ viewport })
+        const l = mathLayout(viewport)
+        const p = pickerScene(playArea(l), l.tablet, l.landscape)
+        expect(p.titleSize).toBeCloseTo(f, 9)
+        expect(PLAY_LABELS.huntTitle).toBe(TITLE[3])
+        expect(PLAY_LABELS.huntTitleFour).toBe(TITLE[4])
+        for (const { length, hit, title } of p.logs) {
+          const el = titleOf(length)
+          expect(el.props.children).toBe(TITLE[length])
+          expect(
+            within(byId(`hunt-pick-${length}`)).getByTestId(
+              `hunt-pick-${length}-title`,
+            ),
+          ).toBe(el)
+          expect(
+            within(byId(`hunt-pick-${length}-log`)).queryByTestId(
+              `hunt-pick-${length}-title`,
+            ),
+          ).toBeNull()
+          expect(flat(el)).toMatchObject({
+            position: 'absolute',
+            left: title.x - hit.x,
+            top: title.y - hit.y,
+            height: 1.21 * f,
+            fontFamily: fonts.bold,
+            color: '#6b3f1f',
+            fontSize: f,
+            lineHeight: 1.21 * f,
+          })
+          expect(el.props.numberOfLines).toBe(1)
+          expect(el.props.allowFontScaling).toBe(false)
+          expect(el.props.pointerEvents).toBe('none')
+          expect(el.props.accessible).toBe(false)
+        }
+      },
+    )
+
+    it('a press on a title opens that log’s round: the plink, then the round', async () => {
+      learner({ four: ['clap'] })
+      const g = await mount()
+      await fireEvent.press(titleOf(4))
+      expect(g.sfx.plink.play).toHaveBeenCalledTimes(1)
+      await advance(PICK_AFTER_MS + CRITTERS_OPEN_DELAY_MS + LINE_MS)
+      expect(meadow()).toEqual(FOUR)
+      expect(g.lines).toEqual(['guide.play.critters.open.four'])
+      await fireEvent.press(byId('play-game-back'))
+      await fireEvent.press(titleOf(3))
+      await advance(PICK_AFTER_MS + CRITTERS_OPEN_DELAY_MS + LINE_MS)
+      expect(within(byId('critter-log-numeral')).getByText('3')).toBeTruthy()
+    })
+
+    it('they never move: no translate or opacity on them through the wave and a press', async () => {
+      learner({ four: [] })
+      await mount()
+      const before = [3, 4].map((n) => flat(titleOf(n as 3 | 4)))
+      for (let t = 0; t < 1200; t += 40) {
+        await advance(40)
+        expect(still(3) && still(4)).toBe(true)
+      }
+      await fireEvent(byId('hunt-pick-meadow'), 'pressIn')
+      await advance(200)
+      expect(still(3) && still(4)).toBe(true)
+      await fireEvent(byId('hunt-pick-4'), 'pressIn')
+      await advance(120)
+      expect(still(3) && still(4)).toBe(true)
+      expect([3, 4].map((n) => flat(titleOf(n as 3 | 4)))).toEqual(before)
+    })
+
+    it('static: the same words with a round in progress, after a round, and after the roll-in', async () => {
+      const words = () =>
+        ([3, 4] as const).map((n) => titleOf(n).props.children as string)
+      learner({ four: ['clap'] })
+      const g = await mount()
+      expect(words()).toEqual([TITLE[3], TITLE[4]])
+      await pick(4)
+      await fireEvent.press(byId('play-game-back'))
+      expect(words()).toEqual([TITLE[3], TITLE[4]])
+      await g.unmount()
+      await toBeat()
+      await until(() => has('hunt-new-letters'))
+      await fireEvent.press(byId('play-game-back'))
+      expect(has('hunt-picker')).toBe(true)
+      expect(words()).toEqual([TITLE[3], TITLE[4]])
+      const texts = within(byId('hunt-picker'))
+        .queryAllByText(/./)
+        .map((t) => t.props.children as string)
+      expect(texts).toEqual(['Three letters', '3', 'Four letters', '4'])
+    })
   })
 
   it('a tap on the meadow opens nothing and plays nothing', async () => {
@@ -1031,6 +1151,21 @@ describe('F18: Reduce Motion', () => {
     ).toEqual([])
   })
 
+  it('the picker’s press dims the log and leaves its title’s opacity at 1', async () => {
+    learner({ four: [] })
+    await mount()
+    await fireEvent(byId('hunt-pick-4'), 'pressIn')
+    // The dim rides the log's motion view; the title is outside it.
+    expect(
+      within(byId('hunt-pick-4-log')).queryByTestId('hunt-pick-4-title'),
+    ).toBeNull()
+    for (let t = 0; t <= PICK_DIM_MS; t += 25) {
+      expect(titleStill(4)).toBe(true)
+      expect(flat(byId('hunt-pick-4')).opacity).toBeUndefined()
+      await advance(25)
+    }
+  })
+
   it('the picker: no wave on arrival or on a meadow press-in', async () => {
     learner({ four: [] })
     const timing = jest.spyOn(Reanimated, 'withTiming')
@@ -1089,7 +1224,7 @@ describe('F18: Reduce Motion', () => {
 })
 
 describe('F19: VoiceOver', () => {
-  it('the picker: two buttons, top then bottom; its logs, their shadows and the meadow are not elements', async () => {
+  it('the picker: two buttons, top then bottom, their labels unchanged; its logs, titles, shadows and the meadow are not elements', async () => {
     learner({ four: [] })
     await mount()
     const rows = byId('play-game').queryAll(
@@ -1105,7 +1240,18 @@ describe('F19: VoiceOver', () => {
     for (const l of [3, 4]) {
       expect(byId(`hunt-pick-${l}-log`).props.accessible).toBe(false)
       expect(byId(`hunt-pick-${l}-shadow`).props.accessible).toBe(false)
+      expect(byId(`hunt-pick-${l}-title`).props.accessible).toBe(false)
     }
+    // The labels are unchanged with the titles (§ 8.2), and each holds its
+    // log's visible title (Label in Name).
+    expect(PLAY_LABELS.huntLog).toBe('Log, three letters')
+    expect(PLAY_LABELS.huntLogFour).toBe('Log, four letters')
+    rows.forEach((n, i) => {
+      const title = byId(`hunt-pick-${i + 3}-title`).props.children as string
+      expect(String(n.props.accessibilityLabel).toLowerCase()).toContain(
+        title.toLowerCase(),
+      )
+    })
     const meadowEl = byId('hunt-pick-meadow')
     expect(meadowEl.props.accessible).toBe(false)
     expect(meadowEl.props.accessibilityLabel).toBeUndefined()

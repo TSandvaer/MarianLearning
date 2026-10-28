@@ -237,27 +237,36 @@ function BareLog({
  * sinks the log, its sockets and disc 6 × k over 120 ms (k 7/12 on phones,
  * 1 on tablets) while its shadow stays on the ground; Reduce Motion: a
  * 150 ms dim instead. The wave's hop lifts it `rise` and dims the shadow
- * to 0.75 at the top.
+ * to 0.75 at the top. Its title (§ 5.4) lies on the meadow above the disc,
+ * inside the row: a tap on the words is a tap on the log, and it never
+ * hops, sinks or dims.
  */
 function PickerLogButton({
-  entry: { length, hit, log, shadow },
+  entry: { length, hit, log, shadow, title },
+  titleSize,
+  titleLine,
   lift,
   rise,
   tablet,
   reducedMotion,
   label,
+  text,
   onDown,
   onPress,
 }: {
   entry: PickerLog
+  titleSize: number
+  titleLine: number
   lift: SharedValue<number>
   rise: number
   tablet: boolean
   reducedMotion: boolean
   label: string
+  text: string
   onDown: () => void
   onPress: () => void
 }) {
+  const box = relTo(hit, title)
   const [down, setDown] = useState(false)
   const sink = useSharedValue(0)
   const dim = useSharedValue(1)
@@ -307,6 +316,28 @@ function PickerLogButton({
           ground,
         ]}
       />
+      {/* As wide as its text, so a kerning difference can never truncate
+          it; § 5.4's box is its left, top and line. */}
+      <Text
+        testID={`hunt-pick-${length}-title`}
+        accessible={false}
+        pointerEvents="none"
+        allowFontScaling={false}
+        numberOfLines={1}
+        style={[
+          styles.abs,
+          styles.numeral,
+          {
+            left: box.x,
+            top: box.y,
+            height: box.height,
+            fontSize: titleSize,
+            lineHeight: titleLine,
+          },
+        ]}
+      >
+        {text}
+      </Text>
       <BareLog
         log={log}
         origin={hit}
@@ -321,8 +352,9 @@ function PickerLogButton({
 
 /**
  * The length picker (§ 5): two logs lying in the meadow, "3" on top and
- * "4" below, their discs lined up. No slab, critters, slots, text or
- * count, the same whatever the rounds hold (Decision 5). It never speaks.
+ * "4" below, their discs lined up, each titled in the words Emma says for
+ * that length (§ 5.4). No slab, critters, slots, other text or count, the
+ * same whatever the rounds hold (Decision 5). It never speaks.
  * The wave (§ 5.3) answers the tap that brought her here and a press on
  * the meadow that misses the logs; a press on a log cuts it, and Reduce
  * Motion has none.
@@ -332,12 +364,14 @@ export function LengthPicker({
   tablet,
   reducedMotion,
   labels,
+  titles,
   onPick,
 }: {
   scene: PickerScene
   tablet: boolean
   reducedMotion: boolean
   labels: Readonly<Record<3 | 4, string>>
+  titles: Readonly<Record<3 | 4, string>>
   onPick: (length: 3 | 4) => void
 }) {
   const lift3 = useSharedValue(0)
@@ -397,11 +431,14 @@ export function LengthPicker({
         <PickerLogButton
           key={entry.length}
           entry={entry}
+          titleSize={scene.titleSize}
+          titleLine={scene.titleLine}
           lift={lifts[entry.length]}
           rise={rise}
           tablet={tablet}
           reducedMotion={reducedMotion}
           label={labels[entry.length]}
+          text={titles[entry.length]}
           onDown={cut}
           onPress={() => onPick(entry.length)}
         />

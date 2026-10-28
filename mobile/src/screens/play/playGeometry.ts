@@ -1019,6 +1019,11 @@ export interface PickerLog {
   log: LogParts
   /** The ground shadow under the bar: paint, never touchable. */
   shadow: Rect
+  /**
+   * § 5.4: the title's text box, from the disc's left edge to 2 pt above
+   * the disc, one line of `PickerScene.titleLine`, as wide as its text.
+   */
+  title: Rect
 }
 
 export interface PickerScene {
@@ -1030,7 +1035,18 @@ export interface PickerScene {
   seat: number
   /** The rows' pitch r. */
   pitch: number
+  /** § 5.4: the titles' size f, 0.45 D (18 on phones, 25.2 on tablets). */
+  titleSize: number
+  /** Their line height, 1.21 f: Fredoka 700's ascent plus descent. */
+  titleLine: number
 }
+
+/**
+ * § 5.4: "Three letters" and "Four letters" in Fredoka 700, in em, as
+ * measured there (Chromium's canvas, kerned, with the app's font file).
+ * The advances alone sum to 6.068 and 5.534.
+ */
+const PICKER_TITLE_EM: Readonly<Record<3 | 4, number>> = { 3: 5.898, 4: 5.304 }
 
 /**
  * § 5.2: the two logs lie in the meadow, "3" over "4", thicker than a
@@ -1038,7 +1054,8 @@ export interface PickerScene {
  * is the round's seat where the "4" log's button fits `A`, else the
  * largest that does; the disc covers 4 pt of the first socket. Each log's
  * row is its button, the pair of rows centred in `A`, and both discs sit
- * at the "4" log's centred x.
+ * at the "4" log's centred x. Each title (§ 5.4) sits in its row, its box
+ * from the disc's left edge, ending 2 pt above the disc.
  */
 export function pickerScene(
   A: Rect,
@@ -1062,17 +1079,20 @@ export function pickerScene(
   const pitch = Math.min(2.2 * D, A.height / 2)
   const top = A.y + (A.height - 2 * pitch) / 2
   const x0 = A.x + (A.width - widthOf(4)) / 2
+  const titleSize = 0.45 * D
+  const titleLine = 1.21 * titleSize
   const logs = ([3, 4] as const).map((length, i) => {
     const y = top + i * pitch
     const mid = y + pitch / 2
     const bar = { x: x0, y: mid - H / 2, width: widthOf(length), height: H }
+    const discY = mid - D / 2
     return {
       length,
       hit: { x: x0 - 8, y, width: bar.width + 16, height: pitch },
       log: {
         band: bar,
         bar,
-        disc: { x: x0, y: mid - D / 2, width: D, height: D },
+        disc: { x: x0, y: discY, width: D, height: D },
         seats: Array.from({ length }, (_, k) => ({
           x: x0 + lead + k * (seat + g),
           y: bar.y,
@@ -1086,9 +1106,15 @@ export function pickerScene(
         width: bar.width - 12,
         height: s,
       },
+      title: {
+        x: x0,
+        y: discY - 2 - titleLine,
+        width: PICKER_TITLE_EM[length] * titleSize,
+        height: titleLine,
+      },
     }
   })
-  return { logs, meadow: A, seat, pitch }
+  return { logs, meadow: A, seat, pitch, titleSize, titleLine }
 }
 
 export interface ArrivalScene {
