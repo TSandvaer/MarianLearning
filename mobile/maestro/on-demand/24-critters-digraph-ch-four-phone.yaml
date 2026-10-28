@@ -1,0 +1,63 @@
+# D25 of `design/native/critters-digraph.md` § 11.3, on a phone in portrait:
+# the `critters-hunt-ch-four` seed (digraphs-ch current, "3" and "4" open;
+# Dave's ch-e fallback e ch c j n s t with jets and nest found, D23) → the
+# picker → "4" → the round in progress: the ch critter in cell 2, no h → ch,
+# e, s seated (still, 1-3 seated) → t: chest's four-box slot (0) fills with
+# [ch][e][s][t], the beat (3 of 4), tent stays findable, no chip → Back →
+# Back. The shared steps are
+# `../subflows/critters-digraph-ch-four-{open,partial,end}.yaml`.
+#
+# The points are for an iPhone 17 simulator in portrait (402 x 874, insets
+# t62 b34), from Maestro's hierarchy on this round (2026-10-28): the meadow
+# is 4 + 3, rows at y 667 (x 105, 169, 233, 297) and 731 (x 137, 201, 265);
+# the seats at y 580 (the log band's top + half a seat), x 84, 162, 240 and
+# 318 (the sockets' centres). The digraph round's layout is a plain round's
+# (D22).
+#
+#   e ch c j  /  n s t
+#
+# Screenshots go to Maestro's output (run.sh `--debug-output`, under
+# MAESTRO_OUT/24-critters-digraph-ch-four-phone/).
+appId: host.exp.Exponent
+name: Critters digraph ch, four seats (phone portrait)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: critters-hunt-ch-four
+# A flow that failed in landscape leaves the simulator there.
+- setOrientation: PORTRAIT
+- runFlow:
+    file: ../subflows/critters-digraph-ch-four-open.yaml
+    env:
+      SHOT: digraph-ch-four-phone
+# ch, e, s onto seats 0-2.
+- swipe:
+    start: 169, 667
+    end: 84, 580
+    duration: 800
+- swipe:
+    start: 105, 667
+    end: 162, 580
+    duration: 800
+- swipe:
+    start: 201, 731
+    end: 240, 580
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-digraph-ch-four-partial.yaml
+    env:
+      SHOT: digraph-ch-four-phone
+# ch-e-s-t: t onto seat 3.
+- swipe:
+    start: 265, 731
+    end: 318, 580
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-digraph-ch-four-end.yaml
+    env:
+      SHOT: digraph-ch-four-phone

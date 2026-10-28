@@ -1,0 +1,41 @@
+# Letter critters' digraph critters (`design/native/critters-digraph.md`
+# D24, D28), part 2 of 4: two taps on the sh critter. Each plays its sound
+# and hops it. The first, once per learner (Dave's Q38 ruling, D28): 300
+# ms after its sound, Emma says "Two letters, one sound!". The second
+# plays the sound only: no line.
+#
+# The runs are muted, and the critters' own sounds (the tap-clip player)
+# write no Metro row, so the sound itself is D17's (jest); the line is
+# read from Emma's ribbon, whose label is the line's text.
+#
+#   SHOT  the screenshots' prefix
+appId: host.exp.Exponent
+---
+- tapOn:
+    id: critter-sh
+- extendedWaitUntil:
+    visible:
+      id: play-game-ribbon
+      text: Two letters, one sound!
+    timeout: 10000
+- takeScreenshot: ${SHOT}-pair-line
+- extendedWaitUntil:
+    notVisible:
+      id: play-game-ribbon
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 1500
+# The second tap: the sound, no line (the wait is meant to run out).
+- tapOn:
+    id: critter-sh
+- extendedWaitUntil:
+    visible:
+      id: play-game-ribbon
+    timeout: 5000
+    optional: true
+- assertNotVisible:
+    id: play-game-ribbon
+- assertVisible:
+    id: critter-sh
+    text: Letters s h, one sound
+- takeScreenshot: ${SHOT}-second-tap

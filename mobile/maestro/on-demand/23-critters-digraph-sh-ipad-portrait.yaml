@@ -1,0 +1,76 @@
+# D24 of `design/native/critters-digraph.md` § 11.3, on an iPad in portrait:
+# the `critters-hunt-sh` seed (every CVC step mastered, digraphs-sh current;
+# Dave's sh-i fallback i sh b c n p with bin and pin found, D23) → the round
+# in progress: the sh critter in cell 2, no s and no h → two taps on it: the
+# first says "Two letters, one sound!" after its sound (Dave's Q38 ruling,
+# D28), the second plays the sound only → sh-i-n: an extra, the chip's
+# [sh][i][n] → sh-i-p: ship's slot (3) fills with [sh][i][p], the beat (3 of
+# 4), bib stays findable → the roll-in → Back → Back. The shared steps are
+# `../subflows/critters-digraph-sh-{open,taps,shin,ship}.yaml`.
+#
+# The points are for the iPad Pro 11-inch (M5) simulator in portrait (834 x
+# 1210, insets t32 b20), as 14-critters-four-door-ipad-portrait.yaml: the
+# meadow's rows at y 983 and 1087, cells at x 313, 417 and 521; the seats at
+# y 853, x 291, 417 and 543. The digraph round's layout is a plain round's
+# (D22).
+#
+#   i sh b  /  c n p
+#
+# Screenshots go to Maestro's output (run.sh `--debug-output`, under
+# MAESTRO_OUT/23-critters-digraph-sh-ipad-portrait/); Thomas's eye (D27)
+# reads the critter, its seated size, the slot and the chip from them.
+appId: host.exp.Exponent
+name: Critters digraph sh (iPad portrait)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: critters-hunt-sh
+# A flow that failed in landscape leaves the simulator there.
+- setOrientation: PORTRAIT
+- runFlow:
+    file: ../subflows/critters-digraph-sh-open.yaml
+    env:
+      SHOT: digraph-sh-ipad-portrait
+- runFlow:
+    file: ../subflows/critters-digraph-sh-taps.yaml
+    env:
+      SHOT: digraph-sh-ipad-portrait
+# sh-i-n: an extra, the chip appears.
+- swipe:
+    start: 417, 983
+    end: 291, 853
+    duration: 800
+- swipe:
+    start: 313, 983
+    end: 417, 853
+    duration: 800
+- swipe:
+    start: 417, 1087
+    end: 543, 853
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-digraph-sh-shin.yaml
+    env:
+      SHOT: digraph-sh-ipad-portrait
+# sh-i-p: ship, the completing find (3 of 4).
+- swipe:
+    start: 417, 983
+    end: 291, 853
+    duration: 800
+- swipe:
+    start: 313, 983
+    end: 417, 853
+    duration: 800
+- swipe:
+    start: 521, 1087
+    end: 543, 853
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-digraph-sh-ship.yaml
+    env:
+      SHOT: digraph-sh-ipad-portrait

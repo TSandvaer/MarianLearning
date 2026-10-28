@@ -1,0 +1,80 @@
+# Letter critters' digraph critters (`design/native/critters-digraph.md`
+# D24), part 1 of 4: from the Hub to the `critters-hunt-sh` seed's round
+# in progress (i sh b c n p; bin and pin found, D23). The meadow (§ 5):
+# the vowel, the sh critter beside it in cell 2, then b; c n p below. No s
+# and no h (the pair rule, D5). In board order (§ 4.3) the slots hold bib,
+# bin, pin, ship. The calling flow (23, per form) then taps the sh critter.
+#
+# Slots are checked by their labels (the word, or "Word to find"): the
+# ids inside a slot are not listed reliably (see critters-four-open.yaml).
+#
+#   SHOT  the screenshots' prefix
+appId: host.exp.Exponent
+---
+- runFlow: open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub-play
+    timeout: 120000
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: hub-play
+      NEXT: play-place
+- extendedWaitUntil:
+    visible:
+      id: play-tile-critters
+    timeout: 15000
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: play-tile-critters
+      NEXT: letter-critters
+- extendedWaitUntil:
+    visible:
+      id: critter-log-numeral
+    timeout: 15000
+- assertVisible:
+    id: hunt-slot-0
+    text: Word to find
+- assertVisible:
+    id: hunt-slot-1
+    text: Bin
+- assertVisible:
+    id: hunt-slot-2
+    text: Pin
+- assertVisible:
+    id: hunt-slot-3
+    text: Word to find
+- assertNotVisible:
+    id: hunt-slot-4
+- assertNotVisible:
+    id: hunt-new-letters
+# One critter wears the pair; its label spells it (§ 8.2, D20).
+- assertVisible:
+    id: critter-sh
+    text: Letters s h, one sound
+# Cell 2: in the top row, right of the vowel and left of b.
+- assertVisible:
+    id: critter-sh
+    rightOf:
+      id: critter-i
+    leftOf:
+      id: critter-b
+- assertVisible:
+    id: critter-c
+    below:
+      id: critter-sh
+# The pair rule: an sh board has no s and no h.
+- assertNotVisible:
+    id: critter-s
+- assertNotVisible:
+    id: critter-h
+# The open line and the drag hint end (the hand loops 6 s).
+- extendedWaitUntil:
+    notVisible:
+      id: play-game-ribbon
+    timeout: 25000
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ${SHOT}-round-in-progress
