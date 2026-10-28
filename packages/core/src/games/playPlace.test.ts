@@ -1334,6 +1334,17 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     expect(critterHasPicture('flap')).toBe(false)
   })
 
+  it('digraph critter pictures (Dave 2026-10-27, (D); Thomas’s picks 2026-10-28): fish shed shop chip moth sing chest are bundled and pictured nowhere until the digraph core', () => {
+    const bundled = bundledPictures()
+    for (const w of 'fish shed shop chip moth sing chest'.split(' ')) {
+      expect(bundled.has(w)).toBe(true)
+      expect(HUNT_DIGRAPH_LATER).toContain(w)
+      expect(CRITTER_SAID_WORDS).not.toContain(w)
+      expect(HUNT_FOUR_TARGETS.has(w)).toBe(false)
+      expect(critterHasPicture(w)).toBe(false)
+    }
+  })
+
   it('C10 (Dave’s safeguard, Thomas 2026-10-22): with funny false, a non-word is quiet; every other run is unchanged', () => {
     const off = { funny: false }
     for (const w of ['tup', 'baf', 'gub', 'vop'])
