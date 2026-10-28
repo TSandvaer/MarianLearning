@@ -1,0 +1,19 @@
+# Both rafts open (`design/native/raft-island-goal.md` § 5, I9, I10, I16;
+# `subflows/raft-two-rafts-run.yaml`), on an iPad in landscape: the picker
+# first, the 20 island's party and back to the picker with no reveal,
+# three crossings on the full 10 island, Back, Back.
+appId: host.exp.Exponent
+name: Raft, two rafts (iPad landscape)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: raft-two-rafts
+- setOrientation: LANDSCAPE_LEFT
+- runFlow:
+    file: ../subflows/raft-two-rafts-run.yaml
+    env:
+      SHOT: two-tablet-landscape
+- setOrientation: PORTRAIT

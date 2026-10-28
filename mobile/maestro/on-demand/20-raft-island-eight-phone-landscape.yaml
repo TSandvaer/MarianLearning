@@ -1,0 +1,17 @@
+# Flow 20 on a phone in landscape (run it on an iPhone 17 simulator): I17's
+# 20 raft crossing on the form where its glide is shortest (24.5 pt, Q5).
+appId: host.exp.Exponent
+name: Raft island, eight home (phone landscape)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: raft-island-eight
+- setOrientation: LANDSCAPE_LEFT
+- runFlow:
+    file: ../subflows/raft-eight-run.yaml
+    env:
+      SHOT: eight-phone-landscape
+- setOrientation: PORTRAIT

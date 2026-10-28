@@ -1,0 +1,85 @@
+# The plain raft has no crossing cap (`design/native/raft-island-goal.md`
+# § 6, I8, I16, amended 2026-10-26; Thomas's build-23 report: "raft stops
+# after 3 crossings"). A learner at add-to-10 with an empty island, one
+# raft open: five crossings in a row, each returning with newcomers, the
+# game still open after the fifth; then Back to the Play place.
+#
+# The loads are chosen to bring as few new kinds as they can and never
+# the ninth (`subflows/raft-pick.js`), but the shore deals for missing
+# kinds, so about 1 run in 20 still fills the island by chance: its party
+# then fails the run at `raft-cross.yaml`'s assertions. That is not the
+# cap; run it again.
+appId: host.exp.Exponent
+name: Raft, no crossing cap
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      qaStep: add-to-10
+- setOrientation: PORTRAIT
+- runFlow: ../subflows/open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub-play
+    timeout: 120000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: hub-play
+      NEXT: play-place
+- extendedWaitUntil:
+    visible:
+      id: play-tile-raft
+    timeout: 15000
+- runFlow:
+    file: ../subflows/tap-and-confirm.yaml
+    env:
+      TARGET: play-tile-raft
+      NEXT: raft-crossing
+- extendedWaitUntil:
+    visible:
+      text: Pig, nine, empty home
+    timeout: 15000
+- assertNotVisible:
+    id: raft-pond-10
+- takeScreenshot: no-cap-0-shore
+- runScript:
+    file: ../subflows/raft-init.js
+    env:
+      HOMES: ''
+- runFlow:
+    file: ../subflows/raft-cross.yaml
+    env:
+      TARGET: '10'
+      SHOT: no-cap-1
+- runFlow:
+    file: ../subflows/raft-cross.yaml
+    env:
+      TARGET: '10'
+      SHOT: no-cap-2
+- runFlow:
+    file: ../subflows/raft-cross.yaml
+    env:
+      TARGET: '10'
+      SHOT: no-cap-3
+- runFlow:
+    file: ../subflows/raft-cross.yaml
+    env:
+      TARGET: '10'
+      SHOT: no-cap-4
+- runFlow:
+    file: ../subflows/raft-cross.yaml
+    env:
+      TARGET: '10'
+      SHOT: no-cap-5
+# Still open after five: Back (one raft open) goes to the Play place.
+- assertVisible:
+    id: raft-crossing
+- tapOn:
+    id: play-game-back
+- extendedWaitUntil:
+    visible:
+      id: play-place
+    timeout: 15000
