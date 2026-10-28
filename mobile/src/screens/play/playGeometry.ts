@@ -680,7 +680,7 @@ export interface HuntScene extends CritterScene {
   slots: readonly SlotParts[]
   /**
    * Landscape: the board's cell after the last slot; portrait, and every
-   * four-letter round (no extras): none.
+   * four-letter round (no chip, critters-four-letter.md § 15.3): none.
    */
   chipCell: Rect | null
   /** The numeral disc on the log's left end (§ 3.2). */
@@ -911,8 +911,9 @@ export function huntSceneFits(scene: HuntScene, A: Rect): boolean {
 
 /**
  * The word hunt's scene (§ 2): a phone takes S4; a tablet the first of
- * S1, S2, S3 that fits for every N from 5 to 8 in this orientation (else
- * S3, logged). The step depends on `A` alone, so slots keep their size
+ * S1, S2, S3 that fits for every N from 4 to 8 in this orientation (else
+ * S3, logged; N 4 since the pictured-only boards, § 16.2, at the steps N
+ * 5-8 took). The step depends on `A` alone, so slots keep their size
  * from round to round. A four-letter round (critters-four-letter.md
  * § 2.2): a tablet the first of S1-S4 that fits for N 4, 5 and 6, a phone
  * the first of S4, S5 (else the last, logged).
@@ -941,7 +942,7 @@ export function huntScene(
   const s4 = SLOT_STEPS[3]!
   if (!tablet) return huntSceneAt(A, false, landscape, n, s4)
   const step = SLOT_STEPS.slice(0, 3).find((st) =>
-    [5, 6, 7, 8].every((k) =>
+    [4, 5, 6, 7, 8].every((k) =>
       huntSceneFits(huntSceneAt(A, true, landscape, k, st), A),
     ),
   )
@@ -1009,18 +1010,35 @@ export function logSockets(seats: readonly Rect[], bar: Rect): Rect[] {
   }))
 }
 
+/** One of the picker's logs (§ 5.2): its button, the log, its ground shadow. */
+export interface PickerLog {
+  length: 3 | 4
+  /** The button: the log's row, 8 wider than the log on each side. */
+  hit: Rect
+  /** `band` and `bar` are the bar; `seats` its socket cells. */
+  log: LogParts
+  /** The ground shadow under the bar: paint, never touchable. */
+  shadow: Rect
+}
+
 export interface PickerScene {
-  /** "3" on top, "4" below, each with its log. */
-  slabs: readonly { length: 3 | 4; slab: Rect; log: LogParts }[]
-  /** The slab's radius, `min(R, 0.5 c)` (T9). */
-  radius: number
+  /** "3" on top, "4" below. */
+  logs: readonly PickerLog[]
+  /** The meadow under the logs, `A` (§ 5.3): a press there sends the wave. */
+  meadow: Rect
+  /** The socket cell σ. */
+  seat: number
+  /** The rows' pitch r. */
+  pitch: number
 }
 
 /**
- * § 5.2: two slabs the full width of `A`, each `(A.height − 16) / 2` tall,
- * 16 apart, "3" on top. In each, that length's log band at its in-round
- * size, centred vertically; both start at the "4" log's centred x, so
- * their discs line up and the "4" log reaches one seat further.
+ * § 5.2: the two logs lie in the meadow, "3" over "4", thicker than a
+ * round's (bar 28, disc 40 on phones; 36, 56 on tablets). The socket cell
+ * is the round's seat where the "4" log's button fits `A`, else the
+ * largest that does; the disc covers 4 pt of the first socket. Each log's
+ * row is its button, the pair of rows centred in `A`, and both discs sit
+ * at the "4" log's centred x.
  */
 export function pickerScene(
   A: Rect,
@@ -1029,18 +1047,48 @@ export function pickerScene(
 ): PickerScene {
   const c = tablet ? 88 : landscape ? 48 : 56
   const g = tablet ? 16 : 8
-  const h = (A.height - 16) / 2
-  const x = A.x + (A.width - logBandWidth(c, g, 4)) / 2
-  const bandH = SEATED_SCALE * c + 16
-  const slabs = ([3, 4] as const).map((length, i) => {
-    const slab = { x: A.x, y: A.y + i * (h + 16), width: A.width, height: h }
+  const H = tablet ? 36 : 28
+  const D = tablet ? 56 : 40
+  const s = tablet ? 18 : 12
+  const ledge = tablet ? 6 : 5
+  // The "4" log's button is lead + 4σ + 3g + 16 + 2 × 8 wide, and the
+  // lead is D − 4 − 0.18σ.
+  const seat = Math.min(
+    SEATED_SCALE * c,
+    (A.width - 16 - (D - 4) - 16 - 3 * g) / (4 - 0.18),
+  )
+  const lead = D - 4 - 0.18 * seat
+  const widthOf = (n: 3 | 4) => lead + n * seat + (n - 1) * g + 16
+  const pitch = Math.min(2.2 * D, A.height / 2)
+  const top = A.y + (A.height - 2 * pitch) / 2
+  const x0 = A.x + (A.width - widthOf(4)) / 2
+  const logs = ([3, 4] as const).map((length, i) => {
+    const y = top + i * pitch
+    const mid = y + pitch / 2
+    const bar = { x: x0, y: mid - H / 2, width: widthOf(length), height: H }
     return {
       length,
-      slab,
-      log: logAt(x, slab.y + (h - bandH) / 2, tablet, landscape, length),
+      hit: { x: x0 - 8, y, width: bar.width + 16, height: pitch },
+      log: {
+        band: bar,
+        bar,
+        disc: { x: x0, y: mid - D / 2, width: D, height: D },
+        seats: Array.from({ length }, (_, k) => ({
+          x: x0 + lead + k * (seat + g),
+          y: bar.y,
+          width: seat,
+          height: H,
+        })),
+      },
+      shadow: {
+        x: x0 + 6,
+        y: bar.y + H + ledge - s / 2,
+        width: bar.width - 12,
+        height: s,
+      },
     }
   })
-  return { slabs, radius: Math.min(48 * (tablet ? 1 : 7 / 12), 0.5 * c) }
+  return { logs, meadow: A, seat, pitch }
 }
 
 export interface ArrivalScene {

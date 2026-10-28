@@ -533,6 +533,289 @@ describe('H7: the word hunt scene (critters-word-hunt.md § 2.4)', () => {
   })
 })
 
+/**
+ * critters-word-hunt.md § 16.2: the three-letter board at N 4 on its 16
+ * viewports, as printed: the step, the board (x, y, w, h), the four slots'
+ * (x, y) and the chip zone for 3 extras (x, y, w, h).
+ */
+const N4_TABLE: readonly (readonly [
+  string,
+  Viewport,
+  string,
+  readonly number[],
+  readonly (readonly [number, number])[],
+  readonly number[],
+])[] = [
+  [
+    '375 × 667',
+    vp(375, 667),
+    'S4',
+    [108.5, 264, 158, 140],
+    [
+      [108.5, 264],
+      [190.5, 264],
+      [108.5, 337],
+      [190.5, 337],
+    ],
+    [287.5, 570, 58, 60],
+  ],
+  [
+    '667 × 375',
+    vp(667, 375),
+    'S4',
+    [411, 184.6, 240, 140],
+    [
+      [411, 184.6],
+      [493, 184.6],
+      [575, 184.6],
+      [452, 257.6],
+    ],
+    [543, 261.1, 58, 60],
+  ],
+  [
+    '390 × 844 (t47 b34)',
+    vp(390, 844, { top: 47, bottom: 34 }),
+    'S4',
+    [116, 369.5, 158, 140],
+    [
+      [116, 369.5],
+      [198, 369.5],
+      [116, 442.5],
+      [198, 442.5],
+    ],
+    [295, 675.5, 58, 60],
+  ],
+  [
+    '844 × 390 (l/r47 b21)',
+    vp(844, 390, { left: 47, right: 47, bottom: 21 }),
+    'S4',
+    [510, 181.1, 240, 140],
+    [
+      [510, 181.1],
+      [592, 181.1],
+      [674, 181.1],
+      [551, 254.1],
+    ],
+    [642, 257.6, 58, 60],
+  ],
+  [
+    '820 × 1180 (t24 b20)',
+    vp(820, 1180, { top: 24, bottom: 20 }),
+    'S1',
+    [258, 462.4, 304, 288],
+    [
+      [258, 462.4],
+      [418, 462.4],
+      [258, 614.4],
+      [418, 614.4],
+    ],
+    [574, 992.4, 108, 116],
+  ],
+  [
+    '1180 × 820 (b20)',
+    vp(1180, 820, { bottom: 20 }),
+    'S1',
+    [681.6, 355.5, 464, 288],
+    [
+      [681.6, 355.5],
+      [841.6, 355.5],
+      [1001.6, 355.5],
+      [761.6, 507.5],
+    ],
+    [939.6, 517.5, 108, 116],
+  ],
+  [
+    '1180 × 820 (t24 b20)',
+    vp(1180, 820, { top: 24, bottom: 20 }),
+    'S1',
+    [681.6, 367.5, 464, 288],
+    [
+      [681.6, 367.5],
+      [841.6, 367.5],
+      [1001.6, 367.5],
+      [761.6, 519.5],
+    ],
+    [939.6, 529.5, 108, 116],
+  ],
+  [
+    '834 × 1194 (t24 b20)',
+    vp(834, 1194, { top: 24, bottom: 20 }),
+    'S1',
+    [265, 471.2, 304, 288],
+    [
+      [265, 471.2],
+      [425, 471.2],
+      [265, 623.2],
+      [425, 623.2],
+    ],
+    [581, 1001.2, 108, 116],
+  ],
+  [
+    '1194 × 834 (t24 b20)',
+    vp(1194, 834, { top: 24, bottom: 20 }),
+    'S1',
+    [690.4, 374.5, 464, 288],
+    [
+      [690.4, 374.5],
+      [850.4, 374.5],
+      [1010.4, 374.5],
+      [770.4, 526.5],
+    ],
+    [948.4, 536.5, 108, 116],
+  ],
+  [
+    '744 × 1133 (t24 b20)',
+    vp(744, 1133, { top: 24, bottom: 20 }),
+    'S2',
+    [244, 456.8, 256, 240],
+    [
+      [244, 456.8],
+      [380, 456.8],
+      [244, 584.8],
+      [380, 584.8],
+    ],
+    [536, 950.8, 96, 104],
+  ],
+  [
+    '1133 × 744 (t24 b20)',
+    vp(1133, 744, { top: 24, bottom: 20 }),
+    'S2',
+    [684.2, 353.5, 392, 240],
+    [
+      [684.2, 353.5],
+      [820.2, 353.5],
+      [956.2, 353.5],
+      [752.2, 481.5],
+    ],
+    [900.2, 485.5, 96, 104],
+  ],
+  [
+    '810 × 1080 (t24 b20)',
+    vp(810, 1080, { top: 24, bottom: 20 }),
+    'S2',
+    [277, 423.4, 256, 240],
+    [
+      [277, 423.4],
+      [413, 423.4],
+      [277, 551.4],
+      [413, 551.4],
+    ],
+    [569, 917.4, 96, 104],
+  ],
+  [
+    '1080 × 810 (t24 b20)',
+    vp(1080, 810, { top: 24, bottom: 20 }),
+    'S2',
+    [666.3, 386.5, 392, 240],
+    [
+      [666.3, 386.5],
+      [802.3, 386.5],
+      [938.3, 386.5],
+      [734.3, 514.5],
+    ],
+    [882.3, 518.5, 96, 104],
+  ],
+  [
+    '1080 × 810 (none)',
+    vp(1080, 810),
+    'S2',
+    [666.3, 384.5, 392, 240],
+    [
+      [666.3, 384.5],
+      [802.3, 384.5],
+      [938.3, 384.5],
+      [734.3, 512.5],
+    ],
+    [882.3, 516.5, 96, 104],
+  ],
+  [
+    '768 × 1024 (t24 b20)',
+    vp(768, 1024, { top: 24, bottom: 20 }),
+    'S3',
+    [274, 410.1, 220, 196],
+    [
+      [274, 410.1],
+      [392, 410.1],
+      [274, 516.1],
+      [392, 516.1],
+    ],
+    [548, 880.1, 78, 84],
+  ],
+  [
+    '1024 × 768 (t24 b20)',
+    vp(1024, 768, { top: 24, bottom: 20 }),
+    'S3',
+    [659.8, 387.5, 338, 196],
+    [
+      [659.8, 387.5],
+      [777.8, 387.5],
+      [895.8, 387.5],
+      [718.8, 493.5],
+    ],
+    [848.8, 496.5, 78, 84],
+  ],
+]
+
+describe('B8: the three-letter board at N 4 (critters-word-hunt.md § 16.2)', () => {
+  const sceneOf = (v: Viewport, n: number) => {
+    const layout = mathLayout(v)
+    const A = playArea(layout)
+    return { A, s: huntScene(A, layout.tablet, layout.landscape, n) }
+  }
+  const expectRect = (
+    r: { x: number; y: number; width: number; height: number },
+    [x, y, w, h]: readonly number[],
+  ) => {
+    expect(r.x).toBeCloseTo(x!, 1)
+    expect(r.y).toBeCloseTo(y!, 1)
+    expect(r.width).toBeCloseTo(w!, 1)
+    expect(r.height).toBeCloseTo(h!, 1)
+  }
+
+  it.each(N4_TABLE)(
+    '%s: § 16.2’s step, board, slots and chip zone',
+    (_, v, step, board, slots, chip) => {
+      const { s } = sceneOf(v, 4)
+      expect(s.step.name).toBe(step)
+      expectRect(s.board, board)
+      expect(s.slots).toHaveLength(4)
+      s.slots.forEach(({ card }, i) => {
+        expect(card.x).toBeCloseTo(slots[i]![0], 1)
+        expect(card.y).toBeCloseTo(slots[i]![1], 1)
+      })
+      expectRect(chipRect(s, 3), chip)
+    },
+  )
+
+  it.each(N4_TABLE)(
+    '%s: the fit rule holds for every N from 4 to 8',
+    (_, v) => {
+      for (const n of [4, 5, 6, 7, 8]) {
+        const { A, s } = sceneOf(v, n)
+        expect(s.slots).toHaveLength(n)
+        expect(huntSceneFits(s, A)).toBe(true)
+      }
+    },
+  )
+
+  it('portrait 2 + 2; landscape 3 + (1 + the chip’s cell), the second row centred', () => {
+    const rowsOf = (s: ReturnType<typeof huntScene>) =>
+      [...new Set(s.slots.map((x) => x.card.y))].map(
+        (y) => s.slots.filter((x) => x.card.y === y).length,
+      )
+    expect(rowsOf(sceneOf(vp(375, 667), 4).s)).toEqual([2, 2])
+    const l = sceneOf(vp(667, 375), 4).s
+    expect(rowsOf(l)).toEqual([3, 1])
+    expectRect(l.chipCell!, [534, 257.6, 76, 67])
+  })
+
+  it('the tablet ladder checks N 4-8 and still picks § 2.4’s steps (N 8 unchanged)', () => {
+    for (const [, v, step] of N4_TABLE) {
+      expect(sceneOf(v, 8).s.step.name).toBe(step)
+    }
+  })
+})
+
 /** critters-four-letter.md § 2.4: (x, y, w, h) rects for N 6. */
 const FOUR_TABLE: readonly (readonly [
   string,
@@ -805,99 +1088,305 @@ describe('F10: the four-letter scene (critters-four-letter.md § 2.4)', () => {
 })
 
 describe('F16: the length picker (critters-four-letter.md § 5.2)', () => {
-  const PICKER = [
+  // § 5.2 prints to 0.1 pt (24.17 as 24.2).
+  const near = (
+    r: { x: number; y: number; width: number; height: number },
+    want: readonly number[],
+  ) =>
+    [r.x, r.y, r.width, r.height].forEach((v, k) =>
+      expect(Math.abs(v - want[k]!)).toBeLessThanOrEqual(0.0501),
+    )
+  const sceneOf = (v: Viewport) => {
+    const layout = mathLayout(v)
+    const A = playArea(layout)
+    return { A, p: pickerScene(A, layout.tablet, layout.landscape) }
+  }
+  type Log = readonly [
+    hit: readonly number[],
+    bar: readonly number[],
+    disc: readonly [number, number, number],
+  ]
+  const PICKER: readonly (readonly [
+    string,
+    Viewport,
+    number,
+    number,
+    Log,
+    Log,
+  ])[] = [
     [
       'P',
       vp(375, 667),
+      65.7,
+      88,
       [
-        [16, 259, 343, 180],
-        [16, 455, 343, 180],
+        [16, 359, 269.3, 88],
+        [24, 389, 253.3, 28],
+        [24, 383, 40],
       ],
       [
-        [19.5, 306, 258, 86],
-        [19.5, 502, 336, 86],
+        [16, 447, 343, 88],
+        [24, 477, 327, 28],
+        [24, 471, 40],
       ],
-      [368, 564],
-      [364, 560],
-      32,
-      28,
     ],
     [
       'L',
       vp(667, 375),
+      60,
+      88,
       [
-        [160, 146.4, 491, 100.2],
-        [160, 262.6, 491, 100.2],
+        [244.9, 166.6, 253.2, 88],
+        [252.9, 196.6, 237.2, 28],
+        [252.9, 190.6, 40],
       ],
       [
-        [257.5, 158.5, 228, 76],
-        [257.5, 274.7, 296, 76],
+        [244.9, 254.6, 321.2, 88],
+        [252.9, 284.6, 305.2, 28],
+        [252.9, 278.6, 40],
       ],
-      [210.5, 326.7],
-      [206.5, 322.7],
-      32,
-      24,
     ],
     [
       'W',
       vp(820, 1180, { top: 24, bottom: 20 }),
+      110,
+      123.2,
       [
-        [16, 442.8, 788, 334.6],
-        [16, 793.4, 788, 334.6],
+        [133.9, 662.2, 426.2, 123.2],
+        [141.9, 705.8, 410.2, 36],
+        [141.9, 695.8, 56],
       ],
       [
-        [150, 547.1, 394, 126],
-        [150, 897.7, 520, 126],
+        [133.9, 785.4, 552.2, 123.2],
+        [141.9, 829, 536.2, 36],
+        [141.9, 819, 56],
       ],
-      [649.1, 999.7],
-      [641.1, 991.7],
-      40,
-      44,
     ],
     [
       'TL',
       vp(1180, 820, { bottom: 20 }),
+      110,
+      123.2,
       [
-        [245.2, 231, 918.8, 260.5],
-        [245.2, 507.5, 918.8, 260.5],
+        [428.5, 376.3, 426.2, 123.2],
+        [436.5, 419.9, 410.2, 36],
+        [436.5, 409.9, 56],
       ],
       [
-        [444.6, 298.3, 394, 126],
-        [444.6, 574.8, 520, 126],
+        [428.5, 499.5, 552.2, 123.2],
+        [436.5, 543.1, 536.2, 36],
+        [436.5, 533.1, 56],
       ],
-      [400.3, 676.8],
-      [392.3, 668.8],
-      40,
-      44,
+    ],
+    [
+      "Thomas's iPad 1080 × 810 (none)",
+      vp(1080, 810),
+      110,
+      123.2,
+      [
+        [377.2, 381.3, 426.2, 123.2],
+        [385.2, 424.9, 410.2, 36],
+        [385.2, 414.9, 56],
+      ],
+      [
+        [377.2, 504.5, 552.2, 123.2],
+        [385.2, 548.1, 536.2, 36],
+        [385.2, 538.1, 56],
+      ],
+    ],
+  ]
+  it.each(PICKER)(
+    '%s: σ, the pitch, and each log’s button, bar and disc at § 5.2’s rects',
+    (_, v, seat, pitch, three, four) => {
+      const { p } = sceneOf(v)
+      expect(p.logs.map((l) => l.length)).toEqual([3, 4])
+      expect(Math.abs(p.seat - seat)).toBeLessThanOrEqual(0.0501)
+      expect(Math.abs(p.pitch - pitch)).toBeLessThanOrEqual(0.0501)
+      p.logs.forEach((l, i) => {
+        const [hit, bar, [dx, dy, D]] = [three, four][i]!
+        near(l.hit, hit)
+        near(l.log.bar, bar)
+        expect(l.log.band).toEqual(l.log.bar)
+        near(l.log.disc, [dx, dy, D, D])
+        expect(l.log.seats).toHaveLength(l.length)
+      })
+    },
+  )
+
+  it('sockets: socket 1 at x0 + 36 on phones (42.1 × 17.9 P, 38.4 × 17.9 L), x0 + 52 on tablets (70.4 × 23)', () => {
+    const want = [
+      [vp(375, 667), 36, 42.1, 17.9],
+      [vp(667, 375), 36, 38.4, 17.9],
+      [vp(820, 1180, { top: 24, bottom: 20 }), 52, 70.4, 23],
+      [vp(1080, 810), 52, 70.4, 23],
+    ] as const
+    for (const [v, at, w, h] of want) {
+      const { p } = sceneOf(v)
+      for (const { length, log } of p.logs) {
+        const sockets = logSockets(log.seats, log.bar)
+        expect(sockets).toHaveLength(length)
+        const x0 = log.bar.x
+        expect(sockets[0]!.x - x0).toBeCloseTo(at, 5)
+        expect(sockets[0]!.width).toBeCloseTo(w, 1)
+        expect(sockets[0]!.height).toBeCloseTo(h, 1)
+        // The cells are σ wide and g apart.
+        sockets.slice(1).forEach((s, k) => {
+          expect(s.x - sockets[k]!.x).toBeCloseTo(
+            p.seat + (at === 52 ? 16 : 8),
+            5,
+          )
+        })
+      }
+    }
+  })
+
+  it('the ground shadow: (x0 + 6, bar bottom + ledge − s / 2), W − 12 wide, s tall', () => {
+    const { p: phone } = sceneOf(vp(375, 667))
+    near(phone.logs[0]!.shadow, [30, 416, 241.3, 12])
+    near(phone.logs[1]!.shadow, [30, 504, 315, 12])
+    const { p: ipad } = sceneOf(vp(1080, 810))
+    near(ipad.logs[0]!.shadow, [391.2, 457.9, 398.2, 18])
+    near(ipad.logs[1]!.shadow, [391.2, 581.1, 524.2, 18])
+  })
+
+  const FIT = [
+    ['375 × 667', vp(375, 667), 65.7, 88, 327, [16, 359, 343, 176]],
+    ['667 × 375', vp(667, 375), 60, 88, 305.2, [244.9, 166.6, 321.2, 176]],
+    [
+      '390 × 844 (t47 b34)',
+      vp(390, 844, { top: 47, bottom: 34 }),
+      69.6,
+      88,
+      342,
+      [16, 464.5, 358, 176],
+    ],
+    [
+      '844 × 390 (l/r47 b21)',
+      vp(844, 390, { left: 47, right: 47, bottom: 21 }),
+      60,
+      88,
+      305.2,
+      [343.4, 163.1, 321.2, 176],
+    ],
+    [
+      '820 × 1180 (t24 b20)',
+      vp(820, 1180, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [133.9, 662.2, 552.2, 246.4],
+    ],
+    [
+      '1180 × 820 (b20)',
+      vp(1180, 820, { bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [428.5, 376.3, 552.2, 246.4],
+    ],
+    [
+      '1180 × 820 (t24 b20)',
+      vp(1180, 820, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [428.5, 388.3, 552.2, 246.4],
+    ],
+    [
+      '834 × 1194 (t24 b20)',
+      vp(834, 1194, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [140.9, 671, 552.2, 246.4],
+    ],
+    [
+      '1194 × 834 (t24 b20)',
+      vp(1194, 834, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [437.3, 395.3, 552.2, 246.4],
+    ],
+    [
+      '744 × 1133 (t24 b20)',
+      vp(744, 1133, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [95.9, 632.6, 552.2, 246.4],
+    ],
+    [
+      '1133 × 744 (t24 b20)',
+      vp(1133, 744, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [395.1, 350.3, 552.2, 246.4],
+    ],
+    [
+      '810 × 1080 (t24 b20)',
+      vp(810, 1080, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [128.9, 599.2, 552.2, 246.4],
+    ],
+    [
+      '1080 × 810 (t24 b20)',
+      vp(1080, 810, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [377.2, 383.3, 552.2, 246.4],
+    ],
+    [
+      '1080 × 810 (none)',
+      vp(1080, 810),
+      110,
+      123.2,
+      536.2,
+      [377.2, 381.3, 552.2, 246.4],
+    ],
+    [
+      '768 × 1024 (t24 b20)',
+      vp(768, 1024, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [107.9, 563.9, 552.2, 246.4],
+    ],
+    [
+      '1024 × 768 (t24 b20)',
+      vp(1024, 768, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [343.7, 362.3, 552.2, 246.4],
     ],
   ] as const
-  it.each(PICKER)(
-    '%s: the slabs, logs, bars and discs at § 5.2’s rects',
-    (_, v, slabs, bands, barYs, discYs, D, radius) => {
-      const layout = mathLayout(v)
-      const p = pickerScene(playArea(layout), layout.tablet, layout.landscape)
-      expect(p.slabs.map((s) => s.length)).toEqual([3, 4])
-      expect(p.radius).toBe(radius)
-      p.slabs.forEach((s, i) => {
-        // § 5.2 prints to 0.1 pt (298.25 as 298.3).
-        const near = (
-          r: { x: number; y: number; width: number; height: number },
-          want: readonly number[],
-        ) =>
-          [r.x, r.y, r.width, r.height].forEach((v, k) =>
-            expect(Math.abs(v - want[k]!)).toBeLessThanOrEqual(0.0501),
-          )
-        near(s.slab, slabs[i]!)
-        near(s.log.band, bands[i]!)
-        expect(Math.abs(s.log.bar.y - barYs[i]!)).toBeLessThanOrEqual(0.0501)
-        expect(s.log.bar.height).toBe(24)
-        expect(Math.abs(s.log.disc.y - discYs[i]!)).toBeLessThanOrEqual(0.0501)
-        expect(s.log.disc.width).toBe(D)
-        expect(Math.abs(s.log.disc.x - bands[0]![0]!)).toBeLessThanOrEqual(
-          0.0501,
-        )
-        expect(s.log.seats).toHaveLength(s.length)
-      })
+  it.each(FIT)(
+    '%s: σ, r, the "4" log’s width and the pair; both buttons inside A, at least 44 tall, the rows abutting',
+    (_, v, seat, pitch, width, pair) => {
+      const { A, p } = sceneOf(v)
+      expect(Math.abs(p.seat - seat)).toBeLessThanOrEqual(0.0501)
+      expect(Math.abs(p.pitch - pitch)).toBeLessThanOrEqual(0.0501)
+      const [three, four] = p.logs
+      expect(Math.abs(four!.log.bar.width - width)).toBeLessThanOrEqual(0.0501)
+      near(
+        {
+          x: four!.hit.x,
+          y: three!.hit.y,
+          width: four!.hit.width,
+          height: four!.hit.y + four!.hit.height - three!.hit.y,
+        },
+        pair,
+      )
+      expect(p.logs.every((l) => inside(A)(l.hit))).toBe(true)
+      expect(p.logs.every((l) => l.hit.height >= 44)).toBe(true)
+      expect(four!.hit.y).toBeCloseTo(three!.hit.y + three!.hit.height, 9)
+      expect(three!.log.disc.x).toBe(four!.log.disc.x)
+      expect(p.meadow).toEqual(A)
     },
   )
 })

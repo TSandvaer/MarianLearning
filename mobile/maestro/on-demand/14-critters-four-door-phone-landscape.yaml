@@ -6,7 +6,7 @@
 # log band's top + half a seat, `playGeometry.ts` huntScene), x 318, 386
 # and 454 (the sockets' centres).
 #
-#   a b g  /  h p t
+#   a b f  /  g h t
 appId: host.exp.Exponent
 name: Critters four-letter door (phone landscape)
 tags:
@@ -31,7 +31,7 @@ tags:
     end: 386, 194
     duration: 800
 - swipe:
-    start: 443, 272
+    start: 331, 328
     end: 454, 194
     duration: 800
     waitToSettleTimeoutMs: 300

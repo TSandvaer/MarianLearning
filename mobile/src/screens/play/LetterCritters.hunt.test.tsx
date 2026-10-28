@@ -1,12 +1,14 @@
 /**
  * Letter critters' word hunt on screen (`design/native/critters-word-hunt.md`
- * § 2-§ 8, § 15, ACs H8-H25 and P2-P10), for a learner past cvc-words with
- * short o current (Marian, 2026-10-25), on a seeded round: a b g h p t,
- * whose targets are bag, bat, hat, tag (picture words), tap (a said word
- * with a picture) and pat (familiar, no picture); its extras gab-free:
- * gag, gap and tab; and hag, a never-say word. In board order (§ 15.2) its
- * slots hold bag, bat, hat, tag, tap, pat. Sounds go through the fake
- * tap-sound player.
+ * § 2-§ 8, § 15, § 16, ACs H8-H25, P2-P10 and B9), for a learner past
+ * cvc-words with short o current (Marian, 2026-10-25), on a seeded round:
+ * the `critters-hunt` seed's a b f g h t (§ 16.4), whose targets are bag,
+ * bat, hat and tag (picture words, N 4, in that board order); its extras
+ * fat, gag and tab; and hag, a never-say word. `OB`, o b g m p x, has said
+ * words with a picture on its board (box mop, then mom pop). Since the
+ * pictured-only boards no dealt slot has the listen mark: `OLD` is a round
+ * stored before them (Q30), a b g h p t with pat under the mark. Sounds go
+ * through the fake tap-sound player.
  */
 import { setKeyValueStore } from '@marian/core'
 import { progressAtStep } from '@marian/core/debug/stepProgress'
@@ -16,8 +18,10 @@ import {
   huntBoardOrder,
   huntFind,
   huntRoundOf,
+  huntRounds,
   loadHuntRecord,
   saveHuntRecord,
+  type HuntRound,
 } from '@marian/core/games/critterHunt'
 import { critterWordLine } from '@marian/core/emmasPath/guidanceLines'
 import {
@@ -37,6 +41,8 @@ import { useRef } from 'react'
 import { processColor, StyleSheet } from 'react-native'
 import * as Reanimated from 'react-native-reanimated'
 import { letterWindow, wordWindow } from '../../audio/blendMarks'
+import * as Assets from '../../assets'
+import { pictureAsset } from '../../assets'
 import { audioForWebPath } from '../../audio/bundledAudio'
 import type { Viewport } from '../../layout/layout'
 import { mathLayout } from '../../layout/mathLayout'
@@ -90,10 +96,22 @@ import {
   type HuntScene,
 } from './playGeometry'
 
-const ROUND = ['a', 'b', 'g', 'h', 'p', 't']
-const TARGETS = ['bag', 'bat', 'hat', 'pat', 'tag', 'tap']
+const ROUND = ['a', 'b', 'f', 'g', 'h', 't']
+const TARGETS = ['bag', 'bat', 'hat', 'tag']
 /** The seeded round's slots, in board order (§ 15.2). */
-const BOARD = ['bag', 'bat', 'hat', 'tag', 'tap', 'pat']
+const BOARD = ['bag', 'bat', 'hat', 'tag']
+/** § 16.2's short-o round: box mop (picture words), mom pop (said). */
+const OB = ['o', 'b', 'g', 'm', 'p', 'x']
+/**
+ * Q30: the old `critters-hunt` round as build 24 dealt and stored it; the
+ * pictured-only rule no longer deals it. Board order bag bat hat tag tap,
+ * then pat (no picture: the listen mark).
+ */
+const OLD: HuntRound = {
+  letters: ['a', 'b', 'g', 'h', 'p', 't'],
+  targets: ['bag', 'bat', 'hat', 'pat', 'tag', 'tap'],
+  extras: ['gag', 'gap', 'tab'],
+}
 
 // --- Sounds ------------------------------------------------------------------
 
@@ -136,10 +154,13 @@ function ownMs(letter: string) {
 
 let writes: string[] = []
 
-/** The playing learner at `step` in a fresh store; optionally a round. */
+/**
+ * The playing learner at `step` in a fresh store; optionally a round (the
+ * one its letters deal, or `stored` as a round stored before the rule).
+ */
 function learnerAt(
   step: SkillNode,
-  round?: { letters: string[]; found: string[] },
+  round?: { letters: string[]; found: string[]; stored?: HuntRound },
 ) {
   const map = new Map<string, string>()
   setKeyValueStore({
@@ -154,7 +175,7 @@ function learnerAt(
   })
   saveProgress(progressAtStep(step))
   if (round) {
-    const r = huntRoundOf(round.letters)!
+    const r = round.stored ?? huntRoundOf(round.letters)!
     saveHuntRecord(round.found.reduce(huntFind, freshHuntRecord(r)))
   }
   writes = []
@@ -366,8 +387,12 @@ describe('H10: a new target fills the next empty slot', () => {
     expect(g.sfx.sparkle.play).toHaveBeenCalledTimes(1)
   })
 
-  it('a familiar word without a picture (pat): its tiles in its own slot (5), under the listen mark', async () => {
-    learnerAt('cvc-words-short-o', { letters: ROUND, found: ['bag'] })
+  it('Q30, a round stored before the pictured-only boards: a familiar word without a picture (pat), its tiles in its own slot (5), under the listen mark', async () => {
+    learnerAt('cvc-words-short-o', {
+      letters: OLD.letters,
+      found: ['bag'],
+      stored: OLD,
+    })
     const g = await mount()
     expect(tilesOf(0)).toBe('bag')
     await build('pat')
@@ -378,12 +403,14 @@ describe('H10: a new target fills the next empty slot', () => {
     expect(screen.queryAllByTestId(/^hunt-slot-5-picture-/).length).toBe(0)
   })
 
-  it('a said word with a picture (tap): its tiles in its own slot (4), its picture there from the deal', async () => {
+  it('a said word with a picture (mom): its tiles in its own slot (2), its picture there from the deal', async () => {
+    learnerAt('cvc-words-short-o', { letters: OB, found: [] })
     await mount()
-    expect(has('hunt-slot-4-picture-tap')).toBe(true)
-    await build('tap')
-    expect(tilesOf(4)).toBe('tap')
-    expect(has('hunt-slot-4-picture-tap')).toBe(true)
+    expect(has('hunt-slot-2-picture-mom')).toBe(true)
+    await build('mom')
+    expect(tilesOf(2)).toBe('mom')
+    expect([0, 1, 3].map(tilesOf)).toEqual(['', '', ''])
+    expect(has('hunt-slot-2-picture-mom')).toBe(true)
   })
 })
 
@@ -441,14 +468,14 @@ describe('H13: an extra', () => {
     await advance(40)
     expect(byId('hunt-bonus').props.accessibilityLabel).toBe('Bonus words, tab')
     await advance(SHELF_HOLD_MS + SHELF_DROP_MS + 20)
-    await build('gap')
+    await build('fat')
     expect(byId('hunt-bonus').props.accessibilityLabel).toBe(
-      'Bonus words, tab, gap',
+      'Bonus words, tab, fat',
     )
-    expect(has('hunt-bonus-gap-2')).toBe(true)
+    expect(has('hunt-bonus-fat-2')).toBe(true)
     expect(screen.queryAllByTestId(/^hunt-slot-\d-tile-\d$/)).toHaveLength(0)
     expect(byId('hunt-bonus').props.accessibilityRole).toBeUndefined()
-    expect(loadHuntRecord()!.found).toEqual(['tab', 'gap'])
+    expect(loadHuntRecord()!.found).toEqual(['tab', 'fat'])
   })
 })
 
@@ -457,7 +484,7 @@ describe('H14: runs that never fill a slot', () => {
     const g = await mount()
     await build('hag')
     expect(g.lines.some((l) => l.includes('word.hag'))).toBe(false)
-    await build('bpt')
+    await build('bft')
     expect(g.sfx.boing.play).toHaveBeenCalledTimes(1)
     await seat('b', 'a')
     await advance(SING_AFTER_MS + 3000)
@@ -519,14 +546,14 @@ describe('H15: the hint', () => {
 
 describe('H16: tapping a slot', () => {
   it('a filled slot plays its word (picture word: its word part; said word: its clip), no caption', async () => {
-    learnerAt('cvc-words-short-o', { letters: ROUND, found: ['bag', 'tap'] })
+    learnerAt('cvc-words-short-o', { letters: OB, found: ['box', 'mom'] })
     const g = await mount()
     await fireEvent.press(byId('hunt-slot-0'))
-    expect(g.calls.at(-1)).toEqual(wordSound('bag'))
-    await fireEvent.press(byId('hunt-slot-4'))
-    expect(g.calls.at(-1)).toEqual(wordSound('tap'))
+    expect(g.calls.at(-1)).toEqual(wordSound('box'))
+    await fireEvent.press(byId('hunt-slot-2'))
+    expect(g.calls.at(-1)).toEqual(wordSound('mom'))
     expect(has('play-game-ribbon')).toBe(false)
-    expect(byId('hunt-slot-4').props.accessibilityRole).toBe('button')
+    expect(byId('hunt-slot-2').props.accessibilityRole).toBe('button')
   })
 
   it('ignored while the board waits', async () => {
@@ -540,11 +567,11 @@ describe('H16: tapping a slot', () => {
   })
 })
 
-/** Mount on the seeded 4-of-6 round and build tag, the completing find. */
+/** Mount on the seeded 2-of-4 round and build tag, the completing find. */
 async function toC0() {
   learnerAt('cvc-words-short-o', {
     letters: ROUND,
-    found: ['bag', 'hat', 'bat', 'tap'],
+    found: ['bag', 'hat'],
   })
   const g = await mount()
   await seat('t', 'a', 'g')
@@ -555,18 +582,21 @@ async function toC0() {
 }
 
 describe('H17: completion', () => {
-  it('at the 5th of 6, after its shelf clears: the lap in board order, "You did it!", the cheer and burst, then (her first: the roll-in) New letters; the board ignores touches until then; Back works', async () => {
+  it('at the 3rd of 4, after its shelf clears: the lap in board order, "You did it!", the cheer and burst, then (her first: the roll-in) New letters; the board ignores touches until then; Back works', async () => {
     const g = await toC0()
     // C0: the board locks, Emma celebrates.
     expect(g.poses.at(-1)).toBe('celebration')
     expect(loadHuntRecord()!.complete).toBe(true)
     expect(has('hunt-new-letters')).toBe(false)
-    // Found bag, hat, bat, tap, then tag: the lap is the board's order.
-    const order = ['bag', 'bat', 'hat', 'tag', 'tap']
+    // Found bag, hat, then tag: the lap is the board's order, bat's slot
+    // (1) skipped.
+    const order = ['bag', 'hat', 'tag']
+    const slots = [0, 2, 3]
     let calls = g.calls.length
     await advance(BEAT_LAP_AFTER_MS)
     for (let i = 0; i < order.length; i++) {
-      expect(has(`hunt-slot-${i}-lap`)).toBe(true)
+      expect(has(`hunt-slot-${slots[i]}-lap`)).toBe(true)
+      expect(has('hunt-slot-1-lap')).toBe(false)
       expect(g.calls.slice(calls)).toEqual([wordSound(order[i]!)])
       calls = g.calls.length
       // Touches are ignored: a slot, a critter.
@@ -627,8 +657,8 @@ async function throughBeat() {
 describe('H18: after the beat', () => {
   it('the last target fills its slot with its usual outcome, no second beat; then nothing starts', async () => {
     const g = await throughBeat()
-    await build('pat')
-    expect(tilesOf(5)).toBe('pat')
+    await build('bat')
+    expect(tilesOf(1)).toBe('bat')
     expect(
       g.lines.filter((l) => l === 'guide.play.critters.done'),
     ).toHaveLength(1)
@@ -671,7 +701,7 @@ describe('H19: New letters', () => {
 })
 
 describe('H20: leaving and coming back', () => {
-  it('Back mid-round: the same letters, every find in its own slot, every slot’s picture or mark, and the chip, drawn at once; only the open line', async () => {
+  it('Back mid-round: the same letters, every find in its own slot, every slot’s picture, and the chip, drawn at once; only the open line', async () => {
     const first = await mount()
     await build('hat')
     await build('tab')
@@ -679,16 +709,10 @@ describe('H20: leaving and coming back', () => {
     await first.unmount()
     const g = await mount({ rng: seeded(99) })
     expect(meadow()).toEqual(ROUND)
-    expect(BOARD.map((_, i) => tilesOf(i))).toEqual([
-      'bag',
-      '',
-      'hat',
-      '',
-      '',
-      '',
-    ])
+    expect(BOARD.map((_, i) => tilesOf(i))).toEqual(['bag', '', 'hat', ''])
     expect(has('hunt-slot-1-picture-bat')).toBe(true)
-    expect(has('hunt-slot-5-listen')).toBe(true)
+    expect(has('hunt-slot-3-picture-tag')).toBe(true)
+    expect(screen.queryAllByTestId(/^hunt-slot-\d-listen$/)).toHaveLength(0)
     expect(byId('hunt-bonus').props.accessibilityLabel).toBe('Bonus words, tab')
     expect(has('hunt-fly-0')).toBe(false)
     expect(g.lines).toEqual(['guide.play.critters.open'])
@@ -728,7 +752,7 @@ describe('the background mid-outcome (§ 6.4)', () => {
 
   it.each([
     ['bag', 0],
-    ['pat', 5],
+    ['tag', 3],
   ])(
     'a new target (%s) lands in its own slot (%i) once she is back; the next takes its own',
     async (word, slot) => {
@@ -755,7 +779,7 @@ describe('the background mid-outcome (§ 6.4)', () => {
   it('the completing find: its slot fills, then the beat laps every found slot', async () => {
     learnerAt('cvc-words-short-o', {
       letters: ROUND,
-      found: ['bag', 'hat', 'bat', 'tap'],
+      found: ['bag', 'hat'],
     })
     const g = await mount()
     await cutByBackground(g, 'tag')
@@ -826,19 +850,19 @@ describe('H23: Reduce Motion', () => {
     const { count } = wiggleStarts()
     learnerAt('cvc-words-short-o', {
       letters: ROUND,
-      found: ['bag', 'hat', 'bat'],
+      found: ['bag'],
     })
     const g = await mount()
-    await seat('t', 'a', 'p')
+    await seat('t', 'a', 'g')
     await advance(SING_AFTER_MS)
     for (let t = 0; t < 12000; t += 50) {
       expect(has('hunt-fly-0')).toBe(false)
       await advance(50)
     }
-    expect(tilesOf(4)).toBe('tap')
+    expect(tilesOf(3)).toBe('tag')
     await build('bag')
     expect(count()).toBe(0)
-    await build('tag')
+    await build('hat')
     await advance(20000)
     expect(has('hunt-new-letters')).toBe(true)
     expect(g.lines).toContain('guide.play.critters.done')
@@ -871,7 +895,7 @@ describe('H25: a new layout mid-round', () => {
     await seat('h', 'a')
     await g.relayout(PHONE_L)
     const l = mathLayout(PHONE_L)
-    const scene = huntScene(playArea(l), l.tablet, l.landscape, 6)
+    const scene = huntScene(playArea(l), l.tablet, l.landscape, 4)
     expect(flat(byId('critter-b'))).toMatchObject({
       left: scene.cells[1]!.x,
       top: scene.cells[1]!.y,
@@ -890,7 +914,7 @@ describe('H25: a new layout mid-round', () => {
 // --- Pictures in the word boxes (critters-word-hunt.md § 15, P2-P10) -----------
 
 describe('P2: the board from the deal', () => {
-  it('slot i is board word i (its picture and its sound); the picture at opacity 1 exactly when it has one, else the listen mark, never both; no tile until found', async () => {
+  it('B9 (amends P2): slot i is board word i (its picture and its sound); every slot of a dealt round shows its picture at opacity 1, never the listen mark; no tile until found', async () => {
     const g = await mount()
     const r = huntRoundOf(ROUND)!
     expect(huntBoardOrder(r)).toEqual(BOARD)
@@ -915,25 +939,43 @@ describe('P2: the board from the deal', () => {
       }
       expect(tilesOf(i)).toBe('')
     })
-    expect(critterHasPicture('pat')).toBe(false)
-    expect(has('hunt-slot-5-listen')).toBe(true)
+    expect(BOARD.every(critterHasPicture)).toBe(true)
+    expect(screen.queryAllByTestId(/^hunt-slot-\d-listen$/)).toHaveLength(0)
   })
 
   it('a record stored in find order (as build 23 wrote it) reopens with each find in its own slot', async () => {
     learnerAt('cvc-words-short-o', {
       letters: ROUND,
-      found: ['tap', 'pat', 'bag', 'hat'],
+      found: ['tag', 'gag', 'bat'],
     })
     await mount()
-    expect(BOARD.map((_, i) => tilesOf(i))).toEqual([
-      'bag',
-      '',
-      'hat',
-      '',
-      'tap',
-      'pat',
-    ])
-    expect(loadHuntRecord()!.found).toEqual(['tap', 'pat', 'bag', 'hat'])
+    expect(BOARD.map((_, i) => tilesOf(i))).toEqual(['', 'bat', '', 'tag'])
+    expect(loadHuntRecord()!.found).toEqual(['tag', 'gag', 'bat'])
+  })
+})
+
+describe('B9: every dealt slot a picture; the listen mark only for a missing asset', () => {
+  it('every word of every dealt board, at both lengths, has a bundled pack picture', () => {
+    const missing = [...'aeiou'].flatMap((v) =>
+      [...huntRounds(v), ...huntRounds(v, { length: 4 })]
+        .flatMap(huntBoardOrder)
+        .filter((w) => pictureAsset(critterPictureKey(w)) === undefined),
+    )
+    expect(missing).toEqual([])
+  })
+
+  it('a mocked missing asset (tag): its slot shows the listen mark, never a blank box; every other slot its picture', async () => {
+    const real = pictureAsset
+    jest
+      .spyOn(Assets, 'pictureAsset')
+      .mockImplementation((key) => (key === 'tag' ? undefined : real(key)))
+    await mount()
+    expect(has('hunt-slot-3-listen')).toBe(true)
+    expect(screen.queryAllByTestId(/^hunt-slot-3-picture-/)).toHaveLength(0)
+    for (const [i, word] of BOARD.slice(0, 3).entries()) {
+      expect(has(`hunt-slot-${i}-picture-${word}`)).toBe(true)
+      expect(has(`hunt-slot-${i}-listen`)).toBe(false)
+    }
   })
 })
 
@@ -947,12 +989,18 @@ describe('P3: the picture box', () => {
     ['phone S4', PHONE_P],
     ['tablet', { width: 820, height: 1180, insets: PHONE_P.insets }],
   ])(
-    '%s: the picture is drawn to the whole box, clipped to 0.18 T; the listen mark’s stroke is #b27b37, 9 %% of the box',
+    '%s: the picture is drawn to the whole box, clipped to 0.18 T; the listen mark’s stroke is #b27b37, 9 %% of the box (Q30’s stored round)',
     async (_, viewport) => {
+      learnerAt('cvc-words-short-o', {
+        letters: OLD.letters,
+        found: [],
+        stored: OLD,
+      })
       await mount({ viewport })
       const l = mathLayout(viewport)
       const s = huntScene(playArea(l), l.tablet, l.landscape, 6)
       const T = s.step.T
+      const board = huntBoardOrder(OLD)
       for (const i of [0, 4]) {
         const box = boxOf(s, i)
         expect(flat(byId(`hunt-slot-${i}-box`))).toMatchObject({
@@ -963,7 +1011,7 @@ describe('P3: the picture box', () => {
           borderRadius: 0.18 * T,
         })
         const pic = byId(
-          `hunt-slot-${i}-picture-${critterPictureKey(BOARD[i]!)}`,
+          `hunt-slot-${i}-picture-${critterPictureKey(board[i]!)}`,
         )
         expect(flat(pic)).toMatchObject({
           left: 0,
@@ -1004,12 +1052,13 @@ describe('P3: the picture box', () => {
 })
 
 describe('P4: the fill into its own slot', () => {
-  const UB = ['u', 'b', 'g', 'm', 's', 't']
-  it('u b g m s t with bug found: mug fills slot 4, slots 1-3 stay empty; its card lands on the slot’s picture grown to T / 0.86, the picture drawn throughout', async () => {
+  // bug jug tub (picture words), then gum mug mum tug (said words).
+  const UB = ['u', 'b', 'g', 'j', 'm', 't']
+  it('u b g j m t with bug found: mug fills slot 4, slots 1-3 stay empty; its card lands on the slot’s picture grown to T / 0.86, the picture drawn throughout', async () => {
     learnerAt('cvc-words-short-o', { letters: UB, found: ['bug'] })
     await mount()
     const l = mathLayout(PHONE_P)
-    const s = huntScene(playArea(l), l.tablet, l.landscape, 8)
+    const s = huntScene(playArea(l), l.tablet, l.landscape, 7)
     const box = s.slots[4]!.picture
     const timing = jest.spyOn(Reanimated, 'withTiming')
     await seat('m', 'u', 'g')
@@ -1041,8 +1090,12 @@ describe('P4: the fill into its own slot', () => {
     expect(has('hunt-slot-4-picture-mug')).toBe(true)
   })
 
-  it('a listen slot’s fill shows no card, and its mark stays after the tiles land', async () => {
-    learnerAt('cvc-words-short-o', { letters: ROUND, found: ['bag'] })
+  it('Q30: a listen slot’s fill shows no card, and its mark stays after the tiles land', async () => {
+    learnerAt('cvc-words-short-o', {
+      letters: OLD.letters,
+      found: ['bag'],
+      stored: OLD,
+    })
     await mount()
     await seat('p', 'a', 't')
     await advance(SING_AFTER_MS)
@@ -1057,46 +1110,37 @@ describe('P4: the fill into its own slot', () => {
 
   it('a repeat wiggles one slot once (the slot that holds its word, P2) and fills nothing', async () => {
     const { count } = wiggleStarts()
-    learnerAt('cvc-words-short-o', { letters: ROUND, found: ['bag', 'tap'] })
+    learnerAt('cvc-words-short-o', { letters: ROUND, found: ['bag', 'tag'] })
     await mount()
     const before = count()
-    await build('tap')
+    await build('tag')
     expect(count()).toBe(before + 1)
-    expect(BOARD.map((_, i) => tilesOf(i))).toEqual([
-      'bag',
-      '',
-      '',
-      '',
-      'tap',
-      '',
-    ])
+    expect(BOARD.map((_, i) => tilesOf(i))).toEqual(['bag', '', '', 'tag'])
   })
 })
 
 describe('P5: tapping an empty slot', () => {
   it('cuts any line, plays exactly what a filled slot plays, no caption, pose unchanged; the box pulses (400 ms) and a second tap restarts it; no write', async () => {
     const pulses = pulseStarts()
-    learnerAt('cvc-words-short-o', { letters: ROUND, found: ['bag'] })
+    learnerAt('cvc-words-short-o', { letters: OB, found: ['box'] })
     const g = await mount()
     const poses = g.poses.length
     const record = JSON.stringify(loadHuntRecord())
     writes = []
     // A picture word: the word part of its blend clip.
     const before = pulses()
-    await fireEvent.press(byId('hunt-slot-3'))
-    expect(g.calls.at(-1)).toEqual(wordSound('tag'))
+    await fireEvent.press(byId('hunt-slot-1'))
+    expect(g.calls.at(-1)).toEqual(wordSound('mop'))
     expect(pulses()).toBe(before + 1)
     expect(has('play-game-ribbon')).toBe(false)
     expect(g.poses).toHaveLength(poses)
     // Again: it restarts.
-    await fireEvent.press(byId('hunt-slot-3'))
-    expect(g.calls.slice(-2)).toEqual([wordSound('tag'), wordSound('tag')])
+    await fireEvent.press(byId('hunt-slot-1'))
+    expect(g.calls.slice(-2)).toEqual([wordSound('mop'), wordSound('mop')])
     expect(pulses()).toBe(before + 2)
-    // A said word with a picture, and a word with none: their word clips.
-    await fireEvent.press(byId('hunt-slot-4'))
-    expect(g.calls.at(-1)).toEqual(wordSound('tap'))
-    await fireEvent.press(byId('hunt-slot-5'))
-    expect(g.calls.at(-1)).toEqual(wordSound('pat'))
+    // A said word with a picture: its word clip.
+    await fireEvent.press(byId('hunt-slot-3'))
+    expect(g.calls.at(-1)).toEqual(wordSound('pop'))
     expect(g.lines).toEqual(['guide.play.critters.open'])
     expect(g.poses).toHaveLength(poses)
     expect(writes).toEqual([])
@@ -1126,12 +1170,12 @@ describe('P5: tapping an empty slot', () => {
     g = await toC0()
     await advance(BEAT_LAP_AFTER_MS + 100)
     calls = g.calls.length
-    await fireEvent.press(byId('hunt-slot-5'))
+    await fireEvent.press(byId('hunt-slot-1'))
     expect(g.calls).toHaveLength(calls)
     await advance(20000)
     expect(has('hunt-new-letters')).toBe(true)
-    await fireEvent.press(byId('hunt-slot-5'))
-    expect(g.calls.at(-1)).toEqual(wordSound('pat'))
+    await fireEvent.press(byId('hunt-slot-1'))
+    expect(g.calls.at(-1)).toEqual(wordSound('bat'))
     expect(glowing()).toEqual([])
   })
 
@@ -1159,36 +1203,34 @@ describe('P5: tapping an empty slot', () => {
 })
 
 describe('P6: the hint', () => {
-  const OG = ['o', 'g', 'h', 'j', 'p', 't']
-  it('a word with no picture: its three critter sounds, each 300 ms after the last, then its word clip; Emma points, then idle; no caption, no ghost, no critter moves', async () => {
+  /** o b g m p x with box and mop found: the first empty slot is mom (2). */
+  const momHint = () =>
+    learnerAt('cvc-words-short-o', { letters: OB, found: ['box', 'mop'] })
+  it('a word that is no picture word (mom, said, with a picture): its three critter sounds, each 300 ms after the last, then its word clip; Emma points, then idle; no caption, no ghost, no critter moves', async () => {
     holdSharedValues()
-    // hot, pot, pop, top found: the first empty slot is got (slot 4).
-    learnerAt('cvc-words-short-o', {
-      letters: OG,
-      found: ['hot', 'pot', 'pop', 'top'],
-    })
+    momHint()
     const g = await mount()
-    expect(has('hunt-slot-4-listen')).toBe(true)
-    for (let n = 0; n < HUNT_HINT_RUNS; n++) await build('hgp')
-    expect(glowing()).toEqual([4])
-    expect(byId('hunt-slot-4').props.accessibilityLabel).toBe('Hint')
+    expect(has('hunt-slot-2-picture-mom')).toBe(true)
+    for (let n = 0; n < HUNT_HINT_RUNS; n++) await build('bgp')
+    expect(glowing()).toEqual([2])
+    expect(byId('hunt-slot-2').props.accessibilityLabel).toBe('Hint')
     const sequence = jest.spyOn(Reanimated, 'withSequence')
     const moves = sequence.mock.calls.length
     const calls = g.calls.length
-    await fireEvent.press(byId('hunt-slot-4'))
+    await fireEvent.press(byId('hunt-slot-2'))
     expect(g.poses.at(-1)).toBe('attentive-pointing')
-    const want = [...'got'].map(letterCall)
+    const want = [...'mom'].map(letterCall)
     for (let k = 0; k < 3; k++) {
       expect(g.calls.slice(calls)).toEqual(want.slice(0, k + 1))
-      await advance(ownMs('got'[k]!) + SOUND_GAP_MS - 1)
+      await advance(ownMs('mom'[k]!) + SOUND_GAP_MS - 1)
       expect(g.calls.slice(calls)).toHaveLength(k + 1)
       await advance(1)
     }
-    expect(g.calls.slice(calls)).toEqual([...want, wordSound('got')])
+    expect(g.calls.slice(calls)).toEqual([...want, wordSound('mom')])
     expect(g.poses.at(-1)).toBe('attentive-pointing')
     expect(has('play-game-ribbon')).toBe(false)
     expect(screen.queryAllByTestId(/-ghost-/)).toHaveLength(0)
-    await advance(wordMs('got') - 10)
+    await advance(wordMs('mom') - 10)
     expect(g.poses.at(-1)).toBe('attentive-pointing')
     await advance(20)
     expect(g.poses.at(-1)).toBe('idle')
@@ -1197,37 +1239,31 @@ describe('P6: the hint', () => {
   })
 
   it('a tap mid-hint cuts and replays it from the first sound', async () => {
-    learnerAt('cvc-words-short-o', {
-      letters: OG,
-      found: ['hot', 'pot', 'pop', 'top'],
-    })
+    momHint()
     const g = await mount()
-    for (let n = 0; n < HUNT_HINT_RUNS; n++) await build('hgp')
-    await fireEvent.press(byId('hunt-slot-4'))
-    await advance(ownMs('g') + SOUND_GAP_MS + 10)
+    for (let n = 0; n < HUNT_HINT_RUNS; n++) await build('bgp')
+    await fireEvent.press(byId('hunt-slot-2'))
+    await advance(ownMs('m') + SOUND_GAP_MS + 10)
     const calls = g.calls.length
-    await fireEvent.press(byId('hunt-slot-4'))
-    expect(g.calls.slice(calls)).toEqual([letterCall('g')])
+    await fireEvent.press(byId('hunt-slot-2'))
+    expect(g.calls.slice(calls)).toEqual([letterCall('m')])
     expect(g.poses.at(-1)).toBe('attentive-pointing')
-    const sounds = [...'got'].reduce((ms, l) => ms + ownMs(l), 0)
-    await advance(sounds + 3 * SOUND_GAP_MS + wordMs('got') + 10)
+    const sounds = [...'mom'].reduce((ms, l) => ms + ownMs(l), 0)
+    await advance(sounds + 3 * SOUND_GAP_MS + wordMs('mom') + 10)
     expect(g.calls.slice(calls)).toEqual([
-      ...[...'got'].map(letterCall),
-      wordSound('got'),
+      ...[...'mom'].map(letterCall),
+      wordSound('mom'),
     ])
     expect(g.poses.at(-1)).toBe('idle')
   })
 
   it('another slot’s tap cuts the hint; Emma stops pointing', async () => {
-    learnerAt('cvc-words-short-o', {
-      letters: OG,
-      found: ['hot', 'pot', 'pop', 'top'],
-    })
+    momHint()
     const g = await mount()
-    for (let n = 0; n < HUNT_HINT_RUNS; n++) await build('hgp')
-    await fireEvent.press(byId('hunt-slot-4'))
-    await fireEvent.press(byId('hunt-slot-5'))
-    expect(g.calls.at(-1)).toEqual(wordSound('hog'))
+    for (let n = 0; n < HUNT_HINT_RUNS; n++) await build('bgp')
+    await fireEvent.press(byId('hunt-slot-2'))
+    await fireEvent.press(byId('hunt-slot-3'))
+    expect(g.calls.at(-1)).toEqual(wordSound('pop'))
     expect(g.poses.at(-1)).toBe('idle')
     const calls = g.calls.length
     await advance(5000)
@@ -1250,43 +1286,37 @@ describe('P6: the hint', () => {
   })
 
   it('a meadow tap mid-hint ends the hint’s sounds', async () => {
-    learnerAt('cvc-words-short-o', {
-      letters: OG,
-      found: ['hot', 'pot', 'pop', 'top'],
-    })
+    momHint()
     const g = await mount()
-    for (let n = 0; n < HUNT_HINT_RUNS; n++) await build('hgp')
-    await fireEvent.press(byId('hunt-slot-4'))
+    for (let n = 0; n < HUNT_HINT_RUNS; n++) await build('bgp')
+    await fireEvent.press(byId('hunt-slot-2'))
     await advance(50)
     const calls = g.calls.length
-    await activate(byId('critter-h'), 'hear')
+    await activate(byId('critter-b'), 'hear')
     await advance(4000)
-    expect(g.calls.slice(calls)).toEqual([letterCall('h')])
+    expect(g.calls.slice(calls)).toEqual([letterCall('b')])
   })
 
   it('a run seated mid-hint sings its own three sounds first', async () => {
-    learnerAt('cvc-words-short-o', {
-      letters: OG,
-      found: ['hot', 'pot', 'pop', 'top'],
-    })
+    momHint()
     const g = await mount()
-    for (let n = 0; n < HUNT_HINT_RUNS; n++) await build('hgp')
-    await fireEvent.press(byId('hunt-slot-4'))
+    for (let n = 0; n < HUNT_HINT_RUNS; n++) await build('bgp')
+    await fireEvent.press(byId('hunt-slot-2'))
     const calls = g.calls.length
-    await seat('g', 'o', 't')
+    await seat('b', 'o', 'g')
     await advance(SING_AFTER_MS + 3000)
-    expect(g.calls.slice(calls).slice(0, 3)).toEqual([...'got'].map(letterCall))
+    expect(g.calls.slice(calls).slice(0, 3)).toEqual([...'bog'].map(letterCall))
   })
 })
 
 describe('P7: the lap in board order', () => {
-  it('a b h m p t, found tap, bat, map, ham, hat, then mat: the lap plays bat, hat, mat, ham, map, tap; pat’s slot never lights', async () => {
+  it('a b h m p t (bat hat mat, then ham map tap), found tap, bat, map, ham, then mat: the lap plays bat, mat, ham, map, tap; hat’s slot never lights', async () => {
     learnerAt('cvc-words-short-o', {
       letters: ['a', 'b', 'h', 'm', 'p', 't'],
-      found: ['tap', 'bat', 'map', 'ham', 'hat'],
+      found: ['tap', 'bat', 'map', 'ham'],
     })
     const g = await mount()
-    expect(has('hunt-slot-6-listen')).toBe(true)
+    expect(screen.queryAllByTestId(/^hunt-slot-\d$/)).toHaveLength(6)
     await seat('m', 'a', 't')
     await advance(SING_AFTER_MS)
     const lit: number[] = []
@@ -1297,8 +1327,8 @@ describe('P7: the lap in board order', () => {
       }
       await advance(25)
     }
-    expect(lit).toEqual([0, 1, 2, 3, 4, 5])
-    const order = ['bat', 'hat', 'mat', 'ham', 'map', 'tap']
+    expect(lit).toEqual([0, 2, 3, 4, 5])
+    const order = ['bat', 'mat', 'ham', 'map', 'tap']
     expect(g.calls.slice(calls).slice(-order.length)).toEqual(
       order.map(wordSound),
     )
@@ -1343,7 +1373,7 @@ describe('P10: VoiceOver on the slots', () => {
     const g = await mount()
     expect(byId('hunt-slot-0').props.accessibilityLabel).toBe('Bag')
     expect(byId('hunt-slot-0').props.accessibilityRole).toBe('button')
-    for (const i of [1, 2, 3, 4, 5]) {
+    for (const i of [1, 2, 3]) {
       const label = byId(`hunt-slot-${i}`).props.accessibilityLabel as string
       expect(label).toBe('Word to find')
       expect(label.toLowerCase()).not.toContain(BOARD[i]!)

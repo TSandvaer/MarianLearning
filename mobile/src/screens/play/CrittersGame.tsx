@@ -4,8 +4,8 @@
  * (`LetterCritters.tsx`). While only "3" is open the game is the
  * three-letter round, and Back goes to the Play place, as phase 1 shipped.
  * Once "4" is open (her first complete three-letter round, `critterHunt.ts`)
- * the game opens on the length picker: two meadow slabs, "3" over "4". A
- * slab tap plinks and, about 200 ms after the release, that length's round
+ * the game opens on the length picker: two logs in the meadow, "3" over "4".
+ * A log tap plinks and, about 200 ms after the release, that length's round
  * fades in, in progress or fresh; Back from a round fades back to the
  * picker, silent, keeping the round; Back from the picker goes to the Play
  * place. The picker never speaks and shows no round's state.
@@ -92,7 +92,7 @@ export function CrittersGame({ kit, sounds, words, hunt }: CrittersGameProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /** § 5.3: a slab tap plinks; about 200 ms on, that length's round. */
+  /** § 5.3: a log tap plinks; about 200 ms on, that length's round. */
   const onPick = (length: 3 | 4) => {
     if (pickingRef.current) return
     pickingRef.current = true

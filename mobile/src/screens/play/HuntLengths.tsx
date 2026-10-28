@@ -1,22 +1,25 @@
 /**
  * Letter critters' four-letter rounds, drawn (`design/native/critters-four-letter.md`
  * § 3, § 5, § 6): the sockets under a hunt log's seats, the length picker's
- * two meadow slabs with their logs, the arrival slab that glides in when
- * "4" opens, and the door it becomes. Every piece is a View; the paint is
+ * two logs lying in the meadow, the arrival slab that glides in when "4"
+ * opens, and the door it becomes. Every piece is a View; the paint is
  * the restyle's tokens (`play-games-restyle.md` T8 wood and sockets, T9
  * green clay, T11 end grain). The game (`CrittersGame.tsx`,
  * `LetterCritters.tsx`) owns every state and time; these only draw and
  * animate what they are given.
  */
-import { useEffect, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import Animated, {
+  cancelAnimation,
   Easing,
   FadeIn,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
   withTiming,
+  type AnimatedStyle,
+  type SharedValue,
 } from 'react-native-reanimated'
 import type { Rect } from '../../layout/layout'
 import { fonts } from '../../theme'
@@ -27,6 +30,7 @@ import {
   logSockets,
   type ArrivalScene,
   type LogParts,
+  type PickerLog,
   type PickerScene,
 } from './playGeometry'
 
@@ -34,6 +38,21 @@ import {
 export const PICK_AFTER_MS = 200
 /** § 8.1: Reduce Motion's press, a 150 ms dim (1 → 0.85 → 1). */
 export const PICK_DIM_MS = 150
+/**
+ * § 5.3, the wave: 300 ms after the picker's fade-in ends, the logs hop in
+ * turn, 120 ms apart, each up and back over 480 ms; again on a press on
+ * the meadow, but never twice within 1200 ms. It answers a touch, never a
+ * timer.
+ */
+export const PICK_WAVE_AFTER_MS = 300
+export const PICK_WAVE_STAGGER_MS = 120
+export const PICK_HOP_MS = 480
+export const PICK_WAVE_GAP_MS = 1200
+/** The picker's fade-in, the Play place's and `CRITTERS_SWAP_MS` (200 ms). */
+const PICK_FADE_IN_MS = 200
+/** The hop's rise and fall: CSS ease-out, then ease-in. */
+const HOP_UP = Easing.bezier(0, 0, 0.58, 1)
+const HOP_DOWN = Easing.bezier(0.42, 0, 1, 1)
 /**
  * § 6.1, from U0 (the beat's "its end + 900"): the glide; the rest, the
  * sparkle and the dip; the flight to the door; the door in place, New
@@ -70,7 +89,13 @@ const GRAIN =
   'radial-gradient(circle at 40% 32%, #fbe6c8 0%, #f2d3a6 60%, #dcb27c 100%)'
 const GRAIN_RING =
   'inset 0 0 0 3px rgba(125,74,38,0.22), inset 0 2px 0 rgba(255,255,255,0.5)'
-/** T9: the meadow band's green clay and its shadow at the band's k. */
+/**
+ * § 5.2: a picker log's contact shadow on the meadow, T9's band-shadow
+ * brown, darker.
+ */
+const GROUND =
+  'radial-gradient(ellipse at 50% 50%, rgba(60,40,10,0.3) 0%, rgba(60,40,10,0.15) 38%, rgba(60,40,10,0) 70%)'
+/** T9: the arrival slab's green clay and its shadow at the band's k. */
 const MEADOW = 'linear-gradient(#d7f2c4, #a9d68c)'
 const meadowShadow = (tablet: boolean) => {
   const k = tablet ? 0.7 : 0.45
@@ -158,7 +183,8 @@ function GrainDisc({ rect, length }: { rect: Rect; length: number }) {
 /**
  * A log on its own (§ 5.2, § 6.1): T8's wood bar with a socket under each
  * seat and the length's end-grain disc on its left end; the seats above it
- * are empty garden. Drawn relative to `origin`; never an element.
+ * are empty garden. Drawn relative to `origin`; never an element. `motion`
+ * moves it whole (the picker's press and hop).
  */
 function BareLog({
   log,
@@ -166,20 +192,22 @@ function BareLog({
   tablet,
   length,
   testID,
+  motion,
 }: {
   log: LogParts
   origin: { x: number; y: number }
   tablet: boolean
   length: number
   testID: string
+  motion?: AnimatedStyle<ViewStyle>
 }) {
   const bar = relTo(origin, log.bar)
   return (
-    <View
+    <Animated.View
       testID={testID}
       pointerEvents="none"
       accessible={false}
-      style={styles.fill}
+      style={[styles.fill, motion]}
     >
       <View
         style={[
@@ -200,32 +228,34 @@ function BareLog({
         testID={`${testID}-socket`}
       />
       <GrainDisc rect={relTo(origin, log.disc)} length={length} />
-    </View>
+    </Animated.View>
   )
 }
 
 /**
- * One of the picker's slabs (§ 5.2, § 5.3): the whole slab is the button.
- * A press sinks the slab and its log 6 × k over 120 ms (k 7/12 on phones,
- * 1 on tablets); Reduce Motion: a 150 ms dim instead.
+ * One of the picker's logs (§ 5.2, § 5.3): its row is the button. A press
+ * sinks the log, its sockets and disc 6 × k over 120 ms (k 7/12 on phones,
+ * 1 on tablets) while its shadow stays on the ground; Reduce Motion: a
+ * 150 ms dim instead. The wave's hop lifts it `rise` and dims the shadow
+ * to 0.75 at the top.
  */
-function PickerSlab({
-  length,
-  slab,
-  log,
-  radius,
+function PickerLogButton({
+  entry: { length, hit, log, shadow },
+  lift,
+  rise,
   tablet,
   reducedMotion,
   label,
+  onDown,
   onPress,
 }: {
-  length: 3 | 4
-  slab: Rect
-  log: LogParts
-  radius: number
+  entry: PickerLog
+  lift: SharedValue<number>
+  rise: number
   tablet: boolean
   reducedMotion: boolean
   label: string
+  onDown: () => void
   onPress: () => void
 }) {
   const [down, setDown] = useState(false)
@@ -246,50 +276,56 @@ function PickerSlab({
     }
     sink.set(withTiming(down ? depth : 0, { duration: PRESS_MS }))
   }, [down, depth, reducedMotion, sink, dim])
-  const pressed = useAnimatedStyle(() => ({
+  const moved = useAnimatedStyle(() => ({
     opacity: dim.get(),
-    transform: [{ translateY: sink.get() }],
+    transform: [{ translateY: sink.get() - lift.get() }],
+  }))
+  const ground = useAnimatedStyle(() => ({
+    opacity: 1 - (0.25 * lift.get()) / rise,
   }))
   return (
     <Pressable
       testID={`hunt-pick-${length}`}
       accessibilityRole="button"
       accessibilityLabel={label}
-      onPressIn={() => setDown(true)}
+      onPressIn={() => {
+        onDown()
+        setDown(true)
+      }}
       onPressOut={() => setDown(false)}
       onPress={onPress}
-      style={[styles.abs, rectStyle(slab)]}
+      style={[styles.abs, rectStyle(hit)]}
     >
       <Animated.View
-        testID={`hunt-pick-${length}-face`}
+        testID={`hunt-pick-${length}-shadow`}
         pointerEvents="none"
+        accessible={false}
         style={[
-          styles.fill,
-          {
-            borderRadius: radius,
-            experimental_backgroundImage: MEADOW,
-            boxShadow: meadowShadow(tablet),
-          },
-          pressed,
+          styles.abs,
+          rectStyle(relTo(hit, shadow)),
+          { experimental_backgroundImage: GROUND },
+          ground,
         ]}
-      >
-        <BareLog
-          log={log}
-          origin={slab}
-          tablet={tablet}
-          length={length}
-          testID={`hunt-pick-${length}-log`}
-        />
-      </Animated.View>
+      />
+      <BareLog
+        log={log}
+        origin={hit}
+        tablet={tablet}
+        length={length}
+        testID={`hunt-pick-${length}-log`}
+        motion={moved}
+      />
     </Pressable>
   )
 }
 
 /**
- * The length picker (§ 5): two meadow slabs, "3" on top and "4" below,
- * each with its log at the in-round size and their discs lined up. No
- * critters, no slots, no text, no count, the same whatever the rounds
- * hold (Decision 5). It never speaks.
+ * The length picker (§ 5): two logs lying in the meadow, "3" on top and
+ * "4" below, their discs lined up. No slab, critters, slots, text or
+ * count, the same whatever the rounds hold (Decision 5). It never speaks.
+ * The wave (§ 5.3) answers the tap that brought her here and a press on
+ * the meadow that misses the logs; a press on a log cuts it, and Reduce
+ * Motion has none.
  */
 export function LengthPicker({
   scene,
@@ -304,19 +340,70 @@ export function LengthPicker({
   labels: Readonly<Record<3 | 4, string>>
   onPick: (length: 3 | 4) => void
 }) {
+  const lift3 = useSharedValue(0)
+  const lift4 = useSharedValue(0)
+  const lifts = { 3: lift3, 4: lift4 }
+  const rise = tablet ? 4 : 3
+  const hopsRef = useRef(new Set<ReturnType<typeof setTimeout>>())
+  const lastWaveRef = useRef(-Infinity)
+  const after = (fn: () => void, ms: number) => {
+    const timer = setTimeout(() => {
+      hopsRef.current.delete(timer)
+      fn()
+    }, ms)
+    hopsRef.current.add(timer)
+  }
+  const wave = () => {
+    const now = Date.now()
+    if (reducedMotion || now - lastWaveRef.current < PICK_WAVE_GAP_MS) return
+    lastWaveRef.current = now
+    scene.logs.forEach(({ length }, i) => {
+      const hop = () =>
+        lifts[length].set(
+          withSequence(
+            withTiming(rise, { duration: PICK_HOP_MS / 2, easing: HOP_UP }),
+            withTiming(0, { duration: PICK_HOP_MS / 2, easing: HOP_DOWN }),
+          ),
+        )
+      if (i === 0) hop()
+      else after(hop, i * PICK_WAVE_STAGGER_MS)
+    })
+  }
+  const cut = () => {
+    hopsRef.current.forEach(clearTimeout)
+    hopsRef.current.clear()
+    for (const lift of [lift3, lift4]) {
+      cancelAnimation(lift)
+      lift.set(0)
+    }
+  }
+  useEffect(() => {
+    const hops = hopsRef.current
+    after(wave, PICK_FADE_IN_MS + PICK_WAVE_AFTER_MS)
+    return () => hops.forEach(clearTimeout)
+    // Mount-once: the wave that answers her arrival (rotation lays the
+    // picker out again without one).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   return (
     <View testID="hunt-picker" pointerEvents="box-none" style={styles.fill}>
-      {scene.slabs.map(({ length, slab, log }) => (
-        <PickerSlab
-          key={length}
-          length={length}
-          slab={slab}
-          log={log}
-          radius={scene.radius}
+      <Pressable
+        testID="hunt-pick-meadow"
+        accessible={false}
+        onPressIn={wave}
+        style={[styles.abs, rectStyle(scene.meadow)]}
+      />
+      {scene.logs.map((entry) => (
+        <PickerLogButton
+          key={entry.length}
+          entry={entry}
+          lift={lifts[entry.length]}
+          rise={rise}
           tablet={tablet}
           reducedMotion={reducedMotion}
-          label={labels[length]}
-          onPress={() => onPick(length)}
+          label={labels[entry.length]}
+          onDown={cut}
+          onPress={() => onPick(entry.length)}
         />
       ))}
     </View>
