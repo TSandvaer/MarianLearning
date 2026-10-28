@@ -38,7 +38,7 @@ export function seeded(seed: number): () => number {
   }
 }
 
-export function fakeLines() {
+export function fakeLines(lineMs = LINE_MS) {
   const lines: string[] = []
   let pending: (() => void) | null = null
   const player: PlayLinePlayer = {
@@ -48,7 +48,7 @@ export function fakeLines() {
         const timer = setTimeout(() => {
           pending = null
           resolve()
-        }, LINE_MS)
+        }, lineMs)
         opts?.onWordTick?.(0)
         pending = () => {
           clearTimeout(timer)
@@ -144,10 +144,12 @@ export async function mountGame(
     words?: readonly string[]
     sounds?: TapClipPlayer
     hunt?: boolean
+    /** How long each fake line lasts (default `LINE_MS`). */
+    lineMs?: number
   } = {},
 ) {
   resetDragForTests()
-  const lines = fakeLines()
+  const lines = fakeLines(opts.lineMs)
   const sfx = fakePlaySfx()
   const visibility = fakeVisibility()
   const poses: EmmaPose[] = []

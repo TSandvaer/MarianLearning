@@ -80,9 +80,12 @@ import {
   huntBoardOrder,
   huntDeal,
   huntFind,
+  huntDigraphLineSaid,
   huntHintTarget,
   huntOpenLengths,
+  huntUnits,
   loadHuntRecord,
+  markHuntDigraphLineSaid,
   saveHuntRecord,
   type HuntLength,
   type HuntRecord,
@@ -96,6 +99,7 @@ import {
   critterPictureKey,
   critterRun,
   critterSet,
+  HUNT_DIGRAPH_PICTURE_WORDS,
 } from '@marian/core/games/playPlace'
 import { Image } from 'expo-image'
 import {
@@ -142,6 +146,7 @@ import {
   unseat,
   type Seats,
 } from './critterModel'
+import { CritterPair } from './CritterPair'
 import { recordCritterWord } from './critterSeen'
 import {
   newCrittersVisit,
@@ -172,6 +177,7 @@ import {
   ROLL_FLY_AT_MS,
   ROLL_GLIDE_MS,
 } from './HuntLengths'
+import { isPair } from './pairInk'
 import {
   arrivalScene,
   centre,
@@ -305,6 +311,14 @@ function letterSound(letter: string) {
   return { clip, window: letterWindow(segments[source.index]!) }
 }
 
+/**
+ * `word`'s critters in the round, one tile each (critters digraph D16):
+ * ship on i sh b c n p is sh i p. A word the round's critters do not make
+ * (none is dealt) falls back to one a letter.
+ */
+const wordUnits = (word: string, letters: readonly string[]) =>
+  huntUnits(word, letters) ?? [...word]
+
 type Outcome = 'pair' | 'real' | 'word' | 'funny'
 
 /** A run of three in the hunt: a new or found target, a new or found extra. */
@@ -374,6 +388,7 @@ export function LetterCritters({
       last: stored?.letters,
       probeGuard: gate.hunt.probeGuard,
       length,
+      digraphs: gate.hunt.digraphs,
     })
     return { record: freshHuntRecord(round), dealt: true }
   })
@@ -522,6 +537,13 @@ export function LetterCritters({
   const partialRef = useRef(-1)
   const hintRef = useRef(0)
   const idleRef = useRef(0)
+  /**
+   * Dave's Q38 ruling (critters digraph D28): "Two letters, one sound!",
+   * once per learner (read at mount), and whether it plays now.
+   */
+  const [pairSaidAtMount] = useState(huntDigraphLineSaid)
+  const pairSaidRef = useRef(pairSaidAtMount)
+  const pairPlayingRef = useRef(false)
 
   const setSeats = (next: Seats) => {
     seatsRef.current = next
@@ -776,9 +798,57 @@ export function LetterCritters({
     kit.advance(() => {
       if (songRef.current !== token) return
       if (draggingRef.current) return
+      // The digraph critters' line plays: the run waits for its end (D28).
+      if (pairPlayingRef.current) return
       singDueRef.current = false
       sing()
     }, SING_AFTER_MS)
+  }
+
+  /**
+   * Dave's Q38 ruling (critters digraph D28): the first time she lifts a
+   * digraph critter, or 300 ms after the sound of her first tap on one,
+   * Emma says "Two letters, one sound!", once per learner, and never at
+   * round open. A run that falls due while it plays waits for its end and
+   * then sings (the coordinator's ruling, 2026-10-28); a tap or a drag
+   * cuts it as any line, and the run then sings by the usual rule.
+   */
+  const sayPairLine = () => {
+    if (pairSaidRef.current) return
+    pairSaidRef.current = true
+    markHuntDigraphLineSaid()
+    pairPlayingRef.current = true
+    kit.setPose('attentive-pointing')
+    void kit.speak('guide.play.critters.digraph').then((ok) => {
+      pairPlayingRef.current = false
+      if (singDueRef.current && !lockedRef.current && !draggingRef.current) {
+        if (ok) {
+          singDueRef.current = false
+          sing()
+          return
+        }
+        scheduleSing()
+      }
+      kit.setPose('idle')
+    })
+  }
+  /** A lift of `unit` (a drag, or VoiceOver seating it). */
+  const liftPair = (unit: string) => {
+    if (isPair(unit)) sayPairLine()
+  }
+  /**
+   * A tap's sound on `unit` has ended (`token` its tap): the line 300 ms
+   * on, unless another tap, a seat change or a drag came first.
+   */
+  const pairLineAfter = (unit: string, token: number) => {
+    if (!isPair(unit) || pairSaidRef.current || tapRef.current !== token) {
+      return
+    }
+    kit.later(() => {
+      if (tapRef.current !== token || draggingRef.current) return
+      if (lockedRef.current) return
+      sayPairLine()
+    }, SOUND_GAP_MS)
   }
 
   const sing = () => {
@@ -793,9 +863,10 @@ export function LetterCritters({
     if (run === null) return
     // Its song cuts a slot's sound: the hint ends before the run's pose.
     cutTap()
-    const letters = run.map((i) => current[i]!)
-    const word = letters.join('')
-    const kind = run.length === length ? critterRun(word, { funny }) : null
+    // A run is its critters (critters digraph D17): sh-i-p is three.
+    const units = run.map((i) => current[i]!)
+    const word = units.join('')
+    const kind = run.length === length ? critterRun(units, { funny }) : null
     if (kind !== null) {
       startRun()
       huntRun(word, run)
@@ -804,11 +875,7 @@ export function LetterCritters({
       pictureWord(word, run)
       return
     }
-    song(
-      run,
-      letters,
-      kind === null ? 'pair' : kind === 'quiet' ? 'real' : kind,
-    )
+    song(run, units, kind === null ? 'pair' : kind === 'quiet' ? 'real' : kind)
   }
 
   const pictureWord = (word: string, run: number[]) => {
@@ -974,10 +1041,15 @@ export function LetterCritters({
       void kit.speak(line).then(() => {
         if (songRef.current !== token) return
         joy(run, word)
-        if (four && critterHasPicture(word)) {
+        if (
+          (four || HUNT_DIGRAPH_PICTURE_WORDS.includes(word)) &&
+          critterHasPicture(word)
+        ) {
           // critters-four-letter.md § 4.1: a pictured target's picture pops
           // at the joy beat; a lesson word's praise, once a visit, 1200 ms
           // on; the fill at the later of 2400 and the praise's end + 400.
+          // So does a pictured digraph target at three seats (critters
+          // digraph § 4.2, D17: ship's praise; fish and sing have none).
           setPicture({ word, leaving: false })
           pictureEnds(word, run, token, { joyAfter: false })
           return
@@ -1186,8 +1258,9 @@ export function LetterCritters({
   /**
    * § 15.7: the glowing slot plays its word as sounds, then the word, Emma
    * pointing, sound only: a picture word's whole blend clip; any other
-   * target its three critter sounds in order, `SOUND_GAP_MS` after each,
-   * then its word clip. No critter lights or bounces. Then Emma `idle`.
+   * target its critters' sounds in order (ship: /ʃ/ /ɪ/ /p/, critters
+   * digraph § 4.3), `SOUND_GAP_MS` after each, then its word clip. No
+   * critter lights or bounces. Then Emma `idle`.
    */
   const onHintTap = () => {
     const r = recordRef.current
@@ -1206,13 +1279,14 @@ export function LetterCritters({
       playWord(word, true, done)
       return
     }
+    const units = wordUnits(word, r!.letters)
     const next = (k: number) => {
       if (tapRef.current !== token) return
-      if (k === word.length) {
+      if (k === units.length) {
         playWord(word, false, done)
         return
       }
-      singLetter(word[k]!, () => {
+      singLetter(units[k]!, () => {
         if (tapRef.current !== token) return
         kit.later(() => next(k + 1), SOUND_GAP_MS)
       })
@@ -1371,6 +1445,7 @@ export function LetterCritters({
       last: r.letters,
       probeGuard: gate.hunt.probeGuard,
       length,
+      digraphs: gate.hunt.digraphs,
     })
     setPending([])
     setLit({})
@@ -1397,9 +1472,9 @@ export function LetterCritters({
     if (lockedRef.current) return
     kit.cutLine()
     cutPartial()
-    cutTap()
+    const token = cutTap()
     setMeadowHop((h) => ({ ...h, [letter]: (h[letter] ?? 0) + 1 }))
-    singLetter(letter)
+    singLetter(letter, () => pairLineAfter(letter, token))
   }
 
   const onMeadowActivate = (letter: string) => {
@@ -1408,9 +1483,12 @@ export function LetterCritters({
     const free = seatsRef.current.indexOf(null)
     if (free < 0) {
       cutPartial()
-      cutTap()
-      singLetter(letter)
-    } else changed(seatAt(seatsRef.current, free, letter))
+      const token = cutTap()
+      singLetter(letter, () => pairLineAfter(letter, token))
+    } else {
+      changed(seatAt(seatsRef.current, free, letter))
+      liftPair(letter)
+    }
   }
 
   const onMeadowDrop = (letter: string, p: Point): boolean => {
@@ -1428,9 +1506,9 @@ export function LetterCritters({
     if (letter === null || letter === undefined) return
     kit.cutLine()
     cutPartial()
-    cutTap()
+    const token = cutTap()
     bounceSeat(seat)
-    singLetter(letter)
+    singLetter(letter, () => pairLineAfter(letter, token))
   }
 
   const onSeatDrop = (seat: number, p: Point): boolean => {
@@ -1467,6 +1545,7 @@ export function LetterCritters({
     armHuntIdle()
     if (letter !== undefined && letter === vowel) setVowelDrag(true)
     else if (letter !== undefined) setTwin(letter)
+    if (letter !== undefined) liftPair(letter)
   }
   const dragEnd = () => {
     draggingRef.current = false
@@ -1586,6 +1665,7 @@ export function LetterCritters({
                 step={hs.step}
                 tablet={kit.tablet}
                 word={word}
+                units={wordUnits(word, letters)}
                 filled={filled}
                 fadeIn={filled && word === fresh}
                 glow={glowing}
@@ -1618,6 +1698,7 @@ export function LetterCritters({
               rect={chipRect(hs, bonus.length)}
               tiles={bonus.map((_, i) => chipTiles(hs, bonus.length, i))}
               words={bonus}
+              units={bonus.map((w) => wordUnits(w, letters))}
               lit={lit}
               reducedMotion={reducedMotion}
               label={bonusLabel(bonus)}
@@ -1644,7 +1725,10 @@ export function LetterCritters({
               onActivate={() => {
                 if (!lockedRef.current) changed(unseat(seatsRef.current, i))
               }}
-              onDragStart={() => dragStart()}
+              onDragStart={() => {
+                dragStart()
+                liftPair(letter)
+              }}
               onDragEnd={dragEnd}
               onDrop={(p) => onSeatDrop(i, p)}
             >
@@ -1788,7 +1872,7 @@ export function LetterCritters({
 
       {arriving !== null &&
         hs !== null &&
-        [...arriving.word].map((l, i) => {
+        wordUnits(arriving.word, letters).map((l, i) => {
           const to = hs.slots[arriving.slot]?.boxes[i]
           const from = scene.seats[arriving.run[i] ?? i]
           if (to === undefined || from === undefined) return null
@@ -1963,9 +2047,12 @@ function Falling({
 /**
  * A critter (§ 3.2): a round body, honey for consonants and pink for
  * vowels, on a ledge; two eyes in the top third, two small feet; its
- * letter, lower case, on its belly. A bounce (0.15 size, 250 ms) and the
- * lit pulse (1 → 1.2 → 1, 400 ms) on each new `bounce`; Reduce Motion: the
- * letter lights (120 ms in, 200 ms out), no pulse.
+ * letter, lower case, on its belly. A digraph critter (critters digraph
+ * § 2) is a consonant with its pair and bar there instead, the pair at
+ * 0.46 of its size on a 0.70 baseline. A bounce (0.15 size, 250 ms) and
+ * the lit pulse (1 → 1.2 → 1, 400 ms; a pair and its bar as one) on each
+ * new `bounce`; Reduce Motion: the letter lights (120 ms in, 200 ms out),
+ * no pulse.
  */
 function Critter({
   letter,
@@ -2017,8 +2104,10 @@ function Critter({
   const body = useAnimatedStyle(() => ({
     transform: [{ translateY: y.get() }, { rotate: `${tilt.get()}deg` }],
   }))
-  const letterStyle = useAnimatedStyle(() => ({
+  const pulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: lit.get() }],
+  }))
+  const glowStyle = useAnimatedStyle(() => ({
     textShadowRadius: 8 * glow.get(),
   }))
   const eye = 0.18 * size
@@ -2078,20 +2167,33 @@ function Critter({
             />
           </View>
         ))}
-        <Animated.Text
-          allowFontScaling={false}
-          style={[
-            styles.letter,
-            {
-              fontSize: 0.5 * size,
-              lineHeight: 0.6 * size,
-              marginTop: 0.28 * size,
-            },
-            letterStyle,
-          ]}
-        >
-          {letter}
-        </Animated.Text>
+        {isPair(letter) ? (
+          <CritterPair
+            pair={letter}
+            side={size}
+            f={0.46 * size}
+            baseline={0.7 * size}
+            textStyle={glowStyle}
+            groupStyle={pulseStyle}
+            barTestID={`critter-${letter}-bar`}
+          />
+        ) : (
+          <Animated.Text
+            allowFontScaling={false}
+            style={[
+              styles.letter,
+              {
+                fontSize: 0.5 * size,
+                lineHeight: 0.6 * size,
+                marginTop: 0.28 * size,
+              },
+              pulseStyle,
+              glowStyle,
+            ]}
+          >
+            {letter}
+          </Animated.Text>
+        )}
       </View>
     </Animated.View>
   )
