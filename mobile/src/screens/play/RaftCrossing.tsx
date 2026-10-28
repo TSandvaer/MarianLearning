@@ -1,27 +1,31 @@
 /**
- * Raft crossing (play-place spec § 2): drag or tap animals 1-9 onto a raft
- * that carries exactly ten. Every boarding and take-off shows the total on
- * the flag and Emma says it ("Seven!"), each total cutting the one before.
- * Too heavy: the raft wobbles, the newest animal splashes off and paddles
- * home, "Too heavy! Splash!"; the others stay, nothing is counted. After
- * two splashes in a row on a stuck raft, a newcomer of exactly the missing
- * weight walks on, unannounced (D4). Exactly ten: Emma waves, "Ten! Off we
- * go!", the raft rows to the island, the animals hop off and play a silly
- * scene, and the raft comes back to a refilled shore. The third crossing is
- * the natural stop: "What a party on the island!", then the Play place.
+ * A raft trip (play-place spec § 2, raft-island-goal §§ 1-6): drag or tap
+ * animals 1-9 onto a raft that carries exactly its target, 10 or 20.
+ * Every boarding and take-off shows the total on the flag and Emma says it
+ * ("Seven!"), each total cutting the one before. Too heavy: the raft
+ * wobbles, the newest animal splashes off and paddles home, "Too heavy!";
+ * the others stay. After two splashes in a row on a stuck raft, a
+ * newcomer of `raftNewcomer`'s weight walks on, unannounced (D4). Exactly
+ * the target: Emma waves, "Ten! Off we go!" ("Twenty! ..."), the raft rows
+ * to the island, the seated animals play a silly scene on the deck, then
+ * hop home lightest first: a new kind fills its home (the sparkle and a
+ * burst; the island's record is written then), a kind already home merges
+ * with a wiggle. No crossing cap (§ 6): every crossing without a party
+ * comes back to a refilled shore. The ninth kind's crossing throws the
+ * party (§ 3.1), whose last step is the game's (`onPartyEnd`).
  *
  * The model is `raftModel.ts`; this screen runs its beats (through the
- * frame's kit: Back clears them, a hidden app holds them) and draws the
- * scene from `raftScene`. A new layout redraws from the same model, and a
- * motion in flight jumps to its end. Reduce Motion (§ 2.5): fades only,
- * the same lines and sounds; a drag still follows the finger.
- *
- * The paint is the app's clay (play-games-restyle § 2 T2-T6): the Map's
- * land bands for the water and the shore, a clay oval island, clay wood
- * for the raft, cream clay tiles for the numbers, plinths and contact
- * shadows for the animals. Paint only: every rect is `raftScene`'s.
+ * frame's kit: Back clears them, a hidden app holds them; a trip left for
+ * the picker drops its own) and draws the scene from `raftScene`. A new
+ * layout redraws from the same model, and a motion in flight jumps to its
+ * end. Reduce Motion (§ 2.5, raft-island-goal § 9): fades only, the same
+ * lines and sounds; a drag still follows the finger.
  */
-import { RAFT_ANIMALS, type RaftWeight } from '@marian/core/games/playPlace'
+import {
+  RAFT_ANIMALS,
+  type RaftTarget,
+  type RaftWeight,
+} from '@marian/core/games/playPlace'
 import {
   useEffect,
   useLayoutEffect,
@@ -29,7 +33,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import Animated, {
   Easing,
   FadeIn,
@@ -37,50 +41,74 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withRepeat,
   withSequence,
   withSpring,
   withTiming,
 } from 'react-native-reanimated'
-import { Image } from 'expo-image'
-import { pictureAsset } from '../../assets'
-import { imageShadow } from '../../components/imageShadow'
 import type { Rect } from '../../layout/layout'
-import { fonts } from '../../theme'
-import { ClayOval } from '../map/mapFx'
+import { SparkleBurst, SPARKLE_BURST_MS } from '../wordSong/WordChip'
 import { DragPiece } from './DragPiece'
 import { SPRING } from './dragLock'
 import {
   centre,
   contains,
   grow,
-  islandSpot,
+  islandHomes,
+  moundFace,
   outerness,
   raftScene,
   type Point,
   type RaftScene,
 } from './playGeometry'
 import type { GameKit } from './playKit'
-import { animalLabel, raftLabel, raftTotalLine } from './playLines'
+import {
+  animalLabel,
+  homeLabel,
+  raftGoLine,
+  raftOpenLine,
+  raftTotalLine,
+  type PlayLineId,
+} from './playLines'
 import {
   arrive,
   board,
-  finish,
+  homeOne,
+  homePlan,
   initialRaft,
+  islandIsFull,
   refill,
   splashEnd,
+  startParty,
   takeOff,
-  tripOver,
   wobbleEnd,
+  type HomeHop,
   type RaftState,
   type SceneId,
   type SpotMetric,
 } from './raftModel'
+import { bandRadius, bandShadow, clayK, rectStyle } from './raftPaint'
+import {
+  AnimalArt,
+  Deck,
+  FADE_MS,
+  GLIDE_MS,
+  HomeArt,
+  Plinth,
+  REDUCED_GLIDE_MS,
+  REDUCED_RETURN_MS,
+  RETURN_MS,
+  TripIsland,
+  WATER,
+  WATER_DEEP,
+  WATER_LEDGE,
+  WOBBLE_MS,
+} from './RaftParts'
+
+export { GLIDE_MS, RETURN_MS, WOBBLE_MS } from './RaftParts'
 
 /** The open line: 300 ms after the 200 ms fade-in (§ 4.1). */
 export const RAFT_OPEN_DELAY_MS = 500
 /** Too heavy (§ 2.3). */
-export const WOBBLE_MS = 900
 export const SPLASH_AT_MS = 500
 const SLIDE_MS = 400
 const PADDLE_MS = 1200
@@ -92,84 +120,44 @@ export const REDUCED_SPLASH_END_MS = 400
 /** Newcomers' walk-in, 120 ms apart; Reduce Motion: a 200 ms fade. */
 export const WALK_MS = 500
 const WALK_STAGGER_MS = 120
-/** Exactly ten (§ 2.3). */
+/** Exactly the target (§ 2.3). */
 export const ROW_AT_MS = 600
-export const GLIDE_MS = 2400
-const REDUCED_GLIDE_MS = 400
-const HOP_OFF_MS = 300
-const HOP_OFF_STAGGER_MS = 80
 export const SCENE_AT_MS = 300
 export const SCENE_MS = 2600
+/** The scene's end (its line and motion) to the walk home's `H0` (§ 1.4). */
 export const AFTER_SCENE_MS = 400
-export const RETURN_MS = 1600
-const REDUCED_RETURN_MS = 400
+/** The walk home (§ 1.4): a hop of 300 ms, hops 300 ms apart. */
+export const HOP_HOME_MS = 300
+export const HOP_HOME_STAGGER_MS = 300
+/** A hop's beat after it lands: the fill's settle, a repeat's wiggle. */
+export const HOME_BEAT_MS = 400
+/** The last hop's beat end to the return or the party (§ 1.4). */
+export const AFTER_HOMES_MS = 400
+/** The repeat's wiggle, four 100 ms steps (§ 2.2). */
+const WIGGLE_STEP_MS = 100
+/** The party (§ 3.1), from `P0`. */
+export const PARTY_LAP_AT_MS = 300
+export const PARTY_LAP_STEP_MS = 120
+export const PARTY_LINE_AT_MS = 1760
+/** The shipped cheer's length (J1's place until J1 lands, § 7). */
+export const CHEER_MS = 862
+export const PARTY_CLOSE_GAP_MS = 300
+export const PARTY_DANCE_MS = 2000
+/** The close line's end to the party's last step (§ 3.1). */
 export const CLOSE_GAP_MS = 800
-const FADE_MS = 150
-
-// The clay (play-games-restyle § 2). k is the frame's clay scale (1 on
-// tablets, 7/12 on phones, the Home disc's); R the Map band's radius.
-const clayK = (tablet: boolean) => (tablet ? 1 : 7 / 12)
-const bandRadius = (tablet: boolean) => 48 * clayK(tablet)
-/** The Map band's shadow on its ledge colour (`landParts.tsx`). */
-const bandShadow = (lo: string, k: number) =>
-  `inset 0 ${5 * k}px 0 rgba(255, 255, 255, 0.4), inset 0 ${-8 * k}px 0 rgba(0, 0, 0, 0.08), 0 ${10 * k}px 0 ${lo}, 0 ${18 * k}px ${24 * k}px rgba(60, 40, 10, 0.15)`
-/** T2: today's water as a pool; its ledge is the only new colour. */
-const WATER = '#8fd0ee'
-const WATER_DEEP = '#5fb3dd'
-const WATER_LEDGE = '#4a9cc8'
-/** T2: the Map's sand band (`BAND_TINTS[1]`). */
-const SHORE_HI = '#ffeec2'
-const SHORE_LO = '#e8c77a'
-/** Ripples: fractions of the water rect, clear of the raft's path. */
-const RIPPLES_UP: readonly [number, number][] = [
-  [0.05, 0.25],
-  [0.78, 0.18],
-  [0.08, 0.7],
-  [0.8, 0.62],
-  [0.14, 0.92],
-]
-const RIPPLES_RIGHT: readonly [number, number][] = [
-  [0.62, 0.12],
-  [0.78, 0.3],
-  [0.6, 0.72],
-  [0.8, 0.88],
-  [0.7, 0.5],
-]
-/** T3: the island, a Word Song honey clay oval; bushes in green clay. */
-const MOUND_STOPS = ['#ffeec2', '#f2c27a', '#d9a159'] as const
-const MOUND_SLAB = '#b27b37'
-/** T6: the Map's open-stop plinth. */
-const PLINTH_STOPS = ['#fffaf0', '#efdcc0', '#d6b890'] as const
-const PLINTH_SLAB = '#b8946a'
-/** A clay oval's soft shadow under its slab. */
-const ovalSoft = (drop: number) => ({
-  dy: drop + 2,
-  blur: 8,
-  color: 'rgba(60, 30, 10, 0.22)',
-})
-/** T4: the Home disc's wood, run top to bottom. */
-const WOOD = '#c98a55'
-const WOOD_RIM = '#7d4a26'
-/** T5: the cream clay tile (`ClayChip`) on Number Garden's slab. */
-const TILE = '#fff7ee'
-const TILE_FACE = 'linear-gradient(#ffffff 0%, #fff7ee 60%, #ffeedd 100%)'
-const TAG_SHADOW = {
-  tablet:
-    'inset 0 2px 0 #ffffff, 0 4px 0 #dba675, 0 6px 9px rgba(90, 45, 20, 0.16)',
-  phone:
-    'inset 0 2px 0 #ffffff, 0 3px 0 #dba675, 0 5px 7px rgba(90, 45, 20, 0.16)',
-}
-const TAG_TEXT = '#6b3f1f'
-/** T6: the Hub and map stickers' drop shadow, on every animal picture. */
-const PICTURE_SHADOW = {
-  tablet: imageShadow(4, 8, 'rgba(60, 30, 10, 0.28)'),
-  phone: imageShadow(3, 6, 'rgba(60, 30, 10, 0.28)'),
-}
 
 export interface RaftCrossingProps {
   kit: GameKit
+  /** The raft (default 10). */
+  target?: RaftTarget
+  /** The kinds home on its island as the trip starts. */
+  homes?: readonly RaftWeight[]
   /** Test seam: the first shore's weights. */
   shore?: readonly number[]
+  /** A kind's first landing on this island (the record's write, I7). */
+  onFill?: (weight: RaftWeight) => void
+  /** The party's last step (§ 3.1): the reveal, or back to the picker. */
+  onPartyEnd?: () => void
 }
 
 function metricOf(scene: RaftScene): SpotMetric {
@@ -208,16 +196,58 @@ interface Splash {
   key: number
 }
 
-export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
+/** An animal on its way home (§ 1.4), drawn above the scene. */
+interface Walker extends HomeHop {
+  key: number
+}
+
+/** What a home is doing this beat (§§ 2, 3). */
+interface HomeFx {
+  /** A fill landed: the shape fades, the animal settles (§ 2.1). */
+  fill: number
+  /** A repeat landed: the wiggle (§ 2.2). */
+  repeat: number
+}
+
+export function RaftCrossing({
+  kit,
+  target = 10,
+  homes = [],
+  shore,
+  onFill,
+  onPartyEnd,
+}: RaftCrossingProps) {
   const { reducedMotion, sfx, tablet } = kit
-  const scene = raftScene(kit.area, kit.tablet, kit.landscape)
+  const scene = raftScene(kit.area, kit.tablet, kit.landscape, target)
   const sceneRef = useRef(scene)
   useLayoutEffect(() => {
     sceneRef.current = scene
   })
 
+  // A trip left for the picker (Back with two rafts open) is unmounted
+  // while the frame lives on: its own beats and lines stop with it.
+  const liveRef = useRef(true)
+  useEffect(() => {
+    liveRef.current = true
+    return () => {
+      liveRef.current = false
+    }
+  }, [])
+  const later = (fn: () => void, ms: number) =>
+    kit.later(() => {
+      if (liveRef.current) fn()
+    }, ms)
+  const advance = (fn: () => void, ms: number) =>
+    kit.advance(() => {
+      if (liveRef.current) fn()
+    }, ms)
+  const speak = (id: PlayLineId): Promise<boolean> =>
+    liveRef.current
+      ? kit.speak(id).then((ok) => ok && liveRef.current)
+      : Promise.resolve(false)
+
   const [model, setModel] = useState<RaftState>(() =>
-    initialRaft(kit.rng, shore),
+    initialRaft(kit.rng, { target, homes, shore }),
   )
   const modelRef = useRef(model)
   /**
@@ -231,30 +261,41 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
     setModel(next)
     setFlights(moving)
   }
-  const splashSeq = useRef(0)
+  const seq = useRef(0)
+  const nextKey = () => ++seq.current
   const [splash, setSplash] = useState<Splash | null>(null)
   const [deckAt, setDeckAt] = useState<'dock' | 'landing'>('dock')
   const [gliding, setGliding] = useState(false)
   const [playing, setPlaying] = useState<SceneId | null>(null)
-  const [party, setParty] = useState(false)
   const [leaving, setLeaving] = useState<{
     id: number
     weight: RaftWeight
     spot: number
   } | null>(null)
   const [hops, setHops] = useState<Record<number, number>>({})
-  /** How many animals the latest crossing landed (they play its scene). */
-  const [landed, setLanded] = useState(0)
+  /** The kinds drawn in colour: a fill shows at its hop's end. */
+  const [shown, setShown] = useState<readonly RaftWeight[]>(() => homes)
+  const [walkers, setWalkers] = useState<readonly Walker[]>([])
+  const [fx, setFx] = useState<Partial<Record<RaftWeight, HomeFx>>>({})
+  const [bursts, setBursts] = useState<
+    readonly { w: RaftWeight; key: number }[]
+  >([])
+  /** The party: its lap and its dance, each a fresh key (§ 3.1). */
+  const [lap, setLap] = useState(0)
+  const [dance, setDance] = useState(0)
+  const [partyBurst, setPartyBurst] = useState(false)
+  /** The island was full as the trip began: it never parties (§ 3.1). */
+  const [fullAtStart] = useState(() => homes.length === 9)
 
   // The open line, 300 ms after the fade-in.
   useEffect(() => {
-    kit.later(() => {
+    later(() => {
       kit.setPose('listening')
-      void kit.speak('guide.play.raft.open').then((ok) => {
+      void speak(raftOpenLine(target)).then((ok) => {
         if (ok) kit.setPose('idle')
       })
     }, RAFT_OPEN_DELAY_MS)
-    // Mount-once: the trip starts when the game opens.
+    // Mount-once: the trip starts when it opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -262,7 +303,7 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
   const boardZone = grow(scene.dock, 0.25 * scene.a)
 
   const sayTotal = (total: number) => {
-    if (total >= 1 && total <= 9) void kit.speak(raftTotalLine(total))
+    if (total >= 1 && total < target) void speak(raftTotalLine(total))
     else kit.cutLine()
   }
 
@@ -299,19 +340,18 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
 
   const tooHeavy = (id: number, seat: number) => {
     const weight = modelRef.current.animals[id]!.weight
-    splashSeq.current += 1
-    setSplash({ id, weight, seat, key: splashSeq.current })
+    setSplash({ id, weight, seat, key: nextKey() })
     const atMs = reducedMotion ? 0 : SPLASH_AT_MS
-    kit.later(() => {
+    later(() => {
       sfx.splash.play()
       kit.setPose('puzzled-tilt')
-      void kit.speak('guide.play.raft.splash')
+      void speak('guide.play.raft.splash')
     }, atMs)
-    kit.advance(
+    advance(
       () => apply(wobbleEnd(modelRef.current)),
       reducedMotion ? REDUCED_WOBBLE_MS : WOBBLE_MS,
     )
-    kit.advance(
+    advance(
       () => {
         const [next, { newcomer }] = splashEnd(
           modelRef.current,
@@ -351,23 +391,23 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
       const weight = s.animals[result.leaving]!.weight
       const spot = s.spots.indexOf(result.leaving)
       setLeaving({ id: result.leaving, weight, spot })
-      kit.later(() => setLeaving(null), reducedMotion ? 200 : WALK_MS)
+      later(() => setLeaving(null), reducedMotion ? 200 : WALK_MS)
     }
     apply(next, f)
     sayTotal(next.total)
     return true
   }
 
-  // --- Exactly ten -------------------------------------------------------
+  // --- Exactly the target --------------------------------------------------
 
   const depart = () => {
     sfx.sparkle.play()
     kit.setPose('waving')
-    void kit.speak('guide.play.raft.go')
-    kit.advance(() => {
+    void speak(raftGoLine(target))
+    advance(() => {
       setGliding(true)
       setDeckAt('landing')
-      kit.advance(
+      advance(
         () => {
           setGliding(false)
           land()
@@ -377,27 +417,11 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
     }, ROW_AT_MS)
   }
 
+  /** At the landing the animals stay seated; the scene follows (§ 1.4). */
   const land = () => {
-    const s = modelRef.current
-    const sc = sceneRef.current
-    const aboard = s.seats.flatMap((id, seat) =>
-      id === null ? [] : [{ id, seat }],
-    )
-    const f: Flights = {}
-    aboard.forEach(({ id, seat }, j) => {
-      f[`island-${id}`] = {
-        d: delta(
-          seatOnScreen(sc, sc.landing, seat),
-          islandSpot(sc, s.island.length + j),
-        ),
-        ms: HOP_OFF_MS,
-        delay: HOP_OFF_STAGGER_MS * j,
-      }
-    })
-    const [next, chosen] = arrive(s, kit.rng)
-    setLanded(aboard.length)
-    apply(next, f)
-    kit.advance(() => silly(chosen), SCENE_AT_MS)
+    const [next, chosen] = arrive(modelRef.current, kit.rng)
+    apply(next)
+    advance(() => silly(chosen), SCENE_AT_MS)
   }
 
   const silly = (chosen: SceneId) => {
@@ -405,14 +429,14 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
     kit.setPose('cheering')
     sfx.cheer.play()
     if (chosen === 'cannonball' && !reducedMotion) {
-      kit.later(() => sfx.splash.play(), 500)
+      later(() => sfx.splash.play(), 500)
     }
     let lineDone = false
     let sceneDone = false
     const next = () => {
-      if (lineDone && sceneDone) kit.advance(afterScene, AFTER_SCENE_MS)
+      if (lineDone && sceneDone) advance(walkHome, AFTER_SCENE_MS)
     }
-    kit.later(
+    later(
       () => {
         sceneDone = true
         setPlaying(null)
@@ -420,27 +444,63 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
       },
       reducedMotion ? 0 : SCENE_MS,
     )
-    void kit.speak('guide.play.raft.silly').then(() => {
+    void speak('guide.play.raft.silly').then(() => {
       lineDone = true
       next()
     })
   }
 
-  const afterScene = () => {
-    const s = modelRef.current
-    if (tripOver(s)) {
-      apply(finish(s))
-      setParty(true)
-      kit.setPose('cheering')
-      void kit.speak('guide.play.raft.close').then((ok) => {
-        if (ok) kit.advance(kit.done, CLOSE_GAP_MS)
-      })
+  // --- The walk home (§ 1.4, § 2) ----------------------------------------
+
+  const walkHome = () => {
+    kit.setPose('idle')
+    const plan = homePlan(modelRef.current)
+    plan.forEach((h, k) => advance(() => hopStart(h), HOP_HOME_STAGGER_MS * k))
+    const lastEnd =
+      HOP_HOME_STAGGER_MS * Math.max(0, plan.length - 1) +
+      (reducedMotion ? FADE_MS : HOP_HOME_MS)
+    advance(afterHomes, lastEnd + HOME_BEAT_MS + AFTER_HOMES_MS)
+  }
+
+  const hopStart = (h: HomeHop) => {
+    apply(homeOne(modelRef.current, h.id))
+    const key = nextKey()
+    setWalkers((ws) => [...ws, { ...h, key }])
+    later(() => hopEnd(h, key), reducedMotion ? FADE_MS : HOP_HOME_MS)
+  }
+
+  const hopEnd = (h: HomeHop, key: number) => {
+    setWalkers((ws) => ws.filter((x) => x.key !== key))
+    const w = h.weight
+    if (h.fill) {
+      setShown((ks) => (ks.includes(w) ? ks : [...ks, w]))
+      setFx((f) => ({ ...f, [w]: { fill: key, repeat: f[w]?.repeat ?? 0 } }))
+      sfx.sparkle.play()
+      onFill?.(w)
+      if (!reducedMotion) {
+        setBursts((b) => [...b, { w, key }])
+        later(
+          () => setBursts((b) => b.filter((x) => x.key !== key)),
+          SPARKLE_BURST_MS,
+        )
+      }
       return
     }
+    setFx((f) => ({ ...f, [w]: { fill: f[w]?.fill ?? 0, repeat: key } }))
+  }
+
+  /** The ninth kind just filled: the party; otherwise the way back. */
+  const afterHomes = () => {
+    if (!fullAtStart && islandIsFull(modelRef.current)) party()
+    else goBack()
+  }
+
+  /** Every crossing without a party (§ 6): back to a refilled shore. */
+  const goBack = () => {
     setGliding(true)
     setDeckAt('dock')
     kit.setPose('idle')
-    kit.advance(
+    advance(
       () => {
         setGliding(false)
         const [next, fresh] = refill(
@@ -463,51 +523,117 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
     )
   }
 
+  // --- The party (§ 3.1) ---------------------------------------------------
+
+  const party = () => {
+    apply(startParty(modelRef.current))
+    kit.setPose('celebration')
+    later(() => setLap(nextKey()), PARTY_LAP_AT_MS)
+    advance(() => {
+      kit.setPose('cheering')
+      void speak('guide.play.raft.party').then((ok) => {
+        if (!ok) return
+        sfx.cheer.play()
+        if (!reducedMotion) {
+          setPartyBurst(true)
+          setDance(nextKey())
+          later(() => setPartyBurst(false), SPARKLE_BURST_MS)
+        }
+        advance(() => {
+          kit.setPose('cheering')
+          void speak('guide.play.raft.close').then((closed) => {
+            if (!closed) return
+            advance(() => {
+              kit.setPose('idle')
+              onPartyEnd?.()
+            }, CLOSE_GAP_MS)
+          })
+        }, CHEER_MS + PARTY_CLOSE_GAP_MS)
+      })
+    }, PARTY_LINE_AT_MS)
+  }
+
   // --- Drawing -----------------------------------------------------------
 
   const { a } = scene
   const takeFrom = (key: string) => flights[key]
   const shoreOpen = model.phase === 'loading' || model.phase === 'wobbling'
-  const thisCrossing = playing !== null ? model.island.slice(-landed) : []
+  const homeRects = islandHomes(scene)
+  const face = moundFace(scene)
+  const heaviestAboard = Math.max(
+    0,
+    ...model.seats.map((id) => (id === null ? 0 : model.animals[id]!.weight)),
+  )
 
   return (
     <View testID="raft-crossing" pointerEvents="box-none" style={styles.fill}>
       <Backdrop scene={scene} area={kit.area} tablet={tablet} />
+      <TripIsland scene={scene} tablet={tablet} />
 
-      {/* The island and every animal on it, this visit. */}
+      {/* The nine homes (§ 1): not touch targets (Decision 10). */}
       <View pointerEvents="none" style={styles.fill}>
-        {model.island.map(({ id, weight }, i) => {
-          const r = islandSpot(scene, i)
-          const inScene = thisCrossing.some((x) => x.id === id)
+        {homeRects.map((r, i) => {
+          const w = (i + 1) as RaftWeight
+          const filled = shown.includes(w)
           return (
-            <Fly
-              key={`island-${id}`}
-              testID={`raft-island-${i}`}
-              rect={r}
-              from={takeFrom(`island-${id}`)}
-              reducedMotion={reducedMotion}
+            <View
+              key={w}
+              testID={`raft-home-${w}`}
+              accessible
+              accessibilityLabel={homeLabel(RAFT_ANIMALS[w], w, filled)}
+              style={[styles.abs, rectStyle(r)]}
             >
-              <IslandMotion
-                scene={inScene ? playing : null}
-                party={party}
-                reducedMotion={reducedMotion}
+              <HomeMotion
+                w={w}
+                h={r.width}
                 order={i}
-                heaviest={
-                  inScene &&
-                  weight === Math.max(...thisCrossing.map((x) => x.weight))
-                }
+                fx={fx[w]}
+                lap={filled ? lap : 0}
+                dance={dance}
+                reducedMotion={reducedMotion}
               >
-                <AnimalArt
-                  weight={weight}
+                <HomeArt
+                  key={filled ? 'filled' : 'empty'}
+                  weight={w}
                   size={r.width}
-                  tag={false}
+                  filled={filled}
+                  tag
                   tablet={tablet}
+                  id={`raft-home-${w}`}
                 />
-              </IslandMotion>
-            </Fly>
+              </HomeMotion>
+            </View>
           )
         })}
+        {bursts.map(({ w, key }) => {
+          const r = homeRects[w - 1]!
+          return (
+            <View
+              key={key}
+              pointerEvents="none"
+              style={[styles.abs, rectStyle(r)]}
+            >
+              <SparkleBurst
+                testID={`raft-home-burst-${w}`}
+                distance={1.2 * r.width}
+                glyph={0.45 * r.width}
+              />
+            </View>
+          )
+        })}
+        {partyBurst && (
+          <View pointerEvents="none" style={[styles.abs, rectStyle(face)]}>
+            <SparkleBurst
+              testID="raft-party-burst"
+              distance={75 * (tablet ? 1.5 : 1)}
+              glyph={16 * (tablet ? 1.5 : 1)}
+            />
+          </View>
+        )}
         {playing !== null && <View testID={`raft-scene-${playing}`} />}
+        {lap > 0 && !reducedMotion && <View testID="raft-lap" />}
+        {lap > 0 && reducedMotion && <View testID="raft-brighten" />}
+        {dance > 0 && <View testID="raft-dance" />}
       </View>
 
       <Deck
@@ -548,12 +674,19 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
                 onTap={() => onTakeOff(id)}
                 onDrop={(p) => (contains(boardZone, p) ? false : onTakeOff(id))}
               >
-                <AnimalArt
-                  weight={animal.weight}
-                  size={scene.seats[seat]!.width}
-                  tag
-                  tablet={tablet}
-                />
+                <SceneMotion
+                  scene={playing}
+                  reducedMotion={reducedMotion}
+                  order={seat}
+                  heaviest={animal.weight === heaviestAboard}
+                >
+                  <AnimalArt
+                    weight={animal.weight}
+                    size={scene.seats[seat]!.width}
+                    tag
+                    tablet={tablet}
+                  />
+                </SceneMotion>
               </DragPiece>
             </Fly>
           )
@@ -592,7 +725,7 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
                 RAFT_ANIMALS[animal.weight],
                 animal.weight,
               )}
-              disabled={model.phase === 'done'}
+              disabled={model.phase === 'party'}
               reducedMotion={reducedMotion}
               cancelKey={kit.cancelKey}
               onTap={() => onBoard(id)}
@@ -611,6 +744,22 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
           </Fly>
         )
       })}
+
+      {/* The walk home: each animal from its seat at the landing to its
+          home, above the scene. */}
+      {walkers.map((h) => (
+        <HopHome
+          key={`${h.key}|${kit.cancelKey}`}
+          testID={`raft-hop-${h.id}`}
+          weight={h.weight}
+          seat={seatOnScreen(scene, scene.landing, h.seat)}
+          home={homeRects[h.weight - 1]!}
+          fill={h.fill}
+          a={a}
+          reducedMotion={reducedMotion}
+          tablet={tablet}
+        />
+      ))}
 
       {leaving !== null && (
         <Animated.View
@@ -637,13 +786,6 @@ export function RaftCrossing({ kit, shore }: RaftCrossingProps) {
 function walkFrom(scene: RaftScene): Point {
   return scene.axis === 'up' ? { x: 0, y: scene.a } : { x: -scene.a, y: 0 }
 }
-
-const rectStyle = (r: Rect) => ({
-  left: r.x,
-  top: r.y,
-  width: r.width,
-  height: r.height,
-})
 
 /**
  * A piece that, on mount, flies in from `from` (a delta from its place):
@@ -758,102 +900,194 @@ function WalkOut({
 }
 
 /**
- * An animal and its weight tag (§ 2.2): the pack picture at
- * size × (0.72 + 0.28 × (w − 1) / 8), so the bee is small and the pig
- * fills the cell, with a contact shadow (T6); a cream clay disc of
- * 0.42 × size at its lower right with the numeral (D2, T5).
+ * One hop home (§ 1.4): from its seat (0.7 a) to its home (`h`), a 0.2 a
+ * arc over 300 ms; a repeat fades over the hop's last 100 ms (§ 2.2).
+ * Reduce Motion: no hop; it fades out at its seat (150 ms, § 2.3).
  */
-function AnimalArt({
+function HopHome({
   weight,
-  size,
-  tag,
+  seat,
+  home,
+  fill,
+  a,
+  reducedMotion,
   tablet,
+  testID,
 }: {
   weight: RaftWeight
-  size: number
-  tag: boolean
+  seat: Rect
+  home: Rect
+  fill: boolean
+  a: number
+  reducedMotion: boolean
   tablet: boolean
+  testID: string
 }) {
-  const px = size * (0.72 + (0.28 * (weight - 1)) / 8)
-  const disc = 0.42 * size
+  const t = useSharedValue(0)
+  const o = useSharedValue(1)
+  useEffect(() => {
+    if (reducedMotion) {
+      o.set(withTiming(0, { duration: FADE_MS }))
+      return
+    }
+    t.set(withTiming(1, { duration: HOP_HOME_MS, easing: Easing.linear }))
+    if (!fill) {
+      o.set(
+        withDelay(
+          HOP_HOME_MS - 100,
+          withTiming(0, { duration: 100, easing: Easing.linear }),
+        ),
+      )
+    }
+    // Mount-once: one hop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const d = delta(seat, home)
+  const s0 = seat.width / home.width
+  const arc = 0.2 * a
+  const style = useAnimatedStyle(() => {
+    const p = t.get()
+    return {
+      opacity: o.get(),
+      transform: [
+        { translateX: d.x * (1 - p) },
+        { translateY: d.y * (1 - p) - arc * 4 * p * (1 - p) },
+        { scale: s0 + (1 - s0) * p },
+      ],
+    }
+  })
+  // At the home, carried back to the seat by `d` and `s0` (Reduce Motion
+  // stays there and fades).
   return (
-    <View pointerEvents="none" style={styles.centred}>
-      <View
-        testID="raft-picture"
-        style={tablet ? PICTURE_SHADOW.tablet : PICTURE_SHADOW.phone}
-      >
-        <Image
-          source={pictureAsset(RAFT_ANIMALS[weight])}
-          contentFit="contain"
-          accessible={false}
-          style={{ width: px, height: px }}
-        />
-      </View>
-      {tag && (
-        <View
-          testID="raft-tag"
-          style={[
-            styles.tag,
-            {
-              width: disc,
-              height: disc,
-              borderRadius: disc / 2,
-              right: 0,
-              bottom: 0,
-              boxShadow: tablet ? TAG_SHADOW.tablet : TAG_SHADOW.phone,
-            },
-          ]}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.tagText, { fontSize: 0.3 * size }]}
-          >
-            {weight}
-          </Text>
-        </View>
-      )}
-    </View>
-  )
-}
-
-/**
- * A shore animal's cream clay plinth (T6), inside its cell; it moves with
- * the animal, so an empty spot shows sand.
- */
-function Plinth({
-  size,
-  tablet,
-  id,
-}: {
-  size: number
-  tablet: boolean
-  id: string
-}) {
-  const drop = tablet ? 6 : 4
-  return (
-    <View
-      testID="raft-plinth"
+    <Animated.View
+      testID={testID}
       pointerEvents="none"
-      style={[styles.abs, { left: 0.06 * size, top: 0.62 * size }]}
+      style={[styles.abs, rectStyle(home), style]}
     >
-      <ClayOval
-        id={id}
-        w={0.88 * size}
-        h={0.34 * size}
-        drop={drop}
-        stops={PLINTH_STOPS}
-        slab={PLINTH_SLAB}
-        soft={ovalSoft(drop)}
+      <AnimalArt
+        weight={weight}
+        size={home.width}
+        tag={false}
+        tablet={tablet}
       />
-    </View>
+    </Animated.View>
   )
 }
 
 /**
- * The water, the shore and the island (drawn, § 2.2) as the Map's land
- * (T2, T3): one pool slab under the island and the water, running R under
- * the shore; short ripples; a clay oval island with two green clay
- * bushes; the sand band on top. `raft-water` keeps its rect for tests.
+ * A home's own motion (§§ 2, 3): a fill settles (1.12 → 1, 200 ms); a
+ * repeat wiggles around its feet (0 → −5° → +5° → −3° → 0, 100 ms a
+ * step); the party's lap hops it 0.45 h, 120 ms after the home before;
+ * the dance of nine is the shipped dance at the lap's height. Reduce
+ * Motion (§ 9): a repeat dims 1 → 0.6 → 1 (300 ms), the lap brightens a
+ * filled animal 0.85 → 1 (200 ms), no settle, wiggle, hop or dance.
+ */
+function HomeMotion({
+  w,
+  h,
+  order,
+  fx,
+  lap,
+  dance,
+  reducedMotion,
+  children,
+}: {
+  w: RaftWeight
+  h: number
+  order: number
+  fx: HomeFx | undefined
+  lap: number
+  dance: number
+  reducedMotion: boolean
+  children: ReactNode
+}) {
+  const y = useSharedValue(0)
+  const r = useSharedValue(0)
+  const s = useSharedValue(1)
+  const o = useSharedValue(1)
+  const fill = fx?.fill ?? 0
+  const repeat = fx?.repeat ?? 0
+  const hopUp = (d: number) =>
+    withDelay(
+      d,
+      withSequence(
+        withTiming(-0.45 * h, { duration: 150 }),
+        withTiming(0, { duration: 150 }),
+      ),
+    )
+
+  useEffect(() => {
+    if (fill === 0 || reducedMotion) return
+    s.set(1.12)
+    s.set(withTiming(1, { duration: 200 }))
+  }, [fill, reducedMotion, s])
+
+  useEffect(() => {
+    if (repeat === 0) return
+    if (reducedMotion) {
+      o.set(
+        withSequence(
+          withTiming(0.6, { duration: 150 }),
+          withTiming(1, { duration: 150 }),
+        ),
+      )
+      return
+    }
+    const step = { duration: WIGGLE_STEP_MS }
+    r.set(
+      withSequence(
+        withTiming(-5, step),
+        withTiming(5, step),
+        withTiming(-3, step),
+        withTiming(0, step),
+      ),
+    )
+  }, [repeat, reducedMotion, r, o])
+
+  useEffect(() => {
+    if (lap === 0) return
+    if (reducedMotion) {
+      o.set(0.85)
+      o.set(withTiming(1, { duration: 200 }))
+      return
+    }
+    y.set(hopUp(PARTY_LAP_STEP_MS * order))
+    // A new lap only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lap, reducedMotion])
+
+  useEffect(() => {
+    if (dance === 0 || reducedMotion) return
+    y.set(withSequence(hopUp(100 * order), hopUp(600)))
+    // A new dance only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dance, reducedMotion])
+
+  const style = useAnimatedStyle(() => ({
+    opacity: o.get(),
+    transform: [
+      { translateY: y.get() },
+      { rotate: `${r.get()}deg` },
+      { scale: s.get() },
+    ],
+  }))
+  return (
+    <Animated.View style={[styles.fill, styles.feet, style]}>
+      {children}
+      {fill > 0 && !reducedMotion && <View testID={`raft-home-${w}-settle`} />}
+      {repeat > 0 && !reducedMotion && (
+        <View testID={`raft-home-${w}-wiggle`} />
+      )}
+      {repeat > 0 && reducedMotion && <View testID={`raft-home-${w}-dim`} />}
+    </Animated.View>
+  )
+}
+
+/**
+ * The water, the shore and the island's band (drawn, § 2.2) as the Map's
+ * land (T2): one pool slab under the island and the water, running R
+ * under the shore; short ripples; the sand band on top. The island's oval
+ * and its homes are drawn over it. `raft-water` keeps its rect for tests.
  */
 function Backdrop({
   scene,
@@ -864,7 +1098,7 @@ function Backdrop({
   area: Rect
   tablet: boolean
 }) {
-  const { mound, shore, water, island } = scene
+  const { shore, water, island } = scene
   const k = clayK(tablet)
   const R = bandRadius(tablet)
   const up = scene.axis === 'up'
@@ -883,8 +1117,6 @@ function Backdrop({
         height: area.height,
       }
   const ripple = tablet ? 6 : 4
-  const drop = tablet ? 10 : 7
-  const bush = 0.5 * scene.a
   return (
     <View pointerEvents="none" style={styles.fill}>
       <View
@@ -922,43 +1154,6 @@ function Backdrop({
       </View>
       <View testID="raft-island" style={[styles.abs, rectStyle(island)]} />
       <View
-        testID="raft-mound"
-        style={[styles.abs, { left: mound.x, top: mound.y }]}
-      >
-        <ClayOval
-          id="raft-mound"
-          w={mound.width}
-          h={mound.height - drop}
-          drop={drop}
-          stops={MOUND_STOPS}
-          slab={MOUND_SLAB}
-          soft={ovalSoft(drop)}
-        />
-      </View>
-      {[0.3, 0.7].map((f) => (
-        <View
-          key={f}
-          testID="raft-bush"
-          style={[
-            styles.abs,
-            styles.bush,
-            {
-              left: mound.x + f * mound.width - bush / 2,
-              top: mound.y + 0.12 * mound.height,
-              width: bush,
-              height: 0.8 * bush,
-              // 50 % / 50 % / 45 % / 45 % of the height: iOS draws no
-              // elliptical corners, and a '50%' radius here is a lens.
-              borderTopLeftRadius: 0.4 * bush,
-              borderTopRightRadius: 0.4 * bush,
-              borderBottomRightRadius: 0.36 * bush,
-              borderBottomLeftRadius: 0.36 * bush,
-              boxShadow: `inset 0 ${3 * k}px 0 rgba(255, 255, 255, 0.35), 0 ${5 * k}px 0 #3f8a2e, 0 ${8 * k}px ${10 * k}px rgba(40, 90, 20, 0.3)`,
-            },
-          ]}
-        />
-      ))}
-      <View
         testID="raft-shore"
         style={[
           styles.abs,
@@ -971,249 +1166,24 @@ function Backdrop({
   )
 }
 
-/**
- * The raft (§ 2.2): five logs of Number Garden wood with 6 seats (T4: clay
- * logs on a dark wood base, two rope bands, no seat marks), a mast whose
- * cream clay flag shows the total (blank at 0) and an oar. It sinks with
- * its load, goes under on a splash and wobbles (+6° / −6°, three times,
- * 900 ms; Reduce Motion: dims), and glides between the dock and the
- * island, bobbing and rowing. A new layout jumps it to where it is going.
- */
-function Deck({
-  scene,
-  rect,
-  total,
-  splashing,
-  gliding,
-  reducedMotion,
-  frameKey,
-  tablet,
-  children,
-}: {
-  scene: RaftScene
-  rect: Rect
-  total: number
-  splashing: boolean
-  gliding: boolean
-  reducedMotion: boolean
-  frameKey: string
-  tablet: boolean
-  children: ReactNode
-}) {
-  const { dock } = scene
-  const offset = { x: rect.x - dock.x, y: rect.y - dock.y }
-  const x = useSharedValue(offset.x)
-  const y = useSharedValue(offset.y)
-  const sink = useSharedValue(0)
-  const rot = useSharedValue(0)
-  const dim = useSharedValue(1)
-  const bob = useSharedValue(0)
-  const oar = useSharedValue(0)
-  const frameRef = useRef(frameKey)
-
-  const depth = splashing
-    ? 0.4 * dock.height
-    : (Math.min(total, 10) / 10) * 0.12 * dock.height
-
-  useEffect(() => {
-    const jump = frameRef.current !== frameKey
-    frameRef.current = frameKey
-    if (jump) {
-      x.set(offset.x)
-      y.set(offset.y)
-      return
-    }
-    const ms = offset.x === 0 && offset.y === 0 ? RETURN_MS : GLIDE_MS
-    const t = reducedMotion
-      ? {
-          duration:
-            offset.x === 0 && offset.y === 0
-              ? REDUCED_RETURN_MS
-              : REDUCED_GLIDE_MS,
-        }
-      : { duration: ms, easing: Easing.inOut(Easing.quad) }
-    x.set(withTiming(offset.x, t))
-    y.set(withTiming(offset.y, t))
-    // Animate on a new target; a new layout jumps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [offset.x, offset.y, frameKey])
-
-  useEffect(() => {
-    sink.set(withTiming(depth, { duration: reducedMotion ? FADE_MS : 300 }))
-  }, [depth, reducedMotion, sink])
-
-  useEffect(() => {
-    if (!splashing) return
-    if (reducedMotion) {
-      dim.set(
-        withSequence(
-          withTiming(0.7, { duration: 150 }),
-          withTiming(1, { duration: 150 }),
-        ),
-      )
-      return
-    }
-    const s = { duration: WOBBLE_MS / 6, easing: Easing.out(Easing.quad) }
-    rot.set(
-      withSequence(
-        withTiming(6, s),
-        withTiming(-6, s),
-        withTiming(6, s),
-        withTiming(-6, s),
-        withTiming(4, s),
-        withTiming(0, s),
-      ),
-    )
-  }, [splashing, reducedMotion, rot, dim])
-
-  useEffect(() => {
-    if (!gliding || reducedMotion) {
-      bob.set(0)
-      oar.set(0)
-      return
-    }
-    bob.set(
-      withRepeat(
-        withSequence(
-          withTiming(-3, { duration: 600 }),
-          withTiming(3, { duration: 600 }),
-        ),
-        Math.ceil(GLIDE_MS / 1200),
-        true,
-      ),
-    )
-    oar.set(
-      withRepeat(
-        withSequence(
-          withTiming(20, { duration: 250 }),
-          withTiming(-20, { duration: 250 }),
-        ),
-        Math.ceil(GLIDE_MS / 500),
-        true,
-      ),
-    )
-  }, [gliding, reducedMotion, bob, oar])
-
-  const moved = useAnimatedStyle(() => ({
-    opacity: dim.get(),
-    transform: [
-      { translateX: x.get() },
-      { translateY: y.get() + sink.get() + bob.get() },
-      { rotate: `${rot.get()}deg` },
-    ],
-  }))
-  const oarStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${oar.get()}deg` }],
-  }))
-  const a = scene.a
-  const flag = scene.flag
-  /** The base's depth: 1 on tablets, 0.75 on phones. */
-  const kd = tablet ? 1 : 0.75
-  const log = dock.height / 5
-  const mastW = Math.max(6, 0.07 * a)
-  return (
-    <Animated.View
-      testID="raft"
-      accessible
-      accessibilityLabel={raftLabel(total)}
-      pointerEvents="box-none"
-      style={[styles.abs, rectStyle(dock), moved]}
-    >
-      {splashing && !reducedMotion && <View testID="raft-wobble" />}
-      {splashing && reducedMotion && <View testID="raft-dim" />}
-      {gliding && !reducedMotion && <View testID="raft-rowing" />}
-      <View pointerEvents="none" style={styles.fill}>
-        <View
-          testID="raft-deck"
-          style={[
-            styles.fill,
-            styles.deck,
-            {
-              borderRadius: 0.14 * a,
-              boxShadow: `0 ${8 * kd}px 0 ${WOOD_RIM}, 0 ${14 * kd}px ${18 * kd}px rgba(60, 30, 10, 0.3)`,
-            },
-          ]}
-        />
-        {/* Five logs, 2 pt apart: the base shows between them. */}
-        {[0, 1, 2, 3, 4].map((i) => (
-          <View
-            key={i}
-            testID="raft-log"
-            style={[
-              styles.log,
-              {
-                top: i * log + 1,
-                height: log - 2,
-                borderRadius: (log - 2) / 2,
-              },
-            ]}
-          />
-        ))}
-        {[0.2, 0.8].map((f) => (
-          <View
-            key={f}
-            testID="raft-rope"
-            style={[
-              styles.rope,
-              {
-                left: f * dock.width - 0.05 * a,
-                width: 0.1 * a,
-                height: dock.height + 4,
-                borderRadius: 0.05 * a,
-              },
-            ]}
-          />
-        ))}
-      </View>
-      {/* The mast and its flag, at the back-left corner: the mast's right
-          edge stays 1 pt under the flag, as at its old 4 pt width. */}
-      <View
-        pointerEvents="none"
-        style={[
-          styles.mast,
-          { left: 8 - mastW, width: mastW, top: flag.y, height: -flag.y + 12 },
-        ]}
-      />
-      <View
-        testID="raft-flag-box"
-        pointerEvents="none"
-        style={[
-          styles.flag,
-          {
-            left: 7,
-            top: flag.y,
-            width: flag.width,
-            height: flag.height,
-            borderRadius: 0.08 * a,
-          },
-        ]}
-      >
-        <Text
-          testID="raft-flag"
-          allowFontScaling={false}
-          style={[styles.flagText, { fontSize: 0.26 * a }]}
-        >
-          {total === 0 ? '' : String(Math.min(total, 10))}
-        </Text>
-      </View>
-      {/* The oar along the right edge. */}
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.oar,
-          {
-            right: -6,
-            top: 0.15 * dock.height,
-            width: tablet ? 10 : 8,
-            height: 0.7 * dock.height,
-          },
-          oarStyle,
-        ]}
-      />
-      {children}
-    </Animated.View>
-  )
-}
+/** T2: the Map's sand band (`BAND_TINTS[1]`). */
+const SHORE_HI = '#ffeec2'
+const SHORE_LO = '#e8c77a'
+/** Ripples: fractions of the water rect, clear of the raft's path. */
+const RIPPLES_UP: readonly [number, number][] = [
+  [0.05, 0.25],
+  [0.78, 0.18],
+  [0.08, 0.7],
+  [0.8, 0.62],
+  [0.14, 0.92],
+]
+const RIPPLES_RIGHT: readonly [number, number][] = [
+  [0.62, 0.12],
+  [0.78, 0.3],
+  [0.6, 0.72],
+  [0.8, 0.88],
+  [0.7, 0.5],
+]
 
 /**
  * The newest animal after a too-heavy drop (§ 2.3): on its seat, then at
@@ -1298,20 +1268,20 @@ function SplashingAnimal({
 }
 
 /**
- * The island's silly scenes (§ 2.3), about 2-3 s, played by this
- * crossing's animals; and the party bounce after the third crossing. None
+ * The silly scenes (§ 2.3), about 2-3 s, played by this crossing's
+ * animals on the deck at the landing (raft-island-goal Decision 4): each
+ * scene's motion is an offset from the animal's seat. The tower topples
+ * onto the logs; the cannonball jumps from the deck into the water. None
  * under Reduce Motion.
  */
-function IslandMotion({
+function SceneMotion({
   scene,
-  party,
   reducedMotion,
   order,
   heaviest,
   children,
 }: {
   scene: SceneId | null
-  party: boolean
   reducedMotion: boolean
   order: number
   heaviest: boolean
@@ -1397,15 +1367,6 @@ function IslandMotion({
         break
     }
   }, [scene, reducedMotion, order, heaviest, x, y, r, sy])
-  useEffect(() => {
-    if (!party || reducedMotion) return
-    y.set(
-      withSequence(
-        withTiming(-14, { duration: 180 }),
-        withTiming(0, { duration: 180 }),
-      ),
-    )
-  }, [party, reducedMotion, y])
   const style = useAnimatedStyle(() => ({
     transform: [
       { translateX: x.get() },
@@ -1420,65 +1381,15 @@ function IslandMotion({
 const styles = StyleSheet.create({
   fill: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
   abs: { position: 'absolute' },
-  centred: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  tag: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: TILE,
-    experimental_backgroundImage: TILE_FACE,
-  },
-  tagText: { fontFamily: fonts.bold, color: TAG_TEXT },
+  /** A home turns around its animal's feet, in the nest (§ 2.2). */
+  feet: { transformOrigin: '50% 92%' },
   pool: { backgroundColor: WATER },
   ripple: {
     position: 'absolute',
     backgroundColor: 'rgba(255, 255, 255, 0.55)',
   },
-  bush: {
-    backgroundColor: '#6cc655',
-    experimental_backgroundImage: 'linear-gradient(#7fd364, #5cb945)',
-  },
   shore: {
     backgroundColor: SHORE_LO,
     experimental_backgroundImage: `linear-gradient(${SHORE_HI}, ${SHORE_LO})`,
-  },
-  deck: { backgroundColor: WOOD_RIM },
-  log: {
-    position: 'absolute',
-    left: 2,
-    right: 2,
-    backgroundColor: WOOD,
-    experimental_backgroundImage:
-      'linear-gradient(#e7b07a 0%, #c98a55 55%, #a86c3c 100%)',
-    boxShadow: 'inset 0 2px 0 rgba(255, 255, 255, 0.3)',
-  },
-  rope: {
-    position: 'absolute',
-    top: -2,
-    backgroundColor: '#f2d3a6',
-    boxShadow: 'inset 0 -3px 0 rgba(125, 74, 38, 0.3)',
-  },
-  mast: {
-    position: 'absolute',
-    borderRadius: 4,
-    backgroundColor: WOOD_RIM,
-    experimental_backgroundImage: `linear-gradient(90deg, #a86c3c, ${WOOD_RIM})`,
-  },
-  flag: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: TILE,
-    experimental_backgroundImage: 'linear-gradient(#fffdf8, #fff1e2)',
-    boxShadow:
-      'inset 0 2px 0 #ffffff, 0 3px 0 #efcfb4, 0 6px 8px rgba(90, 45, 20, 0.16)',
-  },
-  flagText: { fontFamily: fonts.bold, color: TAG_TEXT },
-  oar: {
-    position: 'absolute',
-    borderRadius: 6,
-    backgroundColor: WOOD_RIM,
-    experimental_backgroundImage: `linear-gradient(90deg, ${WOOD}, ${WOOD_RIM})`,
-    boxShadow: `0 3px 0 ${WOOD_RIM}`,
   },
 })
