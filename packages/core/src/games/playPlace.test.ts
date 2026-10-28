@@ -36,12 +36,26 @@ import {
   RAFT_ANIMALS,
   RAFT_CROSSINGS,
   RAFT_LOAD,
+  RAFT_SEATS,
   RAFT_SHORE_SIZE,
+  RAFT_TARGETS,
   raftLoads,
+  raftNewcomer,
   raftRefill,
   raftShore,
   raftStuck,
+  type RaftTarget,
+  type RaftWeight,
 } from './playPlace'
+
+/**
+ * I1's refills (1,000 random waiting sets of 2-5 per target, 11 missing
+ * sets each) that no newcomers can give every guarantee, so short of one:
+ * all with 4 or 5 waiting (1 or 2 places). The brute force in I1 proves
+ * each one short whatever walks in.
+ */
+const SHORT_10 = 686
+const SHORT_20 = 1768
 
 /** mulberry32: a small seeded generator, as the tests' `rng`. */
 function seeded(seed: number): () => number {
@@ -258,6 +272,400 @@ describe('the raft (§ 2.1)', () => {
       expect(shore.slice(0, waiting.length)).toEqual(waiting)
       expect(raftLoads(shore).length).toBeGreaterThanOrEqual(2)
       expect(pairLoads(shore).length).toBeGreaterThanOrEqual(1)
+    }
+  })
+})
+
+describe('the raft island goal, core (raft-island-goal § 11.2, I1-I3)', () => {
+  const KINDS: readonly RaftWeight[] = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+  const sum = (ws: readonly number[]) => ws.reduce((n, w) => n + w, 0)
+
+  /** Some load to 20 is four animals that pair into ten and ten. */
+  const tenAndTen = (ws: readonly number[]) =>
+    raftLoads(ws, 20).some(
+      (l) =>
+        l.length === 4 && [1, 2, 3].some((j) => ws[l[0]!]! + ws[l[j]!]! === 10),
+    )
+
+  /** The plain guarantee: Dave (1) for 10, Dave (3) for 20. */
+  function plainOk(ws: readonly number[], target: RaftTarget): boolean {
+    const loads = raftLoads(ws, target)
+    if (loads.length < 2) return false
+    return target === 10 ? loads.some((l) => l.length === 2) : tenAndTen(ws)
+  }
+
+  /** Some load holds a missing kind (Dave (1)); nothing missing passes. */
+  const bringsMissing = (
+    ws: readonly number[],
+    target: RaftTarget,
+    missing: readonly number[],
+  ) =>
+    missing.length === 0 ||
+    raftLoads(ws, target).some((l) => l.some((i) => missing.includes(ws[i]!)))
+
+  const strictOk = (
+    ws: readonly number[],
+    target: RaftTarget,
+    missing: readonly number[],
+  ) => plainOk(ws, target) && bringsMissing(ws, target, missing)
+
+  /** A random non-empty set of kinds. */
+  function someMissing(rng: () => number): RaftWeight[] {
+    const out = KINDS.filter(() => rng() < 0.5)
+    return out.length > 0 ? out : [KINDS[Math.floor(rng() * 9)]!]
+  }
+
+  /** Whether any newcomers for the empty places pass `test` (brute force). */
+  function canGive(
+    waiting: readonly number[],
+    test: (ws: number[]) => boolean,
+  ): boolean {
+    const empty = RAFT_SHORE_SIZE - waiting.length
+    const fill = new Array<number>(empty).fill(1)
+    for (;;) {
+      if (test([...waiting, ...fill])) return true
+      let i = 0
+      while (i < empty && fill[i] === 9) fill[i++] = 1
+      if (i === empty) return false
+      fill[i]! += 1
+    }
+  }
+
+  const inRange = (ws: readonly number[]) =>
+    ws.every((w) => Number.isInteger(w) && w >= 1 && w <= 9)
+
+  it('pins the names the native build uses (§ 11.1)', () => {
+    expect(RAFT_TARGETS).toEqual([10, 20])
+    expect(RAFT_SEATS).toEqual({ 10: 6, 20: 8 })
+    expect(RAFT_LOAD).toBe(RAFT_TARGETS[0])
+  })
+
+  it('I1: raftShore(rng, { target: 10, missing }) gives 6 weights in 1-9, 2 loads, one a pair, and a load with a missing kind, over 1,000 seeds per case', () => {
+    const cases: RaftWeight[][] = [[], ...KINDS.map((k) => [k])]
+    for (const missing of cases) {
+      for (let seed = 1; seed <= 1000; seed++) {
+        const shore = raftShore(seeded(seed), { target: 10, missing })
+        expect(shore).toHaveLength(6)
+        expect(inRange(shore)).toBe(true)
+        expect(strictOk(shore, 10, missing)).toBe(true)
+      }
+    }
+    for (let seed = 1; seed <= 1000; seed++) {
+      const rng = seeded(seed)
+      const missing = someMissing(rng)
+      const shore = raftShore(rng, { target: 10, missing })
+      expect(shore).toHaveLength(6)
+      expect(strictOk(shore, 10, missing)).toBe(true)
+    }
+  }, 30_000)
+
+  it('I1: raftShore(rng, { target: 20, missing }) gives 6 weights in 1-9, 2 loads to 20, a ten-and-ten load, and a load with a missing kind, over 1,000 seeds per case', () => {
+    const cases: RaftWeight[][] = [[], ...KINDS.map((k) => [k])]
+    for (const missing of cases) {
+      for (let seed = 1; seed <= 1000; seed++) {
+        const shore = raftShore(seeded(seed), { target: 20, missing })
+        expect(shore).toHaveLength(6)
+        expect(inRange(shore)).toBe(true)
+        expect(strictOk(shore, 20, missing)).toBe(true)
+      }
+    }
+    for (let seed = 1; seed <= 1000; seed++) {
+      const rng = seeded(seed)
+      const missing = someMissing(rng)
+      const shore = raftShore(rng, { target: 20, missing })
+      expect(shore).toHaveLength(6)
+      expect(strictOk(shore, 20, missing)).toBe(true)
+    }
+  }, 30_000)
+
+  it('I1: the fallback is the canon shore, with a missing kind it lacks swapped in with its partner to ten (Dave (1), (3))', () => {
+    // An rng stuck at 0 draws only bees and pigs: every draw fails a
+    // missing cat, so both targets fall back.
+    const stuck = () => 0
+    const sorted = (ws: number[]) => [...ws].sort((a, b) => a - b)
+    for (const target of RAFT_TARGETS) {
+      expect(sorted(raftShore(stuck, { target, missing: [5] }))).toEqual([
+        3, 4, 5, 5, 6, 7,
+      ])
+      // A missing kind the canon shore has needs no swap.
+      expect(sorted(raftShore(stuck, { target, missing: [5, 8] }))).toEqual([
+        2, 3, 4, 6, 7, 8,
+      ])
+    }
+  })
+
+  it('I1: the same seed gives the same shore, for both targets', () => {
+    for (const target of RAFT_TARGETS) {
+      for (const seed of [1, 7, 42, 999]) {
+        const missing: RaftWeight[] = [9]
+        expect(raftShore(seeded(seed), { target, missing })).toEqual(
+          raftShore(seeded(seed), { target, missing }),
+        )
+        expect(raftRefill([4, 4], seeded(seed), { target, missing })).toEqual(
+          raftRefill([4, 4], seeded(seed), { target, missing }),
+        )
+      }
+    }
+  })
+
+  it('I1: raftRefill keeps the waiting weights in order and returns 6 with the same guarantees, for waiting sets of 2-5, whenever the empty places can give them', () => {
+    // Some waiting sets cannot meet every guarantee whatever walks in: on
+    // the 10 raft five pigs and a missing cat (one place, and a cat needs
+    // a partner of 5); on the 20 raft five pigs (one place, no ten and
+    // ten). There raftRefill keeps the plain guarantee if the places can
+    // give it, else a load to the target if they can. `short` counts them.
+    const short: Record<RaftTarget, number> = { 10: 0, 20: 0 }
+    for (const target of RAFT_TARGETS) {
+      for (let seed = 1; seed <= 1000; seed++) {
+        const rng = seeded(seed)
+        const n = 2 + Math.floor(rng() * 4)
+        const waiting = Array.from(
+          { length: n },
+          () => 1 + Math.floor(rng() * 9),
+        )
+        const cases: RaftWeight[][] = [
+          [],
+          ...KINDS.map((k) => [k]),
+          someMissing(rng),
+        ]
+        for (const missing of cases) {
+          const shore = raftRefill(waiting, rng, { target, missing })
+          expect(shore).toHaveLength(6)
+          expect(shore.slice(0, n)).toEqual(waiting)
+          expect(inRange(shore)).toBe(true)
+          if (strictOk(shore, target, missing)) continue
+          short[target]++
+          expect(canGive(waiting, (ws) => strictOk(ws, target, missing))).toBe(
+            false,
+          )
+          if (canGive(waiting, (ws) => plainOk(ws, target))) {
+            expect(plainOk(shore, target)).toBe(true)
+          } else if (
+            canGive(waiting, (ws) => raftLoads(ws, target).length > 0)
+          ) {
+            expect(raftLoads(shore, target).length).toBeGreaterThan(0)
+          }
+        }
+      }
+    }
+    expect(short).toEqual({ 10: SHORT_10, 20: SHORT_20 })
+  }, 30_000)
+
+  it('I1: in play, every 20 refill keeps every guarantee; a 10 refill may lack the missing-kind load (4 waiting), never the plain guarantee', () => {
+    // 1,000 islands filled crossing by crossing: the shore with the
+    // guarantee, a random load to the target leaves, its kinds come home,
+    // the rest wait for the refill. No stuck newcomers.
+    const kept: Record<RaftTarget, { refills: number; short: number }> = {
+      10: { refills: 0, short: 0 },
+      20: { refills: 0, short: 0 },
+    }
+    for (const target of RAFT_TARGETS) {
+      for (let seed = 1; seed <= 1000; seed++) {
+        const rng = seeded(seed)
+        const home = new Set<number>()
+        const missing = () => KINDS.filter((k) => !home.has(k))
+        let shore = raftShore(rng, { target, missing: missing() })
+        expect(strictOk(shore, target, missing())).toBe(true)
+        while (home.size < 9) {
+          const loads = raftLoads(shore, target)
+          const load = loads[Math.floor(rng() * loads.length)]!
+          for (const i of load) home.add(shore[i]!)
+          const waiting = shore.filter((_, i) => !load.includes(i))
+          shore = raftRefill(waiting, rng, { target, missing: missing() })
+          kept[target].refills++
+          expect(plainOk(shore, target)).toBe(true)
+          if (!bringsMissing(shore, target, missing())) {
+            kept[target].short++
+            expect(target).toBe(10)
+            expect(waiting).toHaveLength(4)
+          }
+        }
+      }
+    }
+    expect(kept).toEqual({
+      10: { refills: 8068, short: 77 },
+      20: { refills: 5207, short: 0 },
+    })
+  }, 30_000)
+
+  it('I1: raftRefill on the hard waiting sets, both targets', () => {
+    expect(
+      plainOk(raftRefill([9, 9, 9, 9, 9], seeded(3), { target: 10 }), 10),
+    ).toBe(true)
+    const pigs = raftRefill([9, 9, 9, 9, 9], seeded(3), { target: 20 })
+    expect(pigs.slice(0, 5)).toEqual([9, 9, 9, 9, 9])
+    expect(raftLoads(pigs, 20).length).toBeGreaterThan(0)
+    for (const target of RAFT_TARGETS) {
+      for (const waiting of [[1, 1, 1], [9, 9, 9], [5, 5, 5], [9], []]) {
+        const shore = raftRefill(waiting, seeded(3), { target, missing: [1] })
+        expect(shore.slice(0, waiting.length)).toEqual(waiting)
+        expect(strictOk(shore, target, [1])).toBe(true)
+      }
+    }
+  })
+
+  it('I1: with no options, raftShore and raftRefill deal today’s shores draw for draw, except where no newcomer gives the plain guarantee', () => {
+    // FNV-1a over the JSON of 1,000 shores, 1,000 refills and 6 hard
+    // refills, by the shipped code at origin/main 4ccd7570: 28085 chars,
+    // hash c252ff. None of them waits 5, 6, 7, 8 and 9, the one set that
+    // changes (pinned in the next test).
+    const out: number[][] = []
+    for (let seed = 1; seed <= 1000; seed++) out.push(raftShore(seeded(seed)))
+    for (let seed = 1; seed <= 1000; seed++) {
+      const rng = seeded(seed)
+      const n = 2 + Math.floor(rng() * 4)
+      const waiting = Array.from({ length: n }, () => 1 + Math.floor(rng() * 9))
+      out.push(raftRefill(waiting, rng))
+    }
+    for (const waiting of [
+      [9, 9, 9, 9, 9],
+      [1, 1, 1, 1, 1],
+      [5, 5, 5, 5, 5],
+      [9],
+      [],
+      [1, 2, 3, 4, 9],
+    ]) {
+      out.push(raftRefill(waiting, seeded(3)))
+    }
+    const s = JSON.stringify(out)
+    let hash = 0x811c9dc5
+    for (let i = 0; i < s.length; i++) {
+      hash ^= s.charCodeAt(i)
+      hash = Math.imul(hash, 0x01000193) >>> 0
+    }
+    expect([s.length, hash.toString(16)]).toEqual([28085, 'c252ff'])
+    for (const seed of [1, 7, 42, 999]) {
+      expect(raftShore(seeded(seed), { target: 10, missing: [] })).toEqual(
+        raftShore(seeded(seed)),
+      )
+      expect(raftRefill([3, 8], seeded(seed), { target: 10 })).toEqual(
+        raftRefill([3, 8], seeded(seed)),
+      )
+    }
+  })
+
+  it('I1: with no options, a refill for waiting 5, 6, 7, 8 and 9 gets a load (9 + 1), where today’s code gave the all-9 shore with none (Dave 2026-10-28)', () => {
+    // No newcomer gives two loads here, so the plain guarantee cannot be
+    // met; Dave's rule then asks for a load to the target.
+    const shore = raftRefill([5, 6, 7, 8, 9], seeded(3))
+    expect(shore).toEqual([5, 6, 7, 8, 9, 1])
+    expect(raftLoads(shore).length).toBeGreaterThan(0)
+  })
+
+  it('I2: raftLoads to 20 on the canon shore is exactly 7 + 3 + 6 + 4, 7 + 3 + 8 + 2 and 6 + 4 + 8 + 2; to 10 it is today’s', () => {
+    expect(raftLoads([7, 3, 6, 4, 8, 2], 20)).toEqual([
+      [0, 1, 2, 3],
+      [0, 1, 4, 5],
+      [2, 3, 4, 5],
+    ])
+    for (const ws of [
+      [7, 3, 6, 4, 8, 2],
+      [1, 2, 7, 9, 5, 5],
+      [9, 9],
+      [],
+      [1, 2, 3, 4, 5, 6],
+    ]) {
+      expect(raftLoads(ws, 10)).toEqual(raftLoads(ws))
+    }
+    // Every set of positions that makes the target, and nothing else.
+    for (let seed = 1; seed <= 200; seed++) {
+      const rng = seeded(seed)
+      const ws = Array.from({ length: 6 }, () => 1 + Math.floor(rng() * 9))
+      for (const target of RAFT_TARGETS) {
+        const all: number[][] = []
+        for (let mask = 1; mask < 64; mask++) {
+          const set = [0, 1, 2, 3, 4, 5].filter((i) => mask & (1 << i))
+          if (sum(set.map((i) => ws[i]!)) === target) all.push(set)
+        }
+        const key = (ls: number[][]) => ls.map((l) => l.join()).sort()
+        expect(key(raftLoads(ws, target))).toEqual(key(all))
+      }
+    }
+  })
+
+  it('I3: on the 10 raft raftNewcomer is 10 − total when stuck (today’s rule), undefined when not', () => {
+    expect(raftNewcomer([2, 5, 7, 9], 6, 10)).toBe(4)
+    expect(raftNewcomer([2, 5, 7, 9], 5, 10)).toBeUndefined()
+    expect(raftNewcomer([], 3, 10)).toBe(7)
+    for (const w of [[], [1], [2, 5, 7, 9], [9, 9, 9]]) {
+      expect(raftNewcomer(w, 0, 10)).toBeUndefined()
+      expect(raftNewcomer(w, 10, 10)).toBeUndefined()
+    }
+    for (let seed = 1; seed <= 1000; seed++) {
+      const rng = seeded(seed)
+      const waiting = Array.from(
+        { length: Math.floor(rng() * 6) },
+        () => 1 + Math.floor(rng() * 9),
+      )
+      const total = 1 + Math.floor(rng() * 9)
+      expect(raftNewcomer(waiting, total, 10)).toBe(
+        raftStuck(waiting, total) ? 10 - total : undefined,
+      )
+    }
+  })
+
+  it('I3: on the 20 raft a stuck raft gets gap − s in 1-9 for a sum s of waiting animals (Q4: s = 0 up to a gap of 9, else the smallest s from gap − 9), and the shore with it can reach 20', () => {
+    expect(raftNewcomer([9, 9], 15, 20)).toBe(5)
+    expect(raftNewcomer([9, 9, 9], 4, 20)).toBe(7)
+    expect(raftNewcomer([9, 8], 1, 20)).toBe(2)
+    expect(raftNewcomer([3, 3], 10, 20)).toBe(7)
+    expect(raftNewcomer([5, 5], 10, 20)).toBeUndefined()
+    // Stuck, but no one animal can close the gap.
+    expect(raftNewcomer([1, 1], 1, 20)).toBeUndefined()
+    for (const w of [[], [1], [9, 9, 9]]) {
+      expect(raftNewcomer(w, 0, 20)).toBeUndefined()
+      expect(raftNewcomer(w, 20, 20)).toBeUndefined()
+    }
+    const sumsOf = (ws: readonly number[]) => {
+      let sums = new Set<number>([0])
+      for (const w of ws)
+        sums = new Set([...sums, ...[...sums].map((s) => s + w)])
+      return sums
+    }
+    for (let seed = 1; seed <= 1000; seed++) {
+      const rng = seeded(seed)
+      const waiting = Array.from(
+        { length: Math.floor(rng() * 6) },
+        () => 1 + Math.floor(rng() * 9),
+      )
+      const total = 1 + Math.floor(rng() * 19)
+      const gap = 20 - total
+      const sums = sumsOf(waiting)
+      const got = raftNewcomer(waiting, total, 20)
+      if (sums.has(gap)) {
+        expect(got).toBeUndefined()
+        continue
+      }
+      const s =
+        gap <= 9
+          ? 0
+          : [...sums]
+              .filter((x) => x >= gap - 9 && x < gap)
+              .sort((a, b) => a - b)[0]
+      expect(got).toBe(s === undefined ? undefined : gap - s)
+      if (got !== undefined) {
+        expect(got).toBeGreaterThanOrEqual(1)
+        expect(got).toBeLessThanOrEqual(9)
+        expect(sumsOf([...waiting, got]).has(gap)).toBe(true)
+      }
+    }
+  })
+
+  it('I3: on a 20 shore that met its guarantee, a stuck raft always gets a newcomer', () => {
+    for (let seed = 1; seed <= 1000; seed++) {
+      const rng = seeded(seed)
+      const shore = raftShore(rng, { target: 20 })
+      // A random set aboard that is under 20; the rest wait.
+      const mask = Math.floor(rng() * 64)
+      const aboard = shore.filter((_, i) => mask & (1 << i))
+      const total = sum(aboard)
+      if (total < 1 || total >= 20) continue
+      const waiting = shore.filter((_, i) => !(mask & (1 << i)))
+      if (raftStuck(waiting, total, 20)) {
+        expect(raftNewcomer(waiting, total, 20)).toBeDefined()
+      } else {
+        expect(raftNewcomer(waiting, total, 20)).toBeUndefined()
+      }
     }
   })
 })
