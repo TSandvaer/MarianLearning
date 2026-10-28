@@ -83,7 +83,7 @@ The shipped critter (`play-place.md:455`; `LetterCritters.tsx:1970-2098`), conso
 | Bar width       | the pair's ink width                                                                                                                |
 | Ink per 1000 em | sh: inset 25, ink width 897, descent 14 · ch: 21, 956, 15 · th: 16, 850, 13 · ng: 16, 1018, 208 (ascent 676 for sh, ch, th; ng 472) |
 
-So the bar's top is at 0.746 c under sh (0.745 under ch and th) and 0.835 c under ng, and its bottom at 0.796 c and 0.885 c. The ink's centre is within 0.0035 em of the advance's centre for all four, so centring by advance centres the ink to within 0.2 pt at the largest size.
+So the bar's top is at 0.746 c under sh and ch (0.745 under th) and 0.835 c under ng, and its bottom at 0.796 c and 0.885 c. The ink's centre is within 0.0035 em of the advance's centre for all four, so centring by advance centres the ink to within 0.2 pt at the largest size.
 
 ### 2.3 Measured at every size
 
