@@ -260,7 +260,8 @@ describe('I8: the scene on the deck, the walk home, no crossing cap', () => {
     expect(has('raft-picker')).toBe(true)
     await back()
     expect(g.onExit).toHaveBeenCalledTimes(1)
-  })
+    // About 2 min of play in 10 ms steps: well past jest's 5 s on CI.
+  }, 30_000)
 })
 
 /**
@@ -535,7 +536,6 @@ describe('I15: VoiceOver', () => {
 
 describe('the 20 raft’s lines: a missing clip stays silent and safe', () => {
   it('each plays its clip when bundled, else walks its caption and resolves', async () => {
-    jest.useRealTimers()
     const speak = jest.fn(() => Promise.resolve())
     const engine = {
       speak,
@@ -557,11 +557,16 @@ describe('the 20 raft’s lines: a missing clip stays silent and safe', () => {
       const bundled = audioForWebPath(line.src!) !== undefined
       speak.mockClear()
       const ticks: number[] = []
-      await expect(
-        player.playLine(id as keyof typeof PLAY_LINE_MANIFEST, {
+      let done = false
+      void player
+        .playLine(id as keyof typeof PLAY_LINE_MANIFEST, {
           onWordTick: (i) => ticks.push(i),
-        }),
-      ).resolves.toBeUndefined()
+        })
+        .then(() => {
+          done = true
+        })
+      await advance(3000)
+      expect(done).toBe(true)
       expect(speak).toHaveBeenCalledTimes(bundled ? 1 : 0)
       if (!bundled) expect(ticks.length).toBeGreaterThan(0)
     }

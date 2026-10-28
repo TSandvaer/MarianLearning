@@ -380,7 +380,9 @@ it('N4, N5, I7: a raft trip writes only its island; a critters visit writes only
   await fireEvent.press(screen.getByTestId('play-home'))
   await settle(500)
   expect(screen.getByTestId('hub')).toBeOnTheScreen()
-})
+  // Three crossings with their walks home, then the critters: past
+  // jest's 5 s on CI.
+}, 30_000)
 
 it('N6: Back mid-drag, mid-crossing and while a picture shows, and a background mid-crossing, write nothing but the word Emma said', async () => {
   boot('cvc-words')
