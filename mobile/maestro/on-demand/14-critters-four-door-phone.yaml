@@ -4,7 +4,7 @@
 # 13-critters-word-hunt-phone.yaml's: the meadow's rows at y 667 and 731,
 # cells at x 137, 201 and 265; the seats at y 580, x 123, 201 and 279.
 #
-#   a b g  /  h p t
+#   a b f  /  g h t
 appId: host.exp.Exponent
 name: Critters four-letter door (phone portrait)
 tags:
@@ -30,7 +30,7 @@ tags:
     end: 201, 580
     duration: 800
 - swipe:
-    start: 265, 667
+    start: 137, 731
     end: 279, 580
     duration: 800
     waitToSettleTimeoutMs: 300

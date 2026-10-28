@@ -389,8 +389,10 @@ const CRITTER_PRAISE_OWN: Readonly<Record<string, string>> = {
 /**
  * The four-letter targets that crab words and tent words teach (Dave
  * 2026-10-26, (B)), sorted: each has the lesson's pack picture and its
- * praise ("Yes! That's a flag."). The lessons' other words (brick, crab,
- * swing, clock, desk) are no critter target.
+ * praise ("Yes! That's a flag."). The lessons' other words (brick, swing,
+ * clock, desk) are no critter target. _crab_ has been one since the
+ * pictured-only boards (Dave 2026-10-27, (A)), which keep the praise to
+ * these 11 (`critters-four-letter.md` § 15.3), so it has none.
  */
 export const HUNT_FOUR_LESSON_WORDS: readonly string[] = [
   'belt',
@@ -558,7 +560,7 @@ export const CRITTER_NOT_SAID: ReadonlySet<string> = new Set([
  * The words Emma says after the critters sing them, sorted: every real word
  * that is not a picture word, not on `CRITTER_NEVER_SAY` and not on
  * `CRITTER_NOT_SAID`. Each has a whole-word Lily clip
- * (`critterWordLine(word)` in `emmasPath/guidanceLines.ts`); the 21 on
+ * (`critterWordLine(word)` in `emmasPath/guidanceLines.ts`); the 31 on
  * `CRITTER_SAID_PICTURE_WORDS` also have a pack picture.
  */
 export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
@@ -579,14 +581,16 @@ export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
  * (Dave 2026-10-25); and, for the word hunt (Dave's ruling of
  * 2026-10-25, § 6), _mum_ with mom's picture and the new pack pictures
  * _mug_, _sad_, _mud_ and _hug_ (batch 19, Thomas's picks 2026-10-25);
- * and _ant_ and _elf_ (critters four-letter F7, pictures in #709).
- * Pinned here, since core never reads the app's registry;
- * `playPlace.test.ts` checks them against it.
+ * and _ant_ and _elf_ (critters four-letter F7, pictures in #709); and
+ * the pictured-only boards' eight (Dave 2026-10-27, (A); pictures in
+ * #714): _dot peg red rod run six ten tug_. Pinned here, since core never
+ * reads the app's registry; `playPlace.test.ts` checks them against it.
  */
 export const CRITTER_SAID_PICTURE_WORDS: readonly string[] = [
   'ant',
   'bun',
   'cab',
+  'dot',
   'egg',
   'elf',
   'gum',
@@ -600,22 +604,32 @@ export const CRITTER_SAID_PICTURE_WORDS: readonly string[] = [
   'mum',
   'nap',
   'pad',
+  'peg',
   'pop',
   'rag',
   'ram',
   'rat',
+  'red',
+  'rod',
+  'run',
   'sad',
+  'six',
   'tap',
+  'ten',
   'top',
+  'tug',
 ]
 
 /**
- * The four-letter rounds' targets (Dave's ruling of 2026-10-26, (B), "The
- * targets, exact"; `design/native/critters-four-letter.md` § 1): 82 CCVC
- * and CVCC words, by vowel (a 18, o 15, i 7, u 19, e 23). Each has a
- * whole-word Lily clip (`critterWordLine(word)`). Four-letter rounds
- * (`huntRounds(vowel, { length: 4 })`) deal them; a run of four that spells
- * one is `'word'` (F8).
+ * The four-letter words: Dave's 82 CCVC and CVCC words (his ruling of
+ * 2026-10-26, (B), "The targets, exact"; `design/native/critters-four-letter.md`
+ * § 1), by vowel (a 18, o 15, i 7, u 19, e 23), and the pictured-only
+ * boards' 15 (Dave 2026-10-27, (A); clips in #714): the 14 voiceless
+ * plurals of pack words and _crab_. 97. Each has a whole-word Lily clip
+ * (`critterWordLine(word)`). A four-letter round
+ * (`huntRounds(vowel, { length: 4 })`) has the pictured ones it spells as
+ * targets and the rest as extras (`critters-four-letter.md` § 15.2); a run
+ * of four that spells one is `'word'` (F8).
  */
 export const HUNT_FOUR_TARGETS: ReadonlySet<string> = new Set(
   [
@@ -624,6 +638,7 @@ export const HUNT_FOUR_TARGETS: ReadonlySet<string> = new Set(
     'gift drip grip trip flip clip lift',
     'drum plum club plug slug spun stun jump bump dump lump pump dust must rust just hunt gulp bulb',
     'tent nest belt bend lend went sent rent bent dent best rest test vest west felt melt left step stem sled next text',
+    'ants bats caps cats crab hats maps mats rats taps cots mops pots tops jets',
   ]
     .join(' ')
     .split(' '),
@@ -648,37 +663,11 @@ export const CRITTER_SAID_LATER: readonly string[] = [
 ]
 
 /**
- * The 15 four-letter words the pictured-only boards give a clip (Dave
- * 2026-10-27, (A) and (C), "New Lily lines"): the 14 voiceless plurals of
- * pack words and _crab_. Content only so far: they are not
- * `HUNT_FOUR_TARGETS` (crab stays on `HUNT_FOUR_UNDEALT`), so a run that
- * spells one sits, until the pictured-board core moves them onto it.
- */
-export const HUNT_FOUR_LATER: readonly string[] = [
-  'ants',
-  'bats',
-  'caps',
-  'cats',
-  'cots',
-  'crab',
-  'hats',
-  'jets',
-  'maps',
-  'mats',
-  'mops',
-  'pots',
-  'rats',
-  'taps',
-  'tops',
-]
-
-/**
  * Every word with a whole-word Lily clip, sorted: the said words (the nine
- * said later among them), the four-letter targets and the 15 four-letter
- * words for later (`critterWordLine(word)`).
+ * said later among them) and the four-letter words (`critterWordLine(word)`).
  */
 export const CRITTER_CLIP_WORDS: readonly string[] = [
-  ...new Set([...CRITTER_SAID_WORDS, ...HUNT_FOUR_TARGETS, ...HUNT_FOUR_LATER]),
+  ...new Set([...CRITTER_SAID_WORDS, ...HUNT_FOUR_TARGETS]),
 ].sort()
 
 /** A word whose pack picture is another word's (Dave 2026-10-25, § 6). */
@@ -689,16 +678,24 @@ export const critterPictureKey = (word: string): string =>
   CRITTER_PICTURE_ALIAS[word] ?? word
 
 /**
- * The four-letter targets with a bundled pack picture, sorted: the 11
+ * The four-letter words with a bundled pack picture, sorted: the 11
  * lesson words and the 14 of #709 (Dave 2026-10-26, (B), the starred
- * words). Pinned here, since core never reads the app's registry;
- * `playPlace.test.ts` checks them against it.
+ * words), and the pictured-only boards' 16 (Dave 2026-10-27, (A);
+ * `critters-four-letter.md` § 15.2, Q33): _step_ and the 14 plurals
+ * (#714) and _crab_ (bundled before). 41. Pinned here, since core never
+ * reads the app's registry; `playPlace.test.ts` checks them against it.
  */
 export const HUNT_FOUR_PICTURE_WORDS: readonly string[] = [
+  'ants',
+  'bats',
   'belt',
   'bulb',
+  'caps',
+  'cats',
   'clap',
   'clip',
+  'cots',
+  'crab',
   'drip',
   'drop',
   'drum',
@@ -706,55 +703,30 @@ export const HUNT_FOUR_PICTURE_WORDS: readonly string[] = [
   'frog',
   'gift',
   'hand',
+  'hats',
+  'jets',
   'jump',
   'lamp',
+  'maps',
+  'mats',
+  'mops',
   'nest',
   'plug',
   'plum',
   'pond',
+  'pots',
   'pump',
   'ramp',
+  'rats',
   'sand',
   'sled',
   'slug',
-  'stop',
-  'tent',
-  'vest',
-]
-
-/**
- * The pack pictures bundled ahead of the rule that deals them, sorted: the
- * pictured-only boards' 23 (Dave 2026-10-27, (A) and (C); Thomas's picks
- * 2026-10-27), the 8 three-letter said words and step and the 14 voiceless
- * plurals. Until core's pictured-board rule moves them onto
- * `CRITTER_SAID_PICTURE_WORDS` and `HUNT_FOUR_PICTURE_WORDS` (and empties
- * this list), no round treats them as pictured, and the tests that check
- * those two lists against the app's registry leave them out.
- */
-export const CRITTER_PICTURES_WIRED_LATER: readonly string[] = [
-  'ants',
-  'bats',
-  'caps',
-  'cats',
-  'cots',
-  'dot',
-  'hats',
-  'jets',
-  'maps',
-  'mats',
-  'mops',
-  'peg',
-  'pots',
-  'rats',
-  'red',
-  'rod',
-  'run',
-  'six',
   'step',
+  'stop',
   'taps',
-  'ten',
+  'tent',
   'tops',
-  'tug',
+  'vest',
 ]
 
 /**

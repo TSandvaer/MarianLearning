@@ -1,8 +1,8 @@
 # Letter critters' four-letter rounds, F20 (`design/native/critters-four-letter.md`
-# § 10.3), part 1 of 2: from the Hub to the `critters-hunt` seed's
-# three-letter round in progress (a b g h p t; bag, hat, bat and tap
-# found) for a learner with only "3" open: no picker, the round at once
-# (§ 5.1). The calling flow (14, per form) then drags t-a-g, and
+# § 10.3; § 15.5, F29), part 1 of 2: from the Hub to the `critters-hunt`
+# seed's three-letter round in progress (a b f g h t; bag and hat found)
+# for a learner with only "3" open: no picker, the round at once (§ 5.1).
+# The calling flow (14, per form) then drags t-a-g, and
 # `critters-four-roll-in.yaml` takes it from the beat.
 #
 # The filled slots are checked by their labels (the word, "Bat"), not by
@@ -35,9 +35,8 @@ appId: host.exp.Exponent
       NEXT: letter-critters
 - assertNotVisible:
     id: hunt-picker
-# The round in progress, in board order bag, bat, hat, tag, tap, pat: the
-# "3" log, four slots filled, tag (pictured) and pat (the listen mark)
-# empty.
+# The round in progress, in board order bag, bat, hat, tag (every slot a
+# picture): the "3" log, bag and hat filled, bat and tag empty.
 - extendedWaitUntil:
     visible:
       id: critter-log
@@ -48,19 +47,15 @@ appId: host.exp.Exponent
     text: Bag
 - assertVisible:
     id: hunt-slot-1
-    text: Bat
+    text: Word to find
 - assertVisible:
     id: hunt-slot-2
     text: Hat
 - assertVisible:
     id: hunt-slot-3
     text: Word to find
-- assertVisible:
+- assertNotVisible:
     id: hunt-slot-4
-    text: Tap
-- assertVisible:
-    id: hunt-slot-5
-    text: Word to find
 - assertNotVisible:
     id: hunt-new-letters
 - assertNotVisible:

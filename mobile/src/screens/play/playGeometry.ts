@@ -429,7 +429,7 @@ export interface HuntScene extends CritterScene {
   slots: readonly SlotParts[]
   /**
    * Landscape: the board's cell after the last slot; portrait, and every
-   * four-letter round (no extras): none.
+   * four-letter round (no chip, critters-four-letter.md § 15.3): none.
    */
   chipCell: Rect | null
   /** The numeral disc on the log's left end (§ 3.2). */
@@ -660,8 +660,9 @@ export function huntSceneFits(scene: HuntScene, A: Rect): boolean {
 
 /**
  * The word hunt's scene (§ 2): a phone takes S4; a tablet the first of
- * S1, S2, S3 that fits for every N from 5 to 8 in this orientation (else
- * S3, logged). The step depends on `A` alone, so slots keep their size
+ * S1, S2, S3 that fits for every N from 4 to 8 in this orientation (else
+ * S3, logged; N 4 since the pictured-only boards, § 16.2, at the steps N
+ * 5-8 took). The step depends on `A` alone, so slots keep their size
  * from round to round. A four-letter round (critters-four-letter.md
  * § 2.2): a tablet the first of S1-S4 that fits for N 4, 5 and 6, a phone
  * the first of S4, S5 (else the last, logged).
@@ -690,7 +691,7 @@ export function huntScene(
   const s4 = SLOT_STEPS[3]!
   if (!tablet) return huntSceneAt(A, false, landscape, n, s4)
   const step = SLOT_STEPS.slice(0, 3).find((st) =>
-    [5, 6, 7, 8].every((k) =>
+    [4, 5, 6, 7, 8].every((k) =>
       huntSceneFits(huntSceneAt(A, true, landscape, k, st), A),
     ),
   )
