@@ -543,7 +543,7 @@ const TEEN = [
   'nineteen',
 ] as const
 
-/** The 20 raft's 12 lines (raft-island-goal § 12.1), awaiting their render. */
+/** The 20 raft's 12 lines (raft-island-goal § 12.1). */
 const RAFT_20_IDS = [
   'guide.play.raft.open.20',
   ...TEEN.map((_, i) => `guide.play.raft.total.${i + 10}`),
@@ -653,13 +653,11 @@ describe('the Play place lines (play-place spec § 4)', () => {
     expect(raft20.reduce((n, l) => n + (l.input ?? l.text).length, 0)).toBe(124)
   })
 
-  it('C7: the 20 shipped play lines are rendered in Lily; the 20 raft’s 12 await theirs (I6)', () => {
+  it('C7: the 32 play lines are rendered in Lily, the 20 raft’s 12 too (none awaits its render)', () => {
     expect(
-      play
-        .filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id))
-        .map((l) => l.id),
-    ).toEqual(RAFT_20_IDS)
-    expect([...GUIDANCE_LINES_AWAITING_RENDER]).toEqual(RAFT_20_IDS)
+      play.filter((l) => GUIDANCE_LINES_AWAITING_RENDER.includes(l.id)),
+    ).toEqual([])
+    expect([...GUIDANCE_LINES_AWAITING_RENDER]).toEqual([])
   })
 
   it('C8: no Emma line (kind play) says again, next, more, round, win, fast or "not a word"; the read-back words (kind play-word) are out of scope', () => {
