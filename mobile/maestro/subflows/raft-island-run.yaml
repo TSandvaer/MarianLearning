@@ -1,0 +1,102 @@
+# Raft crossing's island goal (`design/native/raft-island-goal.md` I16,
+# I17), from a fresh launch of the `raft-island-eight` seed (eight kinds
+# home on the 10 island, all but the pig; one raft open): the Hub, the
+# Play place, the raft; the pig and the bee cross (a load with the 9 is
+# always 9 + 1, and Dave's guarantee puts one on every shore); the scene
+# on the deck, the pig's fill, the party, the reveal, the picker with two
+# rafts; then the 20 raft with two animals aboard, and Back to the picker.
+#
+# Taps go by label and id: the shore is dealt at random on a device. The
+# beats are waited for by their captions (Emma is muted in run.sh's
+# bundle, so each caption walks at 165 wpm).
+#
+#   SHOT  the screenshots' prefix
+appId: host.exp.Exponent
+---
+- runFlow: open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub-play
+    timeout: 120000
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: hub-play
+      NEXT: play-place
+- extendedWaitUntil:
+    visible:
+      id: play-tile-raft
+    timeout: 15000
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: play-tile-raft
+      NEXT: raft-crossing
+- extendedWaitUntil:
+    visible:
+      id: raft-home-9
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: ${SHOT}-1-island-eight
+- tapOn:
+    text: Pig, nine
+- tapOn:
+    text: Bee, one
+- extendedWaitUntil:
+    visible:
+      text: Hee hee! Silly animals!
+    timeout: 15000
+- takeScreenshot: ${SHOT}-2-scene-on-deck
+- extendedWaitUntil:
+    visible:
+      id: raft-home-burst-9
+    timeout: 15000
+    optional: true
+- takeScreenshot: ${SHOT}-3-pig-fills
+- extendedWaitUntil:
+    visible:
+      text: You did it!
+    timeout: 15000
+- takeScreenshot: ${SHOT}-4-party
+- extendedWaitUntil:
+    visible:
+      text: What a party on the island!
+    timeout: 15000
+- takeScreenshot: ${SHOT}-5-party-close
+- extendedWaitUntil:
+    visible:
+      id: raft-pond-20
+    timeout: 15000
+- takeScreenshot: ${SHOT}-6-reveal
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${SHOT}-7-picker-two-rafts
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: raft-pond-20
+      NEXT: raft-crossing
+# The trip's shore (its open line, "The raft can carry twenty!", has no
+# clip until the 20 raft's render lands, and its caption walks for under
+# 2 s, too short for Maestro's poll; the open line is jest's, I10).
+- extendedWaitUntil:
+    visible:
+      id: raft-animal-0
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    id: raft-animal-0
+- tapOn:
+    id: raft-animal-1
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: ${SHOT}-8-raft-twenty
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: play-game-back
+      NEXT: raft-picker
+- assertVisible:
+    id: raft-pond-10

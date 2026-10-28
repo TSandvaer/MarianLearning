@@ -139,6 +139,8 @@ export const HOP_HOME_STAGGER_MS = 300
 export const HOME_BEAT_MS = 400
 /** The last hop's beat end to the return or the party (§ 1.4). */
 export const AFTER_HOMES_MS = 400
+/** Reduce Motion: a home's shape cross-fades to its animal (§ 2.3). */
+const CROSS_FADE_MS = 200
 /** The repeat's wiggle, four 100 ms steps (§ 2.2). */
 const WIGGLE_STEP_MS = 100
 /** The party (§ 3.1), from `P0`. */
@@ -598,15 +600,30 @@ export function RaftCrossing({
                 dance={dance}
                 reducedMotion={reducedMotion}
               >
-                <HomeArt
+                {/* § 2.1: the shape fades out (150 ms) as the animal lands;
+                    § 2.3: Reduce Motion cross-fades (200 ms). */}
+                <Animated.View
                   key={filled ? 'filled' : 'empty'}
-                  weight={w}
-                  size={r.width}
-                  filled={filled}
-                  tag
-                  tablet={tablet}
-                  id={`raft-home-${w}`}
-                />
+                  pointerEvents="none"
+                  entering={
+                    filled && reducedMotion && fx[w]?.fill
+                      ? FadeIn.duration(CROSS_FADE_MS)
+                      : undefined
+                  }
+                  exiting={FadeOut.duration(
+                    reducedMotion ? CROSS_FADE_MS : FADE_MS,
+                  )}
+                  style={styles.fill}
+                >
+                  <HomeArt
+                    weight={w}
+                    size={r.width}
+                    filled={filled}
+                    tag
+                    tablet={tablet}
+                    id={`raft-home-${w}`}
+                  />
+                </Animated.View>
               </HomeMotion>
             </View>
           )
