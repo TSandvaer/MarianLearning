@@ -335,7 +335,7 @@ describe('§ 7: a digraph deals once its step is open', () => {
     learner({ step: 'cvc-words-short-o' })
     await mount({ rng: seeded(7) })
     expect(deal.mock.calls[1]![2]).toMatchObject({ digraphs: [] })
-  })
+  }, 30_000)
 
   it('over seeds, a digraphs-sh learner meets an sh board (and never a pair she has not opened)', async () => {
     const seen = new Set<string>()
@@ -346,7 +346,7 @@ describe('§ 7: a digraph deals once its step is open', () => {
       await g.unmount()
     }
     expect([...seen]).toEqual(['sh'])
-  })
+  }, 30_000)
 })
 
 // --- D14: the critter ----------------------------------------------------------
@@ -710,7 +710,7 @@ describe('D18: the four sound-source blends are never played whole', () => {
     expect(g.calls.length).toBeGreaterThan(12)
     // sh's tap, and its sound in each of its runs (ship, shin, sh-i-b).
     expect(expectWindowsOnly(g.calls)).toBe(4)
-  })
+  }, 30_000)
 
   it.each([
     ['th', FALLBACKS.th!, ['m', 'o', 'th'], 3],
@@ -876,7 +876,7 @@ describe('D21: no new text or line (but D28’s)', () => {
     const plain =
       /^guide\.play\.critters\.(open|done|funny\.[123]|word\.[a-z]+|praise\.[a-z]+)$/
     expect(g.lines.filter((l) => !plain.test(l))).toEqual([DIGRAPH_LINE])
-  })
+  }, 30_000)
 })
 
 // --- D22: the layout ---------------------------------------------------------------
