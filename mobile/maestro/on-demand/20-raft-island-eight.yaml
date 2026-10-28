@@ -1,0 +1,19 @@
+# The raft island from eight kinds home (`design/native/raft-island-goal.md`
+# I16, I17; `subflows/raft-eight-run.yaml`), on an iPad in portrait: the
+# ninth fills, the party, the reveal, the picker, the 20 raft's open line
+# and a whole crossing to twenty, Back to the picker, Back to the Play place.
+appId: host.exp.Exponent
+name: Raft island, eight home (iPad portrait)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: raft-island-eight
+- setOrientation: PORTRAIT
+- runFlow:
+    file: ../subflows/raft-eight-run.yaml
+    env:
+      SHOT: eight-tablet-portrait
+- setOrientation: PORTRAIT

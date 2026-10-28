@@ -1,0 +1,149 @@
+# Raft crossing with both rafts open, from the `raft-two-rafts` seed
+# (raft-island-goal § 5, I9, I10, I16): the 10 island full, the 20 island
+# all but the pig. The game opens on the picker. The 20 raft: a load with
+# the pig fills the ninth home and throws the 20 island's party, then
+# back to the picker with no reveal. The 10 raft on its full island:
+# three crossings, each returning, never a party. Back to the picker,
+# Back to the Play place.
+#
+#   SHOT  the screenshots' prefix
+appId: host.exp.Exponent
+---
+- runFlow: open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub-play
+    timeout: 120000
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: hub-play
+      NEXT: play-place
+- extendedWaitUntil:
+    visible:
+      id: play-tile-raft
+    timeout: 15000
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: play-tile-raft
+      NEXT: raft-pond-10
+# Two rafts open: the picker first, no shore.
+- assertVisible:
+    id: raft-pond-20
+- assertNotVisible:
+    id: raft-crossing
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${SHOT}-1-picker
+# The 20 raft, to its party.
+- tapOn:
+    id: raft-pond-20
+- extendedWaitUntil:
+    visible:
+      text: The raft can carry twenty!
+    timeout: 15000
+    optional: true
+- extendedWaitUntil:
+    visible:
+      text: Pig, nine, empty home
+    timeout: 15000
+- assertVisible:
+    text: Raft for twenty
+- takeScreenshot: ${SHOT}-2-twenty-shore
+- runScript:
+    file: raft-init.js
+    env:
+      HOMES: 1,2,3,4,5,6,7,8
+# A shore with no load to twenty holding the pig (about 1 in 75): an
+# ordinary crossing, then try again.
+- repeat:
+    while:
+      true: ${output.raft.homes.indexOf(9) < 0}
+    commands:
+      - runFlow:
+          file: raft-board.yaml
+          env:
+            TARGET: '20'
+            WANT: '9'
+      - runFlow:
+          when:
+            true: ${output.raft.homes.indexOf(9) < 0}
+          commands:
+            - extendedWaitUntil:
+                visible:
+                  text: Hee hee! Silly animals!
+                timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: Hee hee! Silly animals!
+    timeout: 30000
+- takeScreenshot: ${SHOT}-3-scene-on-deck
+- extendedWaitUntil:
+    visible:
+      text: Pig, nine, home
+    timeout: 30000
+- takeScreenshot: ${SHOT}-4-pig-home
+- extendedWaitUntil:
+    visible:
+      text: You did it!
+    timeout: 30000
+- takeScreenshot: ${SHOT}-5-party
+- extendedWaitUntil:
+    visible:
+      text: What a party on the island!
+    timeout: 30000
+- takeScreenshot: ${SHOT}-6-party-close
+# The 20 island's party ends on the picker: no reveal.
+- extendedWaitUntil:
+    visible:
+      id: raft-pond-10
+    timeout: 30000
+- assertVisible:
+    id: raft-pond-20
+- assertNotVisible:
+    id: raft-crossing
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${SHOT}-7-picker-after-party
+# The 10 raft on its full island: crossings that never party.
+- tapOn:
+    id: raft-pond-10
+- extendedWaitUntil:
+    visible:
+      text: Pig, nine, home
+    timeout: 15000
+- assertVisible:
+    text: Raft for ten
+- runScript:
+    file: raft-init.js
+    env:
+      HOMES: 1,2,3,4,5,6,7,8,9
+- runFlow:
+    file: raft-cross.yaml
+    env:
+      TARGET: '10'
+      SHOT: ${SHOT}-8-full-island-1
+- runFlow:
+    file: raft-cross.yaml
+    env:
+      TARGET: '10'
+      SHOT: ${SHOT}-8-full-island-2
+- runFlow:
+    file: raft-cross.yaml
+    env:
+      TARGET: '10'
+      SHOT: ${SHOT}-8-full-island-3
+- tapOn:
+    id: play-game-back
+- extendedWaitUntil:
+    visible:
+      id: raft-pond-10
+    timeout: 15000
+- takeScreenshot: ${SHOT}-9-back-to-picker
+- tapOn:
+    id: play-game-back
+- extendedWaitUntil:
+    visible:
+      id: play-place
+    timeout: 15000

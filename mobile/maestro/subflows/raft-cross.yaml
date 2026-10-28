@@ -1,0 +1,36 @@
+# One crossing with no party, and its return (raft-island-goal § 1.4's
+# last row, § 6; I8, I16, amended 2026-10-26: no crossing cap): a load
+# aboard (`raft-board.yaml`), the scene on the deck, the walk home, then
+# the raft back and newcomers walking in, the shore 6 again. The game
+# stays open: no party line, Emma never waves.
+#
+#   TARGET  10 or 20
+#   SHOT    the screenshot's name, taken once the raft is back
+appId: host.exp.Exponent
+---
+- runFlow:
+    file: raft-board.yaml
+    env:
+      TARGET: ${TARGET}
+      WANT: ''
+- extendedWaitUntil:
+    visible:
+      text: Hee hee! Silly animals!
+    timeout: 30000
+- takeScreenshot: ${SHOT}-scene
+- extendedWaitUntil:
+    visible:
+      id: 'raft-animal-\d+'
+      index: 5
+    timeout: 60000
+- assertVisible:
+    id: raft-crossing
+- assertNotVisible:
+    text: What a party on the island!
+- assertNotVisible:
+    text: You did it!
+- assertNotVisible:
+    id: emma-waving
+- evalScript: ${output.raft.crossings = output.raft.crossings + 1}
+- evalScript: ${console.log('raft-cross, crossing ' + output.raft.crossings + ' (' + output.raft.boarded + ') returned, homes ' + output.raft.homes.join(','))}
+- takeScreenshot: ${SHOT}-back

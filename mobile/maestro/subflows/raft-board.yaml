@@ -1,0 +1,42 @@
+# Boards one load to TARGET (raft-island-goal I16, I17): waits for a full
+# shore of 6 (the raft docked, boarding open), reads the six labels
+# ("Cat, five"), lets `raft-pick.js` choose the load, then taps its
+# animals one by one. Needs `raft-init.js` run once per trip.
+#
+#   TARGET  10 or 20
+#   WANT    a weight the load must hold if any load can (9), or ''
+appId: host.exp.Exponent
+---
+- extendedWaitUntil:
+    visible:
+      id: 'raft-animal-\d+'
+      index: 5
+    timeout: 60000
+- waitForAnimationToEnd:
+    timeout: 3000
+- evalScript: ${output.raft.shore = []}
+- repeat:
+    times: 6
+    commands:
+      - copyTextFrom:
+          id: 'raft-animal-\d+'
+          index: ${output.raft.shore.length}
+      - evalScript: ${output.raft.shore.push(maestro.copiedText)}
+- runScript:
+    file: raft-pick.js
+    env:
+      TARGET: ${TARGET}
+      WANT: ${WANT}
+- evalScript: ${output.raft.i = 0}
+- repeat:
+    while:
+      true: ${output.raft.i < output.raft.load.length}
+    commands:
+      # A short settle: Maestro's default waits for a still screen (7 s on
+      # a phone on 2026-10-28) and the scene's caption ("Hee hee! Silly
+      # animals!") can come and go inside it after the last tap.
+      - tapOn:
+          id: 'raft-animal-\d+'
+          text: ${output.raft.load[output.raft.i]}
+          waitToSettleTimeoutMs: 300
+      - evalScript: ${output.raft.i = output.raft.i + 1}

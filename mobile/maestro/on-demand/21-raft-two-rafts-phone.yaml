@@ -1,0 +1,16 @@
+# Flow 21 on a phone in portrait (run it on an iPhone 17 simulator).
+appId: host.exp.Exponent
+name: Raft, two rafts (phone portrait)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: raft-two-rafts
+- setOrientation: PORTRAIT
+- runFlow:
+    file: ../subflows/raft-two-rafts-run.yaml
+    env:
+      SHOT: two-phone-portrait
+- setOrientation: PORTRAIT
