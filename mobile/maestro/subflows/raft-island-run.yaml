@@ -93,10 +93,14 @@ appId: host.exp.Exponent
 - waitForAnimationToEnd:
     timeout: 2000
 - takeScreenshot: ${SHOT}-8-raft-twenty
-- runFlow:
-    file: tap-and-confirm.yaml
-    env:
-      TARGET: play-game-back
-      NEXT: raft-picker
+# Back from the trip: the picker. A plain tap: the Back disc stays on
+# screen over the picker, so tap-and-confirm.yaml's re-tap would leave
+# the picker for the Play place.
+- tapOn:
+    id: play-game-back
+- extendedWaitUntil:
+    visible:
+      id: raft-pond-10
+    timeout: 15000
 - assertVisible:
-    id: raft-pond-10
+    id: raft-pond-20
