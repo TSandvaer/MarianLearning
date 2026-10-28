@@ -406,25 +406,48 @@ export const HUNT_FOUR_LESSON_WORDS: readonly string[] = [
 ]
 
 /**
+ * The digraph targets that the digraph lessons and duck words teach (Dave
+ * 2026-10-27, digraph critters (B), "Praise and hint"), sorted: each has
+ * its lesson's praise ("Yes! That's a ship."), a bundled canon clip. fish
+ * and sing are targets with no praise.
+ */
+export const HUNT_DIGRAPH_LESSON_WORDS: readonly string[] = [
+  'chest',
+  'chip',
+  'moth',
+  'ring',
+  'shed',
+  'ship',
+  'shop',
+  'wing',
+]
+
+/**
  * A picture word's praise (Thomas 2026-10-25, Dave's ruling): the lesson's
  * own `word.p*.correct` line for it ("Yes! That's a fan."), which Emma says
  * the first time the word is built in a visit; since the four-letter
- * rounds (F9) also the 11 `HUNT_FOUR_LESSON_WORDS`. Every one is a bundled
+ * rounds (F9) also the 11 `HUNT_FOUR_LESSON_WORDS`, and since the digraph
+ * critters (D13) the 8 `HUNT_DIGRAPH_LESSON_WORDS`. Every one is a bundled
  * canon clip, so it costs no render. Undefined for any other run.
  */
 export function critterPraise(word: string): string | undefined {
   if (
     !CRITTER_PICTURE_WORDS.includes(word) &&
-    !HUNT_FOUR_LESSON_WORDS.includes(word)
+    !HUNT_FOUR_LESSON_WORDS.includes(word) &&
+    !HUNT_DIGRAPH_LESSON_WORDS.includes(word)
   )
     return undefined
   return CRITTER_PRAISE_OWN[word] ?? `Yes! That's a ${word}.`
 }
 
-/** Every word with a praise line, sorted: the 45 and the 11 four-letter. */
+/**
+ * Every word with a praise line, sorted: the 45, the 11 four-letter and
+ * the 8 digraph.
+ */
 export const CRITTER_PRAISE_WORDS: readonly string[] = [
   ...CRITTER_PICTURE_WORDS,
   ...HUNT_FOUR_LESSON_WORDS,
+  ...HUNT_DIGRAPH_LESSON_WORDS,
 ].sort()
 
 /**
@@ -667,9 +690,10 @@ export const CRITTER_SAID_LATER: readonly string[] = [
  * The 13 digraph-critter words that get a clip (Dave 2026-10-27, digraph
  * critters (C) and (D), "New Lily lines"): the three-seat targets ship
  * fish shed shop chip moth ring wing sing, the four-seat target chest and
- * the extras shin shot wish. Content only so far: none is dealt or said
- * (a run that spells one is not `'word'`) until the digraph core wires
- * them.
+ * the extras shin shot wish. Since the digraph core (D3, D6) they are
+ * dealt and said: a run of their critters (sh-i-p, three; ch-e-s-t, four)
+ * is `'word'`, and a round has the pictured ones it spells as targets and
+ * the rest as extras.
  */
 export const HUNT_DIGRAPH_LATER: readonly string[] = [
   'chest',
@@ -688,14 +712,49 @@ export const HUNT_DIGRAPH_LATER: readonly string[] = [
 ]
 
 /**
+ * A digraph critter's two letters (Dave 2026-10-27, digraph critters (A)):
+ * one honey critter that sings one sound and fills one seat and one box.
+ */
+export type HuntDigraph = 'sh' | 'ch' | 'th' | 'ng'
+
+/** The digraph critters, in Word Song's teaching order (critters digraph D1). */
+export const HUNT_DIGRAPHS: readonly HuntDigraph[] = ['sh', 'ch', 'th', 'ng']
+
+/**
+ * One critter: a letter, or a `HUNT_DIGRAPHS` pair. A run, a round's
+ * `letters` and a word's tiles count critters, never characters (Dave
+ * 2026-10-27, digraph critters (A), "For Kevin"): sh-i-p is three.
+ */
+export type HuntUnit = string
+
+/**
+ * The three-critter digraph words that sing and sit (Dave 2026-10-27,
+ * digraph critters (C)), 62: his quiet words (voiced th, as the path
+ * teaches only voiceless; bath and path, the BATH rule; both, GOAT; push
+ * and bush, /ʊ/; wash, /ɒ/; chef, /ʃ/; itch, tch; chew, show and thaw),
+ * his rude words, and the words a 6-9 learner knows that have no clip.
+ * No round deals letters that spell one (`critterHunt.ts`).
+ */
+export const HUNT_DIGRAPH_QUIET: ReadonlySet<string> = new Set(
+  [
+    'that than this them then thus with bath path both push bush wash chef itch chew show thaw',
+    'shit shat shag gash tush dong bong wang dung thug meth chav',
+    'bash cash dash mash rash dish shut rush hush chat chop chug much such rich inch chin thin math thud',
+    'bang fang gang hang rang sang long song hung lung rung sung',
+  ]
+    .join(' ')
+    .split(' '),
+)
+
+/**
  * The digraph critters' sound sources (Dave 2026-10-27, digraph critters
  * (A), "Its sound"): one Lily blend clip per digraph, in the 4-segment
  * blend format, its marks exported with every blend's (`BLEND_MARKS`). No
  * lesson plays them; a critter sings the digraph's own window: sh, ch and
- * th the first sound, ng the third (no English word starts with ng). Not
- * in `CRITTER_SOUND_SOURCE` yet: the digraph core adds them.
+ * th the first sound, ng the third (no English word starts with ng).
+ * `CRITTER_SOUND_SOURCE` reads them (D9).
  */
-export const CRITTER_DIGRAPH_BLENDS: Readonly<Record<string, string>> = {
+export const CRITTER_DIGRAPH_BLENDS: Readonly<Record<HuntDigraph, string>> = {
   sh: 'sh - i - p ... ship',
   ch: 'ch - i - p ... chip',
   th: 'th - i - n ... thin',
@@ -775,13 +834,34 @@ export const HUNT_FOUR_PICTURE_WORDS: readonly string[] = [
 ]
 
 /**
- * A picture word, a said word with a bundled pack picture, or a pictured
- * four-letter target.
+ * The digraph-critter words with a bundled pack picture, sorted (Dave
+ * 2026-10-27, digraph critters (C), (D); D13): ship, ring and wing, bundled
+ * before, and the 7 of #719. The extras shin, shot and wish have none.
+ * Pinned here, since core never reads the app's registry; the tests check
+ * them against it.
+ */
+export const HUNT_DIGRAPH_PICTURE_WORDS: readonly string[] = [
+  'chest',
+  'chip',
+  'fish',
+  'moth',
+  'ring',
+  'shed',
+  'ship',
+  'shop',
+  'sing',
+  'wing',
+]
+
+/**
+ * A picture word, a said word with a bundled pack picture, a pictured
+ * four-letter target, or a pictured digraph target.
  */
 export const critterHasPicture = (word: string): boolean =>
   CRITTER_PICTURE_WORDS.includes(word) ||
   CRITTER_SAID_PICTURE_WORDS.includes(word) ||
-  HUNT_FOUR_PICTURE_WORDS.includes(word)
+  HUNT_FOUR_PICTURE_WORDS.includes(word) ||
+  HUNT_DIGRAPH_PICTURE_WORDS.includes(word)
 
 /**
  * What a 3-letter run does: `'picture'` pops its clip and picture, `'word'`
@@ -792,6 +872,15 @@ export const critterHasPicture = (word: string): boolean =>
  * four-letter F8) is `'word'` for a `HUNT_FOUR_TARGETS` word and `'quiet'`
  * for anything else: no four-letter word has a blend clip, and nothing
  * judges a four-letter miss.
+ *
+ * A run is its critters (critters digraph D3; Dave 2026-10-27, digraph
+ * critters (A), "For Kevin"): its length is the number of critters, never
+ * of letters, and a string is one critter a letter. A run with a digraph
+ * critter is `'word'` for a `HUNT_DIGRAPH_LATER` word (sh-i-p; ch-e-s-t at
+ * four), `'quiet'` for a `HUNT_DIGRAPH_QUIET` word (th-i-s), and otherwise
+ * `'funny'` at three (`'quiet'` with `funny: false`) and `'quiet'` at
+ * four. No digraph run is `'picture'`: none has a blend clip of its own.
+ * s-h-i-p, four single critters, is a run of four, never ship.
  */
 export type CritterRun = 'picture' | 'word' | 'quiet' | 'funny'
 
@@ -809,13 +898,24 @@ export function critterFunnyOpen(progress: Progress | null): boolean {
 }
 
 export function critterRun(
-  run: string,
+  run: string | readonly HuntUnit[],
   { funny = true }: { funny?: boolean } = {},
 ): CritterRun {
-  if (run.length === 4) return HUNT_FOUR_TARGETS.has(run) ? 'word' : 'quiet'
-  if (CRITTER_PICTURE_WORDS.includes(run)) return 'picture'
-  if (!CRITTER_REAL_WORDS.has(run)) return funny ? 'funny' : 'quiet'
-  return CRITTER_NEVER_SAY.has(run) || CRITTER_NOT_SAID.has(run)
+  const critters = typeof run === 'string' ? [...run] : run
+  const word = critters.join('')
+  const digraph = critters.some((u) =>
+    (HUNT_DIGRAPHS as readonly string[]).includes(u),
+  )
+  if (digraph && HUNT_DIGRAPH_LATER.includes(word)) return 'word'
+  if (critters.length === 4)
+    return HUNT_FOUR_TARGETS.has(word) ? 'word' : 'quiet'
+  if (digraph) {
+    if (HUNT_DIGRAPH_QUIET.has(word)) return 'quiet'
+    return funny ? 'funny' : 'quiet'
+  }
+  if (CRITTER_PICTURE_WORDS.includes(word)) return 'picture'
+  if (!CRITTER_REAL_WORDS.has(word)) return funny ? 'funny' : 'quiet'
+  return CRITTER_NEVER_SAY.has(word) || CRITTER_NOT_SAID.has(word)
     ? 'quiet'
     : 'word'
 }
@@ -871,7 +971,9 @@ export function critterSet(
  * Which clip and which of its sounds a letter sings alone (§ 3.4): a
  * consonant from the first word (alphabetically) it starts, a vowel from
  * the first word it sits in the middle of, and a letter that starts no word
- * (g, x) from the end of its first word.
+ * (g, x) from the end of its first word. A digraph critter (D9) sings its
+ * own window of its `CRITTER_DIGRAPH_BLENDS` clip: sh from ship, ch from
+ * chip and th from thin (the first sound), ng from ring (the third).
  */
 export const CRITTER_SOUND_SOURCE: Readonly<
   Record<string, { word: string; index: 0 | 1 | 2 }>
@@ -882,6 +984,11 @@ export const CRITTER_SOUND_SOURCE: Readonly<
     const at = (i: 0 | 1 | 2) => CRITTER_PICTURE_WORDS.find((w) => w[i] === l)
     const index: 0 | 1 | 2 = VOWELS.has(l) ? 1 : at(0) !== undefined ? 0 : 2
     out[l] = { word: at(index)!, index }
+  }
+  for (const g of HUNT_DIGRAPHS) {
+    const [sounds, word] = CRITTER_DIGRAPH_BLENDS[g].split(' ... ')
+    const index = sounds!.split(' - ').indexOf(g) as 0 | 1 | 2
+    out[g] = { word: word!, index }
   }
   return out
 })()

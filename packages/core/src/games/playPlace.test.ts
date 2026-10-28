@@ -28,6 +28,7 @@ import {
   CRITTER_PRAISE_WORDS,
   CRITTER_DIGRAPH_BLENDS,
   HUNT_DIGRAPH_LATER,
+  HUNT_DIGRAPH_LESSON_WORDS,
   HUNT_FOUR_LESSON_WORDS,
   HUNT_FOUR_PICTURE_WORDS,
   HUNT_FOUR_TARGETS,
@@ -902,7 +903,7 @@ describe('the critters (§ 3.1)', () => {
     expect(set.words).toEqual(words)
   })
 
-  it('C6: CRITTER_SOUND_SOURCE follows § 3.4’s rule and equals its table', () => {
+  it('C6 (D9 adds the digraphs): CRITTER_SOUND_SOURCE follows § 3.4’s rule and equals its table', () => {
     const table = {
       a: { word: 'bag', index: 1 },
       e: { word: 'bed', index: 1 },
@@ -927,7 +928,15 @@ describe('the critters (§ 3.1)', () => {
       g: { word: 'bag', index: 2 },
       x: { word: 'box', index: 2 },
     }
-    expect(CRITTER_SOUND_SOURCE).toEqual(table)
+    // Since the digraph core (D9), the four digraph critters' windows of
+    // their sound-source blends too (`critterHuntDigraph.test.ts`).
+    expect(CRITTER_SOUND_SOURCE).toEqual({
+      ...table,
+      sh: { word: 'ship', index: 0 },
+      ch: { word: 'chip', index: 0 },
+      th: { word: 'thin', index: 0 },
+      ng: { word: 'ring', index: 2 },
+    })
     // The rule, recomputed from the 45 words.
     const ruled: Record<string, { word: string; index: number }> = {}
     for (const l of CRITTER_LETTERS) {
@@ -936,7 +945,8 @@ describe('the critters (§ 3.1)', () => {
       ruled[l] = { word: at(index)!, index }
     }
     expect(ruled).toEqual(table)
-    for (const [l, src] of Object.entries(CRITTER_SOUND_SOURCE)) {
+    for (const l of CRITTER_LETTERS) {
+      const src = CRITTER_SOUND_SOURCE[l]!
       expect(ALL_45).toContain(src.word)
       expect(src.word[src.index]).toBe(l)
     }
@@ -1263,12 +1273,15 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     expect('CRITTER_PICTURES_WIRED_LATER' in PlayPlace).toBe(false)
   })
 
-  it('digraph critters content (Dave 2026-10-27, (A), (C), (D)): the 13 clip words, none dealt or said yet, and the 4 sound-source blends', () => {
+  it('digraph critters content (Dave 2026-10-27, (A), (C), (D)): the 13 clip words, words only as critters (D3), and the 4 sound-source blends', () => {
     expect(HUNT_DIGRAPH_LATER).toEqual(
       'chest chip fish moth ring shed shin ship shop shot sing wing wish'.split(
         ' ',
       ),
     )
+    // A string is one critter a letter: s-h-i-p is a run of four, never
+    // ship. As critters (sh-i-p) each is a word since the digraph core
+    // (D3, `critterHuntDigraph.test.ts`).
     for (const w of HUNT_DIGRAPH_LATER) {
       expect(CRITTER_SAID_WORDS).not.toContain(w)
       expect(HUNT_FOUR_TARGETS.has(w)).toBe(false)
@@ -1288,9 +1301,9 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
       expect(sounds!.split(' - ')).toContain(g)
       expect(sounds!.split(' - ').join('')).toBe(word)
     }
-    // Not a sound source yet: the digraph core adds them.
-    for (const g of Object.keys(CRITTER_DIGRAPH_BLENDS))
-      expect(CRITTER_SOUND_SOURCE[g]).toBeUndefined()
+    // Each is its digraph critter's sound source (D9).
+    for (const [g, text] of Object.entries(CRITTER_DIGRAPH_BLENDS))
+      expect(text.endsWith(` ... ${CRITTER_SOUND_SOURCE[g]!.word}`)).toBe(true)
   })
 
   it('F8 (critters four-letter § 1): a run of four is word for a HUNT_FOUR_TARGETS word and quiet for every other, never picture or funny', () => {
@@ -1336,14 +1349,14 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     expect(critterHasPicture('flap')).toBe(false)
   })
 
-  it('digraph critter pictures (Dave 2026-10-27, (D); Thomas’s picks 2026-10-28): fish shed shop chip moth sing chest are bundled and pictured nowhere until the digraph core', () => {
+  it('digraph critter pictures (Dave 2026-10-27, (D); Thomas’s picks 2026-10-28): fish shed shop chip moth sing chest are bundled, and pictured since the digraph core (D13)', () => {
     const bundled = bundledPictures()
     for (const w of 'fish shed shop chip moth sing chest'.split(' ')) {
       expect(bundled.has(w)).toBe(true)
       expect(HUNT_DIGRAPH_LATER).toContain(w)
       expect(CRITTER_SAID_WORDS).not.toContain(w)
       expect(HUNT_FOUR_TARGETS.has(w)).toBe(false)
-      expect(critterHasPicture(w)).toBe(false)
+      expect(critterHasPicture(w)).toBe(true)
     }
   })
 
@@ -1420,10 +1433,15 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     for (const w of HUNT_FOUR_TARGETS)
       if (!HUNT_FOUR_LESSON_WORDS.includes(w))
         expect(critterPraise(w)).toBeUndefined()
+    // And since the digraph core (D13), the 8 digraph lesson words.
     expect(CRITTER_PRAISE_WORDS).toEqual(
-      [...CRITTER_PICTURE_WORDS, ...HUNT_FOUR_LESSON_WORDS].sort(),
+      [
+        ...CRITTER_PICTURE_WORDS,
+        ...HUNT_FOUR_LESSON_WORDS,
+        ...HUNT_DIGRAPH_LESSON_WORDS,
+      ].sort(),
     )
-    expect(CRITTER_PRAISE_WORDS).toHaveLength(56)
+    expect(CRITTER_PRAISE_WORDS).toHaveLength(64)
   })
 
   it('C10 (Dave’s safeguard): non-words are funny from blending sounds on, quiet before it and for null', () => {
