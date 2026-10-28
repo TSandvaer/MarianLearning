@@ -21,7 +21,14 @@ import {
 } from '../../../test/playHarness'
 import { gardenBackground } from '../hub/clay'
 import { playArea, raftScene } from './playGeometry'
-import { GLIDE_MS, ROW_AT_MS } from './RaftCrossing'
+import {
+  AFTER_SCENE_MS,
+  GLIDE_MS,
+  HOP_HOME_MS,
+  ROW_AT_MS,
+  SCENE_AT_MS,
+  SCENE_MS,
+} from './RaftCrossing'
 
 type Node = ReturnType<typeof screen.getByTestId>
 
@@ -213,7 +220,7 @@ describe('T2-T6: the raft in clay', () => {
 
 describe('T6 (AC 5): plinths on the shore, contact shadows everywhere', () => {
   it.each(FORMS)(
-    '%s: a plinth in every shore piece, none aboard or on the island',
+    '%s: a plinth in every shore piece, none aboard or in a home',
     async (_, v) => {
       await mountGame('raft', { viewport: v, shore: SHORE })
       const tablet = mathLayout(v).tablet
@@ -226,17 +233,24 @@ describe('T6 (AC 5): plinths on the shore, contact shadows everywhere', () => {
         expect(oval.stops).toEqual(['#fffaf0', '#efdcc0', '#d6b890'].map(argb))
         expect(oval.slab).toBe(argb('#b8946a'))
       }
-      // 7 + 3: aboard, then across to the island.
+      // 7 + 3: aboard, then across and home (raft-island-goal § 1.4).
       await tap(byId('raft-animal-0'))
       expect(
         within(byId('raft-aboard-0')).queryAllByTestId('raft-plinth'),
       ).toEqual([])
       await tap(byId('raft-animal-1'))
-      await advance(ROW_AT_MS + GLIDE_MS)
-      for (const i of [0, 1]) {
-        const island = byId(`raft-island-${i}`)
-        expect(within(island).queryAllByTestId('raft-plinth')).toEqual([])
-        const picture = styleOf(within(island).getByTestId('raft-picture'))
+      await advance(
+        ROW_AT_MS +
+          GLIDE_MS +
+          SCENE_AT_MS +
+          SCENE_MS +
+          AFTER_SCENE_MS +
+          2 * HOP_HOME_MS,
+      )
+      for (const w of [3, 7]) {
+        const home = byId(`raft-home-${w}`)
+        expect(within(home).queryAllByTestId('raft-plinth')).toEqual([])
+        const picture = styleOf(within(home).getByTestId('raft-picture'))
         expect(picture.shadowColor).toBe('rgba(60, 30, 10, 0.28)')
         expect(picture.shadowOffset).toEqual({
           width: 0,

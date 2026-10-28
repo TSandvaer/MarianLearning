@@ -54,14 +54,11 @@ export function openPlayGames(progress: Progress | null): PlayGameId[] {
 
 /** What the raft carries, exactly. */
 export const RAFT_LOAD = 10
-/** Animals waiting on the shore. */
-export const RAFT_SHORE_SIZE = 6
 /**
- * Crossings in a trip; the third is the natural stop. Goes with the island
- * goal's native build, with `tripOver` (raft-island-goal § 6, Dave 23 (C):
- * no crossing cap); until then the shipped trip keeps it.
+ * Animals waiting on the shore. A trip has no crossing cap: it ends at its
+ * island's party or on Back (raft-island-goal § 6, Dave 23 (C)).
  */
-export const RAFT_CROSSINGS = 3
+export const RAFT_SHORE_SIZE = 6
 
 export type RaftWeight = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
 

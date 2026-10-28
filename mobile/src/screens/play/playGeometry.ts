@@ -3,6 +3,7 @@
  * pure maths from the lesson's Math frame. Each game fills `A`, the
  * problem and chip regions together (a game has no chips).
  */
+import type { RaftTarget } from '@marian/core/games/playPlace'
 import { isTablet, type Rect, type Viewport } from '../../layout/layout'
 import { mathLayout, type MathLayout } from '../../layout/mathLayout'
 
@@ -64,8 +65,19 @@ export const overlaps = (a: Rect, b: Rect) =>
 export const SEAT_SCALE = 0.7
 const DECK_GAP = 6
 const DECK_PAD = 12
+/**
+ * The 20 deck, 4 × 2 (raft-island-goal § 4.1, Decision 6): seat columns 4
+ * apart and an 8 pt side pad on phones, 6 and 12 on tablets; rows as the
+ * 10 deck's.
+ */
+const DECK_20 = {
+  phone: { gap: 4, pad: 8 },
+  tablet: { gap: 6, pad: 12 },
+} as const
 
 export interface RaftScene {
+  /** The raft's load: the 10 deck is 3 × 2, the 20 deck 4 × 2. */
+  target: RaftTarget
   /** Portrait crosses upward; landscape rightward. */
   axis: 'up' | 'right'
   /** The animal cell (touch target): 64 on phones, 104 on tablets. */
@@ -80,7 +92,8 @@ export interface RaftScene {
   /** The deck docked at the shore, and landed at the island. */
   dock: Rect
   landing: Rect
-  /** The 6 seats, relative to the deck's top-left: back row, then front. */
+  /** The seats (6, or 8), relative to the deck's top-left: back row,
+   *  then front. */
   seats: readonly Rect[]
   /** The mast's flag, relative to the deck. */
   flag: Rect
@@ -90,16 +103,22 @@ export function raftScene(
   A: Rect,
   tablet: boolean,
   landscape: boolean,
+  target: RaftTarget = 10,
 ): RaftScene {
   const a = tablet ? 104 : 64
   const seat = SEAT_SCALE * a
-  const deckW = 3 * seat + 2 * DECK_GAP + 2 * DECK_PAD
+  const cols = target === 10 ? 3 : 4
+  const { gap: colGap, pad: sidePad } =
+    target === 10
+      ? { gap: DECK_GAP, pad: DECK_PAD }
+      : DECK_20[tablet ? 'tablet' : 'phone']
+  const deckW = cols * seat + (cols - 1) * colGap + 2 * sidePad
   const deckH = 2 * seat + DECK_GAP + 2 * DECK_PAD
   const seats: Rect[] = []
   for (let row = 0; row < 2; row++) {
-    for (let col = 0; col < 3; col++) {
+    for (let col = 0; col < cols; col++) {
       seats.push({
-        x: DECK_PAD + col * (seat + DECK_GAP),
+        x: sidePad + col * (seat + colGap),
         y: DECK_PAD + row * (seat + DECK_GAP),
         width: seat,
         height: seat,
@@ -150,6 +169,7 @@ export function raftScene(
     }
     const x = A.x + (A.width - deckW) / 2
     return {
+      target,
       axis: 'up',
       a,
       shore,
@@ -199,6 +219,7 @@ export function raftScene(
   }
   const y = A.y + (A.height - deckH) / 2
   return {
+    target,
     axis: 'right',
     a,
     shore,
@@ -218,20 +239,250 @@ export function outerness(scene: RaftScene, spot: Rect): number {
   return scene.axis === 'up' ? spot.y : -spot.x
 }
 
-/** Where island animal i (0-based, this visit) sits, at 0.5 a. */
-export function islandSpot(scene: RaftScene, i: number): Rect {
-  const s = 0.5 * scene.a
+/** The clay oval's drop under its face: 7 on phones, 10 on tablets. */
+export const clayDrop = (tablet: boolean) => (tablet ? 10 : 7)
+
+/** The island's clay oval face: the mound less its drop. */
+export function moundFace(scene: RaftScene): Rect {
   const { mound } = scene
-  const perRow = Math.max(1, Math.floor((mound.width - 8) / (s + 4)))
-  const row = Math.floor(i / perRow)
-  const col = i % perRow
-  const rows = Math.max(1, Math.floor((mound.height - 8) / (s + 4)))
+  const tablet = scene.a > 64
+  return { ...mound, height: mound.height - clayDrop(tablet) }
+}
+
+/** A home's side (raft-island-goal Decision 2): 0.42 a phones, 0.55 a tablets. */
+export const homeSize = (a: number, tablet: boolean) =>
+  (tablet ? 0.55 : 0.42) * a
+
+/**
+ * Nine `h × h` cells `gap` apart, in reading order (bee 1 to pig 9),
+ * centred on `at`: rows of 5 and 4 (the 4 centred under the 5, like
+ * bricks), or 3 × 3.
+ */
+function homeGrid(
+  at: Point,
+  h: number,
+  gap: number,
+  fiveFour: boolean,
+): Rect[] {
+  const rows = fiveFour ? [5, 4] : [3, 3, 3]
+  const gh = rows.length * h + (rows.length - 1) * gap
+  const out: Rect[] = []
+  rows.forEach((n, r) => {
+    const rw = n * h + (n - 1) * gap
+    for (let c = 0; c < n; c++) {
+      out.push({
+        x: at.x - rw / 2 + c * (h + gap),
+        y: at.y - gh / 2 + r * (h + gap),
+        width: h,
+        height: h,
+      })
+    }
+  })
+  return out
+}
+
+/**
+ * The nine homes (raft-island-goal § 1.2): `h`-sided cells 4 pt (phones)
+ * or 6 pt (tablets) apart, centred on the oval face; rows of 5 and 4 in
+ * portrait, 3 × 3 in landscape. Home `w` is cell `w − 1`.
+ */
+export function islandHomes(scene: RaftScene): Rect[] {
+  const tablet = scene.a > 64
+  return homeGrid(
+    centre(moundFace(scene)),
+    homeSize(scene.a, tablet),
+    tablet ? 6 : 4,
+    scene.axis === 'up',
+  )
+}
+
+/** A home's nest, its sand dip (§ 1.1): (0.04 h, 0.6 h), 0.92 h × 0.36 h. */
+export function homeNest(home: Rect): Rect {
+  const h = home.width
   return {
-    x: mound.x + 4 + col * (s + 4) + (row % 2) * (s / 2),
-    y: mound.y + 4 + (row % rows) * (s + 4),
-    width: s,
-    height: s,
+    x: home.x + 0.04 * h,
+    y: home.y + 0.6 * h,
+    width: 0.92 * h,
+    height: 0.36 * h,
   }
+}
+
+/**
+ * The two bushes (10 island) or sand stones (20 island) at the oval's
+ * long-axis ends (§ 1.2): centred 0.86 × (semi-axis − 2) from the face's
+ * centre, 0.32 a × 0.26 a.
+ */
+export function islandTips(scene: RaftScene): Rect[] {
+  const face = moundFace(scene)
+  const c = centre(face)
+  const w = 0.32 * scene.a
+  const h = 0.26 * scene.a
+  const along = scene.axis === 'up' ? face.width / 2 : face.height / 2
+  const d = 0.86 * (along - 2)
+  return [-1, 1].map((sgn) => {
+    const p =
+      scene.axis === 'up'
+        ? { x: c.x + sgn * d, y: c.y }
+        : { x: c.x, y: c.y + sgn * d }
+    return { x: p.x - w / 2, y: p.y - h / 2, width: w, height: h }
+  })
+}
+
+/**
+ * The target board on the raft's front edge (§ 4.3), relative to the
+ * deck: 0.56 a × 0.34 a, centred, its top at `deck height − 12 − 0.1 a`.
+ */
+export function targetBoard(scene: RaftScene): Rect {
+  const { a, dock } = scene
+  const width = 0.56 * a
+  return {
+    x: (dock.width - width) / 2,
+    y: dock.height - 12 - 0.1 * a,
+    width,
+    height: 0.34 * a,
+  }
+}
+
+/**
+ * Whether `inner` (an ellipse in its rect) lies inside the ellipse of
+ * `outer` inset by `inset` on every side.
+ */
+export function ellipseInside(inner: Rect, outer: Rect, inset = 0): boolean {
+  const o = centre(outer)
+  const A = outer.width / 2 - inset
+  const B = outer.height / 2 - inset
+  const c = centre(inner)
+  for (let k = 0; k < 360; k++) {
+    const t = (k / 180) * Math.PI
+    const x = c.x + (inner.width / 2) * Math.cos(t) - o.x
+    const y = c.y + (inner.height / 2) * Math.sin(t) - o.y
+    if ((x / A) ** 2 + (y / B) ** 2 > 1 + 1e-9) return false
+  }
+  return true
+}
+
+/** One raft's pond in the picker (raft-island-goal § 5.2). */
+export interface RaftPond {
+  target: RaftTarget
+  /** The pool slab: the whole pond is the button. */
+  pond: Rect
+  /** The raft's scene at the pond (its seats, flag and board). */
+  raft: RaftScene
+  /** The deck, docked in the pond. */
+  deck: Rect
+  /** The island's clay oval: its face, and the drop under it. */
+  island: Rect
+  face: Rect
+  /** The nine homes at the picker's `hp`, no tags. */
+  homes: readonly Rect[]
+}
+
+/**
+ * The raft picker (§ 5.2): one pond per raft, the full width (portrait,
+ * stacked, 10 on top) or half (landscape, side by side, 10 on the left),
+ * 16 apart; inside, inset 8 pt (phones) or 16 (tablets), the raft at full
+ * size and its island. Portrait: the raft block (flag to deck) centred
+ * down the pond's left side, the island centred in the room an inset
+ * right of the wider deck; landscape: the deck on the pond's bottom inset, the island
+ * above it, right of the flag. The island's face is the home grid ÷ 0.7
+ * each way, narrowed to its room, grown in height until every nest lies
+ * inside it inset 2 pt; the oval is that face and its drop, no taller than
+ * its room. Homes `hp`: 0.34 a on phones, 0.55 a on tablets, the grid
+ * 3 × 3 in portrait and 5 + 4 in landscape.
+ */
+export function raftPicker(
+  A: Rect,
+  tablet: boolean,
+  landscape: boolean,
+  targets: readonly RaftTarget[],
+): RaftPond[] {
+  const n = targets.length
+  const inset = tablet ? 16 : 8
+  const drop = clayDrop(tablet)
+  const pondW = landscape ? (A.width - 16 * (n - 1)) / n : A.width
+  const pondH = landscape ? A.height : (A.height - 16 * (n - 1)) / n
+  const scenes = targets.map((t) => raftScene(A, tablet, landscape, t))
+  const a = scenes[0]!.a
+  const hp = (tablet ? 0.55 : 0.34) * a
+  const gap = tablet ? 6 : 4
+  const fiveFour = landscape
+  const cols = fiveFour ? 5 : 3
+  const rows = fiveFour ? 2 : 3
+  const gw = cols * hp + (cols - 1) * gap
+  const gh = rows * hp + (rows - 1) * gap
+  const widest = Math.max(...scenes.map((sc) => sc.dock.width))
+  const flagUp = -scenes[0]!.flag.y
+  /** Past the flag's right edge, landscape (§ 5.2's L and TL). */
+  const flagGap = tablet ? 8 : 6
+  return targets.map((target, i) => {
+    const raft = scenes[i]!
+    const pond: Rect = {
+      x: A.x + (landscape ? i * (pondW + 16) : 0),
+      y: A.y + (landscape ? 0 : i * (pondH + 16)),
+      width: pondW,
+      height: pondH,
+    }
+    const { width: dw, height: dh } = raft.dock
+    const deck: Rect = landscape
+      ? {
+          x: pond.x + inset,
+          y: bottom(pond) - inset - dh,
+          width: dw,
+          height: dh,
+        }
+      : {
+          x: pond.x + inset,
+          y: pond.y + (pondH - flagUp - dh) / 2 + flagUp,
+          width: dw,
+          height: dh,
+        }
+    const room: Rect = landscape
+      ? (() => {
+          const x = deck.x + raft.flag.x + 7 + raft.flag.width + flagGap
+          const y = pond.y + inset
+          return {
+            x,
+            y,
+            width: right(pond) - inset - x,
+            height: deck.y - flagGap - y,
+          }
+        })()
+      : (() => {
+          const x = pond.x + 2 * inset + widest
+          return {
+            x,
+            y: pond.y + inset,
+            width: right(pond) - inset - x,
+            height: pondH - 2 * inset,
+          }
+        })()
+    const faceW = Math.min(gw / 0.7, room.width)
+    let faceH = gh / 0.7
+    const fits = (h: number) => {
+      const face = { x: 0, y: 0, width: faceW, height: h }
+      return homeGrid(centre(face), hp, gap, fiveFour).every((home) =>
+        ellipseInside(homeNest(home), face, 2),
+      )
+    }
+    while (!fits(faceH) && faceH < room.height) faceH += 0.5
+    const islandH = Math.min(faceH + drop, room.height)
+    const island: Rect = {
+      x: room.x + (room.width - faceW) / 2,
+      y: room.y + (room.height - islandH) / 2,
+      width: faceW,
+      height: islandH,
+    }
+    const face = { ...island, height: islandH - drop }
+    return {
+      target,
+      pond,
+      raft,
+      deck,
+      island,
+      face,
+      homes: homeGrid(centre(face), hp, gap, fiveFour),
+    }
+  })
 }
 
 // --------------------------------------------------------------------------

@@ -2,7 +2,8 @@
  * The Play place end to end on an in-memory store (play-place spec § 1.4,
  * § 1.6; ACs N4, N5, N6, N16): Hub → Play → a full Raft crossing trip →
  * the Play place, quiet → Letter critters with a word, a non-word and a
- * pair → Back → Home → the Hub. The Raft writes nothing. Letter critters
+ * pair → Back → Home → the Hub. The Raft writes only its island, once per
+ * new kind (raft-island-goal I7). Letter critters
  * writes each word Emma says into the progress doc's seen-record (Dave
  * 2026-10-24: the cvc-words probe reserve skips a word she met there) and,
  * past blending sounds, its word hunt round (critters-word-hunt.md § 1,
@@ -16,6 +17,7 @@
  * starts and ends each (`finishPlayLine`, as App.game's `finishGameLine`).
  */
 import { HUNT_STORAGE_KEY } from '@marian/core/games/critterHunt'
+import { RAFT_ISLAND_STORAGE_KEY } from '@marian/core/games/raftIsland'
 import { CRITTER_PICTURE_WORDS } from '@marian/core/games/playPlace'
 import {
   loadProgress,
@@ -284,7 +286,7 @@ afterEach(() => {
   jest.useRealTimers()
 })
 
-it('N4, N5: a full raft trip writes nothing; a critters visit writes only the words Emma says; neither calls anything', async () => {
+it('N4, N5, I7: a raft trip writes only its island; a critters visit writes only the words Emma says; neither calls anything', async () => {
   boot('cvc-words')
   withRaft()
   await toHub()
@@ -297,24 +299,33 @@ it('N4, N5: a full raft trip writes nothing; a critters visit writes only the wo
   expect(screen.getAllByTestId(/^play-tile-(raft|critters)$/)).toHaveLength(2)
 
   await open('raft')
+  // No crossing cap (raft-island-goal § 6): every crossing comes back.
   for (let k = 0; k < 3; k++) {
     await until(() => shore().length === 6)
     await loadTen()
-    await until(() =>
-      k === 2
-        ? screen.queryByTestId('play-place') !== null
-        : screen.queryAllByTestId(/^raft-animal-\d+$/).length === 6 &&
-          screen.queryByTestId('raft-rowing') === null &&
-          screen.queryAllByTestId(/^raft-scene-/).length === 0,
+    await until(
+      () =>
+        screen.queryAllByTestId(/^raft-animal-\d+$/).length === 6 &&
+        screen.queryAllByTestId(/^raft-aboard-\d+$/).length === 0 &&
+        screen.queryByTestId('raft-rowing') === null &&
+        screen.queryAllByTestId(/^raft-scene-/).length === 0,
     )
   }
-  // The natural stop: the Play place, silent.
+  expect(screen.queryByTestId('play-game')).toBeOnTheScreen()
+  // Back: the Play place, silent.
+  await fireEvent.press(screen.getByTestId('play-game-back'))
+  await until(() => screen.queryByTestId('play-place') !== null)
   expect(screen.queryByTestId('play-game')).not.toBeOnTheScreen()
   await settle(1500)
   expect(playLine()).toBeNull()
   expect(screen.queryByTestId('play-bubble')).not.toBeOnTheScreen()
-  // The whole raft trip wrote and fetched nothing.
-  expect(snapshot()).toEqual(before)
+  // The trip wrote its island only, at least its first two kinds, and
+  // fetched nothing (I7).
+  const afterRaft = snapshot()
+  expect({ ...afterRaft, writes: null }).toEqual({ ...before, writes: null })
+  const raftWrites = writes.slice(before.writes)
+  expect(raftWrites.length).toBeGreaterThanOrEqual(2)
+  expect(raftWrites.every((k) => k === RAFT_ISLAND_STORAGE_KEY)).toBe(true)
 
   await open('critters')
   // A word, a non-word and a pair, from the letters this visit shows: a
@@ -364,12 +375,14 @@ it('N4, N5: a full raft trip writes nothing; a critters visit writes only the wo
   // From the Hub's Play tap to here: only the picture word Emma said, in
   // the seen-record, and the hunt's round (its deal and the new find); no
   // fetch.
-  expectOnlyWordsMet(before, [picture], 2)
+  expectOnlyWordsMet(afterRaft, [picture], 2)
   // Home: the Hub (which decides its own visit on mount, as on any return).
   await fireEvent.press(screen.getByTestId('play-home'))
   await settle(500)
   expect(screen.getByTestId('hub')).toBeOnTheScreen()
-})
+  // Three crossings with their walks home, then the critters: past
+  // jest's 5 s on CI.
+}, 30_000)
 
 it('N6: Back mid-drag, mid-crossing and while a picture shows, and a background mid-crossing, write nothing but the word Emma said', async () => {
   boot('cvc-words')

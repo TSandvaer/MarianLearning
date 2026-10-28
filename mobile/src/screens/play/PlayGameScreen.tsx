@@ -59,7 +59,7 @@ import {
   type PlayLineId,
   type PlayLinePlayer,
 } from './playLines'
-import { RaftCrossing } from './RaftCrossing'
+import { RaftGame } from './RaftGame'
 
 /** The game's fade in and out (§ 1.4). */
 export const PLAY_GAME_FADE_MS = 200
@@ -287,7 +287,7 @@ export function PlayGameScreen({
         style={styles.foreground}
       >
         {game === 'raft' ? (
-          <RaftCrossing kit={kit} shore={shore} />
+          <RaftGame kit={kit} shore={shore} />
         ) : (
           <CrittersGame
             key="critters"
