@@ -1089,8 +1089,8 @@ describe('Thomas 2026-10-25 (Dave’s ruling): a real word’s joy beat, and a p
     expect(g.sfx.cheer.play).not.toHaveBeenCalled()
   })
 
-  it('the 56 praise lines (the 45 and the 11 four-letter lesson words) play the lessons’ bundled canon clips; a said word has none', () => {
-    expect(CRITTER_PRAISE_WORDS).toHaveLength(56)
+  it('the 64 praise lines (the 45, the 11 four-letter and the 8 digraph lesson words) play the lessons’ bundled canon clips; a said word has none', () => {
+    expect(CRITTER_PRAISE_WORDS).toHaveLength(64)
     for (const w of CRITTER_PRAISE_WORDS) {
       const id = crittersPraiseLine(w)!
       const clip = canonClipFor(critterPraise(w)!)
