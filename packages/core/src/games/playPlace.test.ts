@@ -504,10 +504,11 @@ describe('the raft island goal, core (raft-island-goal § 11.2, I1-I3)', () => {
     }
   })
 
-  it('I1: with no options, raftShore and raftRefill deal exactly today’s shores (nothing in the app changes until the island ships)', () => {
+  it('I1: with no options, raftShore and raftRefill deal today’s shores draw for draw, except where no newcomer gives the plain guarantee', () => {
     // FNV-1a over the JSON of 1,000 shores, 1,000 refills and 6 hard
     // refills, by the shipped code at origin/main 4ccd7570: 28085 chars,
-    // hash c252ff.
+    // hash c252ff. None of them waits 5, 6, 7, 8 and 9, the one set that
+    // changes (pinned in the next test).
     const out: number[][] = []
     for (let seed = 1; seed <= 1000; seed++) out.push(raftShore(seeded(seed)))
     for (let seed = 1; seed <= 1000; seed++) {
@@ -541,6 +542,14 @@ describe('the raft island goal, core (raft-island-goal § 11.2, I1-I3)', () => {
         raftRefill([3, 8], seeded(seed)),
       )
     }
+  })
+
+  it('I1: with no options, a refill for waiting 5, 6, 7, 8 and 9 gets a load (9 + 1), where today’s code gave the all-9 shore with none (Dave 2026-10-28)', () => {
+    // No newcomer gives two loads here, so the plain guarantee cannot be
+    // met; Dave's rule then asks for a load to the target.
+    const shore = raftRefill([5, 6, 7, 8, 9], seeded(3))
+    expect(shore).toEqual([5, 6, 7, 8, 9, 1])
+    expect(raftLoads(shore).length).toBeGreaterThan(0)
   })
 
   it('I2: raftLoads to 20 on the canon shore is exactly 7 + 3 + 6 + 4, 7 + 3 + 8 + 2 and 6 + 4 + 8 + 2; to 10 it is today’s', () => {

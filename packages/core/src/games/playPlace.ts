@@ -295,7 +295,12 @@ export function raftShore(
  * every set in order: the first with every guarantee, else the first with
  * the plain one, else the first with a load. Some waiting sets cannot have
  * every guarantee (five pigs on the 20 raft: one place, no ten and ten).
- * With no options it deals today's refills, draw for draw.
+ * With no options it deals today's refills, draw for draw, except where no
+ * newcomer gives the plain guarantee (waiting 5, 6, 7, 8 and 9, after a
+ * stuck newcomer): today's code returned the all-9 shore, with no load;
+ * this one returns the first shore with a load (9 + 1), per Dave's rule
+ * (2026-10-28: "else it keeps the plain guarantee (else a load to the
+ * target)").
  */
 export function raftRefill(
   waiting: readonly number[],
