@@ -560,7 +560,7 @@ export const CRITTER_NOT_SAID: ReadonlySet<string> = new Set([
  * The words Emma says after the critters sing them, sorted: every real word
  * that is not a picture word, not on `CRITTER_NEVER_SAY` and not on
  * `CRITTER_NOT_SAID`. Each has a whole-word Lily clip
- * (`critterWordLine(word)` in `emmasPath/guidanceLines.ts`); the 31 on
+ * (`critterWordLine(word)` in `emmasPath/guidanceLines.ts`); the 33 on
  * `CRITTER_SAID_PICTURE_WORDS` also have a pack picture.
  */
 export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
@@ -583,16 +583,20 @@ export const CRITTER_SAID_WORDS: readonly string[] = [...CRITTER_REAL_WORDS]
  * _mug_, _sad_, _mud_ and _hug_ (batch 19, Thomas's picks 2026-10-25);
  * and _ant_ and _elf_ (critters four-letter F7, pictures in #709); and
  * the pictured-only boards' eight (Dave 2026-10-27, (A); pictures in
- * #714): _dot peg red rod run six ten tug_. Pinned here, since core never
- * reads the app's registry; `playPlace.test.ts` checks them against it.
+ * #714): _dot peg red rod run six ten tug_; and the digraph critters'
+ * _fog_ and _dig_ (Dave's digraph-critter ruling of 2026-10-27, (E);
+ * pictures in #719). Pinned here, since core never reads the app's
+ * registry; `playPlace.test.ts` checks them against it.
  */
 export const CRITTER_SAID_PICTURE_WORDS: readonly string[] = [
   'ant',
   'bun',
   'cab',
+  'dig',
   'dot',
   'egg',
   'elf',
+  'fog',
   'gum',
   'ham',
   'hug',

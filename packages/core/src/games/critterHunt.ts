@@ -279,9 +279,9 @@ const ROUNDS = new Map<string, readonly HuntRound[]>()
 
 /**
  * Every round `vowel` deals, by its consonants in lexicographic order.
- * Three letters: 473 in all (a 182, o 76, u 127, i 6, e 82), Dave 27
- * (A)'s count with #714's eight pictures (B2); _fog_ and _dig_ add o 16
- * and i 2 once their pictures are bundled. Four letters (`length: 4`):
+ * Three letters: 491 in all (a 182, o 92, u 127, i 8, e 82), Dave 27
+ * (A)'s count with #714's eight pictures (B2) and _fog_ and _dig_ (Dave 27
+ * (E), pictures in #719: o +16, i +2). Four letters (`length: 4`):
  * 196 (a 110, o 29, u 38, i 0, e 19; F25). Computed once per vowel, guard
  * and length.
  */

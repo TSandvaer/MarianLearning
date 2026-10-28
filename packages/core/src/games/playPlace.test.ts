@@ -1131,7 +1131,7 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     ).toEqual([])
   })
 
-  it('C10 (Thomas 2026-10-23, build 20): CRITTER_SAID_PICTURE_WORDS is exactly the said words with a bundled pack picture: 31, sorted', () => {
+  it('C10 (Thomas 2026-10-23, build 20): CRITTER_SAID_PICTURE_WORDS is exactly the said words with a bundled pack picture: 33, sorted', () => {
     const bundled = bundledPictures()
     // The registry read works: every picture word's picture is found.
     for (const w of ALL_45) expect(bundled.has(w)).toBe(true)
@@ -1141,14 +1141,17 @@ describe('CRITTER_REAL_WORDS and critterRun (§ 3.1, D5)', () => {
     // new pictures, mug, sad, mud and hug (the word hunt ruling, § 6);
     // and ant and elf (critters four-letter F7, pictures in #709); and the
     // pictured-only boards' eight (Dave 2026-10-27, (A); #714): dot peg
-    // red rod run six ten tug.
+    // red rod run six ten tug; and the digraph critters' fog and dig
+    // (Dave 2026-10-27, (E); #719).
     expect(CRITTER_SAID_PICTURE_WORDS).toEqual([
       'ant',
       'bun',
       'cab',
+      'dig',
       'dot',
       'egg',
       'elf',
+      'fog',
       'gum',
       'ham',
       'hug',
