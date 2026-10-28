@@ -854,6 +854,61 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
       found: ['bib'],
     },
   },
+
+  // The digraph critters (critters-digraph.md D23, D24): every CVC step
+  // mastered, digraphs-sh current, and Dave's sh-i fallback i sh b c n p in
+  // progress with bin and pin found (2 of bib bin pin ship). The sh critter
+  // sits in cell 2, with no s or h. Building sh-i-p fills hunt-slot-3 with
+  // three tiles and completes it (3 of 4); bib stays findable. Its extras:
+  // nib, nip, shin (shin joins the chip as [sh][i][n]).
+  'critters-hunt-sh': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'sounding-out': 'mastered',
+      'cvc-words': 'mastered',
+      'cvc-words-short-o': 'mastered',
+      'cvc-words-short-u': 'mastered',
+      'cvc-words-short-i': 'mastered',
+      'cvc-words-short-e': 'mastered',
+      'digraphs-sh': 'practicing',
+    },
+    skipGreet: true,
+    hunt: {
+      letters: ['i', 'sh', 'b', 'c', 'n', 'p'],
+      found: ['bin', 'pin'],
+    },
+  },
+
+  // The four-seat digraph round (critters-digraph.md D23, D25): the learner
+  // of `critters-hunt-sh` with digraphs-sh mastered and digraphs-ch current,
+  // "3" and "4" open, and Dave's ch-e fallback e ch c j n s t in progress
+  // with jets and nest found (2 of chest jets nest tent). The game opens on
+  // the picker; on "4", ch-e-s-t fills hunt-slot-0 with four tiles and
+  // completes it (3 of 4); tent stays findable.
+  'critters-hunt-ch-four': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'sounding-out': 'mastered',
+      'cvc-words': 'mastered',
+      'cvc-words-short-o': 'mastered',
+      'cvc-words-short-u': 'mastered',
+      'cvc-words-short-i': 'mastered',
+      'cvc-words-short-e': 'mastered',
+      'digraphs-sh': 'mastered',
+      'digraphs-ch': 'practicing',
+    },
+    skipGreet: true,
+    hunt: {
+      letters: ['e', 'ch', 'c', 'j', 'n', 's', 't'],
+      found: ['jets', 'nest'],
+      length: 4,
+      open: [3, 4],
+    },
+  },
 }
 
 /** Every recognized seed name, in table order. */
