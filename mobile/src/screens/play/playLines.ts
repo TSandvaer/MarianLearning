@@ -117,6 +117,10 @@ export const PLAY_LABELS = {
   // The four-letter rounds (critters-four-letter.md § 8.2): the picker's
   // bottom slab, the door and the four-seat log.
   huntLogFour: 'Log, four letters',
+  // The picker's printed titles (critters-four-letter.md § 5.4): the words
+  // Emma says when that round opens. Shown, never spoken.
+  huntTitle: 'Three letters',
+  huntTitleFour: 'Four letters',
   emptySlot: 'Word to find',
   hint: 'Hint',
   bonus: 'Bonus words',

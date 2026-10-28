@@ -13,6 +13,13 @@ export const FREDOKA_600 = resolve(
   'node_modules/@expo-google-fonts/fredoka/600SemiBold/Fredoka_600SemiBold.ttf',
 )
 
+/** Fredoka 700, the games' type (`fonts.bold`). */
+export const FREDOKA_700 = resolve(
+  __dirname,
+  '..',
+  'node_modules/@expo-google-fonts/fredoka/700Bold/Fredoka_700Bold.ttf',
+)
+
 /** `text`'s width at `size` pt, in pt. */
 export type MeasureText = (text: string, size: number) => number
 

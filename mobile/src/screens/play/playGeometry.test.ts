@@ -4,6 +4,7 @@
  * critters at the tablet sizes the layout tests use (Thomas 2026-10-23,
  * build 20).
  */
+import { FREDOKA_700, fontMeasure } from '../../../test/fontAdvances'
 import type { Viewport } from '../../layout/layout'
 import { mathLayout } from '../../layout/mathLayout'
 import {
@@ -22,6 +23,7 @@ import {
   raftScene,
   TABLET_FIT_INSETS,
 } from './playGeometry'
+import { PLAY_LABELS } from './playLines'
 
 const vp = (
   width: number,
@@ -1389,6 +1391,79 @@ describe('F16: the length picker (critters-four-letter.md § 5.2)', () => {
       expect(p.meadow).toEqual(A)
     },
   )
+
+  // § 5.4 (2026-10-28): the titles.
+  const TITLES = [
+    ['P', vp(375, 667), 18, [24, 359.2, 106.2, 21.8], [24, 447.2, 95.5, 21.8]],
+    [
+      'L',
+      vp(667, 375),
+      18,
+      [252.9, 166.8, 106.2, 21.8],
+      [252.9, 254.8, 95.5, 21.8],
+    ],
+    [
+      'W',
+      vp(820, 1180, { top: 24, bottom: 20 }),
+      25.2,
+      [141.9, 663.3, 148.6, 30.5],
+      [141.9, 786.5, 133.7, 30.5],
+    ],
+    [
+      'TL',
+      vp(1180, 820, { bottom: 20 }),
+      25.2,
+      [436.5, 377.4, 148.6, 30.5],
+      [436.5, 500.6, 133.7, 30.5],
+    ],
+    [
+      "Thomas's iPad 1080 × 810 (none)",
+      vp(1080, 810),
+      25.2,
+      [385.2, 382.4, 148.6, 30.5],
+      [385.2, 505.6, 133.7, 30.5],
+    ],
+  ] as const
+  it.each(TITLES)(
+    '%s: the titles at § 5.4’s boxes, 0.45 D, line 1.21 f, 2 pt above the disc',
+    (_, v, f, three, four) => {
+      const { p } = sceneOf(v)
+      expect(p.titleSize).toBeCloseTo(f, 9)
+      expect(p.titleLine).toBeCloseTo(1.21 * f, 9)
+      expect(p.titleSize).toBeCloseTo(0.45 * p.logs[0]!.log.disc.width, 9)
+      p.logs.forEach((l, i) => {
+        near(l.title, [three, four][i]!)
+        expect(l.title.x).toBe(l.log.disc.x)
+        expect(l.title.height).toBe(p.titleLine)
+        expect(l.log.disc.y - (l.title.y + l.title.height)).toBeCloseTo(2, 9)
+      })
+    },
+  )
+
+  // The advances alone, no kerning: wider than the kerned text, so a title
+  // that fits by them fits whatever the engine kerns.
+  const unkerned = fontMeasure(FREDOKA_700)
+  const WORDS = { 3: PLAY_LABELS.huntTitle, 4: PLAY_LABELS.huntTitleFour }
+  it.each(FIT)(
+    '%s: each title inside its own button, ending short of its log’s end',
+    (_, v) => {
+      const { p } = sceneOf(v)
+      for (const l of p.logs) {
+        const wide = unkerned(WORDS[l.length], p.titleSize)
+        expect(wide).toBeGreaterThan(l.title.width)
+        expect(inside(l.hit)({ ...l.title, width: wide })).toBe(true)
+        expect(l.title.y).toBeGreaterThan(l.hit.y)
+        expect(l.title.x + wide).toBeLessThan(l.log.bar.x + l.log.bar.width)
+      }
+    },
+  )
+
+  it('the tightest: the "3" title on phone L ends at 359.1, its bar at 490.1', () => {
+    const { p } = sceneOf(vp(667, 375))
+    const t = p.logs[0]!
+    expect(t.title.x + t.title.width).toBeCloseTo(359.1, 1)
+    expect(t.log.bar.x + t.log.bar.width).toBeCloseTo(490.1, 1)
+  })
 })
 
 describe('F17: the arrival slab and the door (critters-four-letter.md § 6.1, § 6.2)', () => {
