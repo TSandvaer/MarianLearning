@@ -3429,7 +3429,7 @@
       "a chimney (house)",
       "red (barn.webp)"
     ],
-    "distinctFrom": ["hut", "barn"]
+    "distinctFrom": ["shop", "hut", "barn"]
   },
   {
     "word": "shop",
@@ -3441,7 +3441,7 @@
       "a chimney (house)",
       "a pointed striped roof (tent)"
     ],
-    "distinctFrom": ["tent"]
+    "distinctFrom": ["shed", "tent"]
   },
   {
     "word": "chip",
@@ -3449,7 +3449,7 @@
     "batch": 22,
     "subject": "One golden potato crisp, round and slightly wavy.",
     "avoid": ["a pile or a packet (bag, a pack word)", "a cookie", "a coin"],
-    "distinctFrom": ["bag"]
+    "distinctFrom": ["chest", "bag"]
   },
   {
     "word": "moth",
@@ -3487,7 +3487,7 @@
       "a chest of drawers",
       "a body"
     ],
-    "distinctFrom": ["box"]
+    "distinctFrom": ["chip", "box"]
   },
   {
     "word": "fog",
