@@ -45,6 +45,7 @@ import {
   has,
   LINE_MS,
   mountGame,
+  PHONE_L,
   PHONE_P,
   seeded,
   tap,
@@ -54,6 +55,9 @@ import { FILL_LAND_FOUR_MS, FILL_LAND_MS } from './HuntBoard'
 import {
   PICK_AFTER_MS,
   PICK_DIM_MS,
+  PICK_HOP_MS,
+  PICK_WAVE_GAP_MS,
+  PICK_WAVE_STAGGER_MS,
   ROLL_DONE_MS,
   ROLL_FLY_AT_MS,
   ROLL_GLIDE_MS,
@@ -684,24 +688,163 @@ describe('F16: the length picker', () => {
     expect(meadow()).toEqual([])
     const l = mathLayout(PHONE_P)
     const p = pickerScene(playArea(l), l.tablet, l.landscape)
-    for (const { length, slab } of p.slabs) {
+    for (const { length, hit } of p.logs) {
       expect(flat(byId(`hunt-pick-${length}`))).toMatchObject({
-        left: slab.x,
-        top: slab.y,
-        width: slab.width,
-        height: slab.height,
+        left: hit.x,
+        top: hit.y,
+        width: hit.width,
+        height: hit.height,
       })
     }
+    expect(flat(byId('hunt-pick-meadow'))).toMatchObject({
+      left: p.meadow.x,
+      top: p.meadow.y,
+      width: p.meadow.width,
+      height: p.meadow.height,
+    })
+    // The wave runs in these 5 s, silent.
     await advance(5000)
     expect(g.lines).toEqual([])
     expect(g.calls).toEqual([])
     expect(g.poses.filter((x) => x !== 'idle')).toEqual([])
+    const played = () =>
+      Object.values(g.sfx).reduce((n, s) => n + s.play.mock.calls.length, 0)
+    expect(played()).toBe(0)
     await fireEvent.press(byId('hunt-pick-4'))
     expect(g.sfx.plink.play).toHaveBeenCalledTimes(1)
+    expect(played()).toBe(1)
     expect(g.lines).toEqual([])
   })
 
-  it('a slab opens its round (in progress, else fresh); the open line on the first entry only; Back to the picker, then the Play place', async () => {
+  it('no slab: two logs, n sockets on log n, no text but the discs’ numerals', async () => {
+    learner({ four: ['clap'] })
+    await mount()
+    for (const n of [3, 4]) {
+      expect(has(`hunt-pick-${n}-face`)).toBe(false)
+      expect(has(`hunt-pick-${n}-log`)).toBe(true)
+      expect(has(`hunt-pick-${n}-shadow`)).toBe(true)
+      const sockets = [0, 1, 2, 3, 4].filter((i) =>
+        has(`hunt-pick-${n}-log-socket-${i}`),
+      )
+      expect(sockets).toEqual([0, 1, 2, 3].slice(0, n))
+    }
+    const texts = within(byId('hunt-picker'))
+      .queryAllByText(/./)
+      .map((t) => t.props.children as string)
+    expect(texts).toEqual(['3', '4'])
+  })
+
+  it('a tap on the meadow opens nothing and plays nothing', async () => {
+    learner({ four: ['clap'] })
+    const g = await mount()
+    for (const event of ['pressIn', 'pressOut', 'press']) {
+      await fireEvent(byId('hunt-pick-meadow'), event)
+    }
+    await advance(PICK_AFTER_MS + CRITTERS_OPEN_DELAY_MS + LINE_MS)
+    expect(has('hunt-picker')).toBe(true)
+    expect(meadow()).toEqual([])
+    expect(g.lines).toEqual([])
+    expect(g.calls).toEqual([])
+    expect(g.sfx.plink.play).not.toHaveBeenCalled()
+  })
+
+  describe('the wave (§ 5.3)', () => {
+    /** § 5.3: 300 ms after the picker's 200 ms fade-in. */
+    const WAVE_AT = 500
+    let hops: () => number
+    beforeEach(() => {
+      const timing = jest.spyOn(Reanimated, 'withTiming')
+      // A hop's rise: 3 pt on a phone, over half of the 480 ms.
+      hops = () =>
+        timing.mock.calls.filter(
+          ([v, cfg]) => v === 3 && cfg?.duration === PICK_HOP_MS / 2,
+        ).length
+    })
+
+    it('500 ms after the picker mounts, "3" then "4" 120 ms on; then nothing moves with no touch for 30 s', async () => {
+      learner({ four: [] })
+      await mount()
+      await advance(WAVE_AT - 10)
+      expect(hops()).toBe(0)
+      await advance(10)
+      expect(hops()).toBe(1)
+      await advance(PICK_WAVE_STAGGER_MS - 10)
+      expect(hops()).toBe(1)
+      await advance(10)
+      expect(hops()).toBe(2)
+      await advance(30000)
+      expect(hops()).toBe(2)
+    })
+
+    it('again on a meadow press-in, but not twice within 1200 ms', async () => {
+      learner({ four: [] })
+      await mount()
+      await advance(WAVE_AT + PICK_WAVE_STAGGER_MS)
+      expect(hops()).toBe(2)
+      // 120 ms after the last wave began: too soon.
+      await fireEvent(byId('hunt-pick-meadow'), 'pressIn')
+      await advance(PICK_HOP_MS)
+      expect(hops()).toBe(2)
+      // 1200 ms after it began: a wave, "3" at once, "4" 120 ms on.
+      await advance(PICK_WAVE_GAP_MS - PICK_WAVE_STAGGER_MS - PICK_HOP_MS)
+      await fireEvent(byId('hunt-pick-meadow'), 'pressIn')
+      await advance(10)
+      expect(hops()).toBe(3)
+      await advance(PICK_WAVE_STAGGER_MS)
+      expect(hops()).toBe(4)
+      // And again only 1200 ms after that one.
+      await advance(PICK_WAVE_GAP_MS - PICK_WAVE_STAGGER_MS - 20)
+      await fireEvent(byId('hunt-pick-meadow'), 'pressIn')
+      await advance(PICK_HOP_MS)
+      expect(hops()).toBe(4)
+      await fireEvent(byId('hunt-pick-meadow'), 'pressIn')
+      await advance(PICK_WAVE_STAGGER_MS + 10)
+      expect(hops()).toBe(6)
+      await advance(30000)
+      expect(hops()).toBe(6)
+    })
+
+    it('a log’s press-in cuts it: the hop under way stops, the next never starts', async () => {
+      learner({ four: [] })
+      await mount()
+      const cancel = jest.spyOn(Reanimated, 'cancelAnimation')
+      await advance(WAVE_AT)
+      expect(hops()).toBe(1)
+      await fireEvent(byId('hunt-pick-4'), 'pressIn')
+      expect(cancel).toHaveBeenCalledTimes(2)
+      await advance(PICK_WAVE_STAGGER_MS + PICK_HOP_MS)
+      expect(hops()).toBe(1)
+    })
+
+    it('a log’s press-in before the wave: no wave', async () => {
+      learner({ four: [] })
+      await mount()
+      await advance(WAVE_AT - 100)
+      await fireEvent(byId('hunt-pick-3'), 'pressIn')
+      await fireEvent(byId('hunt-pick-3'), 'pressOut')
+      await advance(PICK_WAVE_GAP_MS)
+      expect(hops()).toBe(0)
+      expect(has('hunt-picker')).toBe(true)
+    })
+
+    it('rotation lays it out again without a wave', async () => {
+      learner({ four: [] })
+      const g = await mount()
+      await advance(WAVE_AT + PICK_WAVE_STAGGER_MS)
+      expect(hops()).toBe(2)
+      await g.relayout(PHONE_L)
+      await advance(5000)
+      expect(hops()).toBe(2)
+      const l = mathLayout(PHONE_L)
+      const p = pickerScene(playArea(l), l.tablet, l.landscape)
+      expect(flat(byId('hunt-pick-4'))).toMatchObject({
+        left: p.logs[1]!.hit.x,
+        top: p.logs[1]!.hit.y,
+      })
+    })
+  })
+
+  it('a log opens its round (in progress, else fresh); the open line on the first entry only; Back to the picker, then the Play place', async () => {
     learner({ four: ['clap'] })
     const g = await mount()
     await fireEvent.press(byId('hunt-pick-4'))
@@ -888,6 +1031,19 @@ describe('F18: Reduce Motion', () => {
     ).toEqual([])
   })
 
+  it('the picker: no wave on arrival or on a meadow press-in', async () => {
+    learner({ four: [] })
+    const timing = jest.spyOn(Reanimated, 'withTiming')
+    await mount()
+    await advance(2000)
+    await fireEvent(byId('hunt-pick-meadow'), 'pressIn')
+    await advance(2000)
+    expect(
+      timing.mock.calls.filter(([, cfg]) => cfg?.duration === PICK_HOP_MS / 2),
+    ).toEqual([])
+    expect(has('hunt-picker')).toBe(true)
+  })
+
   it('the roll-in: no slab; the door fades in at U0 + 1200 with the sparkle; idle at 2300; New letters and the unlock at 2800', async () => {
     const g = await toBeat()
     const sparkles = g.sfx.sparkle.play.mock.calls.length
@@ -933,24 +1089,27 @@ describe('F18: Reduce Motion', () => {
 })
 
 describe('F19: VoiceOver', () => {
-  it('the picker: two buttons, top then bottom; its logs are not elements', async () => {
+  it('the picker: two buttons, top then bottom; its logs, their shadows and the meadow are not elements', async () => {
     learner({ four: [] })
     await mount()
-    const slabs = byId('play-game').queryAll(
+    const rows = byId('play-game').queryAll(
       (n) =>
         typeof n.type === 'string' &&
         /^hunt-pick-[34]$/.test(String(n.props.testID ?? '')),
     )
-    expect(slabs.map((n) => n.props.accessibilityLabel)).toEqual([
+    expect(rows.map((n) => n.props.accessibilityLabel)).toEqual([
       'Log, three letters',
       'Log, four letters',
     ])
-    expect(slabs.every((n) => n.props.accessibilityRole === 'button')).toBe(
-      true,
-    )
+    expect(rows.every((n) => n.props.accessibilityRole === 'button')).toBe(true)
     for (const l of [3, 4]) {
       expect(byId(`hunt-pick-${l}-log`).props.accessible).toBe(false)
+      expect(byId(`hunt-pick-${l}-shadow`).props.accessible).toBe(false)
     }
+    const meadowEl = byId('hunt-pick-meadow')
+    expect(meadowEl.props.accessible).toBe(false)
+    expect(meadowEl.props.accessibilityLabel).toBeUndefined()
+    expect(meadowEl.props.accessibilityRole).toBeUndefined()
   })
 
   it('the round’s log and slots; the door', async () => {

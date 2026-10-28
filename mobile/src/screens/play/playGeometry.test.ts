@@ -1088,99 +1088,305 @@ describe('F10: the four-letter scene (critters-four-letter.md § 2.4)', () => {
 })
 
 describe('F16: the length picker (critters-four-letter.md § 5.2)', () => {
-  const PICKER = [
+  // § 5.2 prints to 0.1 pt (24.17 as 24.2).
+  const near = (
+    r: { x: number; y: number; width: number; height: number },
+    want: readonly number[],
+  ) =>
+    [r.x, r.y, r.width, r.height].forEach((v, k) =>
+      expect(Math.abs(v - want[k]!)).toBeLessThanOrEqual(0.0501),
+    )
+  const sceneOf = (v: Viewport) => {
+    const layout = mathLayout(v)
+    const A = playArea(layout)
+    return { A, p: pickerScene(A, layout.tablet, layout.landscape) }
+  }
+  type Log = readonly [
+    hit: readonly number[],
+    bar: readonly number[],
+    disc: readonly [number, number, number],
+  ]
+  const PICKER: readonly (readonly [
+    string,
+    Viewport,
+    number,
+    number,
+    Log,
+    Log,
+  ])[] = [
     [
       'P',
       vp(375, 667),
+      65.7,
+      88,
       [
-        [16, 259, 343, 180],
-        [16, 455, 343, 180],
+        [16, 359, 269.3, 88],
+        [24, 389, 253.3, 28],
+        [24, 383, 40],
       ],
       [
-        [19.5, 306, 258, 86],
-        [19.5, 502, 336, 86],
+        [16, 447, 343, 88],
+        [24, 477, 327, 28],
+        [24, 471, 40],
       ],
-      [368, 564],
-      [364, 560],
-      32,
-      28,
     ],
     [
       'L',
       vp(667, 375),
+      60,
+      88,
       [
-        [160, 146.4, 491, 100.2],
-        [160, 262.6, 491, 100.2],
+        [244.9, 166.6, 253.2, 88],
+        [252.9, 196.6, 237.2, 28],
+        [252.9, 190.6, 40],
       ],
       [
-        [257.5, 158.5, 228, 76],
-        [257.5, 274.7, 296, 76],
+        [244.9, 254.6, 321.2, 88],
+        [252.9, 284.6, 305.2, 28],
+        [252.9, 278.6, 40],
       ],
-      [210.5, 326.7],
-      [206.5, 322.7],
-      32,
-      24,
     ],
     [
       'W',
       vp(820, 1180, { top: 24, bottom: 20 }),
+      110,
+      123.2,
       [
-        [16, 442.8, 788, 334.6],
-        [16, 793.4, 788, 334.6],
+        [133.9, 662.2, 426.2, 123.2],
+        [141.9, 705.8, 410.2, 36],
+        [141.9, 695.8, 56],
       ],
       [
-        [150, 547.1, 394, 126],
-        [150, 897.7, 520, 126],
+        [133.9, 785.4, 552.2, 123.2],
+        [141.9, 829, 536.2, 36],
+        [141.9, 819, 56],
       ],
-      [649.1, 999.7],
-      [641.1, 991.7],
-      40,
-      44,
     ],
     [
       'TL',
       vp(1180, 820, { bottom: 20 }),
+      110,
+      123.2,
       [
-        [245.2, 231, 918.8, 260.5],
-        [245.2, 507.5, 918.8, 260.5],
+        [428.5, 376.3, 426.2, 123.2],
+        [436.5, 419.9, 410.2, 36],
+        [436.5, 409.9, 56],
       ],
       [
-        [444.6, 298.3, 394, 126],
-        [444.6, 574.8, 520, 126],
+        [428.5, 499.5, 552.2, 123.2],
+        [436.5, 543.1, 536.2, 36],
+        [436.5, 533.1, 56],
       ],
-      [400.3, 676.8],
-      [392.3, 668.8],
-      40,
-      44,
+    ],
+    [
+      "Thomas's iPad 1080 × 810 (none)",
+      vp(1080, 810),
+      110,
+      123.2,
+      [
+        [377.2, 381.3, 426.2, 123.2],
+        [385.2, 424.9, 410.2, 36],
+        [385.2, 414.9, 56],
+      ],
+      [
+        [377.2, 504.5, 552.2, 123.2],
+        [385.2, 548.1, 536.2, 36],
+        [385.2, 538.1, 56],
+      ],
+    ],
+  ]
+  it.each(PICKER)(
+    '%s: σ, the pitch, and each log’s button, bar and disc at § 5.2’s rects',
+    (_, v, seat, pitch, three, four) => {
+      const { p } = sceneOf(v)
+      expect(p.logs.map((l) => l.length)).toEqual([3, 4])
+      expect(Math.abs(p.seat - seat)).toBeLessThanOrEqual(0.0501)
+      expect(Math.abs(p.pitch - pitch)).toBeLessThanOrEqual(0.0501)
+      p.logs.forEach((l, i) => {
+        const [hit, bar, [dx, dy, D]] = [three, four][i]!
+        near(l.hit, hit)
+        near(l.log.bar, bar)
+        expect(l.log.band).toEqual(l.log.bar)
+        near(l.log.disc, [dx, dy, D, D])
+        expect(l.log.seats).toHaveLength(l.length)
+      })
+    },
+  )
+
+  it('sockets: socket 1 at x0 + 36 on phones (42.1 × 17.9 P, 38.4 × 17.9 L), x0 + 52 on tablets (70.4 × 23)', () => {
+    const want = [
+      [vp(375, 667), 36, 42.1, 17.9],
+      [vp(667, 375), 36, 38.4, 17.9],
+      [vp(820, 1180, { top: 24, bottom: 20 }), 52, 70.4, 23],
+      [vp(1080, 810), 52, 70.4, 23],
+    ] as const
+    for (const [v, at, w, h] of want) {
+      const { p } = sceneOf(v)
+      for (const { length, log } of p.logs) {
+        const sockets = logSockets(log.seats, log.bar)
+        expect(sockets).toHaveLength(length)
+        const x0 = log.bar.x
+        expect(sockets[0]!.x - x0).toBeCloseTo(at, 5)
+        expect(sockets[0]!.width).toBeCloseTo(w, 1)
+        expect(sockets[0]!.height).toBeCloseTo(h, 1)
+        // The cells are σ wide and g apart.
+        sockets.slice(1).forEach((s, k) => {
+          expect(s.x - sockets[k]!.x).toBeCloseTo(
+            p.seat + (at === 52 ? 16 : 8),
+            5,
+          )
+        })
+      }
+    }
+  })
+
+  it('the ground shadow: (x0 + 6, bar bottom + ledge − s / 2), W − 12 wide, s tall', () => {
+    const { p: phone } = sceneOf(vp(375, 667))
+    near(phone.logs[0]!.shadow, [30, 416, 241.3, 12])
+    near(phone.logs[1]!.shadow, [30, 504, 315, 12])
+    const { p: ipad } = sceneOf(vp(1080, 810))
+    near(ipad.logs[0]!.shadow, [391.2, 457.9, 398.2, 18])
+    near(ipad.logs[1]!.shadow, [391.2, 581.1, 524.2, 18])
+  })
+
+  const FIT = [
+    ['375 × 667', vp(375, 667), 65.7, 88, 327, [16, 359, 343, 176]],
+    ['667 × 375', vp(667, 375), 60, 88, 305.2, [244.9, 166.6, 321.2, 176]],
+    [
+      '390 × 844 (t47 b34)',
+      vp(390, 844, { top: 47, bottom: 34 }),
+      69.6,
+      88,
+      342,
+      [16, 464.5, 358, 176],
+    ],
+    [
+      '844 × 390 (l/r47 b21)',
+      vp(844, 390, { left: 47, right: 47, bottom: 21 }),
+      60,
+      88,
+      305.2,
+      [343.4, 163.1, 321.2, 176],
+    ],
+    [
+      '820 × 1180 (t24 b20)',
+      vp(820, 1180, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [133.9, 662.2, 552.2, 246.4],
+    ],
+    [
+      '1180 × 820 (b20)',
+      vp(1180, 820, { bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [428.5, 376.3, 552.2, 246.4],
+    ],
+    [
+      '1180 × 820 (t24 b20)',
+      vp(1180, 820, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [428.5, 388.3, 552.2, 246.4],
+    ],
+    [
+      '834 × 1194 (t24 b20)',
+      vp(834, 1194, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [140.9, 671, 552.2, 246.4],
+    ],
+    [
+      '1194 × 834 (t24 b20)',
+      vp(1194, 834, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [437.3, 395.3, 552.2, 246.4],
+    ],
+    [
+      '744 × 1133 (t24 b20)',
+      vp(744, 1133, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [95.9, 632.6, 552.2, 246.4],
+    ],
+    [
+      '1133 × 744 (t24 b20)',
+      vp(1133, 744, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [395.1, 350.3, 552.2, 246.4],
+    ],
+    [
+      '810 × 1080 (t24 b20)',
+      vp(810, 1080, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [128.9, 599.2, 552.2, 246.4],
+    ],
+    [
+      '1080 × 810 (t24 b20)',
+      vp(1080, 810, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [377.2, 383.3, 552.2, 246.4],
+    ],
+    [
+      '1080 × 810 (none)',
+      vp(1080, 810),
+      110,
+      123.2,
+      536.2,
+      [377.2, 381.3, 552.2, 246.4],
+    ],
+    [
+      '768 × 1024 (t24 b20)',
+      vp(768, 1024, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [107.9, 563.9, 552.2, 246.4],
+    ],
+    [
+      '1024 × 768 (t24 b20)',
+      vp(1024, 768, { top: 24, bottom: 20 }),
+      110,
+      123.2,
+      536.2,
+      [343.7, 362.3, 552.2, 246.4],
     ],
   ] as const
-  it.each(PICKER)(
-    '%s: the slabs, logs, bars and discs at § 5.2’s rects',
-    (_, v, slabs, bands, barYs, discYs, D, radius) => {
-      const layout = mathLayout(v)
-      const p = pickerScene(playArea(layout), layout.tablet, layout.landscape)
-      expect(p.slabs.map((s) => s.length)).toEqual([3, 4])
-      expect(p.radius).toBe(radius)
-      p.slabs.forEach((s, i) => {
-        // § 5.2 prints to 0.1 pt (298.25 as 298.3).
-        const near = (
-          r: { x: number; y: number; width: number; height: number },
-          want: readonly number[],
-        ) =>
-          [r.x, r.y, r.width, r.height].forEach((v, k) =>
-            expect(Math.abs(v - want[k]!)).toBeLessThanOrEqual(0.0501),
-          )
-        near(s.slab, slabs[i]!)
-        near(s.log.band, bands[i]!)
-        expect(Math.abs(s.log.bar.y - barYs[i]!)).toBeLessThanOrEqual(0.0501)
-        expect(s.log.bar.height).toBe(24)
-        expect(Math.abs(s.log.disc.y - discYs[i]!)).toBeLessThanOrEqual(0.0501)
-        expect(s.log.disc.width).toBe(D)
-        expect(Math.abs(s.log.disc.x - bands[0]![0]!)).toBeLessThanOrEqual(
-          0.0501,
-        )
-        expect(s.log.seats).toHaveLength(s.length)
-      })
+  it.each(FIT)(
+    '%s: σ, r, the "4" log’s width and the pair; both buttons inside A, at least 44 tall, the rows abutting',
+    (_, v, seat, pitch, width, pair) => {
+      const { A, p } = sceneOf(v)
+      expect(Math.abs(p.seat - seat)).toBeLessThanOrEqual(0.0501)
+      expect(Math.abs(p.pitch - pitch)).toBeLessThanOrEqual(0.0501)
+      const [three, four] = p.logs
+      expect(Math.abs(four!.log.bar.width - width)).toBeLessThanOrEqual(0.0501)
+      near(
+        {
+          x: four!.hit.x,
+          y: three!.hit.y,
+          width: four!.hit.width,
+          height: four!.hit.y + four!.hit.height - three!.hit.y,
+        },
+        pair,
+      )
+      expect(p.logs.every((l) => inside(A)(l.hit))).toBe(true)
+      expect(p.logs.every((l) => l.hit.height >= 44)).toBe(true)
+      expect(four!.hit.y).toBeCloseTo(three!.hit.y + three!.hit.height, 9)
+      expect(three!.log.disc.x).toBe(four!.log.disc.x)
+      expect(p.meadow).toEqual(A)
     },
   )
 })
