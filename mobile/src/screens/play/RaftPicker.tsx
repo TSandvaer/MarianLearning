@@ -222,9 +222,9 @@ function Pond({
             ]}
           />
           <View style={[styles.fill, styles.clip, { borderRadius: R }]}>
+            {/* Inside the pond's button: VoiceOver reads the pond only. */}
             <View
               accessible={false}
-              importantForAccessibility="no-hide-descendants"
               style={[styles.fill, { left: -p.pond.x, top: -p.pond.y }]}
             >
               <IslandGround

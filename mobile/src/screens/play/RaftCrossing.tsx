@@ -104,7 +104,13 @@ import {
   WOBBLE_MS,
 } from './RaftParts'
 
-export { GLIDE_MS, RETURN_MS, WOBBLE_MS } from './RaftParts'
+export {
+  FADE_MS,
+  GLIDE_MS,
+  REDUCED_GLIDE_MS,
+  RETURN_MS,
+  WOBBLE_MS,
+} from './RaftParts'
 
 /** The open line: 300 ms after the 200 ms fade-in (§ 4.1). */
 export const RAFT_OPEN_DELAY_MS = 500

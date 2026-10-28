@@ -227,6 +227,8 @@ import {
   setHuntOpenLengths,
   type HuntLength,
 } from '../games/critterHunt'
+import type { RaftWeight } from '../games/playPlace'
+import { saveIslandRecord } from '../games/raftIsland'
 
 interface SeedRecipe {
   /**
@@ -275,6 +277,15 @@ interface SeedRecipe {
     found: readonly string[]
     length?: HuntLength
     open?: readonly HuntLength[]
+  }
+  /**
+   * Optional Raft crossing islands (raft-island-goal § 11.1): the kinds
+   * home on each raft's island, written over the learner's island record
+   * (`games/raftIsland.ts`).
+   */
+  readonly island?: {
+    10: readonly RaftWeight[]
+    20: readonly RaftWeight[]
   }
 }
 
@@ -743,6 +754,36 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
     ],
   },
 
+  // Raft crossing's island goal (raft-island-goal I17): adding to ten
+  // current, and eight kinds home on the 10 island, all but the pig (9).
+  // One raft open: the game opens on the 10 shore, which always carries a
+  // load with a 9 (Dave (1)); its crossing fills the ninth home, the party
+  // plays, the picker shows and the 20 raft docks.
+  'raft-island-eight': {
+    skillLevels: {
+      'number-recog': 'mastered',
+      'add-to-10': 'practicing',
+    },
+    skipGreet: true,
+    island: { 10: [1, 2, 3, 4, 5, 6, 7, 8], 20: [] },
+  },
+
+  // Both rafts open (raft-island-goal § 5): the 10 island full, the 20
+  // island with all but the pig. The game opens on the picker; the 20
+  // raft's next pig crossing throws the 20 island's party, then back to
+  // the picker with no reveal.
+  'raft-two-rafts': {
+    skillLevels: {
+      'number-recog': 'mastered',
+      'add-to-10': 'practicing',
+    },
+    skipGreet: true,
+    island: {
+      10: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+      20: [1, 2, 3, 4, 5, 6, 7, 8],
+    },
+  },
+
   // Letter critters word hunt (critters-word-hunt.md § 10.3, H26): a
   // learner past cvc-words with short o current (Marian, 2026-10-25), and
   // the round a b g h p t in progress with bag, hat, bat and tap found
@@ -848,6 +889,9 @@ export function applyDebugSeed(value: string): boolean {
   }
   if (recipe.hunt) {
     applyHuntSeed(recipe.hunt)
+  }
+  if (recipe.island) {
+    saveIslandRecord({ 10: [...recipe.island[10]], 20: [...recipe.island[20]] })
   }
   if (recipe.skipGreet) {
     bumpSessionCountIfZero()
