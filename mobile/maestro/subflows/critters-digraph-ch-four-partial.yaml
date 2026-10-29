@@ -1,0 +1,31 @@
+# Letter critters' digraph critters on the four-seat log
+# (`design/native/critters-digraph.md` D25), part 2 of 3: ch, e and s sit
+# on seats 0-2 (the calling flow dragged them; ch's lift was this
+# learner's first, so Emma said "Two letters, one sound!" during the
+# drags, D28). 1-3 seated make no sound on their own, so the seats hold
+# still for the screenshot: the ch critter at its seated size (1.25 c).
+# The calling flow then seats t.
+#
+#   SHOT  the screenshots' prefix
+appId: host.exp.Exponent
+---
+- extendedWaitUntil:
+    visible:
+      id: critter-seat-2
+      text: Letter s, on the log
+    timeout: 5000
+- assertVisible:
+    id: critter-seat-0
+    text: Letters c h, one sound, on the log
+- assertVisible:
+    id: critter-seat-1
+    text: Letter e, on the log
+- assertNotVisible:
+    id: critter-seat-3
+- extendedWaitUntil:
+    notVisible:
+      id: play-game-ribbon
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ${SHOT}-three-seated

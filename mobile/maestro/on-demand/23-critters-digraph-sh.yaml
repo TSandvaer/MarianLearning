@@ -1,0 +1,76 @@
+# D24 of `design/native/critters-digraph.md` § 11.3, on an iPad in
+# landscape: the `critters-hunt-sh` seed (every CVC step mastered,
+# digraphs-sh current; Dave's sh-i fallback i sh b c n p with bin and pin
+# found, D23) → the round in progress: the sh critter in cell 2, no s and no
+# h → two taps on it: the first says "Two letters, one sound!" after its
+# sound (Dave's Q38 ruling, D28), the second plays the sound only → sh-i-n:
+# an extra, the chip's [sh][i][n] → sh-i-p: ship's slot (3) fills with
+# [sh][i][p], the beat (3 of 4), bib stays findable → the roll-in → Back →
+# Back. The shared steps are
+# `../subflows/critters-digraph-sh-{open,taps,shin,ship}.yaml`.
+#
+# The points are for the iPad Pro 11-inch (M5) simulator in landscape (1210
+# x 834, insets t32 b20), as 12-critters-word-hunt.yaml: the meadow's rows
+# at y 542 and 646, cells at x 373, 477 and 581; the seats at y 411, x 351,
+# 477 and 603. The digraph round's layout is a plain round's (D22).
+#
+#   i sh b  /  c n p
+#
+# Screenshots go to Maestro's output (run.sh `--debug-output`, under
+# MAESTRO_OUT/23-critters-digraph-sh/); Thomas's eye (D27) reads the
+# critter, its seated size, the slot and the chip from them.
+appId: host.exp.Exponent
+name: Critters digraph sh (iPad landscape)
+tags:
+  - play
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      seed: critters-hunt-sh
+- setOrientation: LANDSCAPE_LEFT
+- runFlow:
+    file: ../subflows/critters-digraph-sh-open.yaml
+    env:
+      SHOT: digraph-sh-ipad-landscape
+- runFlow:
+    file: ../subflows/critters-digraph-sh-taps.yaml
+    env:
+      SHOT: digraph-sh-ipad-landscape
+# sh-i-n: an extra, the chip appears.
+- swipe:
+    start: 477, 542
+    end: 351, 411
+    duration: 800
+- swipe:
+    start: 373, 542
+    end: 477, 411
+    duration: 800
+- swipe:
+    start: 477, 646
+    end: 603, 411
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-digraph-sh-shin.yaml
+    env:
+      SHOT: digraph-sh-ipad-landscape
+# sh-i-p: ship, the completing find (3 of 4).
+- swipe:
+    start: 477, 542
+    end: 351, 411
+    duration: 800
+- swipe:
+    start: 373, 542
+    end: 477, 411
+    duration: 800
+- swipe:
+    start: 581, 646
+    end: 603, 411
+    duration: 800
+    waitToSettleTimeoutMs: 300
+- runFlow:
+    file: ../subflows/critters-digraph-sh-ship.yaml
+    env:
+      SHOT: digraph-sh-ipad-landscape
+- setOrientation: PORTRAIT

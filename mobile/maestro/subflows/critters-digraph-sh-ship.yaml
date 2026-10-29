@@ -1,0 +1,85 @@
+# Letter critters' digraph critters (`design/native/critters-digraph.md`
+# D24, D23), part 4 of 4: the calling flow has seated sh, i, p. One sound
+# a seat (§ 4.1); ship is a target: Emma says it ("Ship."), its picture,
+# then three tiles fill its slot (3), [sh][i][p], and that is 3 of 4 (bin,
+# pin, ship), so the beat plays (the lap, "You did it!"); bib's slot (0)
+# stays empty, findable. The seed has only "3" open, so the roll-in
+# follows the beat (critters-four-letter.md § 6) and New letters comes
+# with the door. Back → the picker; Back → the Play place.
+#
+# The seated labels are part 3's. "Ship." lasts about a second and under
+# load can end before a swipe's settle does (2026-10-28), so it and the
+# praise are read from Metro's log (`play:guide.play.critters.word.ship`,
+# `...praise.ship`); the picture, up through the praise, is waited for.
+#
+#   SHOT  the screenshots' prefix
+appId: host.exp.Exponent
+---
+- extendedWaitUntil:
+    visible:
+      id: critter-picture-ship
+    timeout: 15000
+- takeScreenshot: ${SHOT}-ship-picture
+# The fill: ship's three tiles in its own slot (3).
+- extendedWaitUntil:
+    visible:
+      id: hunt-slot-3
+      text: Ship
+    timeout: 20000
+# One tile a critter (D16): three tiles, sh i p, and no fourth.
+- extendedWaitUntil:
+    visible:
+      id: hunt-slot-3-tile-2
+    timeout: 5000
+- assertVisible:
+    id: hunt-slot-3-tile-0
+- assertNotVisible:
+    id: hunt-slot-3-tile-3
+# The beat: the lap lights each found slot in turn (bin, pin, ship; bib's
+# slot, 0, stays dark), then "You did it!".
+- extendedWaitUntil:
+    visible:
+      id: hunt-slot-[1-3]-lap
+    timeout: 20000
+- takeScreenshot: ${SHOT}-beat-lap
+- extendedWaitUntil:
+    visible:
+      id: play-game-ribbon
+      text: You did it!
+    timeout: 20000
+- takeScreenshot: ${SHOT}-beat-you-did-it
+- extendedWaitUntil:
+    visible:
+      id: hunt-new-letters
+    timeout: 30000
+- assertVisible:
+    id: hunt-slot-0
+    text: Word to find
+- assertVisible:
+    id: hunt-slot-1
+    text: Bin
+- assertVisible:
+    id: hunt-slot-2
+    text: Pin
+- assertVisible:
+    id: hunt-slot-3
+    text: Ship
+- assertVisible:
+    id: hunt-bonus
+    text: Bonus words, shin
+- assertNotVisible:
+    id: hunt-slot-0-lap
+- waitForAnimationToEnd:
+    timeout: 1500
+# Thomas's eye (D27): the slot's [sh][i][p] and the chip's [sh][i][n].
+- takeScreenshot: ${SHOT}-board-after-beat
+- runFlow:
+    file: tap-and-confirm-stays.yaml
+    env:
+      TARGET: play-game-back
+      NEXT: hunt-picker
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: play-game-back
+      NEXT: play-place

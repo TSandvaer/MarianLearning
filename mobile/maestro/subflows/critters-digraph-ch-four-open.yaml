@@ -1,0 +1,83 @@
+# Letter critters' digraph critters on the four-seat log
+# (`design/native/critters-digraph.md` D25), part 1 of 3: from the Hub to
+# the `critters-hunt-ch-four` seed's round in progress (e ch c j n s t;
+# jets and nest found; "3" and "4" open, D23). The game opens on the
+# picker; "4" opens the round. The meadow (§ 5), 4 + 3: the vowel, the ch
+# critter beside it in cell 2, then c j; n s t below. c alone may be
+# dealt, h never (the pair rule, D5). In board order (§ 4.3) the slots
+# hold chest, jets, nest, tent. The calling flow (24, per form) then
+# seats ch, e, s.
+#
+#   SHOT  the screenshots' prefix
+appId: host.exp.Exponent
+---
+- runFlow: open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: hub-play
+    timeout: 120000
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: hub-play
+      NEXT: play-place
+- extendedWaitUntil:
+    visible:
+      id: play-tile-critters
+    timeout: 15000
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: play-tile-critters
+      NEXT: hunt-picker
+- assertVisible:
+    id: hunt-pick-3
+    text: Log, three letters
+- assertVisible:
+    id: hunt-pick-4
+    text: Log, four letters
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: hunt-pick-4
+      NEXT: letter-critters
+- extendedWaitUntil:
+    visible:
+      id: critter-log
+      text: Log, four letters
+    timeout: 15000
+- assertVisible:
+    id: hunt-slot-0
+    text: Word to find
+- assertVisible:
+    id: hunt-slot-1
+    text: Jets
+- assertVisible:
+    id: hunt-slot-2
+    text: Nest
+- assertVisible:
+    id: hunt-slot-3
+    text: Word to find
+- assertNotVisible:
+    id: hunt-slot-4
+- assertNotVisible:
+    id: hunt-new-letters
+- assertVisible:
+    id: critter-ch
+    text: Letters c h, one sound
+- assertVisible:
+    id: critter-ch
+    rightOf:
+      id: critter-e
+    leftOf:
+      id: critter-c
+- assertNotVisible:
+    id: critter-h
+# The four-letter open line and the drag hint end (the hand loops 6 s).
+- extendedWaitUntil:
+    notVisible:
+      id: play-game-ribbon
+    timeout: 25000
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ${SHOT}-round-in-progress

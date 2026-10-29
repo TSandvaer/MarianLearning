@@ -1,0 +1,86 @@
+# Letter critters' digraph critters on the four-seat log
+# (`design/native/critters-digraph.md` D25), part 3 of 3: the calling flow
+# has seated t. Four seated sing, one sound a seat; chest is a target:
+# Emma says it ("Chest."), its picture, then four tiles fill its slot (0),
+# [ch][e][s][t] (at b 20 on a phone in landscape, S5), and that is 3 of 4
+# (chest, jets, nest), so the beat plays (the lap, "You did it!") and New
+# letters enters, with no roll-in ("4" is already open). Tent's slot stays
+# empty (findable); no chip on the four-seat log. Back → the picker; Back
+# → the Play place.
+#
+# The seated labels are part 2's. "Chest." lasts about a second and under
+# load can end before a swipe's settle does (2026-10-28), so it and the
+# praise are read from Metro's log (`play:guide.play.critters.word.chest`,
+# `...praise.chest`); the picture, up through the praise, is waited for.
+#
+#   SHOT  the screenshots' prefix
+appId: host.exp.Exponent
+---
+- extendedWaitUntil:
+    visible:
+      id: critter-picture-chest
+    timeout: 15000
+- takeScreenshot: ${SHOT}-chest-picture
+# The fill: chest's four tiles in its own slot (0).
+- extendedWaitUntil:
+    visible:
+      id: hunt-slot-0
+      text: Chest
+    timeout: 20000
+# One tile a critter (D16): four tiles, ch e s t, and no fifth.
+- extendedWaitUntil:
+    visible:
+      id: hunt-slot-0-tile-3
+    timeout: 5000
+- assertNotVisible:
+    id: hunt-slot-0-tile-4
+- extendedWaitUntil:
+    visible:
+      id: hunt-slot-[0-2]-lap
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: play-game-ribbon
+      text: You did it!
+    timeout: 20000
+- takeScreenshot: ${SHOT}-beat-you-did-it
+- extendedWaitUntil:
+    visible:
+      id: hunt-new-letters
+    timeout: 20000
+- assertNotVisible:
+    id: hunt-roll-in
+- assertNotVisible:
+    id: hunt-bonus
+- assertVisible:
+    id: hunt-slot-0
+    text: Chest
+- assertVisible:
+    id: hunt-slot-1
+    text: Jets
+- assertVisible:
+    id: hunt-slot-2
+    text: Nest
+- assertVisible:
+    id: hunt-slot-3
+    text: Word to find
+- extendedWaitUntil:
+    notVisible:
+      id: critter-seat-0
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 1500
+# Thomas's eye (D27): the four-box slot's [ch][e][s][t].
+- takeScreenshot: ${SHOT}-board-after-beat
+# Back stays on screen over the picker: the -stays variant (see
+# critters-four-roll-in.yaml).
+- runFlow:
+    file: tap-and-confirm-stays.yaml
+    env:
+      TARGET: play-game-back
+      NEXT: hunt-picker
+- runFlow:
+    file: tap-and-confirm.yaml
+    env:
+      TARGET: play-game-back
+      NEXT: play-place

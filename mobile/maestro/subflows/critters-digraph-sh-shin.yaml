@@ -1,0 +1,51 @@
+# Letter critters' digraph critters (`design/native/critters-digraph.md`
+# D24, D23), part 3 of 4: the calling flow has seated sh, i, n. The sh
+# critter sits on seat 0 at its seated size (1.25 c), labelled on the log
+# (§ 8.2). shin is an extra of the round (nib nip shin): Emma says it, and
+# at the fill's moment the bonus chip appears with its three tiles,
+# [sh][i][n] (§ 3); no slot fills. Then the shelf clears.
+#
+#   SHOT  the screenshots' prefix
+appId: host.exp.Exponent
+---
+- extendedWaitUntil:
+    visible:
+      id: critter-seat-2
+      text: Letter n, on the log
+    timeout: 5000
+- assertVisible:
+    id: critter-seat-0
+    text: Letters s h, one sound, on the log
+- assertVisible:
+    id: critter-seat-1
+    text: Letter i, on the log
+# The three seated: the seated sh at 1.25 c. "Shin." lasts about a second,
+# so it is read from Metro's log (`play:guide.play.critters.word.shin`).
+- takeScreenshot: ${SHOT}-shin-seated
+- extendedWaitUntil:
+    visible:
+      id: hunt-bonus
+      text: Bonus words, shin
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: critter-seat-0
+    timeout: 20000
+- assertVisible:
+    id: hunt-bonus
+    text: Bonus words, shin
+# The chip's tiles are its critters (D16): sh i n, three, no fourth.
+- assertVisible:
+    id: hunt-bonus-shin-2
+- assertNotVisible:
+    id: hunt-bonus-shin-3
+# No slot took it: bib and ship are still to find.
+- assertVisible:
+    id: hunt-slot-0
+    text: Word to find
+- assertVisible:
+    id: hunt-slot-3
+    text: Word to find
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ${SHOT}-chip-shin
