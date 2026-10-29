@@ -778,18 +778,24 @@ function huntSceneAt(
   let blockAt: { x: number; y: number }
   let boardRect: Rect
   if (!landscape) {
+    // Amended 2026-10-29: the board's top is A's top; the block stays where
+    // centring the pair put it, so F / 2 stays under the meadow and the
+    // rest of the free height F becomes gap.
     rows = [Math.ceil(n / 2), Math.floor(n / 2)]
     const boardW = rowW(rows[0]!)
     const boardH = 2 * H + sg
     const gap = tablet ? 24 : 12
-    const top = A.y + (A.height - (boardH + gap + blockH)) / 2
+    const F = A.height - (boardH + gap + blockH)
     boardRect = {
       x: A.x + (A.width - boardW) / 2,
-      y: top,
+      y: A.y,
       width: boardW,
       height: boardH,
     }
-    blockAt = { x: A.x + (A.width - blockW) / 2, y: top + boardH + gap }
+    blockAt = {
+      x: A.x + (A.width - blockW) / 2,
+      y: A.y + F / 2 + boardH + gap,
+    }
   } else {
     // Three letters: the slots and the chip's cell, 3 a row. Four: the
     // slots alone, 2 a row.
