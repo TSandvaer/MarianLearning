@@ -294,7 +294,7 @@ const HUNT_TABLE: readonly (readonly [
     vp(375, 667),
     'S4',
     {
-      board: [26.5, 264, 322, 140],
+      board: [26.5, 259, 322, 140],
       logBand: [58.5, 416, 258, 86],
       meadow: [95.5, 510, 184, 120],
       chip: [287.5, 570, 58, 60],
@@ -318,7 +318,7 @@ const HUNT_TABLE: readonly (readonly [
     vp(390, 844, { top: 47, bottom: 34 }),
     'S4',
     {
-      board: [34, 369.5, 322, 140],
+      board: [34, 327, 322, 140],
       logBand: [66, 521.5, 258, 86],
       meadow: [103, 615.5, 184, 120],
       chip: [295, 675.5, 58, 60],
@@ -342,7 +342,7 @@ const HUNT_TABLE: readonly (readonly [
     vp(820, 1180, { top: 24, bottom: 20 }),
     'S1',
     {
-      board: [98, 462.4, 624, 288],
+      board: [98, 442.8, 624, 288],
       logBand: [213, 774.4, 394, 126],
       meadow: [262, 916.4, 296, 192],
       chip: [574, 992.4, 108, 116],
@@ -378,7 +378,7 @@ const HUNT_TABLE: readonly (readonly [
     vp(834, 1194, { top: 24, bottom: 20 }),
     'S1',
     {
-      board: [105, 471.2, 624, 288],
+      board: [105, 446.4, 624, 288],
       logBand: [220, 783.2, 394, 126],
       meadow: [269, 925.2, 296, 192],
       chip: [581, 1001.2, 108, 116],
@@ -402,7 +402,7 @@ const HUNT_TABLE: readonly (readonly [
     vp(744, 1133, { top: 24, bottom: 20 }),
     'S2',
     {
-      board: [108, 456.8, 528, 240],
+      board: [108, 430.6, 528, 240],
       logBand: [175, 720.8, 394, 126],
       meadow: [224, 862.8, 296, 192],
       chip: [536, 950.8, 96, 104],
@@ -426,7 +426,7 @@ const HUNT_TABLE: readonly (readonly [
     vp(810, 1080, { top: 24, bottom: 20 }),
     'S2',
     {
-      board: [141, 423.4, 528, 240],
+      board: [141, 416.8, 528, 240],
       logBand: [208, 687.4, 394, 126],
       meadow: [257, 829.4, 296, 192],
       chip: [569, 917.4, 96, 104],
@@ -450,7 +450,7 @@ const HUNT_TABLE: readonly (readonly [
     vp(768, 1024, { top: 24, bottom: 20 }),
     'S3',
     {
-      board: [156, 410.1, 456, 196],
+      board: [156, 402.2, 456, 196],
       logBand: [187, 630.1, 394, 126],
       meadow: [236, 772.1, 296, 192],
       chip: [548, 880.1, 78, 84],
@@ -552,12 +552,12 @@ const N4_TABLE: readonly (readonly [
     '375 × 667',
     vp(375, 667),
     'S4',
-    [108.5, 264, 158, 140],
+    [108.5, 259, 158, 140],
     [
-      [108.5, 264],
-      [190.5, 264],
-      [108.5, 337],
-      [190.5, 337],
+      [108.5, 259],
+      [190.5, 259],
+      [108.5, 332],
+      [190.5, 332],
     ],
     [287.5, 570, 58, 60],
   ],
@@ -578,12 +578,12 @@ const N4_TABLE: readonly (readonly [
     '390 × 844 (t47 b34)',
     vp(390, 844, { top: 47, bottom: 34 }),
     'S4',
-    [116, 369.5, 158, 140],
+    [116, 327, 158, 140],
     [
-      [116, 369.5],
-      [198, 369.5],
-      [116, 442.5],
-      [198, 442.5],
+      [116, 327],
+      [198, 327],
+      [116, 400],
+      [198, 400],
     ],
     [295, 675.5, 58, 60],
   ],
@@ -604,12 +604,12 @@ const N4_TABLE: readonly (readonly [
     '820 × 1180 (t24 b20)',
     vp(820, 1180, { top: 24, bottom: 20 }),
     'S1',
-    [258, 462.4, 304, 288],
+    [258, 442.8, 304, 288],
     [
-      [258, 462.4],
-      [418, 462.4],
-      [258, 614.4],
-      [418, 614.4],
+      [258, 442.8],
+      [418, 442.8],
+      [258, 594.8],
+      [418, 594.8],
     ],
     [574, 992.4, 108, 116],
   ],
@@ -643,12 +643,12 @@ const N4_TABLE: readonly (readonly [
     '834 × 1194 (t24 b20)',
     vp(834, 1194, { top: 24, bottom: 20 }),
     'S1',
-    [265, 471.2, 304, 288],
+    [265, 446.4, 304, 288],
     [
-      [265, 471.2],
-      [425, 471.2],
-      [265, 623.2],
-      [425, 623.2],
+      [265, 446.4],
+      [425, 446.4],
+      [265, 598.4],
+      [425, 598.4],
     ],
     [581, 1001.2, 108, 116],
   ],
@@ -669,12 +669,12 @@ const N4_TABLE: readonly (readonly [
     '744 × 1133 (t24 b20)',
     vp(744, 1133, { top: 24, bottom: 20 }),
     'S2',
-    [244, 456.8, 256, 240],
+    [244, 430.6, 256, 240],
     [
-      [244, 456.8],
-      [380, 456.8],
-      [244, 584.8],
-      [380, 584.8],
+      [244, 430.6],
+      [380, 430.6],
+      [244, 558.6],
+      [380, 558.6],
     ],
     [536, 950.8, 96, 104],
   ],
@@ -695,12 +695,12 @@ const N4_TABLE: readonly (readonly [
     '810 × 1080 (t24 b20)',
     vp(810, 1080, { top: 24, bottom: 20 }),
     'S2',
-    [277, 423.4, 256, 240],
+    [277, 416.8, 256, 240],
     [
-      [277, 423.4],
-      [413, 423.4],
-      [277, 551.4],
-      [413, 551.4],
+      [277, 416.8],
+      [413, 416.8],
+      [277, 544.8],
+      [413, 544.8],
     ],
     [569, 917.4, 96, 104],
   ],
@@ -734,12 +734,12 @@ const N4_TABLE: readonly (readonly [
     '768 × 1024 (t24 b20)',
     vp(768, 1024, { top: 24, bottom: 20 }),
     'S3',
-    [274, 410.1, 220, 196],
+    [274, 402.2, 220, 196],
     [
-      [274, 410.1],
-      [392, 410.1],
-      [274, 516.1],
-      [392, 516.1],
+      [274, 402.2],
+      [392, 402.2],
+      [274, 508.2],
+      [392, 508.2],
     ],
     [548, 880.1, 78, 84],
   ],
@@ -833,7 +833,7 @@ const FOUR_TABLE: readonly (readonly [
     'S4',
     {
       slot: [100, 67],
-      board: [31.5, 264, 312, 140],
+      board: [31.5, 259, 312, 140],
       logBand: [19.5, 416, 336, 86],
       meadow: [63.5, 510, 248, 120],
       picture: [87.5, 423, 200],
@@ -857,7 +857,7 @@ const FOUR_TABLE: readonly (readonly [
     'S4',
     {
       slot: [100, 67],
-      board: [39, 369.5, 312, 140],
+      board: [39, 327, 312, 140],
       logBand: [27, 521.5, 336, 86],
       meadow: [71, 615.5, 248, 120],
       picture: [95, 528.5, 200],
@@ -881,7 +881,7 @@ const FOUR_TABLE: readonly (readonly [
     'S1',
     {
       slot: [188, 136],
-      board: [112, 462.4, 596, 288],
+      board: [112, 442.8, 596, 288],
       logBand: [150, 774.4, 520, 126],
       meadow: [210, 916.4, 400, 192],
       picture: [260, 791.4, 300],
@@ -917,7 +917,7 @@ const FOUR_TABLE: readonly (readonly [
     'S1',
     {
       slot: [188, 136],
-      board: [119, 471.2, 596, 288],
+      board: [119, 446.4, 596, 288],
       logBand: [157, 783.2, 520, 126],
       meadow: [217, 925.2, 400, 192],
       picture: [267, 800.2, 300],
@@ -941,7 +941,7 @@ const FOUR_TABLE: readonly (readonly [
     'S2',
     {
       slot: [156, 112],
-      board: [122, 456.8, 500, 240],
+      board: [122, 430.6, 500, 240],
       logBand: [112, 720.8, 520, 126],
       meadow: [172, 862.8, 400, 192],
       picture: [222, 737.8, 300],
@@ -965,7 +965,7 @@ const FOUR_TABLE: readonly (readonly [
     'S2',
     {
       slot: [156, 112],
-      board: [155, 423.4, 500, 240],
+      board: [155, 416.8, 500, 240],
       logBand: [145, 687.4, 520, 126],
       meadow: [205, 829.4, 400, 192],
       picture: [255, 704.4, 300],
@@ -989,7 +989,7 @@ const FOUR_TABLE: readonly (readonly [
     'S3',
     {
       slot: [133, 90],
-      board: [168.5, 410.1, 431, 196],
+      board: [168.5, 402.2, 431, 196],
       logBand: [124, 630.1, 520, 126],
       meadow: [184, 772.1, 400, 192],
       picture: [234, 647.1, 300],
@@ -1087,6 +1087,113 @@ describe('F10: the four-letter scene (critters-four-letter.md § 2.4)', () => {
     expect(s.seats).toHaveLength(3)
     expect(s.slots[0]!.boxes).toHaveLength(3)
   })
+})
+
+/**
+ * critters-word-hunt.md § 2.3 (amended 2026-10-29): every portrait viewport
+ * it measures, as printed: `A` (y, height), the step, the gap after and the
+ * block's top (unchanged).
+ */
+const PORTRAIT_GAP_TABLE: readonly (readonly [
+  string,
+  Viewport,
+  readonly [number, number],
+  string,
+  number,
+  number,
+])[] = [
+  ['375 × 667', vp(375, 667), [259, 376], 'S4', 17, 416],
+  [
+    '390 × 844 (t47 b34)',
+    vp(390, 844, { top: 47, bottom: 34 }),
+    [327, 451],
+    'S4',
+    54.5,
+    521.5,
+  ],
+  [
+    '402 × 874 (t62 b34)',
+    vp(402, 874, { top: 62, bottom: 34 }),
+    [345, 463],
+    'S4',
+    60.5,
+    545.5,
+  ],
+  ['820 × 1180 (none)', vp(820, 1180), [418.8, 729.2], 'S1', 65.6, 772.4],
+  [
+    '820 × 1180 (t24 b20)',
+    vp(820, 1180, { top: 24, bottom: 20 }),
+    [442.8, 685.2],
+    'S1',
+    43.6,
+    774.4,
+  ],
+  [
+    '834 × 1194 (t24 b20)',
+    vp(834, 1194, { top: 24, bottom: 20 }),
+    [446.4, 695.6],
+    'S1',
+    48.8,
+    783.2,
+  ],
+  [
+    '744 × 1133 (b20)',
+    vp(744, 1133, { bottom: 20 }),
+    [406.6, 674.4],
+    'S1',
+    38.2,
+    732.8,
+  ],
+  [
+    '744 × 1133 (t24 b20)',
+    vp(744, 1133, { top: 24, bottom: 20 }),
+    [430.6, 650.4],
+    'S2',
+    50.2,
+    720.8,
+  ],
+  [
+    '810 × 1080 (t24 b20)',
+    vp(810, 1080, { top: 24, bottom: 20 }),
+    [416.8, 611.2],
+    'S2',
+    30.6,
+    687.4,
+  ],
+  [
+    '768 × 1024 (t24 b20)',
+    vp(768, 1024, { top: 24, bottom: 20 }),
+    [402.2, 569.8],
+    'S3',
+    31.9,
+    630.1,
+  ],
+]
+
+describe('PG1: in portrait the board’s top is A’s top (critters-word-hunt.md § 2.3)', () => {
+  it.each(PORTRAIT_GAP_TABLE)(
+    '%s: board at A.y, the block where it was, § 2.3’s gap and step (three letters N 4-8, four N 4-6)',
+    (_, v, [ay, ah], step, gap, blockY) => {
+      const layout = mathLayout(v)
+      const A = playArea(layout)
+      expect(layout.landscape).toBe(false)
+      expect(A.y).toBeCloseTo(ay, 1)
+      expect(A.height).toBeCloseTo(ah, 1)
+      const runs = [
+        ...[4, 5, 6, 7, 8].map((n) => [n, 3] as const),
+        ...[4, 5, 6].map((n) => [n, 4] as const),
+      ]
+      for (const [n, length] of runs) {
+        const s = huntScene(A, layout.tablet, false, n, length)
+        expect(s.step.name).toBe(step)
+        expect(s.board.y).toBeCloseTo(A.y, 1)
+        expect(s.slots[0]!.card.y).toBeCloseTo(A.y, 1)
+        expect(s.block.y).toBeCloseTo(blockY, 1)
+        expect(s.block.y - (s.board.y + s.board.height)).toBeCloseTo(gap, 1)
+        expect(huntSceneFits(s, A)).toBe(true)
+      }
+    },
+  )
 })
 
 describe('F16: the length picker (critters-four-letter.md § 5.2)', () => {
