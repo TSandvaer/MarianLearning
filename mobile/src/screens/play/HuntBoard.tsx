@@ -33,6 +33,8 @@ import type { Rect } from '../../layout/layout'
 import { colors, fonts } from '../../theme'
 import { PRESS_MS } from '../hub/clay'
 import { ClayDisc } from '../map/mapChrome'
+import { CritterPair } from './CritterPair'
+import { isPair } from './pairInk'
 import { OVER_PIECE_Z } from './dragLock'
 import type { SlotParts, SlotStep } from './playGeometry'
 
@@ -83,9 +85,10 @@ function tileLook(letter: string) {
 }
 
 /**
- * One tile: its letter, Fredoka 700 at 0.62 of its side. The lit pulse
- * (1 → 1.15 → 1, 400 ms) on each new `lit`; Reduce Motion: the letter
- * lights (120 ms in, 200 ms out), no pulse.
+ * One tile: its letter, Fredoka 700 at 0.62 of its side; a digraph
+ * critter's tile, its pair and bar on a 0.64 baseline (critters digraph
+ * § 3). The lit pulse (1 → 1.15 → 1, 400 ms) on each new `lit`; Reduce
+ * Motion: the letter lights (120 ms in, 200 ms out), no pulse.
  */
 export function Tile({
   letter,
@@ -138,16 +141,27 @@ export function Tile({
         style,
       ]}
     >
-      <Animated.Text
-        allowFontScaling={false}
-        style={[
-          styles.tileLetter,
-          { fontSize: 0.62 * b, lineHeight: 0.8 * b },
-          letterStyle,
-        ]}
-      >
-        {letter}
-      </Animated.Text>
+      {isPair(letter) ? (
+        <CritterPair
+          pair={letter}
+          side={b}
+          f={0.62 * b}
+          baseline={0.64 * b}
+          textStyle={letterStyle}
+          barTestID={testID === undefined ? undefined : `${testID}-bar`}
+        />
+      ) : (
+        <Animated.Text
+          allowFontScaling={false}
+          style={[
+            styles.tileLetter,
+            { fontSize: 0.62 * b, lineHeight: 0.8 * b },
+            letterStyle,
+          ]}
+        >
+          {letter}
+        </Animated.Text>
+      )}
     </Animated.View>
   )
 }
@@ -283,6 +297,8 @@ export interface SlotProps {
   tablet: boolean
   /** Its word from the deal: slot i holds board word i (§ 15.2). */
   word: string
+  /** Its word's critters, one tile each (critters digraph D16: ship is sh i p). */
+  units: readonly string[]
   /** Its tiles are in: found, and landed. */
   filled: boolean
   /** Reduce Motion's fill: the tiles fade in (200 ms). */
@@ -320,6 +336,7 @@ export function Slot({
   step,
   tablet,
   word,
+  units,
   filled,
   fadeIn = false,
   glow = false,
@@ -370,7 +387,7 @@ export function Slot({
   const box = rel(picture)
   const tiles = !filled ? null : (
     <View pointerEvents="none" style={styles.fill}>
-      {[...word].map((l, k) => (
+      {units.map((l, k) => (
         <Tile
           key={k}
           letter={l}
@@ -461,7 +478,7 @@ export function Slot({
 
 /**
  * The bonus chip (§ 4.5): the extras found, newest at the bottom, each as
- * three small tiles on pale honey. Not a button. It appears with its first
+ * three small tiles on pale honey, one a critter (shin: sh i n). Not a button. It appears with its first
  * extra (fade, and scale 0.8 → 1 on a 300 / 22 spring; Reduce Motion: a
  * 200 ms fade).
  */
@@ -469,6 +486,7 @@ export function BonusChip({
   rect,
   tiles,
   words,
+  units,
   lit,
   reducedMotion,
   label,
@@ -477,6 +495,8 @@ export function BonusChip({
   /** Each extra's three tile boxes, in find order. */
   tiles: readonly (readonly Rect[])[]
   words: readonly string[]
+  /** Each extra's critters, in find order. */
+  units: readonly (readonly string[])[]
   lit: Readonly<Record<string, number>>
   reducedMotion: boolean
   label: string
@@ -504,7 +524,7 @@ export function BonusChip({
       ]}
     >
       {words.map((w, i) =>
-        [...w].map((l, k) => (
+        units[i]!.map((l, k) => (
           <Tile
             key={`${w}-${k}`}
             letter={l}

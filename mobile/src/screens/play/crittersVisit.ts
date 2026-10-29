@@ -4,11 +4,15 @@
  * learner's gate, read once a visit. Never saved.
  */
 import {
+  huntDigraphs,
   huntProbeGuard,
   huntVowels,
   type HuntLength,
 } from '@marian/core/games/critterHunt'
-import { critterFunnyOpen } from '@marian/core/games/playPlace'
+import {
+  critterFunnyOpen,
+  type HuntDigraph,
+} from '@marian/core/games/playPlace'
 import { loadProgress } from '@marian/core/progress'
 
 /**
@@ -56,8 +60,15 @@ export function newCrittersVisit(): CrittersVisit {
 export interface CrittersGate {
   /** A non-word boings (blending sounds is current or mastered). */
   funny: boolean
-  /** The word hunt's vowels and probe guard, or null: the free meadow. */
-  hunt: { vowels: string[]; probeGuard: boolean } | null
+  /**
+   * The word hunt's vowels, probe guard and open digraph critters
+   * (critters digraph § 7), or null: the free meadow.
+   */
+  hunt: {
+    vowels: string[]
+    probeGuard: boolean
+    digraphs: HuntDigraph[]
+  } | null
 }
 
 /**
@@ -76,6 +87,7 @@ export function readCrittersGate(hunt?: boolean): CrittersGate {
         ? {
             vowels: huntVowels(progress),
             probeGuard: huntProbeGuard(progress),
+            digraphs: huntDigraphs(progress),
           }
         : null,
     }
@@ -84,7 +96,10 @@ export function readCrittersGate(hunt?: boolean): CrittersGate {
   }
   if (hunt === false) return { ...gate, hunt: null }
   if (hunt === true && gate.hunt === null) {
-    return { ...gate, hunt: { vowels: ['a'], probeGuard: false } }
+    return {
+      ...gate,
+      hunt: { vowels: ['a'], probeGuard: false, digraphs: [] },
+    }
   }
   return gate
 }

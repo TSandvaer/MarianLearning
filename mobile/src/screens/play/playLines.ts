@@ -12,6 +12,7 @@
 import {
   critterWordLine,
   GUIDANCE_LINES,
+  sessionIntroLine,
 } from '@marian/core/emmasPath/guidanceLines'
 import {
   CRITTER_PRAISE_WORDS,
@@ -49,12 +50,20 @@ export type PlayLineId =
   | `guide.play.critters.word.${string}`
   | `guide.play.critters.praise.${string}`
   | 'guide.play.critters.done'
+  | 'guide.play.critters.digraph'
 
 /**
  * "You did it!", Word Song's session-end opener (no new audio): the word
  * hunt's completion and the raft island's party (raft-island-goal § 3.1).
  */
 export const CRITTERS_DONE_TEXT = 'You did it!'
+
+/**
+ * "Two letters, one sound!" (Dave's Q38 ruling, critters digraph D28): duck
+ * words' step intro, its shipped clip (no new audio), said once per learner
+ * at her first digraph critter.
+ */
+const DIGRAPH_LINE = sessionIntroLine('duck-words')!
 
 const praiseId = (word: string) =>
   `guide.play.critters.praise.${word}` as PlayLineId
@@ -82,6 +91,11 @@ export const PLAY_LINE_MANIFEST: Readonly<Record<PlayLineId, ManifestLine>> =
         text: CRITTERS_DONE_TEXT,
         clip: canonClipFor(CRITTERS_DONE_TEXT)?.module,
       },
+    ],
+    // The digraph critters' one line (D28): duck words' own clip.
+    [
+      'guide.play.critters.digraph',
+      { src: DIGRAPH_LINE.src, text: DIGRAPH_LINE.text },
     ],
     // The raft island's party (raft-island-goal § 3.1): the same clip.
     [
@@ -152,6 +166,10 @@ export const PLAY_LABELS = {
   // Emma says when that round opens. Shown, never spoken.
   huntTitle: 'Three letters',
   huntTitleFour: 'Four letters',
+  // A digraph critter (critters-digraph.md § 8.2): "Letters s h, one
+  // sound", its letters spaced so VoiceOver spells them.
+  letters: 'Letters',
+  oneSound: 'one sound',
   emptySlot: 'Word to find',
   hint: 'Hint',
   bonus: 'Bonus words',
@@ -222,6 +240,14 @@ export const slotLabel = (word: string) => capitalised(word)
 export const bonusLabel = (words: readonly string[]) =>
   [PLAY_LABELS.bonus, ...words].join(', ')
 
-/** A critter: "Letter <x>"; seated, "Letter <x>, on the log". */
-export const critterLabel = (letter: string, seated: boolean) =>
-  seated ? `Letter ${letter}, on the log` : `Letter ${letter}`
+/**
+ * A critter: "Letter <x>"; a digraph critter, "Letters <x> <y>, one sound"
+ * (critters-digraph.md § 8.2); seated, either with ", on the log".
+ */
+export function critterLabel(unit: string, seated: boolean) {
+  const own =
+    unit.length === 2
+      ? `${PLAY_LABELS.letters} ${[...unit].join(' ')}, ${PLAY_LABELS.oneSound}`
+      : `Letter ${unit}`
+  return seated ? `${own}, on the log` : own
+}
