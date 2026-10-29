@@ -18,6 +18,8 @@
 
 **Phase 3, 2026-10-28: digraph critters.** Dave's digraph ruling (committed verbatim as `design/research/critters-digraph-2026-10-28.md`) adds one critter that wears two letters and a bar (sh, ch, th or ng) to three-seat rounds once its Word Song step opens, with words like _ship_ on the three-seat log. It is designed in `design/native/critters-digraph.md`; this spec's layout, steps and timings hold for it unchanged, and its runs, tiles and hint count critters, not characters.
 
+**Amended 2026-10-29: portrait spacing (Thomas's phone note).** In portrait the board now sits at the top of `A`, and the free height that was above it becomes extra gap between the board and the log. The block, the steps and landscape do not change (§ 2.3). The portrait board positions in § 2.4, § 15.8 and § 16.2 are edited in place.
+
 ## Goal
 
 A learner past blending sounds opens Letter critters and sees six critters, a log with a "3" on its end, and a row of three-box slots, each showing the picture of a word to find (amended 2026-10-27, § 16: every dealt slot has a picture; it was "or a listen mark she can tap to hear it"). Each word she builds lands in its own slot. When all but one are found, Emma celebrates the round, and a "new letters" button lets her start another when she wants to.
@@ -111,32 +113,60 @@ A slot is a small cream card with its picture box over three tile boxes: the log
 
 ### 2.3 Arrangement
 
-**Portrait (phone P, tablet W):** the board, then the block, centred together in `A`, with a gap of 12 (phone) or 24 (tablet) between them. The board has 4 columns, `sg` apart (6 phone, 16 tablet). The top row holds `ceil(N/2)` slots and the bottom row `floor(N/2)`, each row centred: 4 is 2 + 2 (§ 16.2), 5 is 3 + 2, 6 is 3 + 3, 7 is 4 + 3, 8 is 4 + 4. The bonus chip sits beside the meadow on its right, `g` from it, bottom-aligned with the meadow. Its extras are stacked in a column, the newest at the bottom.
+**Portrait (phone P, tablet W)** (amended 2026-10-29, Thomas's phone note, below): **the board's top is `A`'s top** (`board.y = A.y`), the board centred across `A`. **The block stays where it was.** Let `F = A.height − (boardH + gap + blockH)`, where `gap` is still 12 (phone) or 24 (tablet). The block's top is `A.y + F/2 + boardH + gap`, so `F/2` stays under the meadow, and the board sits `gap + F/2` above the block. Every portrait board has 2 rows (three-letter N 4-8 and four-letter N 4-6), so `boardH = 2H + sg`, and the board's top, the gap and the block do not depend on N. The board has 4 columns, `sg` apart (6 phone, 16 tablet). The top row holds `ceil(N/2)` slots and the bottom row `floor(N/2)`, each row centred: 4 is 2 + 2 (§ 16.2), 5 is 3 + 2, 6 is 3 + 3, 7 is 4 + 3, 8 is 4 + 4. The bonus chip sits beside the meadow on its right, `g` from it, bottom-aligned with the meadow. Its extras are stacked in a column, the newest at the bottom.
 
 **Landscape (phone L, tablet TL):** the block on the left and the board on the right, `gap = min(24, A.width − block width − board width)` apart, the pair centred in `A`. Each is centred vertically on its own. The board has 3 columns, `sg` apart. Its cells are the N slots, then one cell for the chip, in rows of 3, each row centred. So 4 slots are 3 + (1 + chip) (§ 16.2), 5 are 3 + (2 + chip), 6 are 3 + 3 + (chip), 7 are 3 + 3 + (1 + chip) and 8 are 3 + 3 + (2 + chip). The chip's cell is reserved but draws nothing until the first extra, so slots never move. The chip centres in its cell, extras stacked in a column.
 
 **Why not one chip rule:** in portrait the chip has 71.5 pt beside a phone's meadow (`(343 − 184) / 2 − 8`). In landscape a phone's block is 188 tall in an `A` as short as 214.2 (844 × 390, below), which leaves no room under the meadow.
 
+**Amended 2026-10-29: the portrait board moves to the top of `A` (Thomas's phone note).** Thomas, on a phone-portrait screenshot of a digraph round from the #728 QA run (a _ship_ round, iPhone 402 × 874): "why are the pictures so close to the log on this, when there is space above". **The old rule, verbatim:** "the board, then the block, centred together in `A`, with a gap of 12 (phone) or 24 (tablet) between them" (`playGeometry.ts:780-792`). It split the free height in two, half above the board and half under the meadow. So on a phone the slots sat 12 pt over the seats, and 0.8 pt clear of their drop zones (a seat grown by 0.2 c = 11.2), while the half above was empty sky under Emma's ribbon. Decision 3 puts the board "near Emma". This rule moves the board into that half.
+
+- **Only the board moves.** The block keeps its place, and so do everything in it and everything placed from it: the log band, seats, drop zones, numeral, meadow, burrows, chip and picture card. Every block position printed in § 2.4, § 16.2, `critters-four-letter.md` § 2.4 and `critters-digraph.md` still holds, and nothing she drags moves.
+- **It cannot change a slot size.** When `F ≥ 0` the board moves up, stays inside `A` and only moves away from the block, and no other part the fit rule checks moves. When `F < 0` the burrows already hang below `A`, which fails either way. So every step on the ladder gets the same verdict as before, and every viewport keeps its step. The script below checks this step by step.
+- **Rejected: the block down to the foot of `A` as well,** so that all of `F` becomes gap. That changes a step: S1 would fit the 744 × 1133 mini (t24 b20) for N 4-8, where today it takes S2. It would move every block position printed in § 2.4, § 16.2, `critters-four-letter.md` and `critters-digraph.md`, and on Thomas's phone it would put 106.8 pt between the pictures and the log, which pulls the board away from the play (measured by the same script).
+
+**Measured** on 2026-10-29 by a scratch script (not committed) that calls the shipped `mathLayout`, `playArea`, `huntScene`, `huntSceneAt` (exported in the scratch copy only) and `huntSceneFits` at `origin/main` b2df4546. The new rule is today's scene with the board and its slots moved up to `A.y`. The viewports are every portrait viewport in `playGeometry.test.ts`, plus the screenshot's phone (the QA run's Metro log: `[layout] frame 402×874 insets t62 b34 l0 r0`). **Method check:** on the seven viewports § 2.4 prints, the "before" board tops and the block tops equal its portrait rows. Four-letter rounds give the same rows (the same step on each viewport, the same slot height, a block as tall). Units are pt.
+
+| Viewport (insets)             | `A` y, height | Step | Board top, before → after | Moves up (`F/2`, still under the meadow) | Gap, before → after | Block top (unchanged) |
+| ----------------------------- | ------------- | ---- | ------------------------- | ---------------------------------------- | ------------------- | --------------------- |
+| 375 × 667                     | 259, 376      | S4   | 264 → 259                 | 5                                        | 12 → 17             | 416                   |
+| 390 × 844 (t47 b34)           | 327, 451      | S4   | 369.5 → 327               | 42.5                                     | 12 → 54.5           | 521.5                 |
+| 402 × 874 (t62 b34), Thomas's | 345, 463      | S4   | 393.5 → 345               | 48.5                                     | 12 → 60.5           | 545.5                 |
+| 820 × 1180 (no insets)        | 418.8, 729.2  | S1   | 460.4 → 418.8             | 41.6                                     | 24 → 65.6           | 772.4                 |
+| 820 × 1180 (t24 b20)          | 442.8, 685.2  | S1   | 462.4 → 442.8             | 19.6                                     | 24 → 43.6           | 774.4                 |
+| 834 × 1194 (t24 b20)          | 446.4, 695.6  | S1   | 471.2 → 446.4             | 24.8                                     | 24 → 48.8           | 783.2                 |
+| 744 × 1133 (b20)              | 406.6, 674.4  | S1   | 420.8 → 406.6             | 14.2                                     | 24 → 38.2           | 732.8                 |
+| 744 × 1133 (t24 b20)          | 430.6, 650.4  | S2   | 456.8 → 430.6             | 26.2                                     | 24 → 50.2           | 720.8                 |
+| 810 × 1080 (t24 b20)          | 416.8, 611.2  | S2   | 423.4 → 416.8             | 6.6                                      | 24 → 30.6           | 687.4                 |
+| 768 × 1024 (t24 b20)          | 402.2, 569.8  | S3   | 410.1 → 402.2             | 7.9                                      | 24 → 31.9           | 630.1                 |
+
+- **Every row passes `huntSceneFits`** before and after, for three-letter N 4-8 and four-letter N 4-6. **Every step gets the same verdict before and after:** three-letter S1-S3 on tablets and S4 on phones, four-letter S1-S4 on tablets and S4-S5 on phones.
+- **Where it gains least:** the 375 × 667 floor (12 → 17; it has 10 pt spare in all) and the two smaller iPads (810 × 1080 and 768 × 1024, about +7). Their `A` has little height left over, and the rule only spends the height that is free.
+- **Edited in place, marked "(amended 2026-10-29, § 2.3)":** § 2.4's portrait board cells, § 16.2's portrait rows, the portrait wireframes in § 15.8 and § 16.2, and `critters-four-letter.md` § 2.3 and § 2.4 (its portrait board and gap cells, and its two portrait wireframes). § 6.1 is phase 1's superseded record and stays as drawn. Landscape is unchanged.
+- **PG1** (amends H7, P8, B8 and `critters-four-letter.md` F10 for portrait). On every portrait viewport above, for three-letter N 4-8 and four-letter N 4-6: `huntScene`'s board top is `A.y`; the block and every rect placed from it are unchanged (they equal § 2.4 and four-letter § 2.4 where those print the viewport); the gap equals this table's "after"; `huntSceneFits` holds; and the step is unchanged. Landscape scenes are unchanged. Thomas looks at it on the phone in portrait (Predict-Before-Soak, below).
+- **Prediction (falsifiable, written before anyone sees it on a device):** on his phone in portrait, the slot cards end 60.5 pt above the seats (12 today), a band nearly as tall as a slot (67). In the screenshot the seated critters' heads rise about 10 pt above their seats and touch the cards. After the change about 50 pt of sky separates them. The board's top is 48.5 pt higher, at `A`'s top (y 345), about 12 pt below Emma's feet (about y 333 in the screenshot; this and the heads are read off the image). He no longer calls the pictures close to the log. If he says anything, it is that the sky right of Emma, under the ribbon (about 120 pt), is still empty. That space is above `A` (`play-place.md` § 1.7), so this rule cannot use it.
+- **Bounded convergence.** **Tested:** the rule's geometry on the 10 portrait viewports through the shipped functions: board, gap and block, the fit for every N, and every ladder step's verdict before and after. The method check reproduces § 2.4's portrait rows. **Not tested:** anything on a device or simulator, since no build has the rule yet (Devon implements it); how the wider gap looks; the fill's flight (§ 15.6 item 3: 500 ms per tile), which now crosses up to 48.5 pt more on a phone at the same duration; other phones; split view; landscape (out of scope, unchanged); the space beside Emma above `A`.
+
 ### 2.4 Measured at the floors and the play-place tablets
 
-Measured on 2026-10-25 by a scratch script (not committed) that calls `mathLayout` and `playArea` from `origin/main` 5c253593 and lays out § 2.2-2.3 for N 5-8. Insets are as `play-place.md` § 3.2 uses them, plus two notched phones. Rects are (x, y) w × h, for N = 8. **The four phone rows were measured again on 2026-10-26** for the amended S4 (§ 15.10), by a scratch script (not committed) that calls the shipped `mathLayout`, `playArea`, `huntScene`, `huntSceneFits` and `chipRect` at `origin/main` fe366267 with `SLOT_STEPS[3]` set to pad 3, T 36. With today's S4 the same script gives exactly the old phone rows, so the method matches. The tablet rows do not change (S1-S3 are unchanged).
+Measured on 2026-10-25 by a scratch script (not committed) that calls `mathLayout` and `playArea` from `origin/main` 5c253593 and lays out § 2.2-2.3 for N 5-8. Insets are as `play-place.md` § 3.2 uses them, plus two notched phones. Rects are (x, y) w × h, for N = 8. **The four phone rows were measured again on 2026-10-26** for the amended S4 (§ 15.10), by a scratch script (not committed) that calls the shipped `mathLayout`, `playArea`, `huntScene`, `huntSceneFits` and `chipRect` at `origin/main` fe366267 with `SLOT_STEPS[3]` set to pad 3, T 36. With today's S4 the same script gives exactly the old phone rows, so the method matches. The tablet rows do not change (S1-S3 are unchanged). **The portrait board cells were amended on 2026-10-29 (§ 2.3):** the board's top is `A.y`. Every other cell is as measured.
 
 | Viewport (insets)     | `A`                      | Step | Board (N 8)              | Log band                 | Meadow                   | Chip zone (3 extras)      | Picture card       |
 | --------------------- | ------------------------ | ---- | ------------------------ | ------------------------ | ------------------------ | ------------------------- | ------------------ |
-| 375 × 667             | (16, 259) 343 × 376      | S4   | (26.5, 264) 322 × 140    | (58.5, 416) 258 × 86     | (95.5, 510) 184 × 120    | (287.5, 570) 58 × 60      | (87.5, 423) 200    |
+| 375 × 667             | (16, 259) 343 × 376      | S4   | (26.5, 259) 322 × 140    | (58.5, 416) 258 × 86     | (95.5, 510) 184 × 120    | (287.5, 570) 58 × 60      | (87.5, 423) 200    |
 | 667 × 375             | (160, 146.4) 491 × 216.4 | S4   | (411, 148.1) 240 × 213   | (160, 160.6) 228 × 76    | (194, 244.6) 160 × 104   | (584, 297.6) 58 × 60      | (180, 160.6) 188   |
-| 390 × 844 (t47 b34)   | (16, 327) 358 × 451      | S4   | (34, 369.5) 322 × 140    | (66, 521.5) 258 × 86     | (103, 615.5) 184 × 120   | (295, 675.5) 58 × 60      | (95, 528.5) 200    |
+| 390 × 844 (t47 b34)   | (16, 327) 358 × 451      | S4   | (34, 327) 322 × 140      | (66, 521.5) 258 × 86     | (103, 615.5) 184 × 120   | (295, 675.5) 58 × 60      | (95, 528.5) 200    |
 | 844 × 390 (l/r47 b21) | (227, 143.9) 554 × 214.2 | S4   | (510, 144.6) 240 × 213   | (258, 157.1) 228 × 76    | (292, 241.1) 160 × 104   | (683, 294.1) 58 × 60      | (278, 157.1) 188   |
-| 820 × 1180 (t24 b20)  | (16, 442.8) 788 × 685.2  | S1   | (98, 462.4) 624 × 288    | (213, 774.4) 394 × 126   | (262, 916.4) 296 × 192   | (574, 992.4) 108 × 116    | (260, 791.4) 300   |
+| 820 × 1180 (t24 b20)  | (16, 442.8) 788 × 685.2  | S1   | (98, 442.8) 624 × 288    | (213, 774.4) 394 × 126   | (262, 916.4) 296 × 192   | (574, 992.4) 108 × 116    | (260, 791.4) 300   |
 | 1180 × 820 (b20)      | (245.2, 231) 918.8 × 537 | S1   | (681.6, 279.5) 464 × 440 | (263.6, 332.5) 394 × 126 | (312.6, 474.5) 296 × 192 | (1019.6, 593.5) 108 × 116 | (310.6, 349.5) 300 |
 | 1180 × 820 (t24 b20)  | (245.2, 255) 918.8 × 513 | S1   | (681.6, 291.5) 464 × 440 | (263.6, 344.5) 394 × 126 | (312.6, 486.5) 296 × 192 | (1019.6, 605.5) 108 × 116 | (310.6, 361.5) 300 |
-| 834 × 1194 (t24 b20)  | (16, 446.4) 802 × 695.6  | S1   | (105, 471.2) 624 × 288   | (220, 783.2) 394 × 126   | (269, 925.2) 296 × 192   | (581, 1001.2) 108 × 116   | (267, 800.2) 300   |
+| 834 × 1194 (t24 b20)  | (16, 446.4) 802 × 695.6  | S1   | (105, 446.4) 624 × 288   | (220, 783.2) 394 × 126   | (269, 925.2) 296 × 192   | (581, 1001.2) 108 × 116   | (267, 800.2) 300   |
 | 1194 × 834 (t24 b20)  | (248.8, 255) 929.2 × 527 | S1   | (690.4, 298.5) 464 × 440 | (272.4, 351.5) 394 × 126 | (321.4, 493.5) 296 × 192 | (1028.4, 612.5) 108 × 116 | (319.4, 368.5) 300 |
-| 744 × 1133 (t24 b20)  | (16, 430.6) 712 × 650.4  | S2   | (108, 456.8) 528 × 240   | (175, 720.8) 394 × 126   | (224, 862.8) 296 × 192   | (536, 950.8) 96 × 104     | (222, 737.8) 300   |
+| 744 × 1133 (t24 b20)  | (16, 430.6) 712 × 650.4  | S2   | (108, 430.6) 528 × 240   | (175, 720.8) 394 × 126   | (224, 862.8) 296 × 192   | (536, 950.8) 96 × 104     | (222, 737.8) 300   |
 | 1133 × 744 (t24 b20)  | (225.4, 255) 891.6 × 437 | S2   | (684.2, 289.5) 392 × 368 | (266.2, 306.5) 394 × 126 | (315.2, 448.5) 296 × 192 | (968.2, 549.5) 96 × 104   | (313.2, 323.5) 300 |
-| 810 × 1080 (t24 b20)  | (16, 416.8) 778 × 611.2  | S2   | (141, 423.4) 528 × 240   | (208, 687.4) 394 × 126   | (257, 829.4) 296 × 192   | (569, 917.4) 96 × 104     | (255, 704.4) 300   |
+| 810 × 1080 (t24 b20)  | (16, 416.8) 778 × 611.2  | S2   | (141, 416.8) 528 × 240   | (208, 687.4) 394 × 126   | (257, 829.4) 296 × 192   | (569, 917.4) 96 × 104     | (255, 704.4) 300   |
 | 1080 × 810 (t24 b20)  | (242.6, 255) 821.4 × 503 | S2   | (666.3, 322.5) 392 × 368 | (248.3, 339.5) 394 × 126 | (297.3, 481.5) 296 × 192 | (950.3, 582.5) 96 × 104   | (295.3, 356.5) 300 |
-| 768 × 1024 (t24 b20)  | (16, 402.2) 736 × 569.8  | S3   | (156, 410.1) 456 × 196   | (187, 630.1) 394 × 126   | (236, 772.1) 296 × 192   | (548, 880.1) 78 × 84      | (234, 647.1) 300   |
+| 768 × 1024 (t24 b20)  | (16, 402.2) 736 × 569.8  | S3   | (156, 402.2) 456 × 196   | (187, 630.1) 394 × 126   | (236, 772.1) 296 × 192   | (548, 880.1) 78 × 84      | (234, 647.1) 300   |
 | 1024 × 768 (t24 b20)  | (231.7, 255) 776.3 × 461 | S3   | (659.8, 334.5) 338 × 302 | (241.8, 318.5) 394 × 126 | (290.8, 460.5) 296 × 192 | (907.8, 549.5) 78 × 84    | (288.8, 335.5) 300 |
 
 - The `A` values at the four floors equal `play-place.md:198-201`, and the 22-critter table's (`:468-478`) where they overlap.
@@ -694,6 +724,8 @@ Drawn with react-native-svg in a 100 × 100 viewBox that fills the picture box, 
 
 (Amended 2026-10-27, § 16: the positions hold, but three of these four sample rounds no longer deal, and a b h m p t now deals _pat_ as an extra, so no dealt slot shows the listen mark (`<))`). § 16.2 draws pictured-only boards at N 4.)
 
+(Amended 2026-10-29, § 2.3: in the two portrait frames the board's y values put its top at `A`'s top. Nothing else moves.)
+
 ```
 PHONE PORTRAIT 375×667 (S4 amended), mid-hunt
 round o c h m p t (N 8): cot and pop found; h and o seated; she taps the empty "mop" slot
@@ -703,11 +735,11 @@ round o c h m p t (N 8): cot and pop found; h and o seated; she taps the empty "
 |( Emma  ) | ribbon: empty (the tap is sound  | |  Emma idle; no caption, no pose change
 |(  147  ) | only)                            | |
 | '-----'  +----------------------------------+ |  A from y 259
-|  .-------..-------..=======..-------.         |  board (26.5, 264) 322 × 140: 4 columns of
+|  .-------..-------..=======..-------.         |  board (26.5, 259) 322 × 140: 4 columns of
 |  | {cot} || {hot} || {mop} || {pot} |         |    76 × 67, 6 apart, at x 26.5 108.5 190.5 272.5
 |  |[c|o|t]||[ | | ]||[ | | ]||[ | | ]|         |  slot 3 (mop) pressed: sunk 2 pt, its picture
 |  '-------''-------''=======''-------'         |    pulsing; "mop" plays (wordWindow)
-|  .-------..-------..-------..-------.         |  row 2 at y 337
+|  .-------..-------..-------..-------.         |  row 2 at y 332
 |  | {mom} || {pop} || {top} ||  <))  |         |  slot 8 (hop): the listen mark
 |  |[ | | ]||[p|o|p]||[ | | ]||[ | | ]|         |  pictures 36 at (x + 20, y + 3)
 |  '-------''-------''-------''-------'         |
@@ -751,11 +783,11 @@ its card shrinks onto slot 5's picture and m, u, g fly into slot 5, not slot 2
 |( Emma     ) | (Emma's "Mug." has ended)           | |  Emma idle at the fill
 |(  idle    ) +-------------------------------------+ |
 | '--------'                                          |  A from y 442.8
-|  .---------. .---------. .---------. .---------.    |  board (98, 462.4) 624 × 288: 4 columns
+|  .---------. .---------. .---------. .---------.    |  board (98, 442.8) 624 × 288: 4 columns
 |  |  {bug}  | |  {bus}  | |  {tub}  | |  {gum}  |    |    of 144 × 136, 16 apart, at x 98 258
 |  |[b][u][g]| |[ ][ ][ ]| |[ ][ ][ ]| |[ ][ ][ ]|    |    418 578; pictures 72
 |  '---------' '---------' '---------' '---------'    |
-|  .---------. .---------. .---------. .---------.    |  row 2 at y 614.4
+|  .---------. .---------. .---------. .---------.    |  row 2 at y 594.8
 |  | <{mug}  | |  {mum}  | |   <))   | |   <))   |    |  slot 5: the card (<) lands on mug's own
 |  |[m][u][g]| |[ ][ ][ ]| |[ ][ ][ ]| |[ ][ ][ ]|    |    picture (end rect 83.7 a side about
 |  '--^--^--^' '---------' '---------' '---------'    |    the box's centre)
@@ -907,21 +939,21 @@ the lap plays bat, hat, mat, ham, map, tap; pat's listen slot stays empty and fi
 
 | Viewport (insets)     | Step | Board (N 4)              | Slots: x, y                                    | Chip zone (3 extras)     |
 | --------------------- | ---- | ------------------------ | ---------------------------------------------- | ------------------------ |
-| 375 × 667             | S4   | (108.5, 264) 158 × 140   | 108.5, 264; 190.5, 264; 108.5, 337; 190.5, 337 | (287.5, 570) 58 × 60     |
+| 375 × 667             | S4   | (108.5, 259) 158 × 140   | 108.5, 259; 190.5, 259; 108.5, 332; 190.5, 332 | (287.5, 570) 58 × 60     |
 | 667 × 375             | S4   | (411, 184.6) 240 × 140   | 411, 184.6; 493, 184.6; 575, 184.6; 452, 257.6 | (543, 261.1) 58 × 60     |
-| 390 × 844 (t47 b34)   | S4   | (116, 369.5) 158 × 140   | 116, 369.5; 198, 369.5; 116, 442.5; 198, 442.5 | (295, 675.5) 58 × 60     |
+| 390 × 844 (t47 b34)   | S4   | (116, 327) 158 × 140     | 116, 327; 198, 327; 116, 400; 198, 400         | (295, 675.5) 58 × 60     |
 | 844 × 390 (l/r47 b21) | S4   | (510, 181.1) 240 × 140   | 510, 181.1; 592, 181.1; 674, 181.1; 551, 254.1 | (642, 257.6) 58 × 60     |
-| 820 × 1180 (t24 b20)  | S1   | (258, 462.4) 304 × 288   | 258, 462.4; 418, 462.4; 258, 614.4; 418, 614.4 | (574, 992.4) 108 × 116   |
+| 820 × 1180 (t24 b20)  | S1   | (258, 442.8) 304 × 288   | 258, 442.8; 418, 442.8; 258, 594.8; 418, 594.8 | (574, 992.4) 108 × 116   |
 | 1180 × 820 (b20)      | S1   | (681.6, 355.5) 464 × 288 | 681.6, 355.5; 841.6; 1001.6; 761.6, 507.5      | (939.6, 517.5) 108 × 116 |
 | 1180 × 820 (t24 b20)  | S1   | (681.6, 367.5) 464 × 288 | 681.6, 367.5; 841.6; 1001.6; 761.6, 519.5      | (939.6, 529.5) 108 × 116 |
-| 834 × 1194 (t24 b20)  | S1   | (265, 471.2) 304 × 288   | 265, 471.2; 425, 471.2; 265, 623.2; 425, 623.2 | (581, 1001.2) 108 × 116  |
+| 834 × 1194 (t24 b20)  | S1   | (265, 446.4) 304 × 288   | 265, 446.4; 425, 446.4; 265, 598.4; 425, 598.4 | (581, 1001.2) 108 × 116  |
 | 1194 × 834 (t24 b20)  | S1   | (690.4, 374.5) 464 × 288 | 690.4, 374.5; 850.4; 1010.4; 770.4, 526.5      | (948.4, 536.5) 108 × 116 |
-| 744 × 1133 (t24 b20)  | S2   | (244, 456.8) 256 × 240   | 244, 456.8; 380, 456.8; 244, 584.8; 380, 584.8 | (536, 950.8) 96 × 104    |
+| 744 × 1133 (t24 b20)  | S2   | (244, 430.6) 256 × 240   | 244, 430.6; 380, 430.6; 244, 558.6; 380, 558.6 | (536, 950.8) 96 × 104    |
 | 1133 × 744 (t24 b20)  | S2   | (684.2, 353.5) 392 × 240 | 684.2, 353.5; 820.2; 956.2; 752.2, 481.5       | (900.2, 485.5) 96 × 104  |
-| 810 × 1080 (t24 b20)  | S2   | (277, 423.4) 256 × 240   | 277, 423.4; 413, 423.4; 277, 551.4; 413, 551.4 | (569, 917.4) 96 × 104    |
+| 810 × 1080 (t24 b20)  | S2   | (277, 416.8) 256 × 240   | 277, 416.8; 413, 416.8; 277, 544.8; 413, 544.8 | (569, 917.4) 96 × 104    |
 | 1080 × 810 (t24 b20)  | S2   | (666.3, 386.5) 392 × 240 | 666.3, 386.5; 802.3; 938.3; 734.3, 514.5       | (882.3, 518.5) 96 × 104  |
 | 1080 × 810 (none)     | S2   | (666.3, 384.5) 392 × 240 | 666.3, 384.5; 802.3; 938.3; 734.3, 512.5       | (882.3, 516.5) 96 × 104  |
-| 768 × 1024 (t24 b20)  | S3   | (274, 410.1) 220 × 196   | 274, 410.1; 392, 410.1; 274, 516.1; 392, 516.1 | (548, 880.1) 78 × 84     |
+| 768 × 1024 (t24 b20)  | S3   | (274, 402.2) 220 × 196   | 274, 402.2; 392, 402.2; 274, 508.2; 392, 508.2 | (548, 880.1) 78 × 84     |
 | 1024 × 768 (t24 b20)  | S3   | (659.8, 387.5) 338 × 196 | 659.8, 387.5; 777.8; 895.8; 718.8, 493.5       | (848.8, 496.5) 78 × 84   |
 
 (Landscape rows give the first row's three x values and then slot 4's x, y.)
@@ -929,6 +961,7 @@ the lap plays bat, hat, mat, ham, map, tap; pat's listen slot stays empty and fi
 - **Why it fits:** the N-4 board has N 5's two rows. In portrait its rows are narrower (2 slots, not 3). In landscape its board rect is N 5's (3 cells wide, 2 rows), and its second row (slot 4 and the chip's cell) lies inside N 5's (2 slots and the chip's cell). So it clears everything N 5 clears; the script confirms it.
 - **The chip** in portrait is where it always is (beside the meadow, § 2.3). In landscape its cell is the one after slot 4: on the phone (534, 257.6) 76 × 67, and the chip centres in it as § 14 says.
 - **The board moves between rounds,** as it already does between N 5 and N 7 in landscape: an N-4 board is centred in `A` as any other. Slots never move within a round.
+- **The portrait rows were amended on 2026-10-29 (§ 2.3):** the board and its slots sit higher by § 2.3's "moves up" (the board's top is `A.y`), and so do the wireframe's. The chip zone, log band, meadow and picture card do not change.
 
 **Wireframes** (positions from the table and § 2.4; the art is not to scale, the annotations are). Sample rounds are real rounds under § 16.3's rule (the port of § 16.7).
 
@@ -941,11 +974,11 @@ round o b g m p x: box and mop found, and bob (an extra); m and o seated, seat 3
 |( Emma  ) | ribbon: empty                    | |
 |(  147  ) +----------------------------------+ |
 | '-----'                                       |  A from y 259
-|              .-------..-------.               |  board (108.5, 264) 158 × 140: 2 + 2 of
+|              .-------..-------.               |  board (108.5, 259) 158 × 140: 2 + 2 of
 |              | {box} || {mop} |               |    76 × 67, 6 apart, at x 108.5 190.5
 |              |[b|o|x]||[m|o|p]|               |
 |              '-------''-------'               |
-|              .-------..-------.               |  row 2 at y 337: mom, pop
+|              .-------..-------.               |  row 2 at y 332: mom, pop
 |              | {mom} || {pop} |               |
 |              |[ | | ]||[ | | ]|               |
 |              '-------''-------'               |
@@ -986,11 +1019,11 @@ findable (§ 5.2); end found as an extra; New letters beside Back
 |( Emma     ) | ribbon: empty                       | |
 |(  idle    ) +-------------------------------------+ |
 | '--------'                                          |  A from y 442.8
-|              .---------. .---------.                |  board (258, 462.4) 304 × 288: 2 + 2
+|              .---------. .---------.                |  board (258, 442.8) 304 × 288: 2 + 2
 |              |  {bed}  | |  {pen}  |                |    of 144 × 136, 16 apart, x 258 418;
 |              |[b][e][d]| |[p][e][n]|                |    pictures 72
 |              '---------' '---------'                |
-|              .---------. .---------.                |  row 2 at y 614.4: egg, peg
+|              .---------. .---------.                |  row 2 at y 594.8: egg, peg
 |              |  {egg}  | |  {peg}  |                |
 |              |[e][g][g]| |[ ][ ][ ]|                |
 |              '---------' '---------'                |
