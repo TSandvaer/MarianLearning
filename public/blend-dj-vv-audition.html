@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>/dʒ/-recovery + isolated-/v/ audition</title>
+    <style>
+      :root {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        --ink: #2a2a2a;
+        --muted: #6b6b6b;
+        --line: #ece4d6;
+        --cream: #faf7f2;
+        --green: #1b5e20;
+        --green-soft: #eaf3ea;
+        --blue: #2c5d8a;
+        --blue-soft: #e7eefb;
+        --amber: #8a6d3b;
+        --amber-soft: #fcf8e3;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 1rem 0.75rem 6rem;
+        background: var(--cream);
+        color: var(--ink);
+        max-width: 920px;
+        margin-inline: auto;
+        -webkit-text-size-adjust: 100%;
+      }
+      h1 {
+        font-size: 1.35rem;
+        margin: 0 0 0.25rem;
+      }
+      .voice {
+        display: inline-block;
+        background: var(--green);
+        color: #fff;
+        border-radius: 999px;
+        padding: 0.1rem 0.6rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        vertical-align: middle;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin: 0 0 0.75rem;
+        line-height: 1.45;
+      }
+      .sub code {
+        background: #f0e9dc;
+        padding: 0 0.25rem;
+        border-radius: 4px;
+      }
+      .status {
+        font-size: 0.86rem;
+        color: var(--amber);
+        background: var(--amber-soft);
+        border: 1px solid #faebcc;
+        border-radius: 8px;
+        padding: 0.6rem 0.75rem;
+        margin: 0.5rem 0;
+      }
+      .status.ok {
+        color: var(--green);
+        background: var(--green-soft);
+        border-color: #cce4cc;
+      }
+      .status.err {
+        color: #a94442;
+        background: #f2dede;
+        border-color: #ebccd1;
+      }
+      .section {
+        margin: 1.5rem 0 0.5rem;
+      }
+      .section h2 {
+        font-size: 1.12rem;
+        margin: 0 0 0.2rem;
+      }
+      .section .secblurb {
+        color: var(--muted);
+        font-size: 0.82rem;
+        line-height: 1.45;
+        margin: 0 0 0.5rem;
+      }
+      .group {
+        margin: 0 0 1.25rem;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        overflow: hidden;
+      }
+      .group > .ghead {
+        padding: 0.7rem 0.85rem;
+        background: #f6f0e6;
+        border-bottom: 1px solid var(--line);
+      }
+      .group > .ghead h3 {
+        margin: 0;
+        font-size: 1.05rem;
+        letter-spacing: 0.02em;
+      }
+      .group > .ghead .gctx {
+        font-size: 0.76rem;
+        color: var(--muted);
+        margin-top: 0.25rem;
+        line-height: 1.4;
+      }
+      .group > .ghead .gprov {
+        font-size: 0.72rem;
+        color: var(--muted);
+        margin-top: 0.2rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      .group > .ghead .gpick {
+        font-size: 0.82rem;
+        color: var(--blue);
+        font-weight: 700;
+        margin-top: 0.3rem;
+      }
+      .gbody {
+        padding: 0.5rem;
+      }
+      .row {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.55rem;
+        padding: 0.6rem 0.5rem;
+        border-bottom: 1px solid #f1ece2;
+        flex-wrap: wrap;
+      }
+      .row:last-child {
+        border-bottom: none;
+      }
+      .row.baseline {
+        background: #fbf6ee;
+      }
+      .row.picked {
+        background: var(--blue-soft);
+      }
+      .row.unrendered {
+        opacity: 0.65;
+      }
+      .meta {
+        flex: 1 1 16rem;
+        min-width: 12rem;
+      }
+      .meta .label {
+        font-weight: 700;
+        font-size: 0.92rem;
+        line-height: 1.3;
+      }
+      .meta .label .tag {
+        display: inline-block;
+        font-size: 0.66rem;
+        font-weight: 700;
+        border-radius: 999px;
+        padding: 0.05rem 0.45rem;
+        margin-left: 0.35rem;
+        vertical-align: middle;
+      }
+      .tag.base {
+        background: #efe3cf;
+        color: var(--amber);
+      }
+      .tag.bakeonly {
+        background: #e7eefb;
+        color: var(--blue);
+      }
+      .tag.rej {
+        background: #f2dede;
+        color: #a94442;
+      }
+      .meta .mech {
+        color: var(--muted);
+        font-size: 0.77rem;
+        margin-top: 0.2rem;
+        line-height: 1.4;
+      }
+      .meta .ssml {
+        color: #555;
+        font-size: 0.68rem;
+        margin-top: 0.25rem;
+        word-break: break-all;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: #f7f2e9;
+        border: 1px solid #efe6d6;
+        border-radius: 6px;
+        padding: 0.3rem 0.4rem;
+        display: none;
+      }
+      .meta .ssml.show {
+        display: block;
+      }
+      .meta .errnote {
+        color: #a94442;
+        font-size: 0.77rem;
+        font-style: italic;
+        margin-top: 0.2rem;
+      }
+      .actions {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      button.act {
+        appearance: none;
+        border: 1px solid #cdbfa6;
+        background: #f4ecdd;
+        color: var(--ink);
+        border-radius: 8px;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        min-height: 44px;
+        min-width: 44px;
+      }
+      button.act:active {
+        transform: translateY(1px);
+      }
+      button.act.playing {
+        background: var(--green);
+        color: #fff;
+        border-color: var(--green);
+      }
+      button.act.pick[aria-pressed='true'] {
+        background: var(--blue);
+        color: #fff;
+        border-color: var(--blue);
+      }
+      button.act[disabled] {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      button.ssmltoggle {
+        appearance: none;
+        border: none;
+        background: none;
+        color: var(--blue);
+        font-size: 0.72rem;
+        cursor: pointer;
+        padding: 0.15rem 0;
+        text-decoration: underline;
+      }
+      footer {
+        margin-top: 1.5rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.8rem;
+        line-height: 1.5;
+      }
+      footer code {
+        background: #f0e9dc;
+        padding: 0 0.25rem;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>
+      /dʒ/-recovery + isolated-/v/ audition
+      <span class="voice">Olivia renders</span>
+    </h1>
+    <p class="sub">
+      Two open scratch problems, auditioned through the real Azure pipeline
+      (same voice config the app uses: <code>en-GB-OliviaNeural</code>, rate
+      <code>-10%</code>). <strong>Deliverable 1</strong> recovers the last blend
+      floor, <strong>/dʒ/</strong> (jam/jet/jug) — the baseline
+      <code>j0</code> is the current FLOOR (Emma says the whole word).
+      <strong>Deliverable 2</strong> re-tries the proven pass-7 blend
+      <code>/v/</code> fix (held <code>vːə</code> @ <code>-25%</code>) on the
+      ISOLATED letter-sound <code>vvv</code> — baseline <code>vv0</code> is the
+      current production render. In each group, play each candidate, then tap
+      <strong>Pick</strong> on the best; report the picked id per group in chat
+      or the issue. Rows tagged <span class="tag bakeonly">bake-only</span> use
+      a nested onset the production runtime resource rejects (fine for the bake;
+      /dʒ/ never hits the live graduation render). Unlinked audition tooling —
+      <strong>open in a private tab</strong> to dodge any stale service-worker
+      cache.
+    </p>
+
+    <div id="status" class="status">Loading renders&hellip;</div>
+
+    <div id="sections"></div>
+
+    <footer id="footer"></footer>
+
+    <script>
+      'use strict'
+
+      const LS_PICKS = 'blend-dj-vv-audition-picks'
+      const DATA_URL = '/blend-dj-vv-audition-data.json'
+      // Candidates whose mechanism notes a nested onset the runtime resource
+      // rejects (bake-only). Surfaced as a badge so the ear-test reads it.
+      const BAKE_ONLY_IDS = new Set(['j4', 'j6'])
+
+      let picks = loadPicks()
+
+      function loadPicks() {
+        try {
+          const raw = localStorage.getItem(LS_PICKS)
+          if (!raw) return {}
+          const parsed = JSON.parse(raw)
+          return parsed && typeof parsed === 'object' ? parsed : {}
+        } catch {
+          return {}
+        }
+      }
+      function savePicks() {
+        try {
+          localStorage.setItem(LS_PICKS, JSON.stringify(picks))
+        } catch {
+          /* best-effort; quota / private mode */
+        }
+      }
+
+      function setStatus(msg, cls) {
+        const el = document.getElementById('status')
+        el.textContent = msg
+        el.className = 'status' + (cls ? ' ' + cls : '')
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+      }
+
+      function base64ToBlobUrl(base64, mime) {
+        const bin = atob(base64)
+        const bytes = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+        return URL.createObjectURL(
+          new Blob([bytes], { type: mime || 'audio/mpeg' }),
+        )
+      }
+
+      // ── Audio playback (one active clip, one live blob) ──────────────────
+      let currentAudio = null
+      let currentBtn = null
+      let currentItemId = null
+      const blobUrlByItem = new Map()
+      function releaseActiveBlob() {
+        if (currentItemId) {
+          const url = blobUrlByItem.get(currentItemId)
+          if (url) {
+            URL.revokeObjectURL(url)
+            blobUrlByItem.delete(currentItemId)
+          }
+          currentItemId = null
+        }
+      }
+      function stopActive() {
+        if (currentAudio) {
+          currentAudio.pause()
+          currentAudio = null
+        }
+        if (currentBtn) {
+          currentBtn.classList.remove('playing')
+          currentBtn = null
+        }
+        releaseActiveBlob()
+      }
+      function playCandidate(itemId, base64, mime, btn) {
+        stopActive()
+        let url = blobUrlByItem.get(itemId)
+        if (!url) {
+          url = base64ToBlobUrl(base64, mime)
+          blobUrlByItem.set(itemId, url)
+        }
+        const audio = new Audio(url)
+        currentAudio = audio
+        currentBtn = btn
+        currentItemId = itemId
+        btn.classList.add('playing')
+        const clear = () => {
+          if (currentBtn === btn) {
+            btn.classList.remove('playing')
+            if (currentAudio === audio) releaseActiveBlob()
+          }
+        }
+        audio.onended = clear
+        audio.onerror = clear
+        audio.play().catch(clear)
+      }
+
+      // ── Pick model (one pick per item/group) ─────────────────────────────
+      function recordPick(itemKey, candidateId) {
+        picks[itemKey] = candidateId
+        savePicks()
+        refreshGroup(itemKey)
+      }
+
+      const groupRefs = new Map() // itemKey -> { pickLabelEl, rows:[{row, pickBtn, candidateId}] }
+
+      function refreshGroup(itemKey) {
+        const ref = groupRefs.get(itemKey)
+        if (!ref) return
+        const picked = picks[itemKey]
+        for (const r of ref.rows) {
+          const isPicked = r.candidateId === picked
+          r.row.classList.toggle('picked', isPicked)
+          if (r.pickBtn)
+            r.pickBtn.setAttribute('aria-pressed', String(isPicked))
+        }
+        ref.pickLabelEl.textContent = picked
+          ? 'Picked: ' + picked
+          : 'No pick yet — tap Pick on the best render.'
+      }
+
+      // ── Render ───────────────────────────────────────────────────────────
+      function buildGroup(parentEl, item) {
+        const group = document.createElement('section')
+        group.className = 'group'
+        group.setAttribute('data-testid', 'audition-group-' + item.key)
+
+        const head = document.createElement('div')
+        head.className = 'ghead'
+        const h3 = document.createElement('h3')
+        h3.textContent = item.title
+        const gctx = document.createElement('div')
+        gctx.className = 'gctx'
+        gctx.textContent = item.context
+        head.append(h3, gctx)
+        if (item.canonItemId) {
+          const gprov = document.createElement('div')
+          gprov.className = 'gprov'
+          gprov.textContent = item.canonItemId
+          head.appendChild(gprov)
+        }
+        const gpick = document.createElement('div')
+        gpick.className = 'gpick'
+        gpick.setAttribute('data-testid', 'audition-pick-' + item.key)
+        head.appendChild(gpick)
+        group.appendChild(head)
+
+        const body = document.createElement('div')
+        body.className = 'gbody'
+
+        const rows = []
+        for (const c of item.candidates) {
+          const cid = item.key + '#' + c.id
+          const isBaseline = c.id === 'j0' || c.id === 'vv0'
+          const isBakeOnly = BAKE_ONLY_IDS.has(c.id)
+          const rendered = !!c.base64 && !c.error
+
+          const row = document.createElement('div')
+          row.className =
+            'row' +
+            (isBaseline ? ' baseline' : '') +
+            (rendered ? '' : ' unrendered')
+          row.setAttribute('data-testid', 'audition-row-' + cid)
+
+          const meta = document.createElement('div')
+          meta.className = 'meta'
+
+          const label = document.createElement('div')
+          label.className = 'label'
+          label.innerHTML =
+            escapeHtml(c.label) +
+            (isBaseline ? ' <span class="tag base">baseline</span>' : '') +
+            (isBakeOnly ? ' <span class="tag bakeonly">bake-only</span>' : '')
+          meta.appendChild(label)
+
+          const mech = document.createElement('div')
+          mech.className = 'mech'
+          mech.textContent = c.mechanism
+          meta.appendChild(mech)
+
+          const ssmlToggle = document.createElement('button')
+          ssmlToggle.className = 'ssmltoggle'
+          ssmlToggle.textContent = 'show SSML'
+          const ssml = document.createElement('div')
+          ssml.className = 'ssml'
+          ssml.textContent = c.ssml
+          ssmlToggle.addEventListener('click', () => {
+            const showing = ssml.classList.toggle('show')
+            ssmlToggle.textContent = showing ? 'hide SSML' : 'show SSML'
+          })
+          meta.append(ssmlToggle, ssml)
+
+          if (c.error) {
+            const errnote = document.createElement('div')
+            errnote.className = 'errnote'
+            errnote.textContent = 'Azure rejected this SSML: ' + c.error
+            meta.appendChild(errnote)
+          }
+
+          const actions = document.createElement('div')
+          actions.className = 'actions'
+
+          const playBtn = document.createElement('button')
+          playBtn.className = 'act play'
+          playBtn.setAttribute('data-testid', 'audition-play-' + cid)
+          playBtn.textContent = '▶ Play'
+          if (rendered) {
+            playBtn.addEventListener('click', () =>
+              playCandidate(cid, c.base64, c.mime, playBtn),
+            )
+          } else {
+            playBtn.disabled = true
+          }
+
+          const pickBtn = document.createElement('button')
+          pickBtn.className = 'act pick'
+          pickBtn.setAttribute('data-testid', 'audition-pickbtn-' + cid)
+          pickBtn.setAttribute('aria-pressed', 'false')
+          pickBtn.textContent = 'Pick'
+          if (rendered) {
+            pickBtn.addEventListener('click', () => recordPick(item.key, c.id))
+          } else {
+            pickBtn.disabled = true
+          }
+
+          actions.append(playBtn, pickBtn)
+          row.append(meta, actions)
+          body.appendChild(row)
+          rows.push({
+            row,
+            pickBtn: rendered ? pickBtn : null,
+            candidateId: c.id,
+          })
+        }
+
+        group.appendChild(body)
+        parentEl.appendChild(group)
+        groupRefs.set(item.key, { pickLabelEl: gpick, rows })
+        refreshGroup(item.key)
+      }
+
+      function buildSection(section) {
+        const sectionsEl = document.getElementById('sections')
+        const sec = document.createElement('div')
+        sec.className = 'section'
+        sec.setAttribute('data-testid', 'audition-section-' + section.key)
+        const h2 = document.createElement('h2')
+        h2.textContent = section.title
+        const blurb = document.createElement('p')
+        blurb.className = 'secblurb'
+        blurb.textContent = section.blurb
+        sec.append(h2, blurb)
+        sectionsEl.appendChild(sec)
+        for (const item of section.items) buildGroup(sectionsEl, item)
+      }
+
+      function renderFooter(data) {
+        const el = document.getElementById('footer')
+        const items = data.groups.flatMap((g) => g.items)
+        const total = items.reduce((n, it) => n + it.candidates.length, 0)
+        const rejected = items.reduce(
+          (n, it) => n + it.candidates.filter((c) => c.error).length,
+          0,
+        )
+        el.innerHTML =
+          '<span data-testid="audition-render-count">Rendered <strong>' +
+          total +
+          '</strong> candidates across <strong>' +
+          items.length +
+          '</strong> items / <strong>' +
+          data.groups.length +
+          '</strong> groups</span> ' +
+          (rejected
+            ? '(<strong style="color:#a94442">' +
+              rejected +
+              ' Azure-rejected</strong>) '
+            : '') +
+          '· voice <code>' +
+          escapeHtml(data.voice) +
+          '</code> · root prosody rate <code>' +
+          escapeHtml(data.rootProsody.rate) +
+          '</code> pitch <code>' +
+          escapeHtml(data.rootProsody.pitch) +
+          '</code> volume <code>' +
+          escapeHtml(data.rootProsody.volume) +
+          '</code> · baked <code>' +
+          escapeHtml(data.generatedAt) +
+          '</code>. ' +
+          escapeHtml(data.note)
+      }
+
+      // ── Boot ─────────────────────────────────────────────────────────────
+      async function main() {
+        try {
+          setStatus('Loading renders…')
+          const res = await fetch(DATA_URL + '?v=' + Date.now(), {
+            cache: 'no-store',
+          })
+          if (!res.ok) throw new Error('manifest ' + res.status)
+          const data = await res.json()
+          if (!data || !Array.isArray(data.groups)) {
+            throw new Error('manifest has no groups array')
+          }
+          for (const section of data.groups) buildSection(section)
+          renderFooter(data)
+          const items = data.groups.flatMap((g) => g.items)
+          const total = items.reduce((n, it) => n + it.candidates.length, 0)
+          setStatus(
+            'Ready — ' +
+              items.length +
+              ' items, ' +
+              total +
+              ' candidates. Play each, then Pick the best per item.',
+            'ok',
+          )
+        } catch (err) {
+          setStatus(
+            'Failed to load: ' +
+              err.message +
+              '. Is blend-dj-vv-audition-data.json deployed?',
+            'err',
+          )
+        }
+      }
+      window.addEventListener('pagehide', stopActive)
+
+      // ── Service-worker bypass (mirrors blend-audition.html) ──────────────
+      const SW_BYPASS_FLAG = 'blend-dj-vv-audition-sw-bypassed'
+
+      async function bypassServiceWorker() {
+        let alreadyBypassed = false
+        try {
+          alreadyBypassed = sessionStorage.getItem(SW_BYPASS_FLAG) === '1'
+        } catch {
+          /* sessionStorage blocked (private mode) — fall through. */
+        }
+        if (alreadyBypassed) return false
+        if (!('serviceWorker' in navigator)) return false
+
+        let hadSomethingToClear = false
+        try {
+          const regs = await navigator.serviceWorker.getRegistrations()
+          if (regs.length > 0) hadSomethingToClear = true
+          await Promise.all(regs.map((r) => r.unregister().catch(() => false)))
+        } catch {
+          /* getRegistrations can throw in locked-down contexts — ignore. */
+        }
+        try {
+          if ('caches' in self) {
+            const keys = await caches.keys()
+            if (keys.length > 0) hadSomethingToClear = true
+            await Promise.all(
+              keys.map((k) => caches.delete(k).catch(() => false)),
+            )
+          }
+        } catch {
+          /* Cache Storage unavailable — ignore. */
+        }
+        if (navigator.serviceWorker.controller) hadSomethingToClear = true
+        if (!hadSomethingToClear) return false
+
+        try {
+          sessionStorage.setItem(SW_BYPASS_FLAG, '1')
+        } catch {
+          return false
+        }
+        setStatus('Clearing service worker cache for a fresh audition…')
+        location.reload()
+        return true
+      }
+
+      async function boot() {
+        const reloading = await bypassServiceWorker()
+        if (reloading) return
+        main()
+      }
+      boot()
+    </script>
+  </body>
+</html>
